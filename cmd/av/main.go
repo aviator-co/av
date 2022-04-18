@@ -36,8 +36,13 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().BoolVar(&rootFlags.Debug, "debug", false, "enable verbose debug logging")
+	rootCmd.PersistentFlags().BoolVar(
+		&rootFlags.Debug, "debug", false,
+		"enable verbose debug logging",
+	)
 	rootCmd.AddCommand(
+		prCmd,
+		stackCmd,
 		versionCmd,
 	)
 }
