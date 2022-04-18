@@ -11,10 +11,12 @@ var stackCmd = &cobra.Command{
 	Short: "managed stacked pull requests",
 }
 
-var stackCreateFlags struct {
+var stackBranchFlags struct {
+	// The parent branch to base the new branch off.
+	// By default, this is the current branch.
 	Parent string
 }
-var stackCreateCmd = &cobra.Command{
+var stackBranchCmd = &cobra.Command{
 	Use:   "branch <branch name>",
 	Short: "create a new stacked branch",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -127,7 +129,7 @@ var stackStackStatus = &cobra.Command{
 
 func init() {
 	stackCmd.AddCommand(
-		stackCreateCmd,
+		stackBranchCmd,
 		stackSyncCmd,
 		stackTreeCmd,
 		stackNextCmd,
@@ -135,9 +137,9 @@ func init() {
 		stackStackStatus,
 	)
 
-	// av stack create
-	stackCreateCmd.Flags().StringVar(
-		&stackCreateFlags.Parent, "parent", "",
+	// av stack branch
+	stackBranchCmd.Flags().StringVar(
+		&stackBranchFlags.Parent, "parent", "",
 		"parent branch to stack on",
 	)
 
