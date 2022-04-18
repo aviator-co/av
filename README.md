@@ -7,5 +7,5 @@ This project is built using Go 1.18.1.
 
 To run the command line:
 ```
-go run /cmd/av [subcommand/flags...]
+go run ./cmd/av [subcommand/flags...]
 ```
