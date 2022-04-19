@@ -4,6 +4,7 @@ import (
 	"emperror.dev/errors"
 	"github.com/spf13/cobra"
 	"strconv"
+	"strings"
 )
 
 var stackCmd = &cobra.Command{
@@ -29,8 +30,13 @@ var stackBranchCmd = &cobra.Command{
 
 var stackSyncFlags struct {
 	// Set the parent of the current branch to this branch.
-	// This effectively re-roots the stack on a new parent.
+	// This effectively re-roots the stack on a new parent (e.g., adds a branch
+	// to the stack).
 	Parent string
+	// If set, only sync up to the current branch (do not sync descendants).
+	// This is useful for syncing changes from a parent branch in case the
+	// current branch needs to be updated before continuing the sync.
+	Current bool
 	// If set, incorporate changes from the trunk (repo base branch) into the stack.
 	// Only valid if synchronizing the root of a stack.
 	// This effectively re-roots the stack on the latest commit from the trunk.
@@ -45,19 +51,28 @@ var stackSyncFlags struct {
 }
 var stackSyncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "synchronize all stacked branches after the current branch",
+	Short: "synchronize stacked branches",
+	Long: strings.TrimSpace(`
+Synchronize stacked branches to be up-to-date with their parent branches.
+
+By default, this command will sync all branches starting at the root of the
+stack and recursively rebasing each branch based on the latest commit from the
+parent branch.
+
+If the --current flag is given, this command will not recursively sync dependent
+branches of the current branch within the stack. This allows you to make changes
+to the current branch before syncing the rest of the stack.
+
+If the --trunk flag is given, this command will synchronize changes from the
+latest commit to the repository base branch (e.g., main or master) into the
+stack. This is useful for rebasing a whole stack on the latest changes from the
+base branch.
+`),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return errors.New("unimplemented")
 	},
 }
 
-var stackTreeFlags struct {
-	// Print the stack starting at this branch.
-	// If not set, we start at the base branch of the repository.
-	Root string
-	// Only recurse up-to the given depth.
-	Depth int
-}
 var stackTreeCmd = &cobra.Command{
 	Use:   "tree",
 	Short: "show the tree of stacked branches",
@@ -66,9 +81,21 @@ var stackTreeCmd = &cobra.Command{
 	},
 }
 
+var stackNextFlags struct {
+	// If set, synchronize changes from the parent branch after checking out
+	// the next branch.
+	Sync bool
+}
 var stackNextCmd = &cobra.Command{
 	Use:   "next <n>",
 	Short: "checkout the next branch in the stack",
+	Long: strings.TrimSpace(`
+Checkout the next branch in the stack.
+
+If the --sync flag is given, this command will also synchronize changes from the
+parent branch (i.e., the current branch before this command is run) into the
+child branch (without recursively syncing further descendants).
+`),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var n int = 1
 		if len(args) == 1 {
@@ -114,19 +141,6 @@ var stackPrevCmd = &cobra.Command{
 	},
 }
 
-var stackStackStatus = &cobra.Command{
-	Use:   "status",
-	Short: "show the status of the stack",
-	Long:  `Show the status of the stack.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: This should display information like:
-		//   - a condensed description of the position within the stack
-		//   - whether or not the ancestors/descendants are synchronized
-		//   - how many diverging commits there are to trunk
-		return errors.New("unimplemented")
-	},
-}
-
 func init() {
 	stackCmd.AddCommand(
 		stackBranchCmd,
@@ -134,7 +148,6 @@ func init() {
 		stackTreeCmd,
 		stackNextCmd,
 		stackPrevCmd,
-		stackStackStatus,
 	)
 
 	// av stack branch
@@ -149,6 +162,10 @@ func init() {
 		"set the stack parent to this branch",
 	)
 	stackSyncCmd.Flags().BoolVar(
+		&stackSyncFlags.Current, "current", false,
+		"only sync changes to the current branch\n(don't recurse into descendant branches)",
+	)
+	stackSyncCmd.Flags().BoolVar(
 		&stackSyncFlags.NoPush, "no-push", false,
 		"do not force-push updated branches to GitHub",
 	)
@@ -161,13 +178,9 @@ func init() {
 		"continue a previous sync",
 	)
 
-	// av stack tree
-	stackTreeCmd.Flags().StringVar(
-		&stackTreeFlags.Root, "root", "",
-		"only show the stack tree starting at this branch",
-	)
-	stackTreeCmd.Flags().IntVar(
-		&stackTreeFlags.Depth, "depth", -1,
-		"only show the stack tree up to this depth",
+	// av stack next
+	stackNextCmd.Flags().BoolVar(
+		&stackNextFlags.Sync, "sync", false,
+		"synchronize changes from the parent branch",
 	)
 }
