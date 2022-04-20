@@ -1,15 +1,20 @@
 package main
 
 import (
+	"emperror.dev/errors"
 	"fmt"
 	"github.com/aviator-co/av/internal/config"
+	"github.com/aviator-co/av/internal/git"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"os"
+	"os/exec"
+	"strings"
 )
 
 var rootFlags struct {
-	Debug bool
+	Debug     bool
+	Directory string
 }
 
 var rootCmd = &cobra.Command{
@@ -40,6 +45,10 @@ func init() {
 		&rootFlags.Debug, "debug", false,
 		"enable verbose debug logging",
 	)
+	rootCmd.PersistentFlags().StringVarP(
+		&rootFlags.Directory, "", "C", "",
+		"directory to use for git repository",
+	)
 	rootCmd.AddCommand(
 		prCmd,
 		stackCmd,
@@ -49,15 +58,33 @@ func init() {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		format := "error: %s\n"
 
 		// In debug mode, show more detailed information about the error
 		// (including the stack trace if using pkg/errors).
 		if rootFlags.Debug {
-			format = "error: %#+v\n"
+			stackTrace := fmt.Sprintf("%+v", err)
+			_, _ = fmt.Fprintf(os.Stderr, "error: %s\n%s\n", err, indent(stackTrace, "\t"))
+		} else {
+			_, _ = fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		}
 
-		_, _ = fmt.Fprintf(os.Stderr, format, err)
 		os.Exit(1)
 	}
+}
+
+func indent(s string, prefix string) string {
+	// why is this not in the stdlib????
+	return prefix + strings.Replace(s, "\n", "\n"+prefix, -1)
+}
+
+func getRepo() (*git.Repo, error) {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	if rootFlags.Directory != "" {
+		cmd.Dir = rootFlags.Directory
+	}
+	toplevel, err := cmd.Output()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to determine repo toplevel")
+	}
+	return git.OpenRepo(strings.TrimSpace(string(toplevel)))
 }
