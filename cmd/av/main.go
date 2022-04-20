@@ -1,12 +1,14 @@
 package main
 
 import (
+	"emperror.dev/errors"
 	"fmt"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -70,18 +72,19 @@ func main() {
 	}
 }
 
-func indent(s string, indent string) string {
+func indent(s string, prefix string) string {
 	// why is this not in the stdlib????
-	return "  " + strings.Replace(s, "\n", "\n"+indent, -1)
+	return prefix + strings.Replace(s, "\n", "\n"+prefix, -1)
 }
 
 func getRepo() (*git.Repo, error) {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
 	if rootFlags.Directory != "" {
-		return git.OpenRepo(rootFlags.Directory)
+		cmd.Dir = rootFlags.Directory
 	}
-	wd, err := os.Getwd()
+	toplevel, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to determine repo toplevel")
 	}
-	return git.OpenRepo(wd)
+	return git.OpenRepo(strings.TrimSpace(string(toplevel)))
 }
