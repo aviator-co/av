@@ -3,13 +3,16 @@ package main
 import (
 	"fmt"
 	"github.com/aviator-co/av/internal/config"
+	"github.com/aviator-co/av/internal/git"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"os"
+	"strings"
 )
 
 var rootFlags struct {
-	Debug bool
+	Debug     bool
+	Directory string
 }
 
 var rootCmd = &cobra.Command{
@@ -40,6 +43,10 @@ func init() {
 		&rootFlags.Debug, "debug", false,
 		"enable verbose debug logging",
 	)
+	rootCmd.PersistentFlags().StringVarP(
+		&rootFlags.Directory, "", "C", "",
+		"directory to use for git repository",
+	)
 	rootCmd.AddCommand(
 		prCmd,
 		stackCmd,
@@ -49,15 +56,32 @@ func init() {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		format := "error: %s\n"
 
 		// In debug mode, show more detailed information about the error
 		// (including the stack trace if using pkg/errors).
 		if rootFlags.Debug {
-			format = "error: %#+v\n"
+			stackTrace := fmt.Sprintf("%+v", err)
+			_, _ = fmt.Fprintf(os.Stderr, "error: %s\n%s\n", err, indent(stackTrace, "\t"))
+		} else {
+			_, _ = fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		}
 
-		_, _ = fmt.Fprintf(os.Stderr, format, err)
 		os.Exit(1)
 	}
+}
+
+func indent(s string, indent string) string {
+	// why is this not in the stdlib????
+	return "  " + strings.Replace(s, "\n", "\n"+indent, -1)
+}
+
+func getRepo() (*git.Repo, error) {
+	if rootFlags.Directory != "" {
+		return git.OpenRepo(rootFlags.Directory)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	return git.OpenRepo(wd)
 }

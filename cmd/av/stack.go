@@ -2,6 +2,8 @@ package main
 
 import (
 	"emperror.dev/errors"
+	"fmt"
+	"github.com/aviator-co/av/internal/stacks"
 	"github.com/spf13/cobra"
 	"strconv"
 	"strings"
@@ -22,9 +24,22 @@ var stackBranchCmd = &cobra.Command{
 	Short: "create a new stacked branch",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
-			return errors.New("branch name is required")
+			_ = cmd.Usage()
+			return errors.New("exactly one branch name is required")
 		}
-		return errors.New("unimplemented")
+		repo, err := getRepo()
+		if err != nil {
+			return err
+		}
+		stack, err := stacks.CreateBranch(repo, &stacks.BranchOpts{
+			Name: args[0],
+		})
+		if err != nil {
+			return err
+		}
+		_ = stack
+		fmt.Printf("Created branch %s\n", args[0])
+		return nil
 	},
 }
 
