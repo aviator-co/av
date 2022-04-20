@@ -85,23 +85,34 @@ func (r *Repo) CurrentBranchName() (string, error) {
 	return r.Git("symbolic-ref", "--short", "HEAD")
 }
 
-// CheckoutWithCleanup performs a checkout of the given branch and returns a function that can be
-// used to revert the checkout. This is useful when switching to another branch and switching back
-// during cleanup.
-func (r *Repo) CheckoutWithCleanup(args ...string) (func(), error) {
-	currentBranch, err := r.CurrentBranchName()
+type CheckoutBranch struct {
+	// The name of the branch to checkout.
+	Name string
+	// Specifies the "-b" flag to git.
+	// The checkout will fail if the branch already exists.
+	NewBranch bool
+}
+
+// CheckoutBranch performs a checkout of the given branch and returns the name
+// of the previous branch, if any (this can be used to restore the previous
+// branch if necessary). The returned previous branch name may be empty if the
+// repo is currently not checked out to a branch (i.e., in detached HEAD state).
+func (r *Repo) CheckoutBranch(opts *CheckoutBranch) (string, error) {
+	previousBranchName, err := r.CurrentBranchName()
 	if err != nil {
-		return nil, errors.WrapIf(err, "not currently on branch")
+		r.log.WithError(err).Debug("failed to get current branch name, repo is probably in detached HEAD")
+		previousBranchName = ""
 	}
-	args = append([]string{"checkout"}, args...)
+
+	args := []string{"checkout"}
+	if opts.NewBranch {
+		args = append(args, "-b")
+	}
+	args = append(args, opts.Name)
 	if _, err := r.Git(args...); err != nil {
-		return nil, err
+		return "", err
 	}
-	return func() {
-		if _, err := r.Git("checkout", currentBranch); err != nil {
-			r.log.WithError(err).Error("failed to revert checkout")
-		}
-	}, nil
+	return previousBranchName, nil
 }
 
 func (r *Repo) HeadOid() (string, error) {

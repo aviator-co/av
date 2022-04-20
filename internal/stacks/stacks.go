@@ -40,11 +40,19 @@ func CreateBranch(repo *git.Repo, opts *BranchOpts) (*Branch, error) {
 	// TODO:
 	// 		This has unfortunate effect of breaking `git checkout -` to go back
 	//		to the previous branch.
-	resetCheckout, err := repo.CheckoutWithCleanup(parentHead)
+	previousBranch, err := repo.CheckoutBranch(&git.CheckoutBranch{
+		Name: opts.Name,
+	})
 	if err != nil {
 		return nil, errors.WrapIff(err, "failed to checkout commit %s", parentHead)
 	}
-	cu.Add(resetCheckout)
+	cu.Add(func() {
+		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+			Name: previousBranch,
+		}); err != nil {
+			logrus.WithError(err).Errorf("failed to checkout original branch %q", previousBranch)
+		}
+	})
 
 	// Find the merge base.
 	// If our history looks like:
