@@ -5,6 +5,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"io"
 	"os/exec"
+	"path"
 	"strings"
 )
 
@@ -23,7 +24,7 @@ type Repo struct {
 func OpenRepo(repoDir string) (*Repo, error) {
 	r := &Repo{
 		repoDir, "",
-		logrus.WithFields(logrus.Fields{"repo": repoDir}),
+		logrus.WithFields(logrus.Fields{"repo": path.Base(repoDir)}),
 	}
 
 	for _, possibleTrunk := range []string{"main", "master", "default", "trunk"} {
@@ -100,7 +101,8 @@ type CheckoutBranch struct {
 func (r *Repo) CheckoutBranch(opts *CheckoutBranch) (string, error) {
 	previousBranchName, err := r.CurrentBranchName()
 	if err != nil {
-		r.log.WithError(err).Debug("failed to get current branch name, repo is probably in detached HEAD")
+		r.log.WithError(err).
+			Debug("failed to get current branch name, repo is probably in detached HEAD")
 		previousBranchName = ""
 	}
 
@@ -115,8 +117,15 @@ func (r *Repo) CheckoutBranch(opts *CheckoutBranch) (string, error) {
 	return previousBranchName, nil
 }
 
-func (r *Repo) HeadOid() (string, error) {
-	return r.Git("rev-parse", "HEAD")
+type RevParse struct {
+	// The name of the branch to parse.
+	// If empty, the current branch is parsed.
+	Rev string
+}
+
+func (r *Repo) RevParse(rp *RevParse) (string, error) {
+	args := []string{"rev-parse", rp.Rev}
+	return r.Git(args...)
 }
 
 type UpdateRef struct {

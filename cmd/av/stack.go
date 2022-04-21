@@ -31,13 +31,12 @@ var stackBranchCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		stack, err := stacks.CreateBranch(repo, &stacks.BranchOpts{
+		err = stacks.CreateBranch(repo, &stacks.BranchOpts{
 			Name: args[0],
 		})
 		if err != nil {
 			return err
 		}
-		_ = stack
 		fmt.Printf("Created branch %s\n", args[0])
 		return nil
 	},
