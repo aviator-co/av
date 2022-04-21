@@ -46,7 +46,7 @@ func init() {
 		"enable verbose debug logging",
 	)
 	rootCmd.PersistentFlags().StringVarP(
-		&rootFlags.Directory, "", "C", "",
+		&rootFlags.Directory, "repo", "C", "",
 		"directory to use for git repository",
 	)
 	rootCmd.AddCommand(
