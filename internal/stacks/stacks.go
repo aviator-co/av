@@ -56,8 +56,8 @@ func CreateBranch(repo *git.Repo, opts *BranchOpts) error {
 	//       that 1 is a parent of 2 is a parent of 3.
 	// 1. When we create the branch PR1, it's just a vanilla branch. It's the
 	//    root of the stack. We do nothing special. It has no stack metadata
-	//    because we don't it a stacked branch (otherwise even non-stacked PRs
-	//    would actually be considered stacks).
+	//    because we don't consider it a stacked branch (otherwise even
+	//    non-stacked PRs would actually be considered stacks).
 	// 2. When we create the branch PR2, we need to determine that it is in fact
 	//    a stacked branch. We do this by looking at the metadata of PR1,
 	//    realizing that there is none, and so figuring out that it will be the
@@ -68,9 +68,9 @@ func CreateBranch(repo *git.Repo, opts *BranchOpts) error {
 	//    `1a -> 1b -> 1c` into a single squash commit `1S` (whose commit
 	//    parent is X since we take the parent of `1a`).
 	// 3. When we create the branch PR3, again we look at the stack metadata for
-	//    the parent branch PR2. We see that it in fact DOES have stack metadata
-	//    and we need to use this stack metadata to figure out that we need to
-	//    construct the base branch here as `X -> 1S -> 2S`.
+	//    the parent branch PR2. We see that it in fact DOES have stack
+	//    metadata, and we need to use this stack metadata to figure out that we
+	//    need to construct the base branch here as `X -> 1S -> 2S`.
 
 	// Situation 1: creating a branch directly off of trunk
 	if parentBranch == repo.DefaultBranch() {
@@ -81,7 +81,7 @@ func CreateBranch(repo *git.Repo, opts *BranchOpts) error {
 			Name:      opts.Name,
 			NewBranch: true,
 		}); err != nil {
-			logrus.WithError(err).Debug("failed to checkout branch %q", opts.Name)
+			logrus.WithError(err).Debugf("failed to checkout branch %q", opts.Name)
 			return errors.Errorf(
 				"failed to create branch %q (does it already exist?)",
 				opts.Name,
@@ -173,7 +173,7 @@ func CreateBranch(repo *git.Repo, opts *BranchOpts) error {
 		WithFields(logrus.Fields{"ref": baseRefName, "oid": squashCommit}).
 		Debug("created stack-base ref")
 
-	// Create the new branch and check it out
+	// Create the new branch...
 	headRefName := "refs/heads/" + opts.Name
 	if err := repo.UpdateRef(&git.UpdateRef{
 		Ref: headRefName,
@@ -182,20 +182,21 @@ func CreateBranch(repo *git.Repo, opts *BranchOpts) error {
 	}); err != nil {
 		return errors.WrapIff(err, "cannot create branch %q", opts.Name)
 	}
-	// Note: this can't include refs/head/... because that enters a detached
-	// HEAD state.
+	// ...and check it out.
+	// Note: we need to use the branch name (e.g., feature-1) rather than the
+	// "fully-qualified" ref name (e.g., refs/heads/feature-1) because the
+	// latter tells git to enter the "detached HEAD" state.
 	if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
 		Name: opts.Name,
 	}); err != nil {
 		return errors.WrapIff(err, "failed to checkout new branch %s", opts.Name)
 	}
 
-	// Finally, write the metadata and return the branch.
-	next := &branchMetadata{
+	// Finally, write the metadata.
+	if err := writeStackMetadata(repo, &branchMetadata{
 		Name:   opts.Name,
 		Parent: parentBranch,
-	}
-	if err := writeStackMetadata(repo, next); err != nil {
+	}); err != nil {
 		return errors.WrapIff(err, "failed to write av internal metadata for branch %q", opts.Name)
 	}
 	return nil
