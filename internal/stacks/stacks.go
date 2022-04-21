@@ -12,8 +12,8 @@ import (
 
 type branchMetadata struct {
 	// The branch name associated with this stack.
-	// Not serialized to JSON because the name can always be derived from the
-	// name of the git ref.
+	// Not stored in JSON because the name can always be derived from the name
+	// of the git ref.
 	Name string `json:"-"`
 	// The branch name associated with the parent of the stack (if any).
 	Parent string `json:"parent"`
@@ -272,7 +272,7 @@ TODO(travis):
     from the metadata ref that we store, and we can determine if we need to
     rebase based on whether-or-not the tree of the parent branch is the same as
     the tree of this commit.
-*/ -}}
+*/ }}
 av-stack-parent-branch: {{.ParentBranch}}
 av-stack-parent-head:   {{.ParentHead}}
 `))
