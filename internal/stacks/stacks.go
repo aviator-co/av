@@ -272,7 +272,7 @@ TODO(travis):
     from the metadata ref that we store, and we can determine if we need to
     rebase based on whether-or-not the tree of the parent branch is the same as
     the tree of this commit.
-*/ }}
+*/}}
 av-stack-parent-branch: {{.ParentBranch}}
 av-stack-parent-head:   {{.ParentHead}}
 `))
