@@ -37,18 +37,33 @@ var rootCmd = &cobra.Command{
 			logrus.WithField("av_version", config.Version).Debug("enabled debug logging")
 		}
 
-		repo, _ := getRepo()
 		var configDirs []string
-		if repo != nil {
+		repo, err := getRepo()
+		// If we weren't able to load the Git repo, that probably just means the
+		// command isn't being run from inside a repo. That's fine, we just
+		// don't need to bother reading repo-local config.
+		if err != nil {
+			logrus.WithError(err).Debug("unable to load Git repo (probably not inside a repo)")
+		} else {
 			gitDir, err := repo.Git("rev-parse", "--git-dir")
 			if err != nil {
 				logrus.WithError(err).Warning("failed to determine git root directory")
 			} else {
 				configDirs = append(configDirs, gitDir)
 			}
+			logrus.WithField("git_dir", gitDir).Debug("loaded Git repo")
 		}
-		if _, err := config.Load(configDirs); err != nil {
+
+		// Note: this only returns an error if config exists and it can't be
+		// read/parsed. It doesn't return an error if no config file exists.
+		didLoadConfig, err := config.Load(configDirs)
+		if err != nil {
 			return errors.Wrap(err, "failed to load configuration")
+		}
+		if didLoadConfig {
+			logrus.Debug("loaded configuration")
+		} else {
+			logrus.Debug("no configuration found")
 		}
 
 		return nil

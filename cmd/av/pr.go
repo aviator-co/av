@@ -19,9 +19,10 @@ var prCreateCmd = &cobra.Command{
 	Short: "create a pull request for the current branch",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if config.GitHub.Token == "" {
+			// TODO: lets include a documentation link here
 			logrus.Info(
 				"GitHub token is not configured. " +
-					"Consider adding it to your config file (at ~/config/av/config.yaml) " +
+					"Consider adding it to your config file (at ~/.config/av/config.yaml) " +
 					"to allow av to automatically create pull requests.",
 			)
 		}
