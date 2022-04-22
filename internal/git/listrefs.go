@@ -5,9 +5,31 @@ import (
 	"strings"
 )
 
+type ListRefs struct {
+	Patterns []string
+}
+
+type RefInfo struct {
+	Name string
+	Type string
+	Oid  string
+	// The name of the upstream ref (e.g., refs/remotes/<remote>/<branch>)
+	Upstream string
+	// The status of the ref relative to the upstream.
+	UpstreamStatus UpstreamStatus
+}
+
+// ListRefs lists all refs in the repository (optionally matching a specific
+// pattern).
 func (r *Repo) ListRefs(showRef *ListRefs) ([]RefInfo, error) {
+	// We want a subset of information about each ref, so we can tell Git to
+	// print only specific fields. %00 is a null byte, which is the delimiter
+	// that we split on while parsing the output.
+	// See https://git-scm.com/docs/git-for-each-ref#_field_names for which
+	// fields are available.
 	const refInfoPattern = "%(refname)%00" + "%(objecttype)%00" +
 		"%(objectname)%00" + "%(upstream)%00" + "%(upstream:track)"
+
 	args := []string{"for-each-ref", "--format", refInfoPattern}
 	if len(showRef.Patterns) > 0 {
 		args = append(args, showRef.Patterns...)
@@ -35,18 +57,4 @@ func (r *Repo) ListRefs(showRef *ListRefs) ([]RefInfo, error) {
 		})
 	}
 	return refs, nil
-}
-
-type ListRefs struct {
-	Patterns []string
-}
-
-type RefInfo struct {
-	Name string
-	Type string
-	Oid  string
-	// The name of the upstream ref (e.g., refs/remotes/<remote>/<branch>)
-	Upstream string
-	// The status of the ref relative to the upstream.
-	UpstreamStatus UpstreamStatus
 }
