@@ -25,17 +25,24 @@ type BranchOpts struct {
 
 // CreateBranch creates a new stack branch based off of the current branch.
 func CreateBranch(repo *git.Repo, opts *BranchOpts) error {
+	// validate args
 	if opts.Name == "" {
 		return errors.New("new branch name is required")
 	}
 
+	// validate operation preconditions
+	if _, err := repo.RevParse(&git.RevParse{Rev: opts.Name}); err == nil {
+		return errors.Errorf("branch %q already exists", opts.Name)
+	}
+
+	// determine important contextual information from Git
+	defaultBranch, err := repo.DefaultBranch()
+	if err != nil {
+		return errors.WrapIf(err, "failed to determine repository branch")
+	}
 	parentBranch, err := repo.CurrentBranchName()
 	if err != nil {
 		return errors.WrapIff(err, "failed to get current branch name")
-	}
-
-	if _, err := repo.RevParse(&git.RevParse{Rev: opts.Name}); err == nil {
-		return errors.Errorf("branch %q already exists", opts.Name)
 	}
 
 	// There are three scenarios here.
@@ -73,7 +80,7 @@ func CreateBranch(repo *git.Repo, opts *BranchOpts) error {
 	//    need to construct the base branch here as `X -> 1S -> 2S`.
 
 	// Situation 1: creating a branch directly off of trunk
-	if parentBranch == repo.DefaultBranch() {
+	if parentBranch == defaultBranch {
 		// This is the root of the stack.
 		// We don't need to do anything special.
 		// We just need to create the branch.
@@ -117,12 +124,12 @@ func CreateBranch(repo *git.Repo, opts *BranchOpts) error {
 		// Situation 2: creating the second branch in a stack
 		// This amounts to finding the commit where parent branched off of trunk.
 		var err error
-		parentBase, err = repo.Git("merge-base", repo.DefaultBranch(), "HEAD")
+		parentBase, err = repo.Git("merge-base", defaultBranch, "HEAD")
 		if err != nil {
 			return errors.WrapIff(
 				err,
 				"failed to determine merge base for commit %s and %s",
-				git.ShortSha(parentHead), repo.DefaultBranch(),
+				git.ShortSha(parentHead), defaultBranch,
 			)
 		}
 		if parentBase == "" {

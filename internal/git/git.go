@@ -9,36 +9,27 @@ import (
 	"strings"
 )
 
-// Missing is a sentinel zero-value for object id (aka sha).
-// Git treats this value as "this thing doesn't exist".
-// For example, when updating a ref, if the old value is specified as EmptyOid,
-// Git will refuse to update the ref if already exists.
-const Missing = "0000000000000000000000000000000000000000"
-
 type Repo struct {
-	repoDir       string
-	defaultBranch string
-	log           logrus.FieldLogger
+	repoDir string
+	log     logrus.FieldLogger
 }
 
 func OpenRepo(repoDir string) (*Repo, error) {
 	r := &Repo{
-		repoDir, "",
+		repoDir,
 		logrus.WithFields(logrus.Fields{"repo": path.Base(repoDir)}),
 	}
 
-	for _, possibleTrunk := range []string{"main", "master", "default", "trunk"} {
-		_, err := r.Git("rev-parse", "refs/remotes/origin/"+possibleTrunk)
-		if err == nil {
-			r.defaultBranch = possibleTrunk
-			break
-		}
-	}
 	return r, nil
 }
 
-func (r *Repo) DefaultBranch() string {
-	return r.defaultBranch
+func (r *Repo) DefaultBranch() (string, error) {
+	ref, err := r.Git("symbolic-ref", "refs/remotes/origin/HEAD")
+	if err != nil {
+		logrus.WithError(err).Debug("failed to determine remote HEAD")
+		return "", errors.New("failed to determine remote HEAD (does your repo have a remote configured?)")
+	}
+	return strings.TrimPrefix(ref, "refs/remotes/origin/"), nil
 }
 
 func (r *Repo) Git(args ...string) (string, error) {
