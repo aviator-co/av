@@ -34,8 +34,6 @@ func initTempRepo(t *testing.T) *git.Repo {
 		require.NoErrorf(t, err, "failed to set config %s=%s", k, v)
 	}
 
-	exec.Command("git", "config", "--global", "").Run()
-
 	err = ioutil.WriteFile(dir+"/README.md", []byte("# Hello World"), 0644)
 	require.NoError(t, err, "failed to write README.md")
 
