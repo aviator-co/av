@@ -25,6 +25,17 @@ func initTempRepo(t *testing.T) *git.Repo {
 	repo, err := git.OpenRepo(dir)
 	require.NoError(t, err, "failed to open repo")
 
+	settings := map[string]string{
+		"user.name":  "av-test",
+		"user.email": "av-test@nonexistant",
+	}
+	for k, v := range settings {
+		_, err = repo.Git("config", k, v)
+		require.NoErrorf(t, err, "failed to set config %s=%s", k, v)
+	}
+
+	exec.Command("git", "config", "--global", "").Run()
+
 	err = ioutil.WriteFile(dir+"/README.md", []byte("# Hello World"), 0644)
 	require.NoError(t, err, "failed to write README.md")
 
