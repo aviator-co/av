@@ -10,45 +10,26 @@ import (
 )
 
 type Repo struct {
-	// immutable
 	repoDir string
 	log     logrus.FieldLogger
-
-	// mutable (mostly for caching things that are relatively expensive to
-	// compute)
-	defaultBranch string
 }
 
 func OpenRepo(repoDir string) (*Repo, error) {
 	r := &Repo{
-		repoDir: repoDir,
-		log:     logrus.WithFields(logrus.Fields{"repo": path.Base(repoDir)}),
+		repoDir,
+		logrus.WithFields(logrus.Fields{"repo": path.Base(repoDir)}),
 	}
 
 	return r, nil
 }
 
 func (r *Repo) DefaultBranch() (string, error) {
-	if r.defaultBranch == "" {
-		// TODO: we should just cache this in some metadata file somewhere
-		// (e.g. .git/av-metadata)
-		refs, err := r.Git("ls-remote", "--symref", "origin", "HEAD")
-		if err != nil {
-			return "", errors.WrapIf(err, "failed to list remote refs")
-		}
-		for _, ref := range strings.Split(refs, "\n") {
-			if !strings.HasPrefix(ref, "refs: ") {
-				continue
-			}
-			ref = strings.TrimPrefix(ref, "refs: ")
-			parts := strings.Split(ref, "/")
-			r.defaultBranch = parts[len(parts)-1]
-		}
+	ref, err := r.Git("symbolic-ref", "refs/remotes/origin/HEAD")
+	if err != nil {
+		logrus.WithError(err).Debug("failed to determine remote HEAD")
+		return "", errors.New("failed to determine remote HEAD (does your repo have a remote configured?)")
 	}
-	if r.defaultBranch == "" {
-		return "", errors.New("failed to determine repository default branch")
-	}
-	return r.defaultBranch, nil
+	return strings.TrimPrefix(ref, "refs/remotes/origin/"), nil
 }
 
 func (r *Repo) Git(args ...string) (string, error) {
