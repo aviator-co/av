@@ -31,7 +31,7 @@ func (r *Repo) ListRefs(showRef *ListRefs) ([]RefInfo, error) {
 			Type:           parts[1],
 			Oid:            parts[2],
 			Upstream:       parts[3],
-			UpstreamStatus: parts[4],
+			UpstreamStatus: UpstreamStatus(parts[4]),
 		})
 	}
 	return refs, nil

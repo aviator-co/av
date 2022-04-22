@@ -16,7 +16,7 @@ const (
 
 // UpstreamStatus is the status of a git ref (usually a branch) relative to its
 // upstream.
-type UpstreamStatus = string
+type UpstreamStatus string
 
 // The possible upstream statuses.
 // These match what is returned by Git's `%(upstream:trackshort)` format directive.
