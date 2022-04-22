@@ -2,11 +2,16 @@ package git_test
 
 import (
 	"github.com/aviator-co/av/internal/git"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os/exec"
 	"testing"
 )
+
+func init() {
+	logrus.SetLevel(logrus.DebugLevel)
+}
 
 // Initialize a new git repository.
 func initTempRepo(t *testing.T) *git.Repo {
