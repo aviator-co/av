@@ -29,7 +29,7 @@ func Load(paths []string) (bool, error) {
 	config.AddConfigPath("$XDG_CONFIG_HOME/av")
 	config.AddConfigPath("$HOME/.config/av")
 	config.AddConfigPath("$HOME/.av")
-	config.AddConfigPath("$AV_HOME/.av")
+	config.AddConfigPath("$AV_HOME")
 	// Add additional custom paths.
 	// The primary use case for this is adding repository-specific
 	// configuration (e.g., $REPO/.git/av/config.json).
