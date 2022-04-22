@@ -36,6 +36,21 @@ var rootCmd = &cobra.Command{
 			logrus.SetLevel(logrus.DebugLevel)
 			logrus.WithField("av_version", config.Version).Debug("enabled debug logging")
 		}
+
+		repo, _ := getRepo()
+		var configDirs []string
+		if repo != nil {
+			gitDir, err := repo.Git("rev-parse", "--git-dir")
+			if err != nil {
+				logrus.WithError(err).Warning("failed to determine git root directory")
+			} else {
+				configDirs = append(configDirs, gitDir)
+			}
+		}
+		if _, err := config.Load(configDirs); err != nil {
+			return errors.Wrap(err, "failed to load configuration")
+		}
+
 		return nil
 	},
 }
@@ -50,6 +65,7 @@ func init() {
 		"directory to use for git repository",
 	)
 	rootCmd.AddCommand(
+		authCmd,
 		prCmd,
 		stackCmd,
 		versionCmd,
@@ -77,14 +93,22 @@ func indent(s string, prefix string) string {
 	return prefix + strings.Replace(s, "\n", "\n"+prefix, -1)
 }
 
+var cachedRepo *git.Repo
+
 func getRepo() (*git.Repo, error) {
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	if rootFlags.Directory != "" {
-		cmd.Dir = rootFlags.Directory
+	if cachedRepo == nil {
+		cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+		if rootFlags.Directory != "" {
+			cmd.Dir = rootFlags.Directory
+		}
+		toplevel, err := cmd.Output()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to determine repo toplevel")
+		}
+		cachedRepo, err = git.OpenRepo(strings.TrimSpace(string(toplevel)))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to open git repo")
+		}
 	}
-	toplevel, err := cmd.Output()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to determine repo toplevel")
-	}
-	return git.OpenRepo(strings.TrimSpace(string(toplevel)))
+	return cachedRepo, nil
 }
