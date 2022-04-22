@@ -65,7 +65,6 @@ func init() {
 		"directory to use for git repository",
 	)
 	rootCmd.AddCommand(
-		authCmd,
 		prCmd,
 		stackCmd,
 		versionCmd,
