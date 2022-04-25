@@ -2,8 +2,9 @@ package main
 
 import (
 	"emperror.dev/errors"
+	"fmt"
 	"github.com/aviator-co/av/internal/config"
-	"github.com/sirupsen/logrus"
+	"github.com/aviator-co/av/internal/stacks"
 	"github.com/spf13/cobra"
 )
 
@@ -18,15 +19,63 @@ var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "create a pull request for the current branch",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if config.GitHub.Token == "" {
-			// TODO: lets include a documentation link here
-			logrus.Info(
-				"GitHub token is not configured. " +
-					"Consider adding it to your config file (at ~/.config/av/config.yaml) " +
-					"to allow av to automatically create pull requests.",
-			)
+		// Lets keep this commented until we actually implement this :')
+		//if config.GitHub.Token == "" {
+		//	// TODO: lets include a documentation link here
+		//	logrus.Info(
+		//		"GitHub token is not configured. " +
+		//			"Consider adding it to your config file (at ~/.config/av/config.yaml) " +
+		//			"to allow av to automatically create pull requests.",
+		//	)
+		//}
+
+		repo, err := getRepo()
+		if err != nil {
+			return errors.WrapIf(err, "failed to get repo")
 		}
-		return errors.New("unimplemented")
+		currentBranch, err := repo.CurrentBranchName()
+		if err != nil {
+			return errors.WrapIf(err, "failed to determine current branch")
+		}
+		origin, err := repo.Origin()
+		if err != nil {
+			return errors.WrapIf(err, "failed to determine origin")
+		}
+
+		// figure this out based on whether or not we're on a stacked branch
+		var prBaseBranch string
+
+		stackBranch, err := stacks.GetBranch(repo, currentBranch)
+		if err != nil {
+			return errors.WrapIf(err, "failed to get stack branch")
+		}
+		if stackBranch != nil {
+			prBaseBranch = stackBranch.ParentBranchName()
+		} else {
+			defaultBranch, err := repo.DefaultBranch()
+			if err != nil {
+				return errors.WrapIf(err, "failed to determine default branch")
+			}
+			if currentBranch == defaultBranch {
+				return errors.Errorf(
+					"cannot create pull request for default branch %q "+
+						"(did you mean to checkout a different branch before running this command?)",
+					defaultBranch,
+				)
+			}
+			prBaseBranch = defaultBranch
+		}
+
+		// Example:
+		// https://github.com/aviator-co/av/compare/master...my-fancy-feature?quick_pull=1
+		_, _ = fmt.Printf(
+			"%s/%s/compare/%s...%s?quick_pull=1\n",
+			config.GitHub.BaseUrl,
+			origin.RepoSlug,
+			prBaseBranch,
+			currentBranch,
+		)
+		return nil
 	},
 }
 

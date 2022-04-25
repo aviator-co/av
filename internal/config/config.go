@@ -9,8 +9,11 @@ import (
 // It is set automatically when creating release builds.
 var Version = "<dev>"
 
-var GitHub struct {
-	Token string
+var GitHub = struct {
+	Token   string
+	BaseUrl string
+}{
+	BaseUrl: "https://github.com",
 }
 
 // Load initializes the configuration values.
