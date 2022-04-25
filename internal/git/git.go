@@ -167,7 +167,6 @@ func (r *Repo) Origin() (*Origin, error) {
 		return nil, errors.New("origin URL is empty")
 	}
 
-	// The origin URL is of the form "
 	u, err := giturls.Parse(origin)
 	if err != nil {
 		return nil, errors.WrapIff(err, "failed to parse origin url %q", origin)
