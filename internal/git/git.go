@@ -156,7 +156,7 @@ type Origin struct {
 }
 
 func (r *Repo) Origin() (*Origin, error) {
-	// Note: `git remote git-url` gets the "real" URL of the remote (taking
+	// Note: `git remote get-url` gets the "real" URL of the remote (taking
 	// `insteadOf` from git config into account) whereas `git config --get ...`
 	// does *not*. Not sure if it matters here.
 	origin, err := r.Git("remote", "get-url", "origin")

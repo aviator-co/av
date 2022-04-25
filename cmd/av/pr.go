@@ -45,12 +45,9 @@ var prCreateCmd = &cobra.Command{
 		// figure this out based on whether or not we're on a stacked branch
 		var prBaseBranch string
 
-		stackBranch, err := stacks.GetBranch(repo, currentBranch)
-		if err != nil {
-			return errors.WrapIf(err, "failed to get stack branch")
-		}
-		if stackBranch != nil {
-			prBaseBranch = stackBranch.ParentBranchName()
+		stackMetadata := stacks.GetMetadata(repo, currentBranch)
+		if stackMetadata != nil {
+			prBaseBranch = stackMetadata.Parent
 		} else {
 			defaultBranch, err := repo.DefaultBranch()
 			if err != nil {
