@@ -10,7 +10,7 @@ type CreateBranchOpts struct {
 	Name string
 }
 
-// CreateBranch creates a new stack branch based off of the current branch.
+// CreateBranch creates and checks out a new stack branch based off of the current branch.
 func CreateBranch(repo *git.Repo, opts *CreateBranchOpts) error {
 	// validate args
 	if opts.Name == "" {
