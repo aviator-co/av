@@ -31,7 +31,7 @@ var stackBranchCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		err = stacks.CreateBranch(repo, &stacks.BranchOpts{
+		err = stacks.CreateBranch(repo, &stacks.CreateBranchOpts{
 			Name: args[0],
 		})
 		if err != nil {
