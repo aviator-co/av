@@ -3,7 +3,9 @@ package git
 import (
 	"emperror.dev/errors"
 	"github.com/sirupsen/logrus"
+	giturls "github.com/whilp/git-urls"
 	"io"
+	"net/url"
 	"os/exec"
 	"path"
 	"strings"
@@ -27,7 +29,13 @@ func (r *Repo) DefaultBranch() (string, error) {
 	ref, err := r.Git("symbolic-ref", "refs/remotes/origin/HEAD")
 	if err != nil {
 		logrus.WithError(err).Debug("failed to determine remote HEAD")
-		return "", errors.New("failed to determine remote HEAD (does your repo have a remote configured?)")
+		// this communicates with the remote, so we probably don't want to run
+		// it by default, but we helpfully suggest it to the user. :shrug:
+		logrus.Warn(
+			"Failed to determine repository default branch. " +
+				"Ensure you have a remote named origin and try running `git remote set-head --auto origin` to fix this.",
+		)
+		return "", errors.New("failed to determine remote HEAD")
 	}
 	return strings.TrimPrefix(ref, "refs/remotes/origin/"), nil
 }
@@ -138,4 +146,35 @@ func (r *Repo) UpdateRef(update *UpdateRef) error {
 	}
 	_, err := r.Git(args...)
 	return errors.WrapIff(err, "failed to write ref %q (%s)", update.Ref, ShortSha(update.New))
+}
+
+type Origin struct {
+	URL *url.URL
+	// The URL slug that corresponds to repository.
+	// For example, github.com/my-org/my-repo becomes my-org/my-repo.
+	RepoSlug string
+}
+
+func (r *Repo) Origin() (*Origin, error) {
+	// Note: `git remote get-url` gets the "real" URL of the remote (taking
+	// `insteadOf` from git config into account) whereas `git config --get ...`
+	// does *not*. Not sure if it matters here.
+	origin, err := r.Git("remote", "get-url", "origin")
+	if err != nil {
+		return nil, err
+	}
+	if origin == "" {
+		return nil, errors.New("origin URL is empty")
+	}
+
+	u, err := giturls.Parse(origin)
+	if err != nil {
+		return nil, errors.WrapIff(err, "failed to parse origin url %q", origin)
+	}
+
+	repoSlug := strings.TrimSuffix(u.Path, ".git")
+	return &Origin{
+		URL:      u,
+		RepoSlug: repoSlug,
+	}, nil
 }
