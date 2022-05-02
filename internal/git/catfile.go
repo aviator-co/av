@@ -7,12 +7,13 @@ import (
 	"io"
 )
 
-type CatFileBatch struct {
+type GetRefs struct {
 	// The revisions to retrieve.
 	Revisions []string
 }
-type CatFileItem struct {
-	// The revision that was requested (exactly as given in CatFileBatch.Revisions)
+
+type GetRefsItem struct {
+	// The revision that was requested (exactly as given in GetRefs.Revisions)
 	Revision string
 	// The git object ID that the revision resolved to
 	Oid string
@@ -22,9 +23,9 @@ type CatFileItem struct {
 	Contents []byte
 }
 
-// CatFileBatch reads the contents of the specified objects from the repository.
+// GetRefs reads the contents of the specified objects from the repository.
 // This corresponds to the `git cat-file --batch` command.
-func (r *Repo) CatFileBatch(opts *CatFileBatch) ([]*CatFileItem, error) {
+func (r *Repo) GetRefs(opts *GetRefs) ([]*GetRefsItem, error) {
 	input := new(bytes.Buffer)
 	for _, item := range opts.Revisions {
 		input.WriteString(item)
@@ -36,7 +37,7 @@ func (r *Repo) CatFileBatch(opts *CatFileBatch) ([]*CatFileItem, error) {
 		return nil, err
 	}
 	output := bytes.NewBufferString(res)
-	items := make([]*CatFileItem, 0, len(opts.Revisions))
+	items := make([]*GetRefsItem, 0, len(opts.Revisions))
 	for _, rev := range opts.Revisions {
 		// The output *usually* looks like:
 		//        <oid> SP <type> SP <size> LF
@@ -44,7 +45,7 @@ func (r *Repo) CatFileBatch(opts *CatFileBatch) ([]*CatFileItem, error) {
 		// but it can also be
 		//        <oid> SP {missing|ambiguous} LF
 
-		item := CatFileItem{Revision: rev}
+		item := GetRefsItem{Revision: rev}
 		items = append(items, &item)
 		_, err := fmt.Fscanf(output, "%s %s", &item.Oid, &item.Type)
 		if err != nil {
