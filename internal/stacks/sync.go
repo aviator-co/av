@@ -9,31 +9,54 @@ import (
 type SyncStatus int
 
 const (
+	// SyncAlreadyUpToDate indicates that the sync was a no-op because the
+	// target branch was already up-to-date with its parent.
 	SyncAlreadyUpToDate SyncStatus = iota
-	SyncUpdated         SyncStatus = iota
-	SyncConflict        SyncStatus = iota
+	// SyncUpdated indicates that the sync updated the target branch
+	// (i.e., created a merge commit or perfomed a rebase).
+	SyncUpdated SyncStatus = iota
+	// SyncConflict indicates that there was a conflict while syncing the
+	// target branch with its parent.
+	SyncConflict SyncStatus = iota
 )
 
 type SyncStrategy int
 
 const (
+	// StrategyMergeCommit indicates that the sync should create a merge commit
+	// from the parent branch onto the target branch.
 	StrategyMergeCommit SyncStrategy = iota
-	StrategyRebase      SyncStrategy = iota
+	// StrategyRebase indicates that the sync should perform a rebase onto the
+	// parent branch.
+	StrategyRebase SyncStrategy = iota
 )
 
 type SyncBranchOpts struct {
-	Parent   string
+	// The branch to sync with.
+	Parent string
+	// The strategy for performing the sync.
+	// If the branch is already up-to-date, the sync will be a no-op and
+	// strategy will be ignored.
 	Strategy SyncStrategy
 }
 
+// SyncResult is the result of a SyncBranc operation.
 type SyncResult struct {
 	Status SyncStatus
 }
 
+// SyncBranch synchronizes the currently checked-out branch with the parent.
+// The target branch is said to be already synchronized (up-to-date) if the
+// target branch contains all the commits from the parent branch.
 func SyncBranch(
 	repo *git.Repo,
 	opts *SyncBranchOpts,
 ) (*SyncResult, error) {
+	// Determine whether or not the two branches are up-to-date.
+	// If they are, we can skip the sync.
+	// The target branch is up-to-date if
+	//     merge-base(target, parent) = head(parent)
+	// since merge-base returns the most recent common ancestor of the two.
 	parentHead, err := repo.RevParse(&git.RevParse{
 		Rev: opts.Parent,
 	})
