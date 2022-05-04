@@ -42,7 +42,6 @@ func GetTrees(repo *git.Repo) (map[string]*Tree, error) {
 	// 1. Create maps (dicts) of all the relationships.
 	branchMetadata := make(map[string]*BranchMetadata)
 	branchChildren := make(map[string][]string)
-	branchParent := make(map[string]string)
 	for _, ref := range refContents {
 		var meta BranchMetadata
 		meta.Name = strings.TrimPrefix(ref.Revision, "refs/av/stack-metadata/")
@@ -50,15 +49,13 @@ func GetTrees(repo *git.Repo) (map[string]*Tree, error) {
 			return nil, errors.WrapIff(err, "failed to unmarshal metadata for branch %q", ref.Revision)
 		}
 		branchMetadata[meta.Name] = &meta
-		branchParent[meta.Name] = meta.Parent
 		branchChildren[meta.Parent] = append(branchChildren[meta.Parent], meta.Name)
 	}
 
 	// 2. Find all the branches that do not have a parent. These are the roots.
 	trees := make(map[string]*Tree)
 	for branch := range branchChildren {
-		if branchParent[branch] != "" {
-			// This branch has a parent so can't be a root.
+		if meta := branchMetadata[branch]; meta != nil && meta.Parent != "" {
 			continue
 		}
 		// Root branches don't actually have any associated branch metadata,

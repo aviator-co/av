@@ -25,6 +25,10 @@ func OpenRepo(repoDir string) (*Repo, error) {
 	return r, nil
 }
 
+func (r *Repo) Dir() string {
+	return r.repoDir
+}
+
 func (r *Repo) DefaultBranch() (string, error) {
 	ref, err := r.Git("symbolic-ref", "refs/remotes/origin/HEAD")
 	if err != nil {
