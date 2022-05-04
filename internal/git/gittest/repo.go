@@ -1,4 +1,4 @@
-package git_test
+package gittest
 
 import (
 	"github.com/aviator-co/av/internal/git"
@@ -13,8 +13,8 @@ func init() {
 	logrus.SetLevel(logrus.DebugLevel)
 }
 
-// Initialize a new git repository.
-func initTempRepo(t *testing.T) *git.Repo {
+// NewTempRepo initializes a new git repository with reasonable defaults.
+func NewTempRepo(t *testing.T) *git.Repo {
 	dir := t.TempDir()
 	init := exec.Command("git", "init", "--initial-branch=main")
 	init.Dir = dir
@@ -33,6 +33,9 @@ func initTempRepo(t *testing.T) *git.Repo {
 		_, err = repo.Git("config", k, v)
 		require.NoErrorf(t, err, "failed to set config %s=%s", k, v)
 	}
+
+	_, err = repo.Git("remote", "add", "origin", "git@github.com:aviator-co/nonexistent-repo.git", "--master=main")
+	require.NoError(t, err, "failed to set remote")
 
 	err = ioutil.WriteFile(dir+"/README.md", []byte("# Hello World"), 0644)
 	require.NoError(t, err, "failed to write README.md")

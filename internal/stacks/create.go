@@ -48,11 +48,20 @@ func CreateBranch(repo *git.Repo, opts *CreateBranchOpts) error {
 	// metadata (since we don't actually consider it a stack until it has depth
 	// >= 2).
 	if parentBranch == defaultBranch {
+		logrus.WithFields(logrus.Fields{
+			"branch":         opts.Name,
+			"default_branch": defaultBranch,
+		}).Debug("branching off of default branch, not writing stack metadata")
 		return nil
 	}
 
 	// Otherwise, we need to write the metadata that way we can construct the
 	// DAG of the stack later.
+	logrus.WithFields(logrus.Fields{
+		"branch":         opts.Name,
+		"parent_branch":  parentBranch,
+		"default_branch": defaultBranch,
+	}).Debug("creating branch from non-default parent, writing stack metadata")
 	if err := writeMetadata(repo, &BranchMetadata{
 		Name:   opts.Name,
 		Parent: parentBranch,
