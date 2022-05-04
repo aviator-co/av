@@ -131,6 +131,16 @@ func (r *Repo) RevParse(rp *RevParse) (string, error) {
 	return r.Git(args...)
 }
 
+type MergeBase struct {
+	Revs []string
+}
+
+func (r *Repo) MergeBase(mb *MergeBase) (string, error) {
+	args := []string{"merge-base"}
+	args = append(args, mb.Revs...)
+	return r.Git(args...)
+}
+
 type UpdateRef struct {
 	// The name of the ref (e.g., refs/heads/my-branch).
 	Ref string
