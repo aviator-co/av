@@ -69,7 +69,11 @@ func GetTrees(repo *git.Repo) (map[string]*Tree, error) {
 	return trees, nil
 }
 
-func completeTree(branchName string, branchChildren map[string][]string, branches map[string]*BranchMetadata) *Tree {
+func completeTree(
+	branchName string,
+	branchChildren map[string][]string,
+	branches map[string]*BranchMetadata,
+) *Tree {
 	tree := &Tree{
 		Branch: branches[branchName],
 	}
