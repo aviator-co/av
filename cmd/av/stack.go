@@ -96,7 +96,7 @@ base branch.
 
 		defer func() {
 			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: originalBranch}); err != nil {
-				logrus.WithError(err).Warn("failed to reset to original branch: %q", originalBranch)
+				logrus.WithError(err).Warnf("failed to reset to original branch: %q", originalBranch)
 			}
 		}()
 
