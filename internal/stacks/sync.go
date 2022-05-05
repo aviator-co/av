@@ -90,7 +90,7 @@ func SyncBranch(
 		}, nil
 
 	case StrategyRebase:
-		_, err = repo.Git("rebase", "--onto", parentHead, "HEAD")
+		_, err = repo.Git("rebase", parentHead, "HEAD")
 		if err != nil {
 			return &SyncResult{
 				Status: SyncConflict,
