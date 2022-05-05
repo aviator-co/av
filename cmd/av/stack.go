@@ -89,6 +89,15 @@ base branch.
 		if err != nil {
 			return err
 		}
+
+		diff, err := repo.Diff(&git.DiffOpts{Quiet: true})
+		if err != nil {
+			return err
+		}
+		if !diff.Empty {
+			return errors.New("refusing to sync: there are unstaged changes in the working tree")
+		}
+
 		originalBranch, err := repo.CurrentBranchName()
 		if err != nil {
 			return err

@@ -56,7 +56,7 @@ func (r *Repo) Git(args ...string) (string, error) {
 			stderr = string(exitError.Stderr)
 		}
 		r.log.Debugf("git %s failed: %s: %s", args, err, stderr)
-		return "", errors.Wrapf(err, "git %s", args[0])
+		return strings.TrimSpace(string(out)), errors.Wrapf(err, "git %s", args[0])
 	}
 
 	// trim trailing newline
