@@ -169,7 +169,7 @@ func doStackSync(repo *git.Repo, config stackSyncConfig) (bool, error) {
 			break
 		}
 		if len(currentTree.Next) > 1 {
-			return false, errors.Errorf("unsupported: branch %q has multiple stack children")
+			return false, errors.Errorf("unsupported: branch %q has multiple stack children", currentTree.Branch.Name)
 		}
 		if len(currentTree.Next) == 0 {
 			return false, errors.Errorf("invariant error: couldn't find branch %q in stack", currentBranch)
