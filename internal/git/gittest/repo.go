@@ -1,7 +1,6 @@
 package gittest
 
 import (
-	"fmt"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -16,14 +15,11 @@ func init() {
 
 // NewTempRepo initializes a new git repository with reasonable defaults.
 func NewTempRepo(t *testing.T) *git.Repo {
-	dir, err := ioutil.TempDir("", "gittest")
-	require.NoError(t, err)
-	fmt.Println("tempdir:", dir)
-	//dir := t.TempDir()
+	dir := t.TempDir()
 	init := exec.Command("git", "init", "--initial-branch=main")
 	init.Dir = dir
 
-	err = init.Run()
+	err := init.Run()
 	require.NoError(t, err, "failed to initialize git repository")
 
 	repo, err := git.OpenRepo(dir)
