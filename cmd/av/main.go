@@ -17,7 +17,7 @@ var rootFlags struct {
 	Directory string
 }
 
-var rootCmd = &cobra.Command{
+var RootCmd = &cobra.Command{
 	Use: "av",
 
 	// Don't automatically print errors or usage information (we handle that ourselves).
@@ -71,15 +71,15 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().BoolVar(
+	RootCmd.PersistentFlags().BoolVar(
 		&rootFlags.Debug, "debug", false,
 		"enable verbose debug logging",
 	)
-	rootCmd.PersistentFlags().StringVarP(
+	RootCmd.PersistentFlags().StringVarP(
 		&rootFlags.Directory, "repo", "C", "",
 		"directory to use for git repository",
 	)
-	rootCmd.AddCommand(
+	RootCmd.AddCommand(
 		prCmd,
 		stackCmd,
 		versionCmd,
@@ -87,7 +87,7 @@ func init() {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := RootCmd.Execute(); err != nil {
 
 		// In debug mode, show more detailed information about the error
 		// (including the stack trace if using pkg/errors).

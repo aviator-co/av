@@ -54,3 +54,36 @@ func TestSyncBranch_NoConflicts(t *testing.T) {
 		require.Equal(t, "file1 updated", string(data), "file1 should have been updated after stack sync")
 	}
 }
+
+func TestSyncBranch_WithConflicts(t *testing.T) {
+	for _, strategy := range []stacks.SyncStrategy{
+		stacks.StrategyMergeCommit,
+		stacks.StrategyRebase,
+	} {
+		repo := gittest.NewTempRepo(t)
+
+		_, err := repo.CheckoutBranch(&git.CheckoutBranch{
+			Name:      "stack-1",
+			NewBranch: true,
+		})
+		require.NoError(t, err)
+		gittest.CommitFile(t, repo, "file.txt", []byte("commit 1a\n"))
+
+		err = stacks.CreateBranch(repo, &stacks.CreateBranchOpts{
+			Name: "stack-2",
+		})
+		require.NoError(t, err)
+		gittest.CommitFile(t, repo, "file.txt", []byte("commit 1a\ncommit 2a\n"))
+
+		gittest.WithCheckoutBranch(t, repo, "stack-1", func() {
+			gittest.CommitFile(t, repo, "file.txt", []byte("commit 1a\ncommit 1b\n"))
+		})
+
+		res, err := stacks.SyncBranch(repo, &stacks.SyncBranchOpts{
+			Parent:   "stack-1",
+			Strategy: strategy,
+		})
+		require.NoError(t, err)
+		require.Equal(t, stacks.SyncConflict, res.Status)
+	}
+}

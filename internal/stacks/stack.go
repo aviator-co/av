@@ -4,6 +4,7 @@ import (
 	"emperror.dev/errors"
 	"encoding/json"
 	"github.com/aviator-co/av/internal/git"
+	"github.com/sirupsen/logrus"
 	"strings"
 )
 
@@ -91,6 +92,7 @@ func GetTrees(repo *git.Repo) (map[string]*Tree, error) {
 		if meta := branchMetadata[branch]; meta != nil && meta.Parent != "" {
 			continue
 		}
+		logrus.WithFields(logrus.Fields{"branch": branch}).Debug("found stack tree root")
 		// Root branches don't actually have any associated branch metadata,
 		// so we need to create a fake one.
 		branchMetadata[branch] = &BranchMetadata{

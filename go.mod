@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	emperror.dev/errors v0.8.1
+	github.com/kr/text v0.1.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.11.0
