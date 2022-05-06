@@ -3,7 +3,9 @@ package main
 import (
 	"emperror.dev/errors"
 	"fmt"
+	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/stacks"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"strconv"
 	"strings"
@@ -83,7 +85,74 @@ stack. This is useful for rebasing a whole stack on the latest changes from the
 base branch.
 `),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("unimplemented")
+		repo, err := getRepo()
+		if err != nil {
+			return err
+		}
+
+		diff, err := repo.Diff(&git.DiffOpts{Quiet: true})
+		if err != nil {
+			return err
+		}
+		if !diff.Empty {
+			return errors.New("refusing to sync: there are unstaged changes in the working tree")
+		}
+
+		originalBranch, err := repo.CurrentBranchName()
+		if err != nil {
+			return err
+		}
+
+		defer func() {
+			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: originalBranch}); err != nil {
+				logrus.WithError(err).Warnf("failed to reset to original branch: %q", originalBranch)
+			}
+		}()
+
+		root, err := stacks.GetCurrentRoot(repo)
+		if err != nil {
+			return err
+		}
+		printStackTree(root, 0)
+
+		if len(root.Next) == 0 {
+			// this shouldn't happen, but just in case
+			return errors.New("no branches to sync")
+		}
+
+		current := root.Next[0]
+		for {
+			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+				Name: current.Branch.Name,
+			}); err != nil {
+				return errors.WrapIff(err, "failed to checkout branch %q", current.Branch.Name)
+			}
+			res, err := stacks.SyncBranch(repo, &stacks.SyncBranchOpts{
+				Parent: current.Branch.Parent,
+			})
+			if err != nil {
+				return errors.WrapIff(err, "failed to sync branch %q", current.Branch.Name)
+			}
+			switch res.Status {
+			case stacks.SyncAlreadyUpToDate:
+				fmt.Printf("Branch %q is already up-to-date with %q\n", current.Branch.Name, current.Branch.Parent)
+			case stacks.SyncUpdated:
+				fmt.Printf("Branch %q synchronized with %q\n", current.Branch.Name, current.Branch.Parent)
+			case stacks.SyncConflict:
+				fmt.Printf("Branch %q has merge conflict with %q, aborting...\n", current.Branch.Name, current.Branch.Parent)
+				return nil
+			default:
+				logrus.Panicf("invariant error: unknown sync result: %v", res)
+			}
+
+			if len(current.Next) == 0 {
+				return nil
+			}
+			if len(current.Next) > 1 {
+				return errors.Errorf("unsupported: branch %q has more than one child branch", current.Branch.Name)
+			}
+			current = current.Next[0]
+		}
 	},
 }
 

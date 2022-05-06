@@ -56,7 +56,7 @@ func (r *Repo) Git(args ...string) (string, error) {
 			stderr = string(exitError.Stderr)
 		}
 		r.log.Debugf("git %s failed: %s: %s", args, err, stderr)
-		return "", errors.Wrapf(err, "git %s", args[0])
+		return strings.TrimSpace(string(out)), errors.Wrapf(err, "git %s", args[0])
 	}
 
 	// trim trailing newline
@@ -128,6 +128,16 @@ type RevParse struct {
 
 func (r *Repo) RevParse(rp *RevParse) (string, error) {
 	args := []string{"rev-parse", rp.Rev}
+	return r.Git(args...)
+}
+
+type MergeBase struct {
+	Revs []string
+}
+
+func (r *Repo) MergeBase(mb *MergeBase) (string, error) {
+	args := []string{"merge-base"}
+	args = append(args, mb.Revs...)
 	return r.Git(args...)
 }
 

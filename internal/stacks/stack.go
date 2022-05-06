@@ -17,6 +17,39 @@ type GetTreeOpts struct {
 	Root string
 }
 
+var ErrNotInStack = errors.New("not currently in a stack")
+
+// GetCurrentRoot determines the root of the current stack (if any).
+// Returns ErrNotInStack if not currently checked out to a stacked branch,
+// or a different error if one occurred.
+func GetCurrentRoot(repo *git.Repo) (*Tree, error) {
+	currentBranch, err := repo.CurrentBranchName()
+	if err != nil {
+		return nil, err
+	}
+	currentMeta := GetMetadata(repo, currentBranch)
+	if currentMeta == nil {
+		return nil, ErrNotInStack
+	}
+
+	var root string
+	for currentMeta != nil {
+		root = currentMeta.Parent
+		currentMeta = GetMetadata(repo, currentMeta.Parent)
+	}
+
+	trees, err := GetTrees(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	tree := trees[root]
+	if tree == nil {
+		return nil, errors.Errorf("invariant error: no tree found for stack root %q", root)
+	}
+	return tree, nil
+}
+
 func GetTrees(repo *git.Repo) (map[string]*Tree, error) {
 	refs, err := repo.ListRefs(&git.ListRefs{
 		Patterns: []string{"refs/av/stack-metadata/*"},
