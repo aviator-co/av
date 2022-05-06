@@ -1,6 +1,7 @@
 package e2e_tests
 
 import (
+	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,9 +45,6 @@ func TestStackSync(t *testing.T) {
 		t, 0, syncContinueWithoutResolving.ExitCode,
 		"stack sync --continue should return non-zero exit code if conflicts have not been resolved",
 	)
-	// This message comes from Git, so it might be a touch brittle.
-	// We'll see if it ever becomes an issue.
-	assert.Contains(t, syncContinueWithoutResolving.Stdout, "fatal: Exiting because of an unresolved conflict.")
 
 	// resolve the conflict
 	err := ioutil.WriteFile(filepath.Join(repo.Dir(), "my-file"), []byte("1a\n1b\n2a\n"), 0644)
@@ -56,4 +54,16 @@ func TestStackSync(t *testing.T) {
 
 	syncContinue := Av(t, "stack", "sync", "--continue")
 	assert.Equal(t, 0, syncContinue.ExitCode, "stack sync --continue should return zero exit code after resolving conflicts")
+
+	// make sure stack-2 is up-to-date with stack-1
+	mergeBase, err := repo.MergeBase(&git.MergeBase{Revs: []string{"stack-1", "stack-2"}})
+	require.NoError(t, err)
+	stack1Head, err := repo.RevParse(&git.RevParse{Rev: "stack-1"})
+	require.NoError(t, err)
+	require.Equal(t, mergeBase, stack1Head, "stack-2 should be up-to-date with stack-1")
+
+	// further sync attemps should yield no-ops
+	syncNoop := Av(t, "stack", "sync", "--no-push")
+	assert.Equal(t, 0, syncNoop.ExitCode)
+	assert.Contains(t, syncNoop.Stdout, "already up-to-date")
 }
