@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/meta"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"os"
@@ -80,8 +81,10 @@ func init() {
 		"directory to use for git repository",
 	)
 	rootCmd.AddCommand(
+		initCmd,
 		prCmd,
 		stackCmd,
+		syncCmd,
 		versionCmd,
 	)
 }
@@ -125,4 +128,16 @@ func getRepo() (*git.Repo, error) {
 		}
 	}
 	return cachedRepo, nil
+}
+
+func getRepoMeta() (meta.Repository, error) {
+	repo, err := getRepo()
+	if err != nil {
+		return meta.Repository{}, err
+	}
+	repoMeta, ok := meta.GetRepository(repo)
+	if !ok {
+
+	}
+	return repoMeta, nil
 }
