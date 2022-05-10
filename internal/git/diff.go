@@ -32,9 +32,9 @@ func (r *Repo) Diff(d *DiffOpts) (*Diff, error) {
 	contents, err := r.Git(args...)
 	var exitError *exec.ExitError
 	if errors.As(err, &exitError) && exitError.ExitCode() == 1 {
-		return &Diff{Empty: true}, nil
+		return &Diff{Empty: false}, nil
 	} else if err != nil {
 		return nil, err
 	}
-	return &Diff{Empty: false, Contents: contents}, nil
+	return &Diff{Empty: true, Contents: contents}, nil
 }

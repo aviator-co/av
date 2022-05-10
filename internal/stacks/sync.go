@@ -38,11 +38,14 @@ type SyncBranchOpts struct {
 	// If the branch is already up-to-date, the sync will be a no-op and
 	// strategy will be ignored.
 	Strategy SyncStrategy
+	// If set, continue a previous sync that resulted in a conflict.
+	Continue bool
 }
 
-// SyncResult is the result of a SyncBranc operation.
+// SyncResult is the result of a SyncBranch operation.
 type SyncResult struct {
 	Status SyncStatus
+	Hint   string
 }
 
 // SyncBranch synchronizes the currently checked-out branch with the parent.
@@ -52,6 +55,9 @@ func SyncBranch(
 	repo *git.Repo,
 	opts *SyncBranchOpts,
 ) (*SyncResult, error) {
+	if opts.Parent == "" {
+		return nil, errors.New("parent branch must not be empty")
+	}
 	// Determine whether or not the two branches are up-to-date.
 	// If they are, we can skip the sync.
 	// The target branch is up-to-date if
@@ -77,23 +83,69 @@ func SyncBranch(
 
 	switch opts.Strategy {
 	case StrategyMergeCommit:
-		msg := fmt.Sprintf("Update stacked branch to latest from %q", opts.Parent)
-		_, err = repo.Git("merge", "-m", msg, "--log", parentHead)
-		if err != nil {
+		if opts.Continue {
+			// When merging, we just need to commit the result, assuming the
+			// user hasn't created any commits in the meantime. If they *have*
+			// already commited the merge, then it will be handled by the
+			// already-up-to-date check above.
+			out, err := repo.Run(&git.RunOpts{
+				Args: []string{"commit", "--no-edit"},
+			})
+			if err != nil {
+				return nil, err
+			}
+			if out.ExitCode != 0 {
+				return &SyncResult{
+					Status: SyncConflict,
+					Hint:   string(out.Stderr),
+				}, nil
+			}
 			return &SyncResult{
-				Status: SyncConflict,
+				Status: SyncUpdated,
 			}, nil
 		}
 
+		msg := fmt.Sprintf("Update stacked branch to latest from %q", opts.Parent)
+		out, err := repo.Run(&git.RunOpts{Args: []string{"merge", "-m", msg, "--log", parentHead}})
+		if err != nil {
+			return nil, err
+		}
+		if out.ExitCode != 0 {
+			return &SyncResult{
+				Status: SyncConflict,
+				Hint:   string(out.Stderr),
+			}, nil
+		}
 		return &SyncResult{
 			Status: SyncUpdated,
 		}, nil
 
 	case StrategyRebase:
-		_, err = repo.Git("rebase", parentHead, "HEAD")
+		if opts.Continue {
+			out, err := repo.Run(&git.RunOpts{
+				Args: []string{"rebase", "--continue"},
+			})
+			if err != nil {
+				return nil, err
+			}
+			if out.ExitCode != 0 {
+				return &SyncResult{
+					Status: SyncConflict,
+					Hint:   string(out.Stderr),
+				}, nil
+			}
+			return &SyncResult{
+				Status: SyncUpdated,
+			}, nil
+		}
+		out, err := repo.Run(&git.RunOpts{Args: []string{"rebase", parentHead, "HEAD"}})
 		if err != nil {
+			return nil, err
+		}
+		if out.ExitCode != 0 {
 			return &SyncResult{
 				Status: SyncConflict,
+				Hint:   string(out.Stderr),
 			}, nil
 		}
 		return &SyncResult{

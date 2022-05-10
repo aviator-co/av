@@ -1,6 +1,7 @@
 package git
 
 import (
+	"bytes"
 	"emperror.dev/errors"
 	"github.com/sirupsen/logrus"
 	giturls "github.com/whilp/git-urls"
@@ -27,6 +28,10 @@ func OpenRepo(repoDir string) (*Repo, error) {
 
 func (r *Repo) Dir() string {
 	return r.repoDir
+}
+
+func (r *Repo) GitDir() string {
+	return path.Join(r.repoDir, ".git")
 }
 
 func (r *Repo) DefaultBranch() (string, error) {
@@ -61,6 +66,35 @@ func (r *Repo) Git(args ...string) (string, error) {
 
 	// trim trailing newline
 	return strings.TrimSpace(string(out)), nil
+}
+
+type RunOpts struct {
+	Args []string
+}
+
+type Output struct {
+	ExitCode int
+	Stdout   []byte
+	Stderr   []byte
+}
+
+func (r *Repo) Run(opts *RunOpts) (*Output, error) {
+	cmd := exec.Command("git", opts.Args...)
+	cmd.Dir = r.repoDir
+	r.log.Debugf("git %s", opts.Args)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	var exitError *exec.ExitError
+	if err != nil && !errors.As(err, &exitError) {
+		return nil, errors.Wrapf(err, "git %s", opts.Args)
+	}
+	return &Output{
+		ExitCode: cmd.ProcessState.ExitCode(),
+		Stdout:   stdout.Bytes(),
+		Stderr:   stderr.Bytes(),
+	}, nil
 }
 
 func (r *Repo) GitStdin(args []string, stdin io.Reader) (string, error) {
