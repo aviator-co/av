@@ -84,7 +84,6 @@ func init() {
 		initCmd,
 		prCmd,
 		stackCmd,
-		syncCmd,
 		versionCmd,
 	)
 }
