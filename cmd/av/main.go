@@ -135,7 +135,7 @@ func getRepoMeta() (meta.Repository, error) {
 	if err != nil {
 		return meta.Repository{}, err
 	}
-	repoMeta, ok := meta.GetRepository(repo)
+	repoMeta, ok := meta.ReadRepository(repo)
 	if !ok {
 
 	}

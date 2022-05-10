@@ -83,7 +83,7 @@ Examples:
 		//     opened for a given PR without using av. We might need to do this
 		//     when creating PRs for a whole stack (e.g., when running `av pr`
 		//     on stack branch 3, we should make sure PRs exist for 1 and 2).
-		branchMeta, ok := meta.GetBranch(repo, currentBranch)
+		branchMeta, ok := meta.ReadBranch(repo, currentBranch)
 		if ok && branchMeta.PullRequest.ID != "" && !prCreateFlags.Force {
 			return errors.Errorf("This branch already has an associated pull request: %s", branchMeta.PullRequest.Permalink)
 		}

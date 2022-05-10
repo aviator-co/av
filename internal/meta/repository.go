@@ -19,7 +19,9 @@ type Repository struct {
 	Name string `json:"name"`
 }
 
-func GetRepository(repo *git.Repo) (Repository, bool) {
+// ReadRepository reads repository metadata from the git repo.
+// Returns the metadata and a boolean indicating if the metadata was found.
+func ReadRepository(repo *git.Repo) (Repository, bool) {
 	var meta Repository
 
 	metaPath := path.Join(repo.Dir(), ".git", "av", "repo-metadata.json")
@@ -34,6 +36,8 @@ func GetRepository(repo *git.Repo) (Repository, bool) {
 	return meta, true
 }
 
+// WriteRepository writes repository metadata to the git repo.
+// It can be loaded again with ReadRepository.
 func WriteRepository(repo *git.Repo, meta Repository) error {
 	if err := os.Mkdir(path.Join(repo.Dir(), ".git", "av"), 0755); err != nil && !os.IsExist(err) {
 		return errors.Wrap(err, "failed to create av metadata directory")

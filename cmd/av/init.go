@@ -22,7 +22,7 @@ var initCmd = &cobra.Command{
 		}
 
 		if !initFlags.Force {
-			_, ok := meta.GetRepository(repo)
+			_, ok := meta.ReadRepository(repo)
 			if ok {
 				return errors.New("repository is already initialized for use with av")
 			}

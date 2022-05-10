@@ -13,7 +13,7 @@ type BranchMetadata = meta.Branch
 // GetMetadata loads information about the branch from the git repository.
 // Returns nil if given branch does not exist or is not a stacked branch.
 func GetMetadata(repo *git.Repo, branchName string) *BranchMetadata {
-	branch, ok := meta.GetBranch(repo, branchName)
+	branch, ok := meta.ReadBranch(repo, branchName)
 	if !ok {
 		return nil
 	}

@@ -25,11 +25,11 @@ type PullRequest struct {
 	Permalink string `json:"permalink"`
 }
 
-// GetBranch loads information about the branch from the git repository.
+// ReadBranch loads information about the branch from the git repository.
 // Returns the branch metadata and a boolean indicating if the branch metadata
 // already existed and was loaded. If the branch metadata does not exist, a
 // useful default is returned.
-func GetBranch(repo *git.Repo, branchName string) (Branch, bool) {
+func ReadBranch(repo *git.Repo, branchName string) (Branch, bool) {
 	// No matter what, we return something useful.
 	// We have to set name since it's not loaded from the JSON blob.
 	var branch Branch
@@ -53,6 +53,8 @@ func GetBranch(repo *git.Repo, branchName string) (Branch, bool) {
 	return branch, true
 }
 
+// WriteBranch writes branch metadata to the git repository.
+// It can be loaded again with ReadBranch.
 func WriteBranch(repo *git.Repo, s Branch) error {
 	refName := branchMetaRefName(s.Name)
 	content, err := json.Marshal(s)
