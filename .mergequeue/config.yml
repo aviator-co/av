@@ -1,0 +1,9 @@
+version: 1.0.0
+merge_rules:
+  labels:
+    trigger: mergequeue
+    skip_line: mergequeue-priority
+  merge_mode:
+    type: default
+  base_branches:
+    - master
