@@ -93,6 +93,12 @@ base branch.
 		config := stackSyncFlags.stackSyncConfig
 
 		// check for --continue/--abort
+		// TODO[mvp]:
+		//     Let's make sure we have a reasonable story around what happens in
+		//     edge cases. When we relinquish control of the repo back to the
+		//     user, they might do wild things (checkout a different branch,
+		//     run the continue seventeen days and seventy seven commits later,
+		//     etc.).
 		if stackSyncFlags.Continue && stackSyncFlags.Abort {
 			return errors.New("cannot use --continue and --abort together")
 		}
@@ -152,6 +158,11 @@ base branch.
 // doStackSync performs the stack sync operation.
 // It returns a boolean indicating whether or not the sync was interrupted
 // (if true, the stack sync can be resumed with the --continue flag).
+// TODO[mvp]:
+//    This whole function is kind of a hot mess, and a lot of it is rooted in
+//    how awkward the API is for dealing with "branch trees" (terminology is
+//    hard when you're creating a meta-tree-structure on top of git branches).
+//    Let's refactor that a bit and then re-work this.
 func doStackSync(repo *git.Repo, config stackSyncConfig) (bool, error) {
 	root, err := stacks.GetCurrentRoot(repo)
 	if err != nil {
@@ -265,6 +276,7 @@ func init() {
 		&stackSyncFlags.NoPush, "no-push", false,
 		"do not force-push updated branches to GitHub",
 	)
+	// TODO[mvp]: better name (--to-trunk?)
 	stackSyncCmd.Flags().BoolVar(
 		&stackSyncFlags.Trunk, "trunk", false,
 		"synchronize the trunk into the stack",
