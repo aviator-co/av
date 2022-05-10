@@ -123,11 +123,16 @@ func (r *Repo) CheckoutBranch(opts *CheckoutBranch) (string, error) {
 type RevParse struct {
 	// The name of the branch to parse.
 	// If empty, the current branch is parsed.
-	Rev string
+	Rev              string
+	SymbolicFullName bool
 }
 
 func (r *Repo) RevParse(rp *RevParse) (string, error) {
-	args := []string{"rev-parse", rp.Rev}
+	args := []string{"rev-parse"}
+	if rp.SymbolicFullName {
+		args = append(args, "--symbolic-full-name")
+	}
+	args = append(args, rp.Rev)
 	return r.Git(args...)
 }
 
