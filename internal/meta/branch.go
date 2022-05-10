@@ -13,15 +13,28 @@ type Branch struct {
 	// Not stored in JSON because the name can always be derived from the name
 	// of the git ref.
 	Name string `json:"-"`
+
 	// The branch name associated with the parent of the stack (if any).
+	// If empty, this branch (potentially*) is considered a stack root.
+	// (*depending on the context, we only consider the branch a stack root if
+	// it also has children branches; for example, any "vanilla" branch off of
+	// trunk will have no parent, but we usually don't explicitly consider it a
+	// stack unless it also has stack children)
 	Parent string `json:"parent"`
 
-	PullRequest PullRequest `json:"pullRequest,omitempty"`
+	// The children branches of this branch within the stack (if any).
+	Children []string `json:"children,omitempty"`
+
+	// The associated pull request information, if any.
+	PullRequest *PullRequest `json:"pullRequest,omitempty"`
 }
 
 type PullRequest struct {
-	ID        string `json:"id"`
-	Number    int64  `json:"number"`
+	// The GitHub (GraphQL) ID of the pull request.
+	ID string `json:"id"`
+	// The pull request number.
+	Number int64 `json:"number"`
+	// The web URL for the pull request.
 	Permalink string `json:"permalink"`
 }
 

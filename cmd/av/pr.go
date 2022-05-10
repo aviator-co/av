@@ -84,7 +84,7 @@ Examples:
 		//     when creating PRs for a whole stack (e.g., when running `av pr`
 		//     on stack branch 3, we should make sure PRs exist for 1 and 2).
 		branchMeta, ok := meta.ReadBranch(repo, currentBranch)
-		if ok && branchMeta.PullRequest.ID != "" && !prCreateFlags.Force {
+		if ok && branchMeta.PullRequest != nil && !prCreateFlags.Force {
 			return errors.Errorf("This branch already has an associated pull request: %s", branchMeta.PullRequest.Permalink)
 		}
 
@@ -133,7 +133,7 @@ Examples:
 			return err
 		}
 
-		branchMeta.PullRequest = meta.PullRequest{
+		branchMeta.PullRequest = &meta.PullRequest{
 			Number:    pull.Number,
 			ID:        pull.ID,
 			Permalink: pull.Permalink,
