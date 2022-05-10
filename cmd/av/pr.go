@@ -126,7 +126,7 @@ Examples:
 			RepositoryID: githubv4.ID(repoMeta.ID),
 			BaseRefName:  githubv4.String(prBaseBranch),
 			HeadRefName:  githubv4.String(currentBranch),
-			Title:        githubv4.String(currentBranch),
+			Title:        githubv4.String(prCreateFlags.Title),
 			Body:         gh.Ptr(githubv4.String(body)),
 		})
 		if err != nil {
