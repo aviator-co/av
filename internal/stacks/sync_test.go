@@ -17,16 +17,11 @@ func TestSyncBranch_NoConflicts(t *testing.T) {
 	} {
 		repo := gittest.NewTempRepo(t)
 
-		_, err := repo.CheckoutBranch(&git.CheckoutBranch{
-			Name:      "stack-1",
-			NewBranch: true,
-		})
+		_, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: "stack-1", NewBranch: true})
 		require.NoError(t, err)
 		gittest.CommitFile(t, repo, "file1.txt", []byte("file1"))
 
-		err = stacks.CreateBranch(repo, &stacks.CreateBranchOpts{
-			Name: "stack-2",
-		})
+		_, err = repo.CheckoutBranch(&git.CheckoutBranch{Name: "stack-2", NewBranch: true})
 		require.NoError(t, err)
 		gittest.CommitFile(t, repo, "file2.txt", []byte("file2"))
 
@@ -62,16 +57,11 @@ func TestSyncBranch_WithConflicts(t *testing.T) {
 	} {
 		repo := gittest.NewTempRepo(t)
 
-		_, err := repo.CheckoutBranch(&git.CheckoutBranch{
-			Name:      "stack-1",
-			NewBranch: true,
-		})
+		_, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: "stack-1", NewBranch: true})
 		require.NoError(t, err)
 		gittest.CommitFile(t, repo, "file.txt", []byte("commit 1a\n"))
 
-		err = stacks.CreateBranch(repo, &stacks.CreateBranchOpts{
-			Name: "stack-2",
-		})
+		_, err = repo.CheckoutBranch(&git.CheckoutBranch{Name: "stack-2", NewBranch: true})
 		require.NoError(t, err)
 		gittest.CommitFile(t, repo, "file.txt", []byte("commit 1a\ncommit 2a\n"))
 
