@@ -46,12 +46,12 @@ func (c *Client) mutate(ctx context.Context, mutation any, input githubv4.Input,
 	return c.gh.Mutate(ctx, mutation, input, variables)
 }
 
-// P returns a pointer to the argument.
+// Ptr returns a pointer to the argument.
 // It's a convenience function to make working with the API easier: since Go
 // disallows pointers-to-literals, and optional input fields are expressed as
 // pointers, this function can be used to easily set optional fields to non-nil
 // primitives.
-// For example, githubv4.CreatePullRequestInput{Draft: P(true)}
-func P[T any](v T) *T {
+// For example, githubv4.CreatePullRequestInput{Draft: Ptr(true)}
+func Ptr[T any](v T) *T {
 	return &v
 }

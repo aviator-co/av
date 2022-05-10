@@ -8,8 +8,10 @@ import (
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/shurcooL/githubv4"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"io/ioutil"
+	"os"
+	"strings"
 )
 
 var prCmd = &cobra.Command{
@@ -19,20 +21,29 @@ var prCmd = &cobra.Command{
 var prCreateFlags struct {
 	Base  string
 	Force bool
+	Title string
+	Body  string
 }
 var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "create a pull request for the current branch",
+	Long: strings.TrimSpace(`
+Create a pull request for the current branch.
+
+Examples:
+  Create a PR with an empty body:
+    $ av pr create --title "My PR"
+
+  Create a pull request, specifying the body of the PR from standard input.
+    $ av pr create --title "Implement fancy feature" --body - <<EOF
+    > Implement my very fancy feature.
+    > Can you please review it?
+    > EOF
+`),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Lets keep this commented until we actually implement this :')
-		if config.GitHub.Token == "" {
-			// TODO: lets include a documentation link here
-			logrus.Error(
-				"GitHub token is not configured. " +
-					"Please set the github.token field in your config file " +
-					"(at ~/.config/av/config.yaml).",
-			)
-			return errors.New("GitHub token is not configured")
+		// arg validation
+		if prCreateFlags.Title == "" {
+			return errors.New("title is required")
 		}
 
 		repo, repoMeta, err := getRepoInfo()
@@ -78,11 +89,23 @@ var prCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		body := prCreateFlags.Body
+		// Special case: ready body from stdin
+		if body == "-" {
+			bodyBytes, err := ioutil.ReadAll(os.Stdin)
+			if err != nil {
+				return errors.Wrap(err, "failed to read body from stdin")
+			}
+			body = string(bodyBytes)
+		}
+
 		pull, err := client.CreatePullRequest(context.Background(), githubv4.CreatePullRequestInput{
 			RepositoryID: githubv4.ID(repoMeta.ID),
 			BaseRefName:  githubv4.String(prBaseBranch),
 			HeadRefName:  githubv4.String(currentBranch),
 			Title:        githubv4.String(currentBranch),
+			Body:         gh.Ptr(githubv4.String(body)),
 		})
 		if err != nil {
 			return err
@@ -114,4 +137,16 @@ func init() {
 		&prCreateFlags.Force, "force", false,
 		"force creation of a pull request even if one already exists",
 	)
+	// TODO:
+	//     Want to automatically determine the title of the PR, probably using
+	//     the headline of the first commit.
+	prCreateCmd.Flags().StringVarP(
+		&prCreateFlags.Title, "title", "t", "",
+		"title of the pull request to create",
+	)
+	prCreateCmd.Flags().StringVarP(
+		&prCreateFlags.Body, "body", "b", "",
+		"body of the pull request to create (a value of - will read from stdin)",
+	)
+	_ = prCreateCmd.MarkFlagRequired("title")
 }
