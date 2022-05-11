@@ -67,6 +67,8 @@ func ReadBranch(repo *git.Repo, branchName string) (Branch, bool) {
 	return branch, true
 }
 
+// ReadAllBranches fetches all branch metadata stored in the git repository.
+// It returns a map where the key is the name of the branch.
 func ReadAllBranches(repo *git.Repo) (map[string]Branch, error) {
 	refs, err := repo.ListRefs(&git.ListRefs{
 		Patterns: []string{branchMetaRefPrefix + "**"},
