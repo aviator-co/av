@@ -70,6 +70,11 @@ func ReadBranch(repo *git.Repo, branchName string) (Branch, bool) {
 // ReadAllBranches fetches all branch metadata stored in the git repository.
 // It returns a map where the key is the name of the branch.
 func ReadAllBranches(repo *git.Repo) (map[string]Branch, error) {
+	// Find all branch metadata ref names
+	// Note: need `**` here (not just `*`) because Git seems to only match one
+	// level of nesting in the ref pattern with just a single `*` (even though
+	// the docs seem to suggest this to not be the case). With a single star,
+	// we won't match branch names like `feature/add-xyz` or `travis/fix-123`.
 	refs, err := repo.ListRefs(&git.ListRefs{
 		Patterns: []string{branchMetaRefPrefix + "**"},
 	})
@@ -78,6 +83,7 @@ func ReadAllBranches(repo *git.Repo) (map[string]Branch, error) {
 	}
 	logrus.WithField("refs", refs).Debug("found branch metadata refs")
 
+	// Read the contents of each ref to get the associated metadata blob...
 	refNames := make([]string, len(refs))
 	for i, ref := range refs {
 		refNames[i] = ref.Name
@@ -89,6 +95,7 @@ func ReadAllBranches(repo *git.Repo) (map[string]Branch, error) {
 		return nil, err
 	}
 
+	// ...and for each metadata blob, parse it from JSON into a Branch
 	branches := make(map[string]Branch, len(refs))
 	for _, ref := range refContents {
 		var branch Branch
