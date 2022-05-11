@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/stacks"
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
@@ -86,7 +87,7 @@ base branch.
 			return err
 		}
 		if !diff.Empty {
-			return errors.New("refusing to sync: there are unstaged changes in the working tree")
+			return errors.New("refusing to sync: there are unstaged changes in the working tree (use `git add` to stage changes)")
 		}
 		logrus.Debugf("%#+v", diff)
 
@@ -164,7 +165,7 @@ base branch.
 //    hard when you're creating a meta-tree-structure on top of git branches).
 //    Let's refactor that a bit and then re-work this.
 func doStackSync(repo *git.Repo, config stackSyncConfig) (bool, error) {
-	root, err := stacks.GetCurrentRoot(repo)
+	branches, err := meta.ReadAllBranches(repo)
 	if err != nil {
 		return false, err
 	}
@@ -174,23 +175,13 @@ func doStackSync(repo *git.Repo, config stackSyncConfig) (bool, error) {
 		return false, err
 	}
 
-	currentTree := root
 	for {
-		if currentTree.Branch.Name == currentBranch {
-			break
+		currentMeta, ok := branches[currentBranch]
+		if !ok {
+			return false, errors.Errorf("stack metadata not found for branch %q", currentBranch)
 		}
-		if len(currentTree.Next) > 1 {
-			return false, errors.Errorf("unsupported: branch %q has multiple stack children", currentTree.Branch.Name)
-		}
-		if len(currentTree.Next) == 0 {
-			return false, errors.Errorf("invariant error: couldn't find branch %q in stack", currentBranch)
-		}
-		currentTree = currentTree.Next[0]
-	}
-
-	for {
 		res, err := stacks.SyncBranch(repo, &stacks.SyncBranchOpts{
-			Parent:   currentTree.Branch.Parent,
+			Parent:   currentMeta.Parent,
 			Continue: config.Continue,
 		})
 		if err != nil {
@@ -198,11 +189,11 @@ func doStackSync(repo *git.Repo, config stackSyncConfig) (bool, error) {
 		}
 		switch res.Status {
 		case stacks.SyncAlreadyUpToDate:
-			fmt.Printf("Branch %q is already up-to-date with %q\n", currentBranch, currentTree.Branch.Parent)
+			fmt.Printf("Branch %q is already up-to-date with %q\n", currentBranch, currentMeta.Parent)
 		case stacks.SyncUpdated:
-			fmt.Printf("Branch %q synchronized with %q\n", currentBranch, currentTree.Branch.Parent)
+			fmt.Printf("Branch %q synchronized with %q\n", currentBranch, currentMeta.Parent)
 		case stacks.SyncConflict:
-			fmt.Printf("Branch %q has merge conflict with %q, aborting...\n", currentBranch, currentTree.Branch.Parent)
+			fmt.Printf("Branch %q has merge conflict with %q, aborting...\n", currentBranch, currentMeta.Parent)
 			if res.Hint != "" {
 				_, _ = fmt.Println(text.Indent(res.Hint, "    "))
 			}
@@ -211,13 +202,13 @@ func doStackSync(repo *git.Repo, config stackSyncConfig) (bool, error) {
 			logrus.Panicf("invariant error: unknown sync result: %v", res)
 		}
 
-		if len(currentTree.Next) == 0 {
+		if len(currentMeta.Children) == 0 {
 			return false, nil
 		}
-		if len(currentTree.Next) > 1 {
+		if len(currentMeta.Children) > 1 {
 			return false, errors.Errorf("unsupported: branch %q has more than one child branch", currentBranch)
 		}
-		currentTree = currentTree.Next[0]
+		currentBranch = currentMeta.Children[0]
 	}
 }
 

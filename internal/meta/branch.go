@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/sirupsen/logrus"
+	"strings"
 )
 
 type Branch struct {
@@ -66,6 +67,48 @@ func ReadBranch(repo *git.Repo, branchName string) (Branch, bool) {
 	return branch, true
 }
 
+// ReadAllBranches fetches all branch metadata stored in the git repository.
+// It returns a map where the key is the name of the branch.
+func ReadAllBranches(repo *git.Repo) (map[string]Branch, error) {
+	// Find all branch metadata ref names
+	// Note: need `**` here (not just `*`) because Git seems to only match one
+	// level of nesting in the ref pattern with just a single `*` (even though
+	// the docs seem to suggest this to not be the case). With a single star,
+	// we won't match branch names like `feature/add-xyz` or `travis/fix-123`.
+	refs, err := repo.ListRefs(&git.ListRefs{
+		Patterns: []string{branchMetaRefPrefix + "**"},
+	})
+	if err != nil {
+		return nil, err
+	}
+	logrus.WithField("refs", refs).Debug("found branch metadata refs")
+
+	// Read the contents of each ref to get the associated metadata blob...
+	refNames := make([]string, len(refs))
+	for i, ref := range refs {
+		refNames[i] = ref.Name
+	}
+	refContents, err := repo.GetRefs(&git.GetRefs{
+		Revisions: refNames,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// ...and for each metadata blob, parse it from JSON into a Branch
+	branches := make(map[string]Branch, len(refs))
+	for _, ref := range refContents {
+		var branch Branch
+		if err := json.Unmarshal(ref.Contents, &branch); err != nil {
+			return nil, errors.WrapIff(err, "corrupt stack metadata for branch: %q", ref.Revision)
+		}
+		name := strings.TrimPrefix(ref.Revision, branchMetaRefPrefix)
+		branch.Name = name
+		branches[name] = branch
+	}
+	return branches, nil
+}
+
 // WriteBranch writes branch metadata to the git repository.
 // It can be loaded again with ReadBranch.
 func WriteBranch(repo *git.Repo, s Branch) error {
@@ -90,6 +133,8 @@ func WriteBranch(repo *git.Repo, s Branch) error {
 	return nil
 }
 
+const branchMetaRefPrefix = "refs/av/branch-metadata/"
+
 func branchMetaRefName(branchName string) string {
-	return "refs/av/stack-metadata/" + branchName
+	return branchMetaRefPrefix + branchName
 }
