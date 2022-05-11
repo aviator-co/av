@@ -38,8 +38,6 @@ type SyncBranchOpts struct {
 	// If the branch is already up-to-date, the sync will be a no-op and
 	// strategy will be ignored.
 	Strategy SyncStrategy
-	// If set, continue a previous sync that resulted in a conflict.
-	Continue bool
 }
 
 // SyncResult is the result of a SyncBranch operation.
@@ -83,28 +81,6 @@ func SyncBranch(
 
 	switch opts.Strategy {
 	case StrategyMergeCommit:
-		if opts.Continue {
-			// When merging, we just need to commit the result, assuming the
-			// user hasn't created any commits in the meantime. If they *have*
-			// already commited the merge, then it will be handled by the
-			// already-up-to-date check above.
-			out, err := repo.Run(&git.RunOpts{
-				Args: []string{"commit", "--no-edit"},
-			})
-			if err != nil {
-				return nil, err
-			}
-			if out.ExitCode != 0 {
-				return &SyncResult{
-					Status: SyncConflict,
-					Hint:   string(out.Stderr),
-				}, nil
-			}
-			return &SyncResult{
-				Status: SyncUpdated,
-			}, nil
-		}
-
 		msg := fmt.Sprintf("Update stacked branch to latest from %q", opts.Parent)
 		out, err := repo.Run(&git.RunOpts{Args: []string{"merge", "-m", msg, "--log", parentHead}})
 		if err != nil {
@@ -121,24 +97,7 @@ func SyncBranch(
 		}, nil
 
 	case StrategyRebase:
-		if opts.Continue {
-			out, err := repo.Run(&git.RunOpts{
-				Args: []string{"rebase", "--continue"},
-			})
-			if err != nil {
-				return nil, err
-			}
-			if out.ExitCode != 0 {
-				return &SyncResult{
-					Status: SyncConflict,
-					Hint:   string(out.Stderr),
-				}, nil
-			}
-			return &SyncResult{
-				Status: SyncUpdated,
-			}, nil
-		}
-		out, err := repo.Run(&git.RunOpts{Args: []string{"rebase", parentHead, "HEAD"}})
+		out, err := repo.Run(&git.RunOpts{Args: []string{"rebase", parentHead}})
 		if err != nil {
 			return nil, err
 		}
@@ -152,6 +111,54 @@ func SyncBranch(
 			Status: SyncUpdated,
 		}, nil
 
+	default:
+		return nil, errors.New("unknown sync strategy")
+	}
+}
+
+func SyncContinue(repo *git.Repo, strategy SyncStrategy) (*SyncResult, error) {
+	switch strategy {
+	case StrategyMergeCommit:
+		// When merging, we just need to commit the result, assuming the
+		// user hasn't created any commits in the meantime. If they *have*
+		// already commited the merge, then it will be handled by the
+		// already-up-to-date check above.
+		out, err := repo.Run(&git.RunOpts{
+			Args: []string{"commit", "--no-edit"},
+		})
+		if err != nil {
+			return nil, err
+		}
+		if out.ExitCode != 0 {
+			return &SyncResult{
+				Status: SyncConflict,
+				Hint:   string(out.Stderr),
+			}, nil
+		}
+		return &SyncResult{
+			Status: SyncUpdated,
+		}, nil
+	case StrategyRebase:
+		out, err := repo.Run(&git.RunOpts{
+			Args: []string{"rebase", "--continue"},
+			// `git rebase --continue` will open an editor to allow the user
+			// to edit the commit message, which we don't want here. Instead, we
+			// specify `true` here (which is a command that does nothing and
+			// simply exits 0) to disable the editor.
+			Env: []string{"GIT_EDITOR=true"},
+		})
+		if err != nil {
+			return nil, err
+		}
+		if out.ExitCode != 0 {
+			return &SyncResult{
+				Status: SyncConflict,
+				Hint:   string(out.Stderr),
+			}, nil
+		}
+		return &SyncResult{
+			Status: SyncUpdated,
+		}, nil
 	default:
 		return nil, errors.New("unknown sync strategy")
 	}

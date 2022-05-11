@@ -7,6 +7,7 @@ import (
 	giturls "github.com/whilp/git-urls"
 	"io"
 	"net/url"
+	"os"
 	"os/exec"
 	"path"
 	"strings"
@@ -70,6 +71,7 @@ func (r *Repo) Git(args ...string) (string, error) {
 
 type RunOpts struct {
 	Args []string
+	Env  []string
 }
 
 type Output struct {
@@ -85,6 +87,7 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	cmd.Env = append(os.Environ(), opts.Env...)
 	err := cmd.Run()
 	var exitError *exec.ExitError
 	if err != nil && !errors.As(err, &exitError) {
@@ -119,8 +122,14 @@ func (r *Repo) GitStdin(args []string, stdin io.Reader) (string, error) {
 
 // CurrentBranchName returns the name of the current branch.
 // The name is return in "short" format -- i.e., without the "refs/heads/" prefix.
+// IMPORTANT: This function will return an error if the repository is currently
+// in a detached-head state (e.g., during a rebase conflict).
 func (r *Repo) CurrentBranchName() (string, error) {
-	return r.Git("symbolic-ref", "--short", "HEAD")
+	branch, err := r.Git("symbolic-ref", "--short", "HEAD")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to determine current branch")
+	}
+	return branch, nil
 }
 
 type CheckoutBranch struct {
