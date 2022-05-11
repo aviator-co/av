@@ -22,18 +22,14 @@ var stackBranchCmd = &cobra.Command{
 			_ = cmd.Usage()
 			return errors.New("exactly one branch name is required")
 		}
-
-		var cu cleanup.Cleanup
-		defer cu.Cleanup()
+		name := args[0]
 
 		repo, err := getRepo()
 		if err != nil {
 			return err
 		}
 
-		name := args[0]
-
-		// validate operation preconditions
+		// Validate preconditions
 		if _, err := repo.RevParse(&git.RevParse{Rev: name}); err == nil {
 			return errors.Errorf("branch %q already exists", name)
 		}
@@ -46,6 +42,8 @@ var stackBranchCmd = &cobra.Command{
 
 		// Determine the parent branch and make sure it's checked out
 		var parentBranch string
+		var cu cleanup.Cleanup
+		defer cu.Cleanup()
 		if stackBranchFlags.Parent != "" {
 			parentBranch = stackBranchFlags.Parent
 			origBranch, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: parentBranch})
@@ -66,6 +64,8 @@ var stackBranchCmd = &cobra.Command{
 		}
 
 		// Special case: branching from the repository default branch
+		// We set parentBranch = "" as a sentinel value to indicate that this
+		// branch is the root of a new stack.
 		if parentBranch == defaultBranch {
 			logrus.Debug("creating new stack root branch from default branch")
 			parentBranch = ""
@@ -83,15 +83,14 @@ var stackBranchCmd = &cobra.Command{
 			)
 		}
 
-		branchMeta := meta.Branch{
-			Name:   name,
-			Parent: parentBranch,
-		}
+		branchMeta := meta.Branch{Name: name, Parent: parentBranch}
 		logrus.WithField("meta", branchMeta).Debug("writing branch metadata")
 		if err := meta.WriteBranch(repo, branchMeta); err != nil {
 			return errors.WrapIff(err, "failed to write av internal metadata for branch %q", name)
 		}
 
+		// If this isn't a new stack root, update the parent metadata to include
+		// the new branch as a child.
 		if parentBranch != "" {
 			parentMeta, _ := meta.ReadBranch(repo, parentBranch)
 			parentMeta.Children = append(parentMeta.Children, name)
