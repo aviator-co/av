@@ -3,7 +3,6 @@ package e2e_tests
 import (
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"path/filepath"
@@ -12,7 +11,7 @@ import (
 
 func TestHelp(t *testing.T) {
 	res := Av(t, "--help")
-	assert.Equal(t, 0, res.ExitCode)
+	require.Equal(t, 0, res.ExitCode)
 }
 
 func TestStackSync(t *testing.T) {
@@ -30,18 +29,18 @@ func TestStackSync(t *testing.T) {
 	})
 
 	syncConflict := Av(t, "stack", "sync", "--no-push")
-	assert.NotEqual(
+	require.NotEqual(
 		t, 0, syncConflict.ExitCode,
 		"stack sync should return non-zero exit code if conflicts",
 	)
-	assert.Contains(t, syncConflict.Stderr, "conflict detected")
-	assert.Contains(
+	require.Contains(t, syncConflict.Stderr, "conflict detected")
+	require.Contains(
 		t, syncConflict.Stderr, "av stack sync --continue",
 		"stack sync should print a message with instructions to continue",
 	)
 
 	syncContinueWithoutResolving := Av(t, "stack", "sync", "--continue")
-	assert.NotEqual(
+	require.NotEqual(
 		t, 0, syncContinueWithoutResolving.ExitCode,
 		"stack sync --continue should return non-zero exit code if conflicts have not been resolved",
 	)
@@ -53,7 +52,7 @@ func TestStackSync(t *testing.T) {
 	require.NoError(t, err, "failed to stage file")
 
 	syncContinue := Av(t, "stack", "sync", "--continue")
-	assert.Equal(t, 0, syncContinue.ExitCode, "stack sync --continue should return zero exit code after resolving conflicts")
+	require.Equal(t, 0, syncContinue.ExitCode, "stack sync --continue should return zero exit code after resolving conflicts")
 
 	// make sure stack-2 is up-to-date with stack-1
 	mergeBase, err := repo.MergeBase(&git.MergeBase{Revs: []string{"stack-1", "stack-2"}})
@@ -64,6 +63,6 @@ func TestStackSync(t *testing.T) {
 
 	// further sync attemps should yield no-ops
 	syncNoop := Av(t, "stack", "sync", "--no-push")
-	assert.Equal(t, 0, syncNoop.ExitCode)
-	assert.Contains(t, syncNoop.Stdout, "already up-to-date")
+	require.Equal(t, 0, syncNoop.ExitCode)
+	require.Contains(t, syncNoop.Stdout, "already up-to-date")
 }

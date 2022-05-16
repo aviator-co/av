@@ -34,18 +34,21 @@ type stackSyncConfig struct {
 	Trunk bool `json:"trunk"`
 	// If set, do not push to GitHub.
 	NoPush bool `json:"noPush"`
-	// If set, we need to continue the current sync step before syncing the
-	// remaining branches.
-	// Not serialized to JSON because it's only set by the --continue flag.
-	Continue bool `json:"-"`
 }
 
 // stackSyncState is the state of an in-progress sync operation.
 // It is written to a file if the sync is interrupted (so it can be resumed with
 // the --continue flag).
 type stackSyncState struct {
-	CurrentBranch string          `json:"currentBranch"`
-	Config        stackSyncConfig `json:"config"`
+	// The branch to return to when the sync is complete.
+	OriginalBranch string `json:"originalBranch"`
+	// The current branch being synced.
+	CurrentBranch string `json:"currentBranch"`
+	// If set, we need to continue the current sync step before syncing the
+	// remaining branches. Not serialized to JSON because it's only set by the
+	// --continue flag.
+	Continue bool            `json:"-"`
+	Config   stackSyncConfig `json:"config"`
 }
 
 var stackSyncFlags struct {
@@ -77,11 +80,16 @@ stack. This is useful for rebasing a whole stack on the latest changes from the
 base branch.
 `),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Argument validation
+		if stackSyncFlags.Continue && stackSyncFlags.Abort {
+			return errors.New("cannot use --continue and --abort together")
+		}
+
+		// Check for unstaged changes
 		repo, err := getRepo()
 		if err != nil {
 			return err
 		}
-
 		diff, err := repo.Diff(&git.DiffOpts{Quiet: true})
 		if err != nil {
 			return err
@@ -89,59 +97,155 @@ base branch.
 		if !diff.Empty {
 			return errors.New("refusing to sync: there are unstaged changes in the working tree (use `git add` to stage changes)")
 		}
-		logrus.Debugf("%#+v", diff)
 
-		config := stackSyncFlags.stackSyncConfig
+		// Read any pre-existing state.
+		// This is required to allow us to handle --continue/--abort
+		state, err := readStackSyncState(repo)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
 
-		// check for --continue/--abort
 		// TODO[mvp]:
 		//     Let's make sure we have a reasonable story around what happens in
 		//     edge cases. When we relinquish control of the repo back to the
 		//     user, they might do wild things (checkout a different branch,
 		//     run the continue seventeen days and seventy seven commits later,
 		//     etc.).
-		if stackSyncFlags.Continue && stackSyncFlags.Abort {
-			return errors.New("cannot use --continue and --abort together")
-		}
-		existingState, err := readStackSyncState(repo)
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
 		if stackSyncFlags.Abort {
-			if existingState.CurrentBranch == "" {
+			if state.CurrentBranch == "" {
 				return errors.New("no sync in progress")
 			}
 			err := writeStackSyncState(repo, nil)
 			if err != nil {
 				return errors.Wrap(err, "failed to reset stack sync state")
 			}
-			_, _ = fmt.Fprintf(os.Stderr, "Aborted stack sync for branch %q\n", existingState.CurrentBranch)
+			_, _ = fmt.Fprintf(os.Stderr, "Aborted stack sync for branch %q\n", state.CurrentBranch)
 			return nil
 		} else if stackSyncFlags.Continue {
-			if existingState.CurrentBranch == "" {
+			if state.CurrentBranch == "" {
 				return errors.New("no sync in progress")
 			}
-			config = existingState.Config
-			config.Continue = true
+			state.Continue = true
 		} else {
-			if existingState.CurrentBranch != "" {
+			if state.CurrentBranch != "" {
 				return errors.New("a sync is already in progress: use --continue or --abort")
+			}
+
+			// NOTE: We have to read the current branch name from the stored
+			// state if we're continuing a sync (the case above) because it's
+			// likely that we'll be in a detached-HEAD state due to a rebase
+			// conflict (and this command will not work).
+			// Since we're *not* continuing a sync, we assume we're not in
+			// detached HEAD and so this is a reasonable thing to do.
+			var err error
+			state.CurrentBranch, err = repo.CurrentBranchName()
+			if err != nil {
+				return err
 			}
 		}
 
-		conflict, err := doStackSync(repo, config)
+		// Set the original branch so we can return to it when the sync is done
+		if state.OriginalBranch == "" {
+			state.OriginalBranch = state.CurrentBranch
+		}
+
+		// Construct the list of branches we need to sync
+		branches, err := meta.ReadAllBranches(repo)
 		if err != nil {
 			return err
 		}
-		if conflict {
+		var branchesToSync []string
+		if state.Continue {
+			// If we're continuing, we assume the previous branches are already
+			// synced correctly and we just need to sync the subsequent
+			// branches. (This matters because if we're here, that means there
+			// was a sync conflict, and we need to `git rebase --continue`
+			// before we can sync the next branch, and git will scream at us if
+			// we try to do something in the repo before we finish that)
+			branchesToSync = []string{state.CurrentBranch}
+		} else {
+			// Otherwise, this is not a --continue, so we want to sync every
+			// ancestor first.
 			currentBranch, err := repo.CurrentBranchName()
 			if err != nil {
 				return err
 			}
-			if err := writeStackSyncState(repo, &stackSyncState{
-				CurrentBranch: currentBranch,
-				Config:        config,
-			}); err != nil {
+			branchesToSync, err = previousBranches(branches, currentBranch)
+			if err != nil {
+				return err
+			}
+			branchesToSync = append(branchesToSync, currentBranch)
+		}
+		// Either way (--continue or not), we sync all subsequent branches.
+		nextBranches, err := subsequentBranches(branches, branchesToSync[len(branchesToSync)-1])
+		if err != nil {
+			return err
+		}
+		branchesToSync = append(branchesToSync, nextBranches...)
+
+		logrus.WithField("branches", branchesToSync).Debug("determined branches to sync")
+		conflict := false
+	loop:
+		for _, currentBranch := range branchesToSync {
+			state.CurrentBranch = currentBranch
+			currentMeta, ok := branches[currentBranch]
+			if !ok {
+				return errors.Errorf("stack metadata not found for branch %q", currentBranch)
+			}
+			if currentMeta.Parent == "" {
+				continue
+			}
+			log := logrus.WithFields(logrus.Fields{
+				"current": currentBranch,
+				"parent":  currentMeta.Parent,
+			})
+
+			// Checkout the branch (unless we need to continue a rebase, in which
+			// case Git will yell at us)
+			var res *stacks.SyncResult
+			if state.Continue {
+				log.Debug("finishing previous interrupted sync...")
+				res, err = stacks.SyncContinue(repo, stacks.StrategyRebase)
+
+				// Only the first branch needs to be --continue'd, for the rest
+				// we just do a normal merge/rebase
+				state.Continue = false
+			} else {
+				log.Debug("syncing branch...")
+				_, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: currentBranch})
+				if err != nil {
+					return err
+				}
+				res, err = stacks.SyncBranch(repo, &stacks.SyncBranchOpts{
+					Parent:   currentMeta.Parent,
+					Strategy: stacks.StrategyRebase,
+				})
+			}
+			log.WithField("result", res).WithError(err).Debug("sync finished")
+			if err != nil {
+				return errors.WrapIff(err, "failed to sync branch %q", currentBranch)
+			}
+
+			fmt.Printf("Syncing %q into %q: ", currentMeta.Parent, currentBranch)
+			switch res.Status {
+			case stacks.SyncAlreadyUpToDate:
+				fmt.Println("already up-to-date (no-op)")
+			case stacks.SyncUpdated:
+				fmt.Println("updated")
+			case stacks.SyncConflict:
+				fmt.Println("conflict")
+				if res.Hint != "" {
+					_, _ = fmt.Println(text.Indent(res.Hint, "    "))
+				}
+				conflict = true
+				break loop
+			default:
+				logrus.Panicf("invariant error: unknown sync result: %v", res)
+			}
+		}
+
+		if conflict {
+			if err := writeStackSyncState(repo, &state); err != nil {
 				return errors.Wrap(err, "failed to write stack sync state")
 			}
 			return errors.New("conflict detected: please resolve and then run `av stack sync --continue`")
@@ -152,64 +256,61 @@ base branch.
 		}
 
 		_, _ = fmt.Fprintf(os.Stderr, "Stack sync complete\n")
+
+		// Return to the starting branch when we're done
+		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+			Name: state.OriginalBranch,
+		}); err != nil {
+			return err
+		}
+
 		return nil
 	},
 }
 
-// doStackSync performs the stack sync operation.
-// It returns a boolean indicating whether or not the sync was interrupted
-// (if true, the stack sync can be resumed with the --continue flag).
-// TODO[mvp]:
-//    This whole function is kind of a hot mess, and a lot of it is rooted in
-//    how awkward the API is for dealing with "branch trees" (terminology is
-//    hard when you're creating a meta-tree-structure on top of git branches).
-//    Let's refactor that a bit and then re-work this.
-func doStackSync(repo *git.Repo, config stackSyncConfig) (bool, error) {
-	branches, err := meta.ReadAllBranches(repo)
-	if err != nil {
-		return false, err
-	}
+type syncResult struct {
+	Conflict      bool
+	CurrentBranch string
+}
 
-	currentBranch, err := repo.CurrentBranchName()
-	if err != nil {
-		return false, err
+// Find all the ancestor branches of the given branch name and append them to
+// the given slice (in topological order: a comes before b if a is an ancestor
+// of b).
+func previousBranches(branches map[string]meta.Branch, name string) ([]string, error) {
+	current, ok := branches[name]
+	if !ok {
+		return nil, errors.Errorf("branch metadata not found for %q", name)
 	}
+	if current.Parent == "" {
+		return nil, nil
+	}
+	previous, err := previousBranches(branches, current.Parent)
+	if err != nil {
+		return nil, err
+	}
+	return append(previous, current.Parent), nil
+}
 
-	for {
-		currentMeta, ok := branches[currentBranch]
-		if !ok {
-			return false, errors.Errorf("stack metadata not found for branch %q", currentBranch)
-		}
-		res, err := stacks.SyncBranch(repo, &stacks.SyncBranchOpts{
-			Parent:   currentMeta.Parent,
-			Continue: config.Continue,
-		})
+func subsequentBranches(branches map[string]meta.Branch, name string) ([]string, error) {
+	logrus.Debugf("finding subsequent branches for %q", name)
+	var res []string
+	branchMeta, ok := branches[name]
+	if !ok {
+		return nil, fmt.Errorf("branch metadata not found for %q", name)
+	}
+	if len(branchMeta.Children) == 0 {
+		return res, nil
+	}
+	for _, child := range branchMeta.Children {
+		res = append(res, child)
+		desc, err := subsequentBranches(branches, child)
 		if err != nil {
-			return false, errors.WrapIff(err, "failed to sync branch %q", currentBranch)
+			return nil, err
 		}
-		switch res.Status {
-		case stacks.SyncAlreadyUpToDate:
-			fmt.Printf("Branch %q is already up-to-date with %q\n", currentBranch, currentMeta.Parent)
-		case stacks.SyncUpdated:
-			fmt.Printf("Branch %q synchronized with %q\n", currentBranch, currentMeta.Parent)
-		case stacks.SyncConflict:
-			fmt.Printf("Branch %q has merge conflict with %q, aborting...\n", currentBranch, currentMeta.Parent)
-			if res.Hint != "" {
-				_, _ = fmt.Println(text.Indent(res.Hint, "    "))
-			}
-			return true, nil
-		default:
-			logrus.Panicf("invariant error: unknown sync result: %v", res)
-		}
-
-		if len(currentMeta.Children) == 0 {
-			return false, nil
-		}
-		if len(currentMeta.Children) > 1 {
-			return false, errors.Errorf("unsupported: branch %q has more than one child branch", currentBranch)
-		}
-		currentBranch = currentMeta.Children[0]
+		res = append(res, desc...)
 	}
+
+	return res, nil
 }
 
 const stackSyncStateFile = "stack-sync.state.json"
