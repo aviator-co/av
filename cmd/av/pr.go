@@ -60,7 +60,9 @@ Examples:
 		}
 
 		if !prCreateFlags.NoPush {
-			// First, make sure we've set the upstream.
+			pushFlags := []string{"push"}
+
+			// Check if the upstream is set. If not, we set it during push.
 			upstream, err := repo.RevParse(&git.RevParse{
 				SymbolicFullName: true,
 				Rev:              "HEAD@{u}",
@@ -68,12 +70,10 @@ Examples:
 			if err != nil {
 				// Set the upstream branch
 				upstream = "refs/remotes/origin/" + currentBranch
-				if _, err := repo.Git("branch", "--set-upstream-to", upstream); err != nil {
-					return errors.WrapIf(err, "failed to set upstream")
-				}
+				pushFlags = append(pushFlags, "--set-upstream", "origin", currentBranch)
 			}
 			logrus.WithField("upstream", upstream).Debug("pushing latest changes")
-			if _, err := repo.Git("push"); err != nil {
+			if _, err := repo.Git(pushFlags...); err != nil {
 				return errors.WrapIf(err, "failed to push")
 			}
 		}
@@ -92,6 +92,20 @@ Examples:
 		var prBaseBranch string
 		if ok && branchMeta.Parent != "" {
 			prBaseBranch = branchMeta.Parent
+			// check if the base branch also has an associated PR
+			baseMeta, ok := meta.ReadBranch(repo, prBaseBranch)
+			if !ok {
+				return errors.WrapIff(err, "failed to read branch metadata for %q", prBaseBranch)
+			}
+			if baseMeta.PullRequest == nil {
+				// TODO:
+				//     We should automagically create PRs for every branch in the stack
+				return errors.Errorf(
+					"base branch %q does not have an associated pull request "+
+						"(create one by checking out the branch and running `av pr create`)",
+					prBaseBranch,
+				)
+			}
 		} else {
 			defaultBranch, err := repo.DefaultBranch()
 			if err != nil {
