@@ -57,7 +57,7 @@ func (c *Client) CreatePullRequest(ctx context.Context, input githubv4.CreatePul
 		} `graphql:"createPullRequest(input: $input)"`
 	}
 	if err := c.mutate(ctx, &mutation, input, nil); err != nil {
-		return nil, errors.Wrap(err, "failed to create pull request")
+		return nil, errors.Wrap(err, "failed to create pull request: github error")
 	}
 	return &mutation.CreatePullRequest.PullRequest, nil
 }
