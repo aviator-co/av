@@ -9,6 +9,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    ldflags:
+      - "-X 'github.com/aviator-co/av/internal/config.Version={{ .Version }}'"
 
 # Create a GitHub release on the av repo
 release: {}
@@ -28,7 +30,7 @@ checksum:
   name_template: 'checksums.txt'
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  name_template: "{{ incpatch .Version }}-dev-{{ .ShortCommit }}"
 
 changelog:
   sort: asc
