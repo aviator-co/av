@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/git"
-	"github.com/aviator-co/av/internal/meta"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 var rootFlags struct {
@@ -89,7 +89,12 @@ func init() {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	// Note: this doesn't include whatever time is spent in initializing the
+	// runtime and various packages (e.g., package init functions).
+	startTime := time.Now()
+	err := rootCmd.Execute()
+	logrus.WithField("duration", time.Since(startTime)).Debug("command exited")
+	if err != nil {
 
 		// In debug mode, show more detailed information about the error
 		// (including the stack trace if using pkg/errors).
@@ -127,16 +132,4 @@ func getRepo() (*git.Repo, error) {
 		}
 	}
 	return cachedRepo, nil
-}
-
-func getRepoMeta() (meta.Repository, error) {
-	repo, err := getRepo()
-	if err != nil {
-		return meta.Repository{}, err
-	}
-	repoMeta, ok := meta.ReadRepository(repo)
-	if !ok {
-
-	}
-	return repoMeta, nil
 }

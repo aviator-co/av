@@ -2,6 +2,7 @@ package gh
 
 import (
 	"context"
+	"github.com/aviator-co/av/internal/utils/logutils"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
@@ -21,9 +22,16 @@ func NewClient(token string) (*Client, error) {
 }
 
 func (c *Client) query(ctx context.Context, query any, variables map[string]any) (reterr error) {
+	log := logrus.WithFields(logrus.Fields{
+		"variables": logutils.Format("%#+v", variables),
+	})
+	log.Debug("executing GitHub API query...")
 	startTime := time.Now()
 	defer func() {
-		log := logrus.WithField("time", time.Since(startTime))
+		log := log.WithFields(logrus.Fields{
+			"elapsed": time.Since(startTime),
+			"result":  logutils.Format("%#+v", query),
+		})
 		if reterr != nil {
 			log.WithError(reterr).Debug("GitHub API query failed")
 		} else {
@@ -34,9 +42,16 @@ func (c *Client) query(ctx context.Context, query any, variables map[string]any)
 }
 
 func (c *Client) mutate(ctx context.Context, mutation any, input githubv4.Input, variables map[string]any) (reterr error) {
+	log := logrus.WithFields(logrus.Fields{
+		"input": logutils.Format("%#+v", input),
+	})
+	log.Debug("executing GitHub API mutation...")
 	startTime := time.Now()
 	defer func() {
-		log := logrus.WithField("time", time.Since(startTime))
+		log := log.WithFields(logrus.Fields{
+			"elapsed": time.Since(startTime),
+			"result":  logutils.Format("%#+v", mutation),
+		})
 		if reterr != nil {
 			log.WithError(reterr).Debug("GitHub API mutation failed")
 		} else {

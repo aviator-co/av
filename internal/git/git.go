@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path"
 	"strings"
+	"time"
 )
 
 type Repo struct {
@@ -51,21 +52,23 @@ func (r *Repo) DefaultBranch() (string, error) {
 }
 
 func (r *Repo) Git(args ...string) (string, error) {
+	startTime := time.Now()
 	cmd := exec.Command("git", args...)
 	cmd.Dir = r.repoDir
-	r.log.Debugf("git %s", args)
 	out, err := cmd.Output()
+	log := r.log.WithField("duration", time.Since(startTime))
 	if err != nil {
 		stderr := "<no output>"
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
 			stderr = string(exitError.Stderr)
 		}
-		r.log.Debugf("git %s failed: %s: %s", args, err, stderr)
+		log.Debugf("git %s failed: %s: %s", args, err, stderr)
 		return strings.TrimSpace(string(out)), errors.Wrapf(err, "git %s", args[0])
 	}
 
 	// trim trailing newline
+	log.Debugf("git %s", args)
 	return strings.TrimSpace(string(out)), nil
 }
 
