@@ -14,6 +14,7 @@ func init() {
 		stackBranchCmd,
 		stackNextCmd,
 		stackPrevCmd,
+		stackReparentCmd,
 		stackSyncCmd,
 		stackTreeCmd,
 	)

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 	"strings"
 )
 
@@ -112,6 +113,19 @@ func ReadAllBranches(repo *git.Repo) (map[string]Branch, error) {
 // WriteBranch writes branch metadata to the git repository.
 // It can be loaded again with ReadBranch.
 func WriteBranch(repo *git.Repo, s Branch) error {
+	// Assert a few invariants here
+	// These should be checked by the caller before calling WriteBranch, but
+	// we want to be extra safe to avoid getting into an inconsistent state.
+	if s.Name == "" {
+		return errors.New("cannot write branch metadata: branch name is empty")
+	}
+	if s.Parent == s.Name {
+		return errors.New("cannot write branch metadata: parent branch is the same as the branch itself")
+	}
+	if slices.Contains(s.Children, s.Name) {
+		return errors.New("cannot write branch metadata: branch is a child of itself")
+	}
+
 	refName := branchMetaRefName(s.Name)
 	content, err := json.Marshal(s)
 	if err != nil {

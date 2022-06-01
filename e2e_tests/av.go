@@ -65,6 +65,14 @@ func Av(t *testing.T, args ...string) AvOutput {
 	return output
 }
 
+func RequireAv(t *testing.T, args ...string) AvOutput {
+	output := Av(t, args...)
+	if output.ExitCode != 0 {
+		logrus.Panicf("av %s: exited with %v", args, output.ExitCode)
+	}
+	return output
+}
+
 func Chdir(t *testing.T, dir string) {
 	current, err := os.Getwd()
 	if err != nil {
