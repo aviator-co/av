@@ -5,10 +5,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Version is the version of the av application.
-// It is set automatically when creating release builds.
-var Version = "<dev>"
-
 var GitHub = struct {
 	Token   string
 	BaseUrl string

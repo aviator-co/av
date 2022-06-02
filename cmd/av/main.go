@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/git"
+	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/mod/semver"
 	"os"
 	"os/exec"
 	"strings"
@@ -94,6 +96,7 @@ func main() {
 	startTime := time.Now()
 	err := rootCmd.Execute()
 	logrus.WithField("duration", time.Since(startTime)).Debug("command exited")
+	checkCliVersion()
 	if err != nil {
 
 		// In debug mode, show more detailed information about the error
@@ -106,6 +109,31 @@ func main() {
 		}
 
 		os.Exit(1)
+	}
+}
+
+func checkCliVersion() {
+	if config.Version == config.VersionDev {
+		logrus.Debug("skipping CLI version check (development version)")
+		return
+	}
+	latest, err := config.FetchLatestVersion()
+	if err != nil {
+		logrus.WithError(err).Warning("failed to determine latest released version of av")
+		return
+	}
+	logrus.WithField("latest", latest).Debug("fetched latest released version")
+	if semver.Compare(config.Version, latest) < 0 {
+		c := color.New(color.Bold, color.FgMagenta)
+		_, _ = fmt.Fprint(
+			os.Stderr,
+			c.Sprint(">> A new version of av is available: "),
+			color.RedString(config.Version),
+			c.Sprint(" => "),
+			color.GreenString(latest),
+			"\n",
+			c.Sprint(">> https://docs.aviator.co/reference/aviator-cli/installation#upgrade\n"),
+		)
 	}
 }
 
