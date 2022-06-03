@@ -2,6 +2,7 @@ package gh
 
 import (
 	"context"
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/utils/logutils"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
@@ -14,6 +15,9 @@ type Client struct {
 }
 
 func NewClient(token string) (*Client, error) {
+	if token == "" {
+		return nil, errors.Errorf("no GitHub token provided (do you need to configure one?)")
+	}
 	src := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: token},
 	)
@@ -68,5 +72,17 @@ func (c *Client) mutate(ctx context.Context, mutation any, input githubv4.Input,
 // primitives.
 // For example, githubv4.CreatePullRequestInput{Draft: Ptr(true)}
 func Ptr[T any](v T) *T {
+	return &v
+}
+
+// nullable returns a pointer to the argument if it's not the zero value,
+// otherwise it returns nil.
+// This is useful to translate between Golang-style "unset is zero" and GraphQL
+// which distinguishes between unset (null) and zero values.
+func nullable[T comparable](v T) *T {
+	var zero T
+	if v == zero {
+		return nil
+	}
 	return &v
 }
