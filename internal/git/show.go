@@ -3,7 +3,7 @@ package git
 import (
 	"bytes"
 	"emperror.dev/errors"
-	"fmt"
+	"strings"
 )
 
 type CommitInfoOpts struct {
@@ -17,17 +17,30 @@ type CommitInfo struct {
 }
 
 func (r *Repo) CommitInfo(opts CommitInfoOpts) (*CommitInfo, error) {
-	res, err := r.Git("show", "--format=%H%n%s%n%b", opts.Rev)
+	// Need --quiet to suppress the diff that would otherwise be printed at the
+	// end
+	res, err := r.Git("show", "--quiet", "--format=%H%n%s%n%b", opts.Rev)
 	if err != nil {
 		return nil, err
 	}
 	var info CommitInfo
 	buf := bytes.NewBufferString(res)
-	if _, err := fmt.Fscanf(buf, "%s\n%s\n", &info.Hash, &info.Subject); err != nil {
-		return nil, errors.WrapIff(err, "failed to read output of git show")
+	info.Hash, err = readLine(buf)
+	if err != nil {
+		return nil, errors.Wrap(err, "git show: failed to parse commit hash")
 	}
-	// Note: buf.ReadString returns error iff buffer doesn't contain the delimiter,
-	// which is expected, so we just ignore the error.
+	info.Subject, err = readLine(buf)
+	if err != nil {
+		return nil, errors.Wrap(err, "git show: failed to parse commit subject")
+	}
 	info.Body, _ = buf.ReadString('\000')
 	return &info, nil
+}
+
+func readLine(buf *bytes.Buffer) (string, error) {
+	line, err := buf.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(line, "\n"), nil
 }
