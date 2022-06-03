@@ -147,6 +147,15 @@ func WriteBranch(repo *git.Repo, s Branch) error {
 	return nil
 }
 
+func DeleteBranch(repo *git.Repo, name string) error {
+	refName := branchMetaRefName(name)
+	if err := repo.UpdateRef(&git.UpdateRef{Ref: refName, New: git.Missing}); err != nil {
+		return err
+	}
+	logrus.WithField("ref", refName).Debug("deleted branch metadata")
+	return nil
+}
+
 const branchMetaRefPrefix = "refs/av/branch-metadata/"
 
 func branchMetaRefName(branchName string) string {

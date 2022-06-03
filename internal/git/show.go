@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"emperror.dev/errors"
+	"github.com/sirupsen/logrus"
 	"strings"
 )
 
@@ -19,12 +20,16 @@ type CommitInfo struct {
 func (r *Repo) CommitInfo(opts CommitInfoOpts) (*CommitInfo, error) {
 	// Need --quiet to suppress the diff that would otherwise be printed at the
 	// end
-	res, err := r.Git("show", "--quiet", "--format=%H%n%s%n%b", opts.Rev)
+	res, err := r.Run(&RunOpts{
+		Args:      []string{"show", "--quiet", "--format=%H%n%s%n%b", opts.Rev},
+		ExitError: true,
+	})
 	if err != nil {
 		return nil, err
 	}
+	logrus.WithFields(logrus.Fields{"output": string(res.Stdout), "rev": opts.Rev}).Debug("got commit info")
 	var info CommitInfo
-	buf := bytes.NewBufferString(res)
+	buf := bytes.NewBuffer(res.Stdout)
 	info.Hash, err = readLine(buf)
 	if err != nil {
 		return nil, errors.Wrap(err, "git show: failed to parse commit hash")
