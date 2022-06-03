@@ -134,6 +134,16 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		opts.Title = firstCommit.Subject
 	}
 	if opts.Body == "" {
+		// Commits bodies are often in a fixed-width format (e.g., 80 characters
+		// wide) so most newlines should actually be spaces. Unfortunately,
+		// GitHub renders newlines in the commit body (which goes against the
+		// Markdown spec, but whatever) which makes it a little bit weird to
+		// directly include in the PR body. We could convert singe newlines to
+		// spaces to make GitHub happy, but that's not trivial without using a
+		// full-on Markdown parser (e.g., "foo\nbar" should become "foo bar" but
+		// "foo\n* bar" should stay the same).
+		// Maybe someday we can invest in making this better, but it's not the
+		// end of the world.
 		opts.Body = firstCommit.Body
 	}
 
