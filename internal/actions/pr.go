@@ -157,10 +157,11 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		return nil, err
 	}
 
-	_, _ = fmt.Fprintln(os.Stderr,
-		"  - Created pull request for branch ", color.CyanString("%s", currentBranch),
+	_, _ = fmt.Fprint(os.Stderr,
+		"  - created pull request for branch ", color.CyanString("%s", currentBranch),
 		" (into branch ", color.CyanString("%s", prBaseBranch), "): ",
 		color.CyanString("%s", pull.Permalink),
+		"\n",
 	)
 	return pull, nil
 }
