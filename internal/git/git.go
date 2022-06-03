@@ -244,6 +244,7 @@ func (r *Repo) Origin() (*Origin, error) {
 	}
 
 	repoSlug := strings.TrimSuffix(u.Path, ".git")
+	repoSlug = strings.TrimPrefix(repoSlug, "/")
 	return &Origin{
 		URL:      u,
 		RepoSlug: repoSlug,
