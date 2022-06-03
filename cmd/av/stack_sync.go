@@ -20,10 +20,6 @@ import (
 // It is serializable to JSON to handle the case where the sync is interrupted
 // by a merge conflict (so it can be resumed with the --continue flag).
 type stackSyncConfig struct {
-	// Set the parent of the current branch to this branch.
-	// This effectively re-roots the stack on a new parent (e.g., adds a branch
-	// to the stack).
-	Parent string `json:"parent"`
 	// If set, only sync up to the current branch (do not sync descendants).
 	// This is useful for syncing changes from a parent branch in case the
 	// current branch needs to be updated before continuing the sync.
@@ -155,7 +151,7 @@ base branch.
 			return err
 		}
 		var branchesToSync []string
-		if state.Continue {
+		if state.Continue || state.Config.Current {
 			// If we're continuing, we assume the previous branches are already
 			// synced correctly and we just need to sync the subsequent
 			// branches. (This matters because if we're here, that means there
@@ -284,6 +280,9 @@ func previousBranches(branches map[string]meta.Branch, name string) ([]string, e
 	if current.Parent == "" {
 		return nil, nil
 	}
+	if current.Parent == name {
+		logrus.Fatalf("invariant error: branch %q is its own parent (this is probably a bug with av)", name)
+	}
 	previous, err := previousBranches(branches, current.Parent)
 	if err != nil {
 		return nil, err
@@ -356,10 +355,6 @@ func writeStackSyncState(repo *git.Repo, state *stackSyncState) error {
 }
 
 func init() {
-	stackSyncCmd.Flags().StringVar(
-		&stackSyncFlags.Parent, "parent", "",
-		"set the stack parent to this branch",
-	)
 	stackSyncCmd.Flags().BoolVar(
 		&stackSyncFlags.Current, "current", false,
 		"only sync changes to the current branch\n(don't recurse into descendant branches)",

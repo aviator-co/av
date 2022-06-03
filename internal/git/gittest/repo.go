@@ -5,6 +5,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"testing"
 )
@@ -15,7 +16,15 @@ func init() {
 
 // NewTempRepo initializes a new git repository with reasonable defaults.
 func NewTempRepo(t *testing.T) *git.Repo {
-	dir := t.TempDir()
+	var dir string
+	if os.Getenv("AV_TEST_PRESERVE_TEMP_REPO") != "" {
+		var err error
+		dir, err = os.MkdirTemp("", "repo")
+		require.NoError(t, err)
+		logrus.Infof("created git test repo: %s", dir)
+	} else {
+		dir = t.TempDir()
+	}
 	init := exec.Command("git", "init", "--initial-branch=main")
 	init.Dir = dir
 
