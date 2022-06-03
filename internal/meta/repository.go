@@ -19,21 +19,23 @@ type Repository struct {
 	Name string `json:"name"`
 }
 
+var ErrRepoNotInitialized = errors.New("this repository not initialized: please run `av init`")
+
 // ReadRepository reads repository metadata from the git repo.
 // Returns the metadata and a boolean indicating if the metadata was found.
-func ReadRepository(repo *git.Repo) (Repository, bool) {
+func ReadRepository(repo *git.Repo) (Repository, error) {
 	var meta Repository
 
 	metaPath := path.Join(repo.Dir(), ".git", "av", "repo-metadata.json")
 	data, err := ioutil.ReadFile(metaPath)
 	if err != nil {
-		return meta, false
+		return meta, ErrRepoNotInitialized
 	}
 	if err := json.Unmarshal(data, &meta); err != nil {
 		logrus.WithError(err).Error("repository metadata file is corrupt - ignoring")
-		return meta, false
+		return meta, ErrRepoNotInitialized
 	}
-	return meta, true
+	return meta, nil
 }
 
 // WriteRepository writes repository metadata to the git repo.
