@@ -38,6 +38,10 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		return nil, errors.WrapIf(err, "failed to determine current branch")
 	}
 
+	_, _ = fmt.Fprint(os.Stderr,
+		"Creating pull request for branch ", color.CyanString(currentBranch), ":",
+		"\n",
+	)
 	if !opts.SkipPush {
 		pushFlags := []string{"push"}
 
@@ -58,13 +62,17 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		logrus.WithField("upstream", upstream).Debug("pushing latest changes")
 
 		_, _ = fmt.Fprint(os.Stderr,
-			"  - pushing branch ", color.CyanString("%s", currentBranch),
-			" to GitHub (", color.CyanString("%s", upstream), ")...",
+			"  - pushing branch  to GitHub (", color.CyanString("%s", upstream), ")",
 			"\n",
 		)
 		if _, err := repo.Git(pushFlags...); err != nil {
 			return nil, errors.WrapIf(err, "failed to push")
 		}
+	} else {
+		_, _ = fmt.Fprint(os.Stderr,
+			"  - skipping push to GitHub",
+			"\n",
+		)
 	}
 
 	// TODO:

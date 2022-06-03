@@ -75,6 +75,9 @@ func (r *Repo) Git(args ...string) (string, error) {
 type RunOpts struct {
 	Args []string
 	Env  []string
+	// If true, return a non-nil error if the command exited with a non-zero
+	// exit code.
+	ExitError bool
 }
 
 type Output struct {
@@ -95,6 +98,9 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 	var exitError *exec.ExitError
 	if err != nil && !errors.As(err, &exitError) {
 		return nil, errors.Wrapf(err, "git %s", opts.Args)
+	}
+	if err != nil && opts.ExitError && exitError.ExitCode() != 0 {
+		return nil, errors.Errorf("git %s: %s: %s", opts.Args, err, string(stderr.Bytes()))
 	}
 	return &Output{
 		ExitCode: cmd.ProcessState.ExitCode(),
