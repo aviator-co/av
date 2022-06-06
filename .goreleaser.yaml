@@ -10,10 +10,16 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - "-X 'github.com/aviator-co/av/internal/config.Version={{ .Version }}'"
+      - "-X 'github.com/aviator-co/av/internal/config.Version=v{{ .Version }}'"
 
 # Create a GitHub release on the av repo
 release: {}
+
+archives:
+  - replacements:
+      amd64: x86_64
+      darwin: macos
+
 
 # Push to the homebrew tap
 brews:

@@ -125,7 +125,7 @@ func checkCliVersion() {
 	}
 	logrus.WithField("latest", latest).Debug("fetched latest released version")
 	if semver.Compare(config.Version, latest) < 0 {
-		c := color.New(color.Bold, color.FgMagenta)
+		c := color.New(color.Faint, color.Bold)
 		_, _ = fmt.Fprint(
 			os.Stderr,
 			c.Sprint(">> A new version of av is available: "),
