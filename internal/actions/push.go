@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/aviator-co/av/internal/utils/stringutils"
+	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
@@ -72,7 +72,7 @@ func Push(repo *git.Repo, opts PushOpts) error {
 		} else {
 			_, _ = colors.TroubleshootingC.Fprint(os.Stderr,
 				"      - git output:\n",
-				stringutils.Indent(string(res.Stderr), "        "),
+				text.Indent(string(res.Stderr), "        "),
 				"\n",
 			)
 		}

@@ -6,6 +6,7 @@ import (
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/fatih/color"
+	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
@@ -104,7 +105,7 @@ func main() {
 		// (including the stack trace if using pkg/errors).
 		if rootFlags.Debug {
 			stackTrace := fmt.Sprintf("%+v", err)
-			_, _ = fmt.Fprintf(os.Stderr, "error: %s\n%s\n", err, indent(stackTrace, "\t"))
+			_, _ = fmt.Fprintf(os.Stderr, "error: %s\n%s\n", err, text.Indent(stackTrace, "\t"))
 		} else {
 			_, _ = fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		}
@@ -136,11 +137,6 @@ func checkCliVersion() {
 			c.Sprint(">> https://docs.aviator.co/reference/aviator-cli/installation#upgrade\n"),
 		)
 	}
-}
-
-func indent(s string, prefix string) string {
-	// why is this not in the stdlib????
-	return prefix + strings.Replace(s, "\n", "\n"+prefix, -1)
 }
 
 var cachedRepo *git.Repo
