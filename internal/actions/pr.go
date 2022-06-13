@@ -62,7 +62,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		logrus.WithField("upstream", upstream).Debug("pushing latest changes")
 
 		_, _ = fmt.Fprint(os.Stderr,
-			"  - pushing branch  to GitHub (", color.CyanString("%s", upstream), ")",
+			"  - pushing branch to GitHub (", color.CyanString("%s", upstream), ")",
 			"\n",
 		)
 		if _, err := repo.Git(pushFlags...); err != nil {
