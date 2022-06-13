@@ -4,6 +4,7 @@ import (
 	"emperror.dev/errors"
 	"fmt"
 	"github.com/aviator-co/av/internal/git"
+	"strings"
 )
 
 type SyncStatus int
@@ -13,11 +14,14 @@ const (
 	// target branch was already up-to-date with its parent.
 	SyncAlreadyUpToDate SyncStatus = iota
 	// SyncUpdated indicates that the sync updated the target branch
-	// (i.e., created a merge commit or perfomed a rebase).
+	// (i.e., created a merge commit or performed a rebase).
 	SyncUpdated SyncStatus = iota
 	// SyncConflict indicates that there was a conflict while syncing the
 	// target branch with its parent.
 	SyncConflict SyncStatus = iota
+	// SyncNotInProgress indicates that there was no sync in progress when
+	// SyncContinue was invoked.
+	SyncNotInProgress SyncStatus = iota
 )
 
 type SyncStrategy int
@@ -150,16 +154,42 @@ func SyncContinue(repo *git.Repo, strategy SyncStrategy) (*SyncResult, error) {
 		if err != nil {
 			return nil, err
 		}
-		if out.ExitCode != 0 {
-			return &SyncResult{
-				Status: SyncConflict,
-				Hint:   string(out.Stderr),
-			}, nil
-		}
-		return &SyncResult{
-			Status: SyncUpdated,
-		}, nil
+		return parseRebaseOutput(out)
 	default:
 		return nil, errors.New("unknown sync strategy")
 	}
+}
+
+func parseRebaseOutput(out *git.Output) (*SyncResult, error) {
+	stderr := string(out.Stderr)
+
+	if out.ExitCode == 0 {
+		return &SyncResult{Status: SyncUpdated}, nil
+	}
+
+	// Heuristic: output when rebase is not in progress is usually
+	// "    fatal: No rebase in progress?"
+	if strings.Contains(stderr, "No rebase in progress") {
+		return &SyncResult{
+			Status: SyncNotInProgress,
+			Hint:   string(out.Stderr),
+		}, nil
+	}
+
+	if strings.Contains(stderr, "Could not apply") {
+		return &SyncResult{
+			Status: SyncConflict,
+			Hint:   string(out.Stderr),
+		}, nil
+	}
+
+	if out.ExitCode != 0 {
+		return &SyncResult{
+			Status: SyncConflict,
+			Hint:   stderr,
+		}, nil
+	}
+	return &SyncResult{
+		Status: SyncUpdated,
+	}, nil
 }
