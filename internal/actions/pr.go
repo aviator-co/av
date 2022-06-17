@@ -10,6 +10,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
+	"github.com/pkg/browser"
 	"os"
 	"strings"
 )
@@ -181,5 +182,8 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		color.CyanString("%s", pull.Permalink),
 		"\n",
 	)
+
+	browser.OpenURL(pull.Permalink)
+
 	return pull, nil
 }
