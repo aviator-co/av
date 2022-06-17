@@ -10,9 +10,9 @@ import (
 	"github.com/fatih/color"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
-	"github.com/pkg/browser"
 	"os"
 	"strings"
+	"browser"
 )
 
 type CreatePullRequestOpts struct {
@@ -183,7 +183,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		"\n",
 	)
 
-	browser.OpenURL(pull.Permalink)
+	_, _ = browser.Open(pull.Permalink)
 
 	return pull, nil
 }
