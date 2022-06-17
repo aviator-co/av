@@ -2,17 +2,18 @@ package actions
 
 import (
 	"context"
-	"emperror.dev/errors"
 	"fmt"
+	"os"
+	"strings"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/browser"
 	"github.com/fatih/color"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
-	"os"
-	"strings"
-	"browser"
 )
 
 type CreatePullRequestOpts struct {
@@ -183,7 +184,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		"\n",
 	)
 
-	_, _ = browser.Open(pull.Permalink)
+	_ = browser.Open(pull.Permalink)
 
 	return pull, nil
 }
