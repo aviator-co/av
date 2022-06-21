@@ -64,5 +64,5 @@ func TestStackSync(t *testing.T) {
 	// further sync attemps should yield no-ops
 	syncNoop := Av(t, "stack", "sync", "--no-push")
 	require.Equal(t, 0, syncNoop.ExitCode)
-	require.Contains(t, syncNoop.Stdout, "already up-to-date")
+	require.Contains(t, syncNoop.Stderr, "already up-to-date")
 }

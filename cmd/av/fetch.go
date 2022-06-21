@@ -7,6 +7,7 @@ import (
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/fatih/color"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
@@ -49,7 +50,7 @@ var fetchCmd = &cobra.Command{
 				// only do this once at the start
 				_, _ = fmt.Fprint(
 					os.Stderr,
-					"Fetching ", color.CyanString(fmt.Sprintf("%d", prsPage.TotalCount)),
+					"Fetching ", colors.UserInput(prsPage.TotalCount),
 					" open pull requests from GitHub...",
 					"\n",
 				)
@@ -66,8 +67,8 @@ var fetchCmd = &cobra.Command{
 				if branchMeta.PullRequest == nil {
 					_, _ = fmt.Fprint(
 						os.Stderr,
-						"  - Found pull request ", color.CyanString("#%d", pr.Number),
-						" for branch ", color.CyanString(pr.HeadBranchName()),
+						"  - Found pull request ", colors.UserInput(pr.Number),
+						" for branch ", colors.UserInput(pr.HeadBranchName()),
 						"\n",
 					)
 				} else if branchMeta.PullRequest.Number != pr.Number {
@@ -77,10 +78,10 @@ var fetchCmd = &cobra.Command{
 					_, _ = fmt.Fprint(
 						os.Stderr,
 						"  - ", color.RedString("WARNING: "),
-						"found new pull request ", color.CyanString("#%d (%q)", pr.Number, pr.Title),
-						" for branch ", color.CyanString("%s", pr.HeadBranchName()),
+						"found new pull request ", colors.UserInput("#", pr.Number, " ", pr.Title),
+						" for branch ", colors.UserInput(pr.HeadBranchName()),
 						", overwriting... ",
-						" (old pull request: ", color.CyanString("#%d", branchMeta.PullRequest.Number), ")",
+						" (old pull request: ", colors.UserInput("#", branchMeta.PullRequest.Number), ")",
 						"\n",
 					)
 				} else {

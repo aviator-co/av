@@ -4,9 +4,11 @@ import (
 	"emperror.dev/errors"
 	"encoding/json"
 	"fmt"
+	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/stacks"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stringutils"
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
@@ -139,6 +141,11 @@ base branch.
 			if err != nil {
 				return err
 			}
+			state.Config = stackSyncConfig{
+				Current: stackSyncFlags.Current,
+				Trunk:   stackSyncFlags.Trunk,
+				NoPush:  stackSyncFlags.NoPush,
+			}
 		}
 
 		// Set the original branch so we can return to it when the sync is done
@@ -190,6 +197,22 @@ base branch.
 				return errors.Errorf("stack metadata not found for branch %q", currentBranch)
 			}
 			if currentMeta.Parent == "" {
+				// This should be the first branch in the stack. We don't need
+				// to rebase it (at least not yet -- at some point we need to
+				// implement rebasing on top of trunk...), but we still need to
+				// push it to GitHub.
+				if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+					Name: currentBranch,
+				}); err != nil {
+					return errors.WrapIff(err, "failed to check out branch %q", currentBranch)
+				}
+				if !state.Config.NoPush {
+					if err := actions.Push(repo, actions.PushOpts{
+						Force: actions.ForceWithLease,
+					}); err != nil {
+						return err
+					}
+				}
 				continue
 			}
 			log := logrus.WithFields(logrus.Fields{
@@ -223,14 +246,23 @@ base branch.
 				return errors.WrapIff(err, "failed to sync branch %q", currentBranch)
 			}
 
-			fmt.Printf("Syncing %q into %q: ", currentMeta.Parent, currentBranch)
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - syncing ", colors.UserInput(currentBranch),
+				" on top of ", colors.UserInput(currentBranch), "... ",
+			)
 			switch res.Status {
 			case stacks.SyncAlreadyUpToDate:
-				fmt.Println("already up-to-date (no-op)")
+				_, _ = fmt.Fprint(os.Stderr,
+					colors.Success("already up-to-date"), "\n",
+				)
 			case stacks.SyncUpdated:
-				fmt.Println("updated")
+				_, _ = fmt.Fprint(os.Stderr,
+					colors.Success("updated"), "\n",
+				)
 			case stacks.SyncConflict:
-				fmt.Println("conflict")
+				_, _ = fmt.Fprint(os.Stderr,
+					colors.Failure("conflict"), "\n",
+				)
 				if res.Hint != "" {
 					// Remove the "hint: ..." lines from the output since they
 					// contain instructions that tell the user to run
@@ -258,6 +290,14 @@ base branch.
 				resErr = errors.Errorf("rebase was completed or cancelled outside of av: please run `av stack sync --abort` to abort the current sync and then retry")
 			default:
 				logrus.Panicf("invariant error: unknown sync result: %v", res)
+			}
+
+			if !state.Config.NoPush {
+				if err := actions.Push(repo, actions.PushOpts{
+					Force: actions.ForceWithLease,
+				}); err != nil {
+					return err
+				}
 			}
 		}
 
