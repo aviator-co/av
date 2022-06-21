@@ -7,6 +7,7 @@ import (
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/fatih/color"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
@@ -39,7 +40,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	}
 
 	_, _ = fmt.Fprint(os.Stderr,
-		"Creating pull request for branch ", color.CyanString(currentBranch), ":",
+		"Creating pull request for branch ", colors.UserInput(currentBranch), ":",
 		"\n",
 	)
 	if !opts.SkipPush {
@@ -62,7 +63,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		logrus.WithField("upstream", upstream).Debug("pushing latest changes")
 
 		_, _ = fmt.Fprint(os.Stderr,
-			"  - pushing branch  to GitHub (", color.CyanString("%s", upstream), ")",
+			"  - pushing branch to GitHub (", colors.UserInput(upstream), ")",
 			"\n",
 		)
 		if _, err := repo.Git(pushFlags...); err != nil {
@@ -84,9 +85,9 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	if ok && branchMeta.PullRequest != nil && !opts.Force {
 		_, _ = fmt.Fprint(os.Stderr,
 			"  - ", color.RedString("ERROR: "),
-			"branch ", color.CyanString("%s", currentBranch),
+			"branch ", colors.UserInput(currentBranch),
 			" already has an associated pull request: ",
-			color.CyanString("%s", branchMeta.PullRequest.Permalink),
+			colors.UserInput(branchMeta.PullRequest.Permalink),
 			"\n",
 		)
 		return nil, errors.New("this branch already has an associated pull request")
@@ -176,9 +177,9 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	}
 
 	_, _ = fmt.Fprint(os.Stderr,
-		"  - created pull request for branch ", color.CyanString("%s", currentBranch),
-		" (into branch ", color.CyanString("%s", prBaseBranch), "): ",
-		color.CyanString("%s", pull.Permalink),
+		"  - created pull request for branch ", colors.UserInput(currentBranch),
+		" (into branch ", colors.UserInput(prBaseBranch), "): ",
+		colors.UserInput(pull.Permalink),
 		"\n",
 	)
 	return pull, nil

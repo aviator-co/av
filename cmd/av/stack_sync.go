@@ -4,9 +4,12 @@ import (
 	"emperror.dev/errors"
 	"encoding/json"
 	"fmt"
+	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/stacks"
+	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/fatih/color"
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -138,6 +141,11 @@ base branch.
 			if err != nil {
 				return err
 			}
+			state.Config = stackSyncConfig{
+				Current: stackSyncFlags.Current,
+				Trunk:   stackSyncFlags.Trunk,
+				NoPush:  stackSyncFlags.NoPush,
+			}
 		}
 
 		// Set the original branch so we can return to it when the sync is done
@@ -189,6 +197,22 @@ base branch.
 				return errors.Errorf("stack metadata not found for branch %q", currentBranch)
 			}
 			if currentMeta.Parent == "" {
+				// This should be the first branch in the stack. We don't need
+				// to rebase it (at least not yet -- at some point we need to
+				// implement rebasing on top of trunk...), but we still need to
+				// push it to GitHub.
+				if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+					Name: currentBranch,
+				}); err != nil {
+					return errors.WrapIff(err, "failed to check out branch %q", currentBranch)
+				}
+				if !state.Config.NoPush {
+					if err := actions.Push(repo, actions.PushOpts{
+						Force: actions.ForceWithLease,
+					}); err != nil {
+						return err
+					}
+				}
 				continue
 			}
 			log := logrus.WithFields(logrus.Fields{
@@ -222,14 +246,23 @@ base branch.
 				return errors.WrapIff(err, "failed to sync branch %q", currentBranch)
 			}
 
-			fmt.Printf("Syncing %q into %q: ", currentMeta.Parent, currentBranch)
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - syncing ", colors.UserInput(currentBranch),
+				" on top of ", colors.UserInput(currentBranch), "... ",
+			)
 			switch res.Status {
 			case stacks.SyncAlreadyUpToDate:
-				fmt.Println("already up-to-date (no-op)")
+				_, _ = fmt.Fprint(os.Stderr,
+					colors.Success("already up-to-date"), "\n",
+				)
 			case stacks.SyncUpdated:
-				fmt.Println("updated")
+				_, _ = fmt.Fprint(os.Stderr,
+					colors.Success("updated"), "\n",
+				)
 			case stacks.SyncConflict:
-				fmt.Println("conflict")
+				_, _ = fmt.Fprint(os.Stderr,
+					colorFailure.Sprint("conflict"), "\n",
+				)
 				if res.Hint != "" {
 					_, _ = fmt.Println(text.Indent(res.Hint, "    "))
 				}
@@ -237,6 +270,14 @@ base branch.
 				break loop
 			default:
 				logrus.Panicf("invariant error: unknown sync result: %v", res)
+			}
+
+			if !state.Config.NoPush {
+				if err := actions.Push(repo, actions.PushOpts{
+					Force: actions.ForceWithLease,
+				}); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -377,3 +418,10 @@ func init() {
 		"abort an in-progress sync",
 	)
 }
+
+var (
+	colorCliCmd          = color.New(color.FgMagenta)
+	colorSuccess         = color.New(color.FgGreen, color.Bold)
+	colorFailure         = color.New(color.FgRed, color.Bold)
+	colorTroubleshooting = color.New(color.Faint)
+)
