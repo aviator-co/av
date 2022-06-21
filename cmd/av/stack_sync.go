@@ -9,7 +9,7 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/stacks"
 	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/fatih/color"
+	"github.com/aviator-co/av/internal/utils/stringutils"
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -188,7 +188,7 @@ base branch.
 		branchesToSync = append(branchesToSync, nextBranches...)
 
 		logrus.WithField("branches", branchesToSync).Debug("determined branches to sync")
-		conflict := false
+		var resErr error
 	loop:
 		for _, currentBranch := range branchesToSync {
 			state.CurrentBranch = currentBranch
@@ -261,13 +261,33 @@ base branch.
 				)
 			case stacks.SyncConflict:
 				_, _ = fmt.Fprint(os.Stderr,
-					colorFailure.Sprint("conflict"), "\n",
+					colors.Failure("conflict"), "\n",
 				)
 				if res.Hint != "" {
-					_, _ = fmt.Println(text.Indent(res.Hint, "    "))
+					// Remove the "hint: ..." lines from the output since they
+					// contain instructions that tell the user to run
+					// `git rebase --continue` which we actually *don't* want
+					// them to do.
+					hint := stringutils.RemoveLines(res.Hint, "hint: ")
+					_, _ = fmt.Println(text.Indent(hint, "    "))
 				}
-				conflict = true
+				resErr = errors.Errorf("conflict detected: please resolve and then run `av stack sync --continue`")
 				break loop
+			case stacks.SyncNotInProgress:
+				fmt.Println("invalid state")
+				// TODO:
+				// 		Would be nice to have some way to show more details than
+				// 		this, but having multi-line error's is not very idiomatic
+				//		with go. A future improvement might be having an
+				//		interface like ErrorDetails that can be used to show
+				//		help text if it's the return error from a CLI
+				//		invocation.
+				// Note:
+				//		We don't just auto-abort here because it's unclear what
+				//		the actual state is here. We'd rather err on the side of
+				// 		making the user be explicit than do something unexpected
+				//		with their code/repository.
+				resErr = errors.Errorf("rebase was completed or cancelled outside of av: please run `av stack sync --abort` to abort the current sync and then retry")
 			default:
 				logrus.Panicf("invariant error: unknown sync result: %v", res)
 			}
@@ -281,11 +301,17 @@ base branch.
 			}
 		}
 
-		if conflict {
+		// TODO:
+		// 		this weird thing where we set resErr then break outside of the
+		//		loop is a code smell which probably indicates we should have
+		//		another function wrapping a lot of the logic above, but we'll
+		//		fix that at some point
+		if resErr != nil {
 			if err := writeStackSyncState(repo, &state); err != nil {
+				logrus.WithError(resErr).Warn("while handling error, failed to write stack sync state")
 				return errors.Wrap(err, "failed to write stack sync state")
 			}
-			return errors.New("conflict detected: please resolve and then run `av stack sync --continue`")
+			return resErr
 		}
 
 		if err := writeStackSyncState(repo, nil); err != nil {
@@ -418,10 +444,3 @@ func init() {
 		"abort an in-progress sync",
 	)
 }
-
-var (
-	colorCliCmd          = color.New(color.FgMagenta)
-	colorSuccess         = color.New(color.FgGreen, color.Bold)
-	colorFailure         = color.New(color.FgRed, color.Bold)
-	colorTroubleshooting = color.New(color.Faint)
-)
