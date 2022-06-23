@@ -199,7 +199,9 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	if err := browser.Open(pull.Permalink); err != nil {
 		fmt.Fprint(os.Stderr,
 			"  - couldn't open browser ",
-			color.CyanString("%s", err),
+			colors.UserInput(err),
+			" for pull request link ",
+			colors.UserInput(pull.Permalink),
 		)
 	}
 
