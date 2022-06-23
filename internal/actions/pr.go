@@ -184,7 +184,12 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		"\n",
 	)
 
-	_ = browser.Open(pull.Permalink)
+	if err := browser.Open(pull.Permalink); err != nil {
+		fmt.Fprint(os.Stderr,
+			"  - couldn't open browser ",
+			color.CyanString("%s", err),
+		)
+	}
 
 	return pull, nil
 }
