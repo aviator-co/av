@@ -12,6 +12,12 @@ var GitHub = struct {
 	BaseUrl: "https://github.com",
 }
 
+var App = struct {
+	OpenBrowser bool
+}{
+	OpenBrowser: true,
+}
+
 // Load initializes the configuration values.
 // It may optionally be called with a list of additional paths to check for the
 // config file.
@@ -45,6 +51,10 @@ func Load(paths []string) (bool, error) {
 
 	if err := config.UnmarshalKey("github", &GitHub); err != nil {
 		return true, errors.Wrap(err, "failed to read github config")
+	}
+
+	if err := config.UnmarshalKey("app", &App); err != nil {
+		return true, errors.Wrap(err, "failed to read app config")
 	}
 
 	return true, nil

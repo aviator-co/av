@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
+	"io/ioutil"
+	"os"
+	"strings"
+
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/spf13/cobra"
-	"io/ioutil"
-	"os"
-	"strings"
 )
 
 var prCmd = &cobra.Command{
@@ -17,11 +18,12 @@ var prCmd = &cobra.Command{
 }
 
 var prCreateFlags struct {
-	Base   string
-	Force  bool
-	NoPush bool
-	Title  string
-	Body   string
+	Base        string
+	Force       bool
+	NoPush      bool
+	OpenBrowser bool
+	Title       string
+	Body        string
 }
 var prCreateCmd = &cobra.Command{
 	Use:   "create",
@@ -62,10 +64,11 @@ Examples:
 		if _, err := actions.CreatePullRequest(
 			context.Background(), repo, client,
 			actions.CreatePullRequestOpts{
-				Title:    prCreateFlags.Title,
-				Body:     body,
-				SkipPush: prCreateFlags.NoPush,
-				Force:    prCreateFlags.Force,
+				Title:       prCreateFlags.Title,
+				Body:        body,
+				SkipPush:    prCreateFlags.NoPush,
+				Force:       prCreateFlags.Force,
+				OpenBrowser: prCreateFlags.OpenBrowser,
 			},
 		); err != nil {
 			return err
@@ -89,6 +92,10 @@ func init() {
 	prCreateCmd.Flags().BoolVar(
 		&prCreateFlags.NoPush, "no-push", false,
 		"don't push the latest changes to the remote",
+	)
+	prCreateCmd.Flags().BoolVar(
+		&prCreateFlags.OpenBrowser, "open-browser", config.App.OpenBrowser,
+		"should we attempt to open browser? the default is the app level open-browser setting",
 	)
 	prCreateCmd.Flags().StringVarP(
 		&prCreateFlags.Title, "title", "t", "",

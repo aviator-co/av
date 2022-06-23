@@ -26,6 +26,8 @@ type CreatePullRequestOpts struct {
 	SkipPush bool
 	// If true, create a PR even if we think one already exists
 	Force bool
+	// If true, browser will attempt to open PR regardless of app level settings
+	OpenBrowser bool
 }
 
 // CreatePullRequest creates a pull request on GitHub for the current branch, if
@@ -196,13 +198,15 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		"\n",
 	)
 
-	if err := browser.Open(pull.Permalink); err != nil {
-		fmt.Fprint(os.Stderr,
-			"  - couldn't open browser ",
-			colors.UserInput(err),
-			" for pull request link ",
-			colors.UserInput(pull.Permalink),
-		)
+	if opts.OpenBrowser {
+		if err := browser.Open(pull.Permalink); err != nil {
+			fmt.Fprint(os.Stderr,
+				"  - couldn't open browser ",
+				colors.UserInput(err),
+				" for pull request link ",
+				colors.UserInput(pull.Permalink),
+			)
+		}
 	}
 
 	return pull, nil
