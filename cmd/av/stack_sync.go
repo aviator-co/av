@@ -4,9 +4,12 @@ import (
 	"emperror.dev/errors"
 	"encoding/json"
 	"fmt"
+	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/stacks"
+	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/stringutils"
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -138,6 +141,11 @@ base branch.
 			if err != nil {
 				return err
 			}
+			state.Config = stackSyncConfig{
+				Current: stackSyncFlags.Current,
+				Trunk:   stackSyncFlags.Trunk,
+				NoPush:  stackSyncFlags.NoPush,
+			}
 		}
 
 		// Set the original branch so we can return to it when the sync is done
@@ -180,7 +188,7 @@ base branch.
 		branchesToSync = append(branchesToSync, nextBranches...)
 
 		logrus.WithField("branches", branchesToSync).Debug("determined branches to sync")
-		conflict := false
+		var resErr error
 	loop:
 		for _, currentBranch := range branchesToSync {
 			state.CurrentBranch = currentBranch
@@ -189,6 +197,22 @@ base branch.
 				return errors.Errorf("stack metadata not found for branch %q", currentBranch)
 			}
 			if currentMeta.Parent == "" {
+				// This should be the first branch in the stack. We don't need
+				// to rebase it (at least not yet -- at some point we need to
+				// implement rebasing on top of trunk...), but we still need to
+				// push it to GitHub.
+				if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+					Name: currentBranch,
+				}); err != nil {
+					return errors.WrapIff(err, "failed to check out branch %q", currentBranch)
+				}
+				if !state.Config.NoPush {
+					if err := actions.Push(repo, actions.PushOpts{
+						Force: actions.ForceWithLease,
+					}); err != nil {
+						return err
+					}
+				}
 				continue
 			}
 			log := logrus.WithFields(logrus.Fields{
@@ -222,29 +246,72 @@ base branch.
 				return errors.WrapIff(err, "failed to sync branch %q", currentBranch)
 			}
 
-			fmt.Printf("Syncing %q into %q: ", currentMeta.Parent, currentBranch)
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - syncing ", colors.UserInput(currentBranch),
+				" on top of ", colors.UserInput(currentBranch), "... ",
+			)
 			switch res.Status {
 			case stacks.SyncAlreadyUpToDate:
-				fmt.Println("already up-to-date (no-op)")
+				_, _ = fmt.Fprint(os.Stderr,
+					colors.Success("already up-to-date"), "\n",
+				)
 			case stacks.SyncUpdated:
-				fmt.Println("updated")
+				_, _ = fmt.Fprint(os.Stderr,
+					colors.Success("updated"), "\n",
+				)
 			case stacks.SyncConflict:
-				fmt.Println("conflict")
+				_, _ = fmt.Fprint(os.Stderr,
+					colors.Failure("conflict"), "\n",
+				)
 				if res.Hint != "" {
-					_, _ = fmt.Println(text.Indent(res.Hint, "    "))
+					// Remove the "hint: ..." lines from the output since they
+					// contain instructions that tell the user to run
+					// `git rebase --continue` which we actually *don't* want
+					// them to do.
+					hint := stringutils.RemoveLines(res.Hint, "hint: ")
+					_, _ = fmt.Println(text.Indent(hint, "    "))
 				}
-				conflict = true
+				resErr = errors.Errorf("conflict detected: please resolve and then run `av stack sync --continue`")
 				break loop
+			case stacks.SyncNotInProgress:
+				fmt.Println("invalid state")
+				// TODO:
+				// 		Would be nice to have some way to show more details than
+				// 		this, but having multi-line error's is not very idiomatic
+				//		with go. A future improvement might be having an
+				//		interface like ErrorDetails that can be used to show
+				//		help text if it's the return error from a CLI
+				//		invocation.
+				// Note:
+				//		We don't just auto-abort here because it's unclear what
+				//		the actual state is here. We'd rather err on the side of
+				// 		making the user be explicit than do something unexpected
+				//		with their code/repository.
+				resErr = errors.Errorf("rebase was completed or cancelled outside of av: please run `av stack sync --abort` to abort the current sync and then retry")
 			default:
 				logrus.Panicf("invariant error: unknown sync result: %v", res)
 			}
+
+			if !state.Config.NoPush {
+				if err := actions.Push(repo, actions.PushOpts{
+					Force: actions.ForceWithLease,
+				}); err != nil {
+					return err
+				}
+			}
 		}
 
-		if conflict {
+		// TODO:
+		// 		this weird thing where we set resErr then break outside of the
+		//		loop is a code smell which probably indicates we should have
+		//		another function wrapping a lot of the logic above, but we'll
+		//		fix that at some point
+		if resErr != nil {
 			if err := writeStackSyncState(repo, &state); err != nil {
+				logrus.WithError(resErr).Warn("while handling error, failed to write stack sync state")
 				return errors.Wrap(err, "failed to write stack sync state")
 			}
-			return errors.New("conflict detected: please resolve and then run `av stack sync --continue`")
+			return resErr
 		}
 
 		if err := writeStackSyncState(repo, nil); err != nil {
