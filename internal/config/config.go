@@ -5,17 +5,19 @@ import (
 	"github.com/spf13/viper"
 )
 
-var GitHub = struct {
+type GitHub struct {
 	Token   string
 	BaseUrl string
-}{
-	BaseUrl: "https://github.com",
 }
 
-var App = struct {
+var Av = struct {
 	OpenBrowser bool
+	GitHub      GitHub
 }{
 	OpenBrowser: true,
+	GitHub: GitHub{
+		BaseUrl: "https://github.com",
+	},
 }
 
 // Load initializes the configuration values.
@@ -49,12 +51,8 @@ func Load(paths []string) (bool, error) {
 		return false, err
 	}
 
-	if err := config.UnmarshalKey("github", &GitHub); err != nil {
-		return true, errors.Wrap(err, "failed to read github config")
-	}
-
-	if err := config.UnmarshalKey("app", &App); err != nil {
-		return true, errors.Wrap(err, "failed to read app config")
+	if err := config.Unmarshal(&Av); err != nil {
+		return true, errors.Wrap(err, "failed to read av configs")
 	}
 
 	return true, nil

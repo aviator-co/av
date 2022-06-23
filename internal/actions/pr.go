@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
@@ -23,11 +24,9 @@ type CreatePullRequestOpts struct {
 	//LabelNames      []string
 
 	// If true, do not push the branch to GitHub
-	SkipPush bool
+	NoPush bool
 	// If true, create a PR even if we think one already exists
 	Force bool
-	// If true, browser will attempt to open PR regardless of app level settings
-	OpenBrowser bool
 }
 
 // CreatePullRequest creates a pull request on GitHub for the current branch, if
@@ -47,7 +46,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		"Creating pull request for branch ", colors.UserInput(currentBranch), ":",
 		"\n",
 	)
-	if !opts.SkipPush {
+	if !opts.NoPush {
 		pushFlags := []string{"push"}
 
 		// Check if the upstream is set. If not, we set it during push.
@@ -198,7 +197,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		"\n",
 	)
 
-	if opts.OpenBrowser {
+	if config.Av.OpenBrowser {
 		if err := browser.Open(pull.Permalink); err != nil {
 			fmt.Fprint(os.Stderr,
 				"  - couldn't open browser ",

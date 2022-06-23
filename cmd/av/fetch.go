@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
-	"emperror.dev/errors"
 	"fmt"
+	"os"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
@@ -12,7 +14,6 @@ import (
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 var fetchCmd = &cobra.Command{
@@ -28,7 +29,7 @@ var fetchCmd = &cobra.Command{
 			return errors.Wrap(err, "failed to read av branch metadata")
 		}
 
-		client, err := gh.NewClient(config.GitHub.Token)
+		client, err := gh.NewClient(config.Av.GitHub.Token)
 		if err != nil {
 			return err
 		}
