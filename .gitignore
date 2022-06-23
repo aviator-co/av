@@ -10,6 +10,9 @@ dist/
 # IDE setups
 .idea/
 
+# Vendored dependencies (we use go.mod instead)
+/vendor
+
 # Test binary, built with `go test -c`
 *.test
 
