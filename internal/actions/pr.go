@@ -23,6 +23,8 @@ type CreatePullRequestOpts struct {
 	Body  string
 	//LabelNames      []string
 
+	// If true, create the pull request as a GitHub draft PR.
+	Draft bool
 	// If true, do not push the branch to GitHub
 	NoPush bool
 	// If true, create a PR even if we think one already exists
@@ -165,6 +167,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		HeadRefName:  githubv4.String(currentBranch),
 		Title:        githubv4.String(opts.Title),
 		Body:         gh.Ptr(githubv4.String(opts.Body)),
+		Draft:        gh.Ptr(githubv4.Boolean(opts.Draft)),
 	})
 	if err != nil {
 		return nil, err
@@ -197,7 +200,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		"\n",
 	)
 
-	if config.Av.OpenBrowser {
+	if config.Av.PullRequest.OpenBrowser {
 		if err := browser.Open(pull.Permalink); err != nil {
 			fmt.Fprint(os.Stderr,
 				"  - couldn't open browser ",

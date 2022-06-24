@@ -19,6 +19,7 @@ var prCmd = &cobra.Command{
 
 var prCreateFlags struct {
 	Base   string
+	Draft  bool
 	Force  bool
 	NoPush bool
 	Title  string
@@ -67,6 +68,11 @@ Examples:
 				Body:   body,
 				NoPush: prCreateFlags.NoPush,
 				Force:  prCreateFlags.Force,
+				// TODO: this means we can't override with --draft=false if the
+				//       config has draft=true. We need to figure out how to
+				//       unify config and flags (the latter should always
+				//       override the former).
+				Draft: prCreateFlags.Draft || config.Av.PullRequest.Draft,
 			},
 		); err != nil {
 			return err
@@ -82,6 +88,10 @@ func init() {
 	prCreateCmd.Flags().StringVar(
 		&prCreateFlags.Base, "base", "",
 		"base branch to create the pull request against",
+	)
+	prCreateCmd.Flags().BoolVar(
+		&prCreateFlags.Draft, "draft", false,
+		"create the pull request in draft mode",
 	)
 	prCreateCmd.Flags().BoolVar(
 		&prCreateFlags.Force, "force", false,

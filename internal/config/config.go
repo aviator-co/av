@@ -10,11 +10,18 @@ type GitHub struct {
 	BaseUrl string
 }
 
-var Av = struct {
+type PullRequest struct {
+	Draft       bool
 	OpenBrowser bool
+}
+
+var Av = struct {
+	PullRequest PullRequest
 	GitHub      GitHub
 }{
-	OpenBrowser: true,
+	PullRequest: PullRequest{
+		OpenBrowser: true,
+	},
 	GitHub: GitHub{
 		BaseUrl: "https://github.com",
 	},
