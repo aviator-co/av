@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
+	"io/ioutil"
+	"os"
+	"strings"
+
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/spf13/cobra"
-	"io/ioutil"
-	"os"
-	"strings"
 )
 
 var prCmd = &cobra.Command{
@@ -44,7 +45,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		client, err := gh.NewClient(config.GitHub.Token)
+		client, err := gh.NewClient(config.Av.GitHub.Token)
 		if err != nil {
 			return err
 		}
@@ -62,10 +63,10 @@ Examples:
 		if _, err := actions.CreatePullRequest(
 			context.Background(), repo, client,
 			actions.CreatePullRequestOpts{
-				Title:    prCreateFlags.Title,
-				Body:     body,
-				SkipPush: prCreateFlags.NoPush,
-				Force:    prCreateFlags.Force,
+				Title:  prCreateFlags.Title,
+				Body:   body,
+				NoPush: prCreateFlags.NoPush,
+				Force:  prCreateFlags.Force,
 			},
 		); err != nil {
 			return err

@@ -2,17 +2,20 @@ package actions
 
 import (
 	"context"
-	"emperror.dev/errors"
 	"fmt"
+	"os"
+	"strings"
+
+	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/browser"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/fatih/color"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
-	"os"
-	"strings"
 )
 
 type CreatePullRequestOpts struct {
@@ -21,7 +24,7 @@ type CreatePullRequestOpts struct {
 	//LabelNames      []string
 
 	// If true, do not push the branch to GitHub
-	SkipPush bool
+	NoPush bool
 	// If true, create a PR even if we think one already exists
 	Force bool
 }
@@ -43,7 +46,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		"Creating pull request for branch ", colors.UserInput(currentBranch), ":",
 		"\n",
 	)
-	if !opts.SkipPush {
+	if !opts.NoPush {
 		pushFlags := []string{"push"}
 
 		// Check if the upstream is set. If not, we set it during push.
@@ -193,5 +196,17 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		colors.UserInput(pull.Permalink),
 		"\n",
 	)
+
+	if config.Av.OpenBrowser {
+		if err := browser.Open(pull.Permalink); err != nil {
+			fmt.Fprint(os.Stderr,
+				"  - couldn't open browser ",
+				colors.UserInput(err),
+				" for pull request link ",
+				colors.UserInput(pull.Permalink),
+			)
+		}
+	}
+
 	return pull, nil
 }
