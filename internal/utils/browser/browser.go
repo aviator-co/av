@@ -1,3 +1,6 @@
+// This code was adapted from the original source code:
+// https://cs.opensource.google/go/go/+/master:src/cmd/internal/browser/browser.go
+//
 // Copyright (c) 2009 The Go Authors. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -37,7 +40,7 @@ import (
 
 // Open tries to open url in a browser and reports whether it succeeded.
 func Open(url string) error {
-	var args []string = nil
+	var args []string
 	if exe := os.Getenv("BROWSER"); exe != "" {
 		args = []string{exe}
 	} else {
