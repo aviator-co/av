@@ -59,6 +59,52 @@ func (c *Client) PullRequest(ctx context.Context, opts PullRequestOpts) (*PullRe
 	return &query.Repository.PullRequest, nil
 }
 
+type GetPullRequestsInput struct {
+	// REQUIRED
+	Owner string
+	Repo  string
+	// OPTIONAL
+	HeadRefName string
+	BaseRefName string
+	States      []githubv4.PullRequestState
+	First       int64
+	After       string
+}
+
+type GetPullRequestsPage struct {
+	PageInfo
+	PullRequests []PullRequest
+}
+
+func (c *Client) GetPullRequests(ctx context.Context, input GetPullRequestsInput) (*GetPullRequestsPage, error) {
+	if input.First == 0 {
+		input.First = 50
+	}
+	var query struct {
+		Repository struct {
+			PullRequests struct {
+				Nodes    []PullRequest
+				PageInfo PageInfo
+			} `graphql:"pullRequests(states: $states, headRefName: $headRefName, baseRefName: $baseRefName, first: $first, after: $after)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+	if err := c.query(ctx, &query, map[string]interface{}{
+		"owner":       githubv4.String(input.Owner),
+		"repo":        githubv4.String(input.Repo),
+		"headRefName": nullable(githubv4.String(input.HeadRefName)),
+		"baseRefName": nullable(githubv4.String(input.BaseRefName)),
+		"states":      input.States,
+		"first":       githubv4.Int(input.First),
+		"after":       nullable(githubv4.String(input.After)),
+	}); err != nil {
+		return nil, errors.Wrap(err, "failed to query pull requests")
+	}
+	return &GetPullRequestsPage{
+		PageInfo:     query.Repository.PullRequests.PageInfo,
+		PullRequests: query.Repository.PullRequests.Nodes,
+	}, nil
+}
+
 func (c *Client) CreatePullRequest(ctx context.Context, input githubv4.CreatePullRequestInput) (*PullRequest, error) {
 	var mutation struct {
 		CreatePullRequest struct {
@@ -108,13 +154,6 @@ type RepoPullRequestOpts struct {
 	First  int64
 	After  string
 	States []githubv4.PullRequestState
-}
-
-type PageInfo struct {
-	EndCursor       string
-	HasNextPage     bool
-	HasPreviousPage bool
-	StartCursor     string
 }
 
 type RepoPullRequestsResponse struct {
