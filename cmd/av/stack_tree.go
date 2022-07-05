@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -40,7 +39,7 @@ var stackTreeCmd = &cobra.Command{
 		//     	up-to-date with its stack parent as well as whether or not the
 		//		branch is up-to-date with its upstream tracking branch.
 		if currentBranch == defaultBranch {
-			_, _ = fmt.Fprint(os.Stderr,
+			_, _ = fmt.Print(
 				colors.Success("* "), colors.Success(defaultBranch), "\n",
 			)
 		} else {
@@ -51,14 +50,14 @@ var stackTreeCmd = &cobra.Command{
 				// not a stack root
 				continue
 			}
-			printStackTree(branches, repo, currentBranch, branch, 1)
+			printStackTree(repo, branches, currentBranch, branch, 1)
 		}
 
 		return nil
 	},
 }
 
-func printStackTree(branches map[string]meta.Branch, repo *git.Repo, currentBranch string, root string, depth int) {
+func printStackTree(repo *git.Repo, branches map[string]meta.Branch, currentBranch string, root string, depth int) {
 	indent := strings.Repeat("    ", depth)
 	branch, ok := branches[root]
 	if !ok {
@@ -66,13 +65,13 @@ func printStackTree(branches map[string]meta.Branch, repo *git.Repo, currentBran
 		return
 	}
 	if currentBranch == branch.Name {
-		_, _ = fmt.Fprint(os.Stderr,
+		_, _ = fmt.Print(
 			indent, colors.Success("* "), colors.Success(branch.Name), "\n",
 		)
 	} else {
 		_, _ = fmt.Printf("%s%s\n", indent, branch.Name)
 	}
 	for _, next := range branch.Children {
-		printStackTree(branches, repo, currentBranch, next, depth+1)
+		printStackTree(repo, branches, currentBranch, next, depth+1)
 	}
 }
