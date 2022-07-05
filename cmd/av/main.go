@@ -1,8 +1,13 @@
 package main
 
 import (
-	"emperror.dev/errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/fatih/color"
@@ -10,10 +15,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
-	"os"
-	"os/exec"
-	"strings"
-	"time"
 )
 
 var rootFlags struct {

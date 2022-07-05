@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"emperror.dev/errors"
 	"fmt"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
@@ -28,10 +29,10 @@ var initCmd = &cobra.Command{
 			}
 		}
 
-		if config.GitHub.Token == "" {
+		if config.Av.GitHub.Token == "" {
 			return errors.New("github token must be set")
 		}
-		client, err := gh.NewClient(config.GitHub.Token)
+		client, err := gh.NewClient(config.Av.GitHub.Token)
 		if err != nil {
 			return err
 		}

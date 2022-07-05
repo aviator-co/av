@@ -3,6 +3,7 @@ package gh
 import (
 	"context"
 	"emperror.dev/errors"
+	"fmt"
 	"github.com/shurcooL/githubv4"
 	"strings"
 )
@@ -68,6 +69,37 @@ func (c *Client) CreatePullRequest(ctx context.Context, input githubv4.CreatePul
 		return nil, errors.Wrap(err, "failed to create pull request: github error")
 	}
 	return &mutation.CreatePullRequest.PullRequest, nil
+}
+
+type AddIssueLabelInput struct {
+	// The owner of the GitHub repository.
+	Owner string
+	// The name of the GitHub repository.
+	Repo string
+	// The number of the issue or pull request to add a label to.
+	Number int64
+	// The names of the labels to add to the issue. This will implicitly create
+	// a label on the repository if the label doesn't already exist (this is the
+	// main reason we use the REST API for this call).
+	LabelNames []string
+}
+
+// AddIssueLabels adds labels to an issue (or pull request, since in GitHub
+// a pull request is a superset of an issue).
+func (c *Client) AddIssueLabels(ctx context.Context, input AddIssueLabelInput) error {
+	// Working with labels is still kind of a pain in the GitHub GraphQL API
+	// (you have to add labels by node id, not label name, and there's no way to
+	// create labels from the GraphQL API), so we just use v3/REST here.
+	req := struct {
+		Labels []string `json:"labels"`
+	}{
+		Labels: input.LabelNames,
+	}
+	endpoint := fmt.Sprintf("/repos/%s/%s/issues/%d", input.Owner, input.Repo, input.Number)
+	if err := c.restPost(ctx, endpoint, req, nil); err != nil {
+		return errors.Wrap(err, "failed to add labels")
+	}
+	return nil
 }
 
 type RepoPullRequestOpts struct {

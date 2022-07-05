@@ -2,26 +2,31 @@ package actions
 
 import (
 	"context"
-	"emperror.dev/errors"
 	"fmt"
+	"os"
+	"strings"
+
+	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/browser"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/fatih/color"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
-	"os"
-	"strings"
 )
 
 type CreatePullRequestOpts struct {
 	Title string
 	Body  string
-	//Labels      []string
+	//LabelNames      []string
 
+	// If true, create the pull request as a GitHub draft PR.
+	Draft bool
 	// If true, do not push the branch to GitHub
-	SkipPush bool
+	NoPush bool
 	// If true, create a PR even if we think one already exists
 	Force bool
 }
@@ -43,7 +48,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		"Creating pull request for branch ", colors.UserInput(currentBranch), ":",
 		"\n",
 	)
-	if !opts.SkipPush {
+	if !opts.NoPush {
 		pushFlags := []string{"push"}
 
 		// Check if the upstream is set. If not, we set it during push.
@@ -162,6 +167,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		HeadRefName:  githubv4.String(currentBranch),
 		Title:        githubv4.String(opts.Title),
 		Body:         gh.Ptr(githubv4.String(opts.Body)),
+		Draft:        gh.Ptr(githubv4.Boolean(opts.Draft)),
 	})
 	if err != nil {
 		return nil, err
@@ -176,11 +182,34 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		return nil, err
 	}
 
+	// add the avbeta-stackedprs label to enable Aviator server-side stacked
+	// PRs functionality
+	if err := client.AddIssueLabels(ctx, gh.AddIssueLabelInput{
+		Owner:      repoMeta.Owner,
+		Repo:       repoMeta.Name,
+		Number:     pull.Number,
+		LabelNames: []string{"avbeta-stackedprs"},
+	}); err != nil {
+		return nil, errors.WrapIf(err, "adding avbeta-stackedprs label")
+	}
+
 	_, _ = fmt.Fprint(os.Stderr,
 		"  - created pull request for branch ", colors.UserInput(currentBranch),
 		" (into branch ", colors.UserInput(prBaseBranch), "): ",
 		colors.UserInput(pull.Permalink),
 		"\n",
 	)
+
+	if config.Av.PullRequest.OpenBrowser {
+		if err := browser.Open(pull.Permalink); err != nil {
+			fmt.Fprint(os.Stderr,
+				"  - couldn't open browser ",
+				colors.UserInput(err),
+				" for pull request link ",
+				colors.UserInput(pull.Permalink),
+			)
+		}
+	}
+
 	return pull, nil
 }

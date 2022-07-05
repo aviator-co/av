@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
+	"io/ioutil"
+	"os"
+	"strings"
+
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/spf13/cobra"
-	"io/ioutil"
-	"os"
-	"strings"
 )
 
 var prCmd = &cobra.Command{
@@ -18,6 +19,7 @@ var prCmd = &cobra.Command{
 
 var prCreateFlags struct {
 	Base   string
+	Draft  bool
 	Force  bool
 	NoPush bool
 	Title  string
@@ -44,7 +46,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		client, err := gh.NewClient(config.GitHub.Token)
+		client, err := gh.NewClient(config.Av.GitHub.Token)
 		if err != nil {
 			return err
 		}
@@ -62,10 +64,15 @@ Examples:
 		if _, err := actions.CreatePullRequest(
 			context.Background(), repo, client,
 			actions.CreatePullRequestOpts{
-				Title:    prCreateFlags.Title,
-				Body:     body,
-				SkipPush: prCreateFlags.NoPush,
-				Force:    prCreateFlags.Force,
+				Title:  prCreateFlags.Title,
+				Body:   body,
+				NoPush: prCreateFlags.NoPush,
+				Force:  prCreateFlags.Force,
+				// TODO: this means we can't override with --draft=false if the
+				//       config has draft=true. We need to figure out how to
+				//       unify config and flags (the latter should always
+				//       override the former).
+				Draft: prCreateFlags.Draft || config.Av.PullRequest.Draft,
 			},
 		); err != nil {
 			return err
@@ -81,6 +88,10 @@ func init() {
 	prCreateCmd.Flags().StringVar(
 		&prCreateFlags.Base, "base", "",
 		"base branch to create the pull request against",
+	)
+	prCreateCmd.Flags().BoolVar(
+		&prCreateFlags.Draft, "draft", false,
+		"create the pull request in draft mode",
 	)
 	prCreateCmd.Flags().BoolVar(
 		&prCreateFlags.Force, "force", false,
