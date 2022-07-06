@@ -33,6 +33,8 @@ type stackSyncConfig struct {
 	Trunk bool `json:"trunk"`
 	// If set, do not push to GitHub.
 	NoPush bool `json:"noPush"`
+	// The new parent branch to sync the current branch to.
+	Parent string `json:"parent"`
 }
 
 // stackSyncState is the state of an in-progress sync operation.
@@ -142,9 +144,10 @@ base branch.
 				return err
 			}
 			state.Config = stackSyncConfig{
-				Current: stackSyncFlags.Current,
-				Trunk:   stackSyncFlags.Trunk,
-				NoPush:  stackSyncFlags.NoPush,
+				stackSyncFlags.Current,
+				stackSyncFlags.Trunk,
+				stackSyncFlags.NoPush,
+				stackSyncFlags.Parent,
 			}
 		}
 
@@ -152,6 +155,40 @@ base branch.
 		if state.OriginalBranch == "" {
 			state.OriginalBranch = state.CurrentBranch
 		}
+
+		if state.Config.Parent != "" {
+			var res *actions.ReparentResult
+			var err error
+			if state.Continue {
+				res, err = actions.ReparentContinue(repo, state.CurrentBranch, state.Config.Parent)
+			} else {
+				res, err = actions.Reparent(repo, state.CurrentBranch, state.Config.Parent)
+			}
+			if err != nil {
+				return err
+			}
+			if !res.Success {
+				if err := writeStackSyncState(repo, &state); err != nil {
+					return errors.Wrap(err, "failed to write stack sync state")
+				}
+				_, _ = fmt.Fprint(os.Stderr,
+					"Failed to re-parent branch: resolve the conflicts and continue the sync with ",
+					colors.CliCmd("av stack sync --continue"),
+					"\n",
+				)
+				hint := stringutils.RemoveLines(res.Hint, "hint: ")
+				_, _ = fmt.Fprint(os.Stderr,
+					"hint:\n",
+					text.Indent(hint, "    "),
+					"\n",
+				)
+				return nil
+			}
+			state.Continue = false
+		}
+		// We're done with the reparenting process, so set this to zero so that
+		// we won't try to reparent again later.
+		state.Config.Parent = ""
 
 		// Construct the list of branches we need to sync
 		branches, err := meta.ReadAllBranches(repo)
@@ -220,6 +257,11 @@ base branch.
 				"parent":  currentMeta.Parent,
 			})
 
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - syncing ", colors.UserInput(currentBranch),
+				" on top of ", colors.UserInput(currentMeta.Parent), "... ",
+			)
+
 			// Checkout the branch (unless we need to continue a rebase, in which
 			// case Git will yell at us)
 			var res *stacks.SyncResult
@@ -246,10 +288,6 @@ base branch.
 				return errors.WrapIff(err, "failed to sync branch %q", currentBranch)
 			}
 
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - syncing ", colors.UserInput(currentBranch),
-				" on top of ", colors.UserInput(currentBranch), "... ",
-			)
 			switch res.Status {
 			case stacks.SyncAlreadyUpToDate:
 				_, _ = fmt.Fprint(os.Stderr,
@@ -288,6 +326,7 @@ base branch.
 				// 		making the user be explicit than do something unexpected
 				//		with their code/repository.
 				resErr = errors.Errorf("rebase was completed or cancelled outside of av: please run `av stack sync --abort` to abort the current sync and then retry")
+				break loop
 			default:
 				logrus.Panicf("invariant error: unknown sync result: %v", res)
 			}
@@ -442,5 +481,9 @@ func init() {
 	stackSyncCmd.Flags().BoolVar(
 		&stackSyncFlags.Abort, "abort", false,
 		"abort an in-progress sync",
+	)
+	stackSyncCmd.Flags().StringVar(
+		&stackSyncFlags.Parent, "parent", "",
+		"parent branch to rebase onto",
 	)
 }
