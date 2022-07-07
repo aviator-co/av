@@ -3,7 +3,10 @@ package git
 import (
 	"bytes"
 	"emperror.dev/errors"
+	"fmt"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/sirupsen/logrus"
+	"github.com/kr/text"
 	giturls "github.com/whilp/git-urls"
 	"io"
 	"net/url"
@@ -167,13 +170,28 @@ func (r *Repo) CheckoutBranch(opts *CheckoutBranch) (string, error) {
 	}
 	args = append(args, opts.Name)
 	res, err := r.Run(&RunOpts{
-		Args:      args,
-		ExitError: true,
+		Args: args,
 	})
 	if err != nil {
 	    return "", err
 	}
-	logrus.WithFields(logrus.Fields{"output": string(res.Stdout)}).Debug("git checkout failed")
+	if res.ExitCode != 0 {
+	    _, _ = fmt.Fprint(os.Stderr,
+			colors.Failure("failed to checkout"),
+			"\n",
+		)
+		logrus.WithFields(logrus.Fields{
+		    "stdout": string(res.Stdout),
+		    "stderr": string(res.Stderr),
+		}).Debug("git checkout failed")
+
+		_, _ = colors.TroubleshootingC.Fprint(os.Stderr,
+            "      - git output:\n",
+            text.Indent(string(res.Stderr), "        "),
+            "\n",
+        )
+        return "", errors.WrapIff(err, "failed to checkout branch %q", opts.Name)
+	}
 	return previousBranchName, nil
 }
 
