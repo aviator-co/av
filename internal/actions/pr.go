@@ -81,22 +81,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		)
 	}
 
-	// TODO:
-	//     It would be nice to be able to auto-detect that a PR has been
-	//     opened for a given PR without using av. We might need to do this
-	//     when creating PRs for a whole stack (e.g., when running `av pr`
-	//     on stack branch 3, we should make sure PRs exist for 1 and 2).
 	branchMeta, ok := meta.ReadBranch(repo, currentBranch)
-	if ok && branchMeta.PullRequest != nil && !opts.Force {
-		_, _ = fmt.Fprint(os.Stderr,
-			"  - ", color.RedString("ERROR: "),
-			"branch ", colors.UserInput(currentBranch),
-			" already has an associated pull request: ",
-			colors.UserInput(branchMeta.PullRequest.Permalink),
-			"\n",
-		)
-		return nil, errors.New("this branch already has an associated pull request")
-	}
 
 	// figure this out based on whether or not we're on a stacked branch
 	var prBaseBranch string
@@ -161,17 +146,13 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		opts.Body = firstCommit.Body
 	}
 
-	pull, err := client.CreatePullRequest(ctx, githubv4.CreatePullRequestInput{
-		RepositoryID: githubv4.ID(repoMeta.ID),
-		BaseRefName:  githubv4.String(prBaseBranch),
-		HeadRefName:  githubv4.String(currentBranch),
-		Title:        githubv4.String(opts.Title),
-		Body:         gh.Ptr(githubv4.String(opts.Body)),
-		Draft:        gh.Ptr(githubv4.Boolean(opts.Draft)),
+	pull, didCreatePR, err := getOrCreatePR(ctx, client, repoMeta, getOrCreatePROpts{
+		baseRefName: prBaseBranch,
+		headRefName: currentBranch,
+		title:       opts.Title,
+		body:        opts.Body,
+		draft:       opts.Draft,
 	})
-	if err != nil {
-		return nil, err
-	}
 
 	branchMeta.PullRequest = &meta.PullRequest{
 		Number:    pull.Number,
@@ -193,8 +174,14 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		return nil, errors.WrapIf(err, "adding avbeta-stackedprs label")
 	}
 
+	var action string
+	if didCreatePR {
+		action = "created"
+	} else {
+		action = "fetched existing"
+	}
 	_, _ = fmt.Fprint(os.Stderr,
-		"  - created pull request for branch ", colors.UserInput(currentBranch),
+		"  - ", action, " pull request for branch ", colors.UserInput(currentBranch),
 		" (into branch ", colors.UserInput(prBaseBranch), "): ",
 		colors.UserInput(pull.Permalink),
 		"\n",
@@ -212,4 +199,45 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	}
 
 	return pull, nil
+}
+
+type getOrCreatePROpts struct {
+	baseRefName string
+	headRefName string
+	title       string
+	body        string
+	draft       bool
+}
+
+// getOrCreatePR returns the pull request for the given input, creating a new
+// pull request if one doesn't exist. It returns the pull request, a boolean
+// indicating whether or not the pull request was created, and an error if one
+// occurred.
+func getOrCreatePR(ctx context.Context, client *gh.Client, repoMeta meta.Repository, opts getOrCreatePROpts) (*gh.PullRequest, bool, error) {
+	existing, err := client.GetPullRequests(ctx, gh.GetPullRequestsInput{
+		Owner:       repoMeta.Owner,
+		Repo:        repoMeta.Name,
+		HeadRefName: opts.headRefName,
+		BaseRefName: opts.baseRefName,
+		States:      []githubv4.PullRequestState{githubv4.PullRequestStateOpen},
+	})
+	if err != nil {
+		return nil, false, errors.WrapIf(err, "querying existing pull requests")
+	}
+	if len(existing.PullRequests) > 0 {
+		return &existing.PullRequests[0], false, nil
+	}
+
+	pull, err := client.CreatePullRequest(ctx, githubv4.CreatePullRequestInput{
+		RepositoryID: githubv4.ID(repoMeta.ID),
+		BaseRefName:  githubv4.String(opts.baseRefName),
+		HeadRefName:  githubv4.String(opts.headRefName),
+		Title:        githubv4.String(opts.title),
+		Body:         gh.Ptr(githubv4.String(opts.body)),
+		Draft:        gh.Ptr(githubv4.Boolean(opts.draft)),
+	})
+	if err != nil {
+		return nil, false, errors.WrapIf(err, "opening pull request")
+	}
+	return pull, true, nil
 }
