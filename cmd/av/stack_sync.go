@@ -1,16 +1,20 @@
 package main
 
 import (
+	"context"
 	"emperror.dev/errors"
 	"encoding/json"
 	"fmt"
 	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/config"
+	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/stacks"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stringutils"
 	"github.com/kr/text"
+	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"io/ioutil"
@@ -33,6 +37,8 @@ type stackSyncConfig struct {
 	Trunk bool `json:"trunk"`
 	// If set, do not push to GitHub.
 	NoPush bool `json:"noPush"`
+	// If set, do not fetch updated PR information from GitHub.
+	NoFetch bool `json:"noFetch"`
 	// The new parent branch to sync the current branch to.
 	Parent string `json:"parent"`
 }
@@ -87,7 +93,7 @@ base branch.
 		}
 
 		// Check for unstaged changes
-		repo, err := getRepo()
+		repo, repoMeta, err := getRepoInfo()
 		if err != nil {
 			return err
 		}
@@ -147,6 +153,7 @@ base branch.
 				stackSyncFlags.Current,
 				stackSyncFlags.Trunk,
 				stackSyncFlags.NoPush,
+				stackSyncFlags.NoFetch,
 				stackSyncFlags.Parent,
 			}
 		}
@@ -224,6 +231,9 @@ base branch.
 		}
 		branchesToSync = append(branchesToSync, nextBranches...)
 
+		ctx := context.Background()
+		var ghClient *gh.Client // lazy init only if needed
+
 		logrus.WithField("branches", branchesToSync).Debug("determined branches to sync")
 		var resErr error
 	loop:
@@ -233,6 +243,34 @@ base branch.
 			if !ok {
 				return errors.Errorf("stack metadata not found for branch %q", currentBranch)
 			}
+
+			if !state.Config.NoFetch {
+				if ghClient == nil {
+					var err error
+					ghClient, err = gh.NewClient(config.Av.GitHub.Token)
+					if err != nil {
+						return err
+					}
+				}
+				update, err := actions.UpdatePullRequestState(ctx, repo, ghClient, repoMeta, currentBranch)
+				if err != nil {
+					return errors.Wrap(err, "failed to fetch latest PR info")
+				}
+				branches[currentBranch] = update.Branch
+				currentMeta = update.Branch
+
+				if update.Pull != nil && update.Pull.Merged && len(currentMeta.Children) > 0 {
+					// Not sure if we should always do this, but seems like a relatively
+					// safe bet (that we don't need to sync branches that have been merged).
+					_, _ = fmt.Fprint(os.Stderr,
+						"  - pull request ", colors.UserInput("#", update.Pull.Number),
+						" for branch ", colors.UserInput(currentBranch),
+						" was merged, skipping sync...\n",
+					)
+					continue
+				}
+			}
+
 			if currentMeta.Parent == "" {
 				// This should be the first branch in the stack. We don't need
 				// to rebase it (at least not yet -- at some point we need to
@@ -252,11 +290,31 @@ base branch.
 				}
 				continue
 			}
+
 			log := logrus.WithFields(logrus.Fields{
 				"current": currentBranch,
 				"parent":  currentMeta.Parent,
 			})
 
+			parentMeta, ok := branches[currentMeta.Parent]
+			if ok && parentMeta.PullRequest != nil && parentMeta.PullRequest.State == githubv4.PullRequestStateMerged {
+				defaultBranch, err := repo.DefaultBranch()
+				if err != nil {
+					return errors.Wrap(err, "failed to determine default branch")
+				}
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - pull request ", colors.UserInput("#", parentMeta.PullRequest.Number),
+					" was merged, this branch should be synced on top of the merge commit:\n",
+				)
+				// TODO:
+				//     We should do this automatically for the user
+				_, _ = colors.CliCmdC.Fprint(os.Stderr,
+					"        git fetch origin ", defaultBranch, ":", defaultBranch, "\n",
+					"        git checkout ", currentBranch, "\n",
+					"        av stack sync --parent ", defaultBranch, "\n",
+				)
+				continue
+			}
 			_, _ = fmt.Fprint(os.Stderr,
 				"  - syncing ", colors.UserInput(currentBranch),
 				" on top of ", colors.UserInput(currentMeta.Parent), "... ",
@@ -468,6 +526,10 @@ func init() {
 	stackSyncCmd.Flags().BoolVar(
 		&stackSyncFlags.NoPush, "no-push", false,
 		"do not force-push updated branches to GitHub",
+	)
+	stackSyncCmd.Flags().BoolVar(
+		&stackSyncFlags.NoFetch, "no-fetch", false,
+		"do not fetch latest PR information from GitHub",
 	)
 	// TODO[mvp]: better name (--to-trunk?)
 	stackSyncCmd.Flags().BoolVar(

@@ -6,17 +6,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func getRepoInfo() (*git.Repo, *meta.Repository, error) {
+func getRepoInfo() (*git.Repo, meta.Repository, error) {
 	repo, err := getRepo()
 	if err != nil {
-		return nil, nil, err
+		return nil, meta.Repository{}, err
 	}
 
 	repoMeta, err := meta.ReadRepository(repo)
 	if err != nil {
-		return nil, nil, err
+		return nil, meta.Repository{}, err
 	}
 
 	logrus.Debugf("loaded repository metadata: %+v", repoMeta)
-	return repo, &repoMeta, nil
+	return repo, repoMeta, nil
 }
