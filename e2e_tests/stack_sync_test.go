@@ -22,13 +22,13 @@ func TestStackSync(t *testing.T) {
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n"))
 	require.Equal(t, 0, Av(t, "stack", "branch", "stack-2").ExitCode)
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n2a\n"))
-	require.Equal(t, 0, Av(t, "stack", "sync", "--no-push").ExitCode)
+	require.Equal(t, 0, Av(t, "stack", "sync", "--no-fetch", "--no-push").ExitCode)
 
 	gittest.WithCheckoutBranch(t, repo, "stack-1", func() {
 		gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"))
 	})
 
-	syncConflict := Av(t, "stack", "sync", "--no-push")
+	syncConflict := Av(t, "stack", "sync", "--no-fetch", "--no-push")
 	require.NotEqual(
 		t, 0, syncConflict.ExitCode,
 		"stack sync should return non-zero exit code if conflicts",
@@ -62,7 +62,7 @@ func TestStackSync(t *testing.T) {
 	require.Equal(t, mergeBase, stack1Head, "stack-2 should be up-to-date with stack-1")
 
 	// further sync attemps should yield no-ops
-	syncNoop := Av(t, "stack", "sync", "--no-push")
+	syncNoop := Av(t, "stack", "sync", "--no-fetch", "--no-push")
 	require.Equal(t, 0, syncNoop.ExitCode)
 	require.Contains(t, syncNoop.Stderr, "already up-to-date")
 }
