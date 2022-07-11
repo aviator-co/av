@@ -5,6 +5,7 @@ import (
 	"emperror.dev/errors"
 	"encoding/json"
 	"github.com/aviator-co/av/internal/git"
+	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
 	"strings"
@@ -38,6 +39,8 @@ type PullRequest struct {
 	Number int64 `json:"number"`
 	// The web URL for the pull request.
 	Permalink string `json:"permalink"`
+	// The state of the pull request (open, closed, or merged).
+	State githubv4.PullRequestState
 }
 
 // ReadBranch loads information about the branch from the git repository.

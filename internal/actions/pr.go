@@ -241,3 +241,130 @@ func getOrCreatePR(ctx context.Context, client *gh.Client, repoMeta meta.Reposit
 	}
 	return pull, true, nil
 }
+
+type UpdatePullRequestResult struct {
+	// True if the pull request information changed (e.g., a new pull request
+	// was found or if the pull request changed state)
+	Changed bool
+	// The (updated) branch metadata.
+	Branch meta.Branch
+	// The pull request object that was returned from GitHub
+	Pull *gh.PullRequest
+}
+
+// UpdatePullRequestState fetches the latest pull request information from GitHub
+// and writes the relevant branch metadata.
+func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Client, repoMeta meta.Repository, branchName string) (*UpdatePullRequestResult, error) {
+	_, _ = fmt.Fprint(os.Stderr,
+		"  - fetching latest pull request information for ", colors.UserInput(branchName),
+		"\n",
+	)
+
+	branch, _ := meta.ReadBranch(repo, branchName)
+
+	page, err := client.GetPullRequests(ctx, gh.GetPullRequestsInput{
+		Owner:       repoMeta.Owner,
+		Repo:        repoMeta.Name,
+		HeadRefName: branchName,
+	})
+	if err != nil {
+		return nil, errors.WrapIf(err, "querying GitHub pull requests")
+	}
+
+	if len(page.PullRequests) == 0 {
+		// branch has no pull request
+		if branch.PullRequest != nil {
+			// This should never happen?
+			logrus.WithFields(logrus.Fields{
+				"branch": branch.Name,
+				"pull":   branch.PullRequest.Permalink,
+			}).Error("GitHub reported no pull requests for branch but local metadata has pull request")
+			return nil, errors.New("GitHub reported no pull requests for branch but local metadata has pull request")
+		}
+
+		return &UpdatePullRequestResult{false, branch, nil}, nil
+	}
+
+	// The latest info for the pull request that we have stored in local metadata
+	// (we can use this to check if the pull was closed/merged)
+	var currentPull *gh.PullRequest
+	// The current open pull request (if any)
+	var openPull *gh.PullRequest
+	for _, pull := range page.PullRequests {
+		if branch.PullRequest != nil && pull.ID == branch.PullRequest.ID {
+			currentPull = &pull
+		}
+		if pull.State != githubv4.PullRequestStateOpen {
+			continue
+		}
+		// GH only allows one open pull for a given (head, base) pair, but
+		// we only support one open pull per head branch (the workflow of
+		// opening a pull from a head branch into multiple base branches is
+		// rare). This probably isn't necessary but better to be defensive
+		// here.
+		if openPull != nil {
+			return nil, errors.Errorf(
+				"multiple open pull requests for branch %q (#%d into %q and #%d into %q)",
+				branchName,
+				openPull.Number, openPull.BaseRefName,
+				pull.Number, pull.BaseRefName,
+			)
+		}
+		openPull = &pull
+	}
+
+	changed := false
+	var oldId string
+	if branch.PullRequest != nil {
+		oldId = branch.PullRequest.ID
+	}
+
+	var newPull *gh.PullRequest
+	if openPull != nil {
+		if oldId != openPull.ID {
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - found new pull request for ", colors.UserInput(branchName),
+				": ", colors.UserInput(openPull.Permalink),
+				"\n",
+			)
+			changed = true
+		}
+		branch.PullRequest = &meta.PullRequest{
+			ID:        openPull.ID,
+			Number:    openPull.Number,
+			Permalink: openPull.Permalink,
+			State:     openPull.State,
+		}
+		newPull = openPull
+	} else {
+		// openPull is nil
+		if currentPull != nil {
+			branch.PullRequest = &meta.PullRequest{
+				ID:        currentPull.ID,
+				Number:    currentPull.Number,
+				Permalink: currentPull.Permalink,
+				State:     currentPull.State,
+			}
+		} else {
+			// openPull and currentPull is nil
+			if branch.PullRequest != nil {
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - ", colors.Failure("ERROR:"),
+					" pull request for ", colors.UserInput(branchName),
+					" could not be found on GitHub: ", colors.UserInput(branch.PullRequest.Permalink),
+					" (removing reference from local state)\n",
+				)
+				changed = true
+			}
+			branch.PullRequest = nil
+		}
+		newPull = currentPull
+	}
+
+	// Write branch metadata regardless of changed to make sure it's in consistent state
+	if err := meta.WriteBranch(repo, branch); err != nil {
+		return nil, errors.WrapIf(err, "writing branch metadata")
+	}
+
+	return &UpdatePullRequestResult{changed, branch, newPull}, nil
+}

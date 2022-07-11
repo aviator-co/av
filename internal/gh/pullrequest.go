@@ -93,7 +93,7 @@ func (c *Client) GetPullRequests(ctx context.Context, input GetPullRequestsInput
 		"repo":        githubv4.String(input.Repo),
 		"headRefName": nullable(githubv4.String(input.HeadRefName)),
 		"baseRefName": nullable(githubv4.String(input.BaseRefName)),
-		"states":      input.States,
+		"states":      &input.States,
 		"first":       githubv4.Int(input.First),
 		"after":       nullable(githubv4.String(input.After)),
 	}); err != nil {
