@@ -81,22 +81,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		)
 	}
 
-	// TODO:
-	//     It would be nice to be able to auto-detect that a PR has been
-	//     opened for a given PR without using av. We might need to do this
-	//     when creating PRs for a whole stack (e.g., when running `av pr`
-	//     on stack branch 3, we should make sure PRs exist for 1 and 2).
 	branchMeta, ok := meta.ReadBranch(repo, currentBranch)
-	if ok && branchMeta.PullRequest != nil && !opts.Force {
-		_, _ = fmt.Fprint(os.Stderr,
-			"  - ", color.RedString("ERROR: "),
-			"branch ", colors.UserInput(currentBranch),
-			" already has an associated pull request: ",
-			colors.UserInput(branchMeta.PullRequest.Permalink),
-			"\n",
-		)
-		return nil, errors.New("this branch already has an associated pull request")
-	}
 
 	// figure this out based on whether or not we're on a stacked branch
 	var prBaseBranch string
@@ -161,17 +146,13 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		opts.Body = firstCommit.Body
 	}
 
-	pull, err := client.CreatePullRequest(ctx, githubv4.CreatePullRequestInput{
-		RepositoryID: githubv4.ID(repoMeta.ID),
-		BaseRefName:  githubv4.String(prBaseBranch),
-		HeadRefName:  githubv4.String(currentBranch),
-		Title:        githubv4.String(opts.Title),
-		Body:         gh.Ptr(githubv4.String(opts.Body)),
-		Draft:        gh.Ptr(githubv4.Boolean(opts.Draft)),
+	pull, didCreatePR, err := getOrCreatePR(ctx, client, repoMeta, getOrCreatePROpts{
+		baseRefName: prBaseBranch,
+		headRefName: currentBranch,
+		title:       opts.Title,
+		body:        opts.Body,
+		draft:       opts.Draft,
 	})
-	if err != nil {
-		return nil, err
-	}
 
 	branchMeta.PullRequest = &meta.PullRequest{
 		Number:    pull.Number,
@@ -193,8 +174,14 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		return nil, errors.WrapIf(err, "adding avbeta-stackedprs label")
 	}
 
+	var action string
+	if didCreatePR {
+		action = "created"
+	} else {
+		action = "fetched existing"
+	}
 	_, _ = fmt.Fprint(os.Stderr,
-		"  - created pull request for branch ", colors.UserInput(currentBranch),
+		"  - ", action, " pull request for branch ", colors.UserInput(currentBranch),
 		" (into branch ", colors.UserInput(prBaseBranch), "): ",
 		colors.UserInput(pull.Permalink),
 		"\n",
@@ -212,4 +199,172 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	}
 
 	return pull, nil
+}
+
+type getOrCreatePROpts struct {
+	baseRefName string
+	headRefName string
+	title       string
+	body        string
+	draft       bool
+}
+
+// getOrCreatePR returns the pull request for the given input, creating a new
+// pull request if one doesn't exist. It returns the pull request, a boolean
+// indicating whether or not the pull request was created, and an error if one
+// occurred.
+func getOrCreatePR(ctx context.Context, client *gh.Client, repoMeta meta.Repository, opts getOrCreatePROpts) (*gh.PullRequest, bool, error) {
+	existing, err := client.GetPullRequests(ctx, gh.GetPullRequestsInput{
+		Owner:       repoMeta.Owner,
+		Repo:        repoMeta.Name,
+		HeadRefName: opts.headRefName,
+		BaseRefName: opts.baseRefName,
+		States:      []githubv4.PullRequestState{githubv4.PullRequestStateOpen},
+	})
+	if err != nil {
+		return nil, false, errors.WrapIf(err, "querying existing pull requests")
+	}
+	if len(existing.PullRequests) > 0 {
+		return &existing.PullRequests[0], false, nil
+	}
+
+	pull, err := client.CreatePullRequest(ctx, githubv4.CreatePullRequestInput{
+		RepositoryID: githubv4.ID(repoMeta.ID),
+		BaseRefName:  githubv4.String(opts.baseRefName),
+		HeadRefName:  githubv4.String(opts.headRefName),
+		Title:        githubv4.String(opts.title),
+		Body:         gh.Ptr(githubv4.String(opts.body)),
+		Draft:        gh.Ptr(githubv4.Boolean(opts.draft)),
+	})
+	if err != nil {
+		return nil, false, errors.WrapIf(err, "opening pull request")
+	}
+	return pull, true, nil
+}
+
+type UpdatePullRequestResult struct {
+	// True if the pull request information changed (e.g., a new pull request
+	// was found or if the pull request changed state)
+	Changed bool
+	// The (updated) branch metadata.
+	Branch meta.Branch
+	// The pull request object that was returned from GitHub
+	Pull *gh.PullRequest
+}
+
+// UpdatePullRequestState fetches the latest pull request information from GitHub
+// and writes the relevant branch metadata.
+func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Client, repoMeta meta.Repository, branchName string) (*UpdatePullRequestResult, error) {
+	_, _ = fmt.Fprint(os.Stderr,
+		"  - fetching latest pull request information for ", colors.UserInput(branchName),
+		"\n",
+	)
+
+	branch, _ := meta.ReadBranch(repo, branchName)
+
+	page, err := client.GetPullRequests(ctx, gh.GetPullRequestsInput{
+		Owner:       repoMeta.Owner,
+		Repo:        repoMeta.Name,
+		HeadRefName: branchName,
+	})
+	if err != nil {
+		return nil, errors.WrapIf(err, "querying GitHub pull requests")
+	}
+
+	if len(page.PullRequests) == 0 {
+		// branch has no pull request
+		if branch.PullRequest != nil {
+			// This should never happen?
+			logrus.WithFields(logrus.Fields{
+				"branch": branch.Name,
+				"pull":   branch.PullRequest.Permalink,
+			}).Error("GitHub reported no pull requests for branch but local metadata has pull request")
+			return nil, errors.New("GitHub reported no pull requests for branch but local metadata has pull request")
+		}
+
+		return &UpdatePullRequestResult{false, branch, nil}, nil
+	}
+
+	// The latest info for the pull request that we have stored in local metadata
+	// (we can use this to check if the pull was closed/merged)
+	var currentPull *gh.PullRequest
+	// The current open pull request (if any)
+	var openPull *gh.PullRequest
+	for _, pull := range page.PullRequests {
+		if branch.PullRequest != nil && pull.ID == branch.PullRequest.ID {
+			currentPull = &pull
+		}
+		if pull.State != githubv4.PullRequestStateOpen {
+			continue
+		}
+		// GH only allows one open pull for a given (head, base) pair, but
+		// we only support one open pull per head branch (the workflow of
+		// opening a pull from a head branch into multiple base branches is
+		// rare). This probably isn't necessary but better to be defensive
+		// here.
+		if openPull != nil {
+			return nil, errors.Errorf(
+				"multiple open pull requests for branch %q (#%d into %q and #%d into %q)",
+				branchName,
+				openPull.Number, openPull.BaseRefName,
+				pull.Number, pull.BaseRefName,
+			)
+		}
+		openPull = &pull
+	}
+
+	changed := false
+	var oldId string
+	if branch.PullRequest != nil {
+		oldId = branch.PullRequest.ID
+	}
+
+	var newPull *gh.PullRequest
+	if openPull != nil {
+		if oldId != openPull.ID {
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - found new pull request for ", colors.UserInput(branchName),
+				": ", colors.UserInput(openPull.Permalink),
+				"\n",
+			)
+			changed = true
+		}
+		branch.PullRequest = &meta.PullRequest{
+			ID:        openPull.ID,
+			Number:    openPull.Number,
+			Permalink: openPull.Permalink,
+			State:     openPull.State,
+		}
+		newPull = openPull
+	} else {
+		// openPull is nil
+		if currentPull != nil {
+			branch.PullRequest = &meta.PullRequest{
+				ID:        currentPull.ID,
+				Number:    currentPull.Number,
+				Permalink: currentPull.Permalink,
+				State:     currentPull.State,
+			}
+		} else {
+			// openPull and currentPull is nil
+			if branch.PullRequest != nil {
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - ", colors.Failure("ERROR:"),
+					" pull request for ", colors.UserInput(branchName),
+					" could not be found on GitHub: ", colors.UserInput(branch.PullRequest.Permalink),
+					" (removing reference from local state)\n",
+				)
+				changed = true
+			}
+			branch.PullRequest = nil
+		}
+		newPull = currentPull
+	}
+
+	// Write branch metadata regardless of changed to make sure it's in consistent state
+	if err := meta.WriteBranch(repo, branch); err != nil {
+		return nil, errors.WrapIf(err, "writing branch metadata")
+	}
+
+	return &UpdatePullRequestResult{changed, branch, newPull}, nil
 }
