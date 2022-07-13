@@ -71,7 +71,7 @@ var stackBranchCmd = &cobra.Command{
 			Name:      name,
 			NewBranch: true,
 		}); err != nil {
-			return errors.WrapIff(err, "failed to checkout branch %q", name)
+			return errors.WrapIff(err, "checkout error")
 		}
 
 		branchMeta := meta.Branch{Name: name, Parent: parentBranch}
