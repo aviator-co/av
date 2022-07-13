@@ -166,9 +166,18 @@ func (r *Repo) CheckoutBranch(opts *CheckoutBranch) (string, error) {
 		args = append(args, "-b")
 	}
 	args = append(args, opts.Name)
-	if _, err := r.Git(args...); err != nil {
-		return "", err
+	res, err := r.Run(&RunOpts{
+		Args: args,
+	})
+	if err != nil {
+	    return "", err
 	}
+	if res.ExitCode != 0 {
+		logrus.WithFields(logrus.Fields{
+		    "stdout": string(res.Stdout),
+		    "stderr": string(res.Stderr),
+		}).Debug("git checkout failed")
+        return "", errors.Errorf("failed to checkout branch %q: %s", opts.Name, string(res.Stderr))	}
 	return previousBranchName, nil
 }
 

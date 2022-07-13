@@ -29,11 +29,6 @@ var stackBranchCmd = &cobra.Command{
 			return err
 		}
 
-		// Validate preconditions
-		if _, err := repo.RevParse(&git.RevParse{Rev: name}); err == nil {
-			return errors.Errorf("branch %q already exists", name)
-		}
-
 		// Determine important contextual information from Git
 		defaultBranch, err := repo.DefaultBranch()
 		if err != nil {
@@ -76,11 +71,7 @@ var stackBranchCmd = &cobra.Command{
 			Name:      name,
 			NewBranch: true,
 		}); err != nil {
-			logrus.WithError(err).Debugf("failed to checkout branch %q", name)
-			return errors.Errorf(
-				"failed to create branch %q (does it already exist?)",
-				name,
-			)
+			return errors.WrapIff(err, "checkout error")
 		}
 
 		branchMeta := meta.Branch{Name: name, Parent: parentBranch}
