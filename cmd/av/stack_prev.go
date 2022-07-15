@@ -2,13 +2,11 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
-	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/spf13/cobra"
 )
 
@@ -51,7 +49,7 @@ var stackPrevCmd = &cobra.Command{
 		}
 
 		// confirm we can in fact do the operation given current branch state
-		if len(previousBranches) == 0 {
+		if previousBranches == nil {
 			return errors.New("there is no previous branch")
 		}
 		if n > len(previousBranches) {
@@ -59,14 +57,11 @@ var stackPrevCmd = &cobra.Command{
 		}
 
 		// checkout nth previous branch
-		var branchToCheckout = previousBranches[len(previousBranches)-n]
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
-			Name: branchToCheckout,
+			Name: previousBranches[len(previousBranches)-n],
 		}); err != nil {
 			return err
 		}
-
-		_, _ = fmt.Fprint(os.Stderr, "Checked out branch ", colors.UserInput(branchToCheckout))
 
 		return nil
 	},
