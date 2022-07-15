@@ -1,9 +1,13 @@
 package main
 
 import (
-	"emperror.dev/errors"
-	"github.com/spf13/cobra"
+	"fmt"
 	"strconv"
+
+	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/meta"
+	"github.com/spf13/cobra"
 )
 
 var stackPrevCmd = &cobra.Command{
@@ -26,6 +30,39 @@ var stackPrevCmd = &cobra.Command{
 			return errors.New("invalid number (must be >= 1)")
 		}
 
-		return errors.New("unimplemented")
+		// Get the previous branches so we can checkout the nth one
+		repo, _, err := getRepoInfo()
+		if err != nil {
+			return err
+		}
+		branches, err := meta.ReadAllBranches(repo)
+		if err != nil {
+			return err
+		}
+		currentBranch, err := repo.CurrentBranchName()
+		if err != nil {
+			return err
+		}
+		previousBranches, err := previousBranches(branches, currentBranch)
+		if err != nil {
+			return err
+		}
+
+		// confirm we can in fact do the operation given current branch state
+		if previousBranches == nil {
+			return errors.New("there is no previous branch")
+		}
+		if n > len(previousBranches) {
+			return fmt.Errorf("invalid number (there are only %d previous branches in the stack)", len(previousBranches))
+		}
+
+		// checkout nth previous branch
+		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+			Name: previousBranches[len(previousBranches)-n],
+		}); err != nil {
+			return err
+		}
+
+		return nil
 	},
 }

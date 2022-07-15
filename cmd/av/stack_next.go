@@ -1,27 +1,18 @@
 package main
 
 import (
-	"emperror.dev/errors"
-	"github.com/spf13/cobra"
+	"fmt"
 	"strconv"
-	"strings"
+
+	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/meta"
+	"github.com/spf13/cobra"
 )
 
-var stackNextFlags struct {
-	// If set, synchronize changes from the parent branch after checking out
-	// the next branch.
-	Sync bool
-}
 var stackNextCmd = &cobra.Command{
 	Use:   "next <n>",
 	Short: "checkout the next branch in the stack",
-	Long: strings.TrimSpace(`
-Checkout the next branch in the stack.
-
-If the --sync flag is given, this command will also synchronize changes from the
-parent branch (i.e., the current branch before this command is run) into the
-child branch (without recursively syncing further descendants).
-`),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var n int = 1
 		if len(args) == 1 {
@@ -39,6 +30,39 @@ child branch (without recursively syncing further descendants).
 			return errors.New("invalid number (must be >= 1)")
 		}
 
-		return errors.New("unimplemented")
+		// Get the subsequent branches so we can checkout the nth one
+		repo, _, err := getRepoInfo()
+		if err != nil {
+			return err
+		}
+		branches, err := meta.ReadAllBranches(repo)
+		if err != nil {
+			return err
+		}
+		currentBranch, err := repo.CurrentBranchName()
+		if err != nil {
+			return err
+		}
+		subsequentBranches, err := subsequentBranches(branches, currentBranch)
+		if err != nil {
+			return err
+		}
+
+		// confirm we can in fact do the operation given current branch state
+		if subsequentBranches == nil {
+			return errors.New("there is no next branch")
+		}
+		if n > len(subsequentBranches) {
+			return fmt.Errorf("invalid number (there are only %d subsequent branches in the stack)", len(subsequentBranches))
+		}
+
+		// checkout nth branch
+		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+			Name: subsequentBranches[n-1],
+		}); err != nil {
+			return err
+		}
+
+		return nil
 	},
 }
