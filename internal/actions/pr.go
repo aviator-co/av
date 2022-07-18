@@ -81,12 +81,11 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		)
 	}
 
-	branchMeta, ok := meta.ReadBranch(repo, currentBranch)
-
 	// figure this out based on whether or not we're on a stacked branch
 	var prBaseBranch string
-	if ok && branchMeta.Parent != "" {
-		prBaseBranch = branchMeta.Parent
+	branchMeta, ok := meta.ReadBranch(repo, currentBranch)
+	if ok && branchMeta.Parent.Name != "" {
+		prBaseBranch = branchMeta.Parent.Name
 		// check if the base branch also has an associated PR
 		baseMeta, ok := meta.ReadBranch(repo, prBaseBranch)
 		if !ok {
@@ -102,6 +101,8 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 			)
 		}
 	} else {
+		// This usually means that the branch wasn't created with `av stack pr`,
+		// so we should just create a PR into the mainline branch.
 		defaultBranch, err := repo.DefaultBranch()
 		if err != nil {
 			return nil, errors.WrapIf(err, "failed to determine repository default branch")

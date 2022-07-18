@@ -36,12 +36,12 @@ var stackBranchCmd = &cobra.Command{
 		}
 
 		// Determine the parent branch and make sure it's checked out
-		var parentBranch string
+		var parentBranchName string
 		var cu cleanup.Cleanup
 		defer cu.Cleanup()
 		if stackBranchFlags.Parent != "" {
-			parentBranch = stackBranchFlags.Parent
-			origBranch, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: parentBranch})
+			parentBranchName = stackBranchFlags.Parent
+			origBranch, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: parentBranchName})
 			if err != nil {
 				return errors.WrapIf(err, "failed to checkout parent branch")
 			}
@@ -52,21 +52,24 @@ var stackBranchCmd = &cobra.Command{
 			})
 		} else {
 			var err error
-			parentBranch, err = repo.CurrentBranchName()
+			parentBranchName, err = repo.CurrentBranchName()
 			if err != nil {
 				return errors.WrapIff(err, "failed to get current branch name")
 			}
 		}
 
-		// Special case: branching from the repository default branch
-		// We set parentBranch = "" as a sentinel value to indicate that this
-		// branch is the root of a new stack.
-		if parentBranch == defaultBranch {
-			logrus.Debug("creating new stack root branch from default branch")
-			parentBranch = ""
-		}
+		// Currently, we only allow the repo default branch to be a trunk.
+		// We might want to allow other branches to be trunks in the future, but
+		// that does run the risk of allowing the user to get into a weird state
+		// (where some stacks assume a branch is a trunk and others don't).
+		isBranchFromTrunk := parentBranchName == defaultBranch
+		parentState, err := meta.ReadBranchState(repo, parentBranchName, isBranchFromTrunk)
 
 		// Create a new branch off of the parent
+		logrus.WithFields(logrus.Fields{
+			"parent":     parentBranchName,
+			"new_branch": name,
+		}).Debug("creating new branch from parent")
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
 			Name:      name,
 			NewBranch: true,
@@ -74,7 +77,10 @@ var stackBranchCmd = &cobra.Command{
 			return errors.WrapIff(err, "checkout error")
 		}
 
-		branchMeta := meta.Branch{Name: name, Parent: parentBranch}
+		branchMeta := meta.Branch{
+			Name:   name,
+			Parent: parentState,
+		}
 		logrus.WithField("meta", branchMeta).Debug("writing branch metadata")
 		if err := meta.WriteBranch(repo, branchMeta); err != nil {
 			return errors.WrapIff(err, "failed to write av internal metadata for branch %q", name)
@@ -82,8 +88,8 @@ var stackBranchCmd = &cobra.Command{
 
 		// If this isn't a new stack root, update the parent metadata to include
 		// the new branch as a child.
-		if parentBranch != "" {
-			parentMeta, _ := meta.ReadBranch(repo, parentBranch)
+		if !isBranchFromTrunk {
+			parentMeta, _ := meta.ReadBranch(repo, parentBranchName)
 			parentMeta.Children = append(parentMeta.Children, name)
 			logrus.WithField("meta", parentMeta).Debug("writing parent branch metadata")
 			if err := meta.WriteBranch(repo, parentMeta); err != nil {

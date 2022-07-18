@@ -17,13 +17,8 @@ type Branch struct {
 	// of the git ref.
 	Name string `json:"-"`
 
-	// The branch name associated with the parent of the stack (if any).
-	// If empty, this branch (potentially*) is considered a stack root.
-	// (*depending on the context, we only consider the branch a stack root if
-	// it also has children branches; for example, any "vanilla" branch off of
-	// trunk will have no parent, but we usually don't explicitly consider it a
-	// stack unless it also has stack children)
-	Parent string `json:"parent"`
+	// Information about the parent branch.
+	Parent BranchState `json:"parent,omitempty"`
 
 	// The children branches of this branch within the stack (if any).
 	Children []string `json:"children,omitempty"`
@@ -31,6 +26,56 @@ type Branch struct {
 	// The associated pull request information, if any.
 	PullRequest *PullRequest `json:"pullRequest,omitempty"`
 }
+
+func (b *Branch) IsStackRoot() bool {
+	return b.Parent.Trunk
+}
+
+func (b *Branch) UnmarshalJSON(bytes []byte) error {
+	// We have to do a bit of backwards-compatible trickery here to support the
+	// fact that "parent" used to be a string field and now it's a struct
+	// (the main reason it's a struct is because we want the parent info to be
+	// updated atomically and doing it like this makes it harder to forget to
+	// update the branch name but forget to update the HEAD sha).
+	// Two things are happening here as far as the code is concerned:
+	// 1. We want to still use the normal JSON machinery to parse most fields
+	//    out of Branch (without having to write our own JSON parsing logic
+	//    here). To do that, we have to define a type alias for Branch which
+	// 	  effectively erases the UnmorshalJSON method (otherwise we get a stack
+	//	  overflow as this function would be called recursively).
+	// 2. We define a new type that embeds BranchAlias but overrides the Parent
+	//    field so we can parse that manually ourselves.
+	type BranchAlias Branch
+	type data struct {
+		BranchAlias
+		Parent json.RawMessage `json:"parent"`
+	}
+	var d data
+	if err := json.Unmarshal(bytes, &d); err != nil {
+		return err
+	}
+
+	// Everything except name (since that is set externally) and parent is set
+	// on the actual Branch object we're unmarshalling into
+	b.Children = d.Children
+	b.PullRequest = d.PullRequest
+
+	// Parse the parent information (which can either be a string or a JSON)
+	var err error
+	b.Parent, err = unmarshalBranchState(d.Parent)
+	if err != nil {
+		return err
+	}
+	// can't do this because sometimes we read an uninitialized branch
+	//if b.Parent.Name == "" {
+	//	return errors.Errorf("cannot unmarshal Branch from JSON: parent branch of %q is unset", b.Name)
+	//}
+
+	logrus.Debugf("parsed branch metadata: %s => %#+v %#+v", bytes, d, b)
+	return nil
+}
+
+var _ json.Unmarshaler = (*Branch)(nil)
 
 type PullRequest struct {
 	// The GitHub (GraphQL) ID of the pull request.
@@ -41,6 +86,27 @@ type PullRequest struct {
 	Permalink string `json:"permalink"`
 	// The state of the pull request (open, closed, or merged).
 	State githubv4.PullRequestState
+}
+
+func unmarshalBranch(repo *git.Repo, name string, refName string, blob []byte) (Branch, bool) {
+	branch := Branch{Name: name}
+	if err := json.Unmarshal([]byte(blob), &branch); err != nil {
+		logrus.WithError(err).WithField("ref", refName).Error("corrupt stack metadata, deleting...")
+		_ = repo.UpdateRef(&git.UpdateRef{Ref: refName, New: git.Missing})
+		return branch, false
+	}
+	if branch.Parent.Name == "" {
+		// COMPAT: assume parent branch is the default/mainline branch
+		defaultBranch, err := repo.DefaultBranch()
+		if err != nil {
+			// panic isn't great, but plumbing through the error is more effort
+			// that it's worth here
+			panic(errors.Wrap(err, "failed to determine repository default branch"))
+		}
+		branch.Parent.Name = defaultBranch
+		branch.Parent.Trunk = true
+	}
+	return branch, true
 }
 
 // ReadBranch loads information about the branch from the git repository.
@@ -122,9 +188,17 @@ func WriteBranch(repo *git.Repo, s Branch) error {
 	if s.Name == "" {
 		return errors.New("cannot write branch metadata: branch name is empty")
 	}
-	if s.Parent == s.Name {
+
+	if s.Parent.Name == s.Name {
 		return errors.New("cannot write branch metadata: parent branch is the same as the branch itself")
 	}
+
+	if s.Parent.Trunk && s.Parent.Head != "" {
+		return errors.New("invariant error: cannot write branch metadata: parent branch is a trunk branch and has a head commit assigned")
+	} else if !s.Parent.Trunk && s.Parent.Head == "" {
+		return errors.New("invariant error: cannot write branch metadata: parent branch is not a trunk branch and has no head commit assigned")
+	}
+
 	if slices.Contains(s.Children, s.Name) {
 		return errors.New("cannot write branch metadata: branch is a child of itself")
 	}

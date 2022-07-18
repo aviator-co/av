@@ -4,7 +4,7 @@ type RebaseOpts struct {
 	// Required (unless Continue is true)
 	// The upstream branch to rebase onto.
 	Upstream string
-	// Optional
+	// Optional (mutually exclusive with all other options)
 	// If set, continue a rebase (all other options are ignored).
 	Continue bool
 	// Optional

@@ -36,8 +36,13 @@ const (
 )
 
 type SyncBranchOpts struct {
-	// The branch to sync with.
+	// The branch that is being synced (this should already be checked out).
+	Branch string
+	// The name of the parent branch
 	Parent string
+	// The base commit to use for the rebase (every commit *after* this one
+	// will be replayed onto Parent).
+	Base string
 	// The strategy for performing the sync.
 	// If the branch is already up-to-date, the sync will be a no-op and
 	// strategy will be ignored.
@@ -57,9 +62,6 @@ func SyncBranch(
 	repo *git.Repo,
 	opts *SyncBranchOpts,
 ) (*SyncResult, error) {
-	if opts.Parent == "" {
-		return nil, errors.New("parent branch must not be empty")
-	}
 	// Determine whether or not the two branches are up-to-date.
 	// If they are, we can skip the sync.
 	// The target branch is up-to-date if
@@ -101,7 +103,14 @@ func SyncBranch(
 		}, nil
 
 	case StrategyRebase:
-		out, err := repo.Run(&git.RunOpts{Args: []string{"rebase", parentHead}})
+		if opts.Base == "" {
+			opts.Base = mergeBase
+		}
+		out, err := repo.Rebase(git.RebaseOpts{
+			Upstream: opts.Base,
+			Onto:     opts.Parent,
+			Branch:   opts.Branch,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -143,13 +152,8 @@ func SyncContinue(repo *git.Repo, strategy SyncStrategy) (*SyncResult, error) {
 			Status: SyncUpdated,
 		}, nil
 	case StrategyRebase:
-		out, err := repo.Run(&git.RunOpts{
-			Args: []string{"rebase", "--continue"},
-			// `git rebase --continue` will open an editor to allow the user
-			// to edit the commit message, which we don't want here. Instead, we
-			// specify `true` here (which is a command that does nothing and
-			// simply exits 0) to disable the editor.
-			Env: []string{"GIT_EDITOR=true"},
+		out, err := repo.Rebase(git.RebaseOpts{
+			Continue: true,
 		})
 		if err != nil {
 			return nil, err
