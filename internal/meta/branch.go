@@ -88,7 +88,7 @@ type PullRequest struct {
 	State githubv4.PullRequestState
 }
 
-func unmarshalBranch(repo *git.Repo, name string, refName string, blob []byte) (Branch, bool) {
+func unmarshalBranch(repo *git.Repo, name string, refName string, blob string) (Branch, bool) {
 	branch := Branch{Name: name}
 	if err := json.Unmarshal([]byte(blob), &branch); err != nil {
 		logrus.WithError(err).WithField("ref", refName).Error("corrupt stack metadata, deleting...")
@@ -114,27 +114,31 @@ func unmarshalBranch(repo *git.Repo, name string, refName string, blob []byte) (
 // already existed and was loaded. If the branch metadata does not exist, a
 // useful default is returned.
 func ReadBranch(repo *git.Repo, branchName string) (Branch, bool) {
-	// No matter what, we return something useful.
-	// We have to set name since it's not loaded from the JSON blob.
-	var branch Branch
-	branch.Name = branchName
-
 	refName := branchMetaRefName(branchName)
 	blob, err := repo.Git("cat-file", "blob", refName)
 
 	// Just assume that any error here means that the metadata ref doesn't exist
 	// (there's no easy way to distinguish between that and an actual Git error)
 	if err != nil {
-		return branch, false
+		defaultBranch, err := repo.DefaultBranch()
+		if err != nil {
+			// panic isn't great, but plumbing through the error is more effort
+			// that it's worth here
+			panic(errors.Wrap(err, "failed to determine repository default branch"))
+		}
+		// If there is no branch metadata, it probably means that they created
+		// the branch with "git checkout -b" and we implicitly assume that
+		// the branch is a stack root whose trunk is the repo default branch.
+		return Branch{
+			Name: branchName,
+			Parent: BranchState{
+				Trunk: true,
+				Name:  defaultBranch,
+			},
+		}, false
 	}
 
-	if err := json.Unmarshal([]byte(blob), &branch); err != nil {
-		logrus.WithError(err).WithField("ref", refName).Error("corrupt stack metadata, deleting...")
-		_ = repo.UpdateRef(&git.UpdateRef{Ref: refName, New: git.Missing})
-		return branch, false
-	}
-
-	return branch, true
+	return unmarshalBranch(repo, branchName, refName, blob)
 }
 
 // ReadAllBranches fetches all branch metadata stored in the git repository.
@@ -168,12 +172,8 @@ func ReadAllBranches(repo *git.Repo) (map[string]Branch, error) {
 	// ...and for each metadata blob, parse it from JSON into a Branch
 	branches := make(map[string]Branch, len(refs))
 	for _, ref := range refContents {
-		var branch Branch
-		if err := json.Unmarshal(ref.Contents, &branch); err != nil {
-			return nil, errors.WrapIff(err, "corrupt stack metadata for branch: %q", ref.Revision)
-		}
 		name := strings.TrimPrefix(ref.Revision, branchMetaRefPrefix)
-		branch.Name = name
+		branch, _ := unmarshalBranch(repo, name, ref.Revision, string(ref.Contents))
 		branches[name] = branch
 	}
 	return branches, nil

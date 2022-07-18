@@ -23,7 +23,9 @@ func TestStackSync(t *testing.T) {
 	// 		stack-1: main -> 1a
 	// 		stack-2: 		  \ -> 2a
 	//      stack-3:                \ -> 3a
-	require.Equal(t, 0, Av(t, "stack", "branch", "stack-1").ExitCode)
+	// Note: we create the first branch with a "vanilla" git checkout just to
+	// make sure that's working as intended.
+	require.Equal(t, 0, Cmd(t, "git", "checkout", "-b", "stack-1").ExitCode)
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n"), gittest.WithMessage("Commit 1a"))
 	require.Equal(t, 0, Av(t, "stack", "branch", "stack-2").ExitCode)
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n2a\n"), gittest.WithMessage("Commit 2a"))
