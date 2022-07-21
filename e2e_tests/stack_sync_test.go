@@ -20,9 +20,9 @@ func TestStackSync(t *testing.T) {
 
 	// To start, we create a simple three-stack where each stack has a single commit.
 	// Our stack looks like:
-	// 		stack-1: main -> 1a
-	// 		stack-2: 		  \ -> 2a
-	//      stack-3:                \ -> 3a
+	//     stack-1: main -> 1a
+	//     stack-2:           \ -> 2a
+	//     stack-3:                \ -> 3a
 	// Note: we create the first branch with a "vanilla" git checkout just to
 	// make sure that's working as intended.
 	require.Equal(t, 0, Cmd(t, "git", "checkout", "-b", "stack-1").ExitCode)
@@ -37,20 +37,22 @@ func TestStackSync(t *testing.T) {
 
 	// We're going to add a commit to the first branch in the stack.
 	// Our stack looks like:
-	// 		stack-1: main -> 1a -> 1b
-	// 		stack-2: 		  \ -> 2a
+	//      stack-1: main -> 1a -> 1b
+	//      stack-2:           \ -> 2a
 	//      stack-3:                \ -> 3a
+
 	// (note that stack-2 has diverged with stack-1)
 	// Ultimately, after the sync (and resolving conflicts), our stack should look like:
-	// 		stack-1: main -> 1a -> 1b
-	// 		stack-2: 		        \ -> 2a'
+	//      stack-1: main -> 1a -> 1b
+	//      stack-2:                 \ -> 2a'
 	//      stack-3:                       \ -> 3a'
 	// It's very important here to make sure to handle the sync of stack-3 correctly.
 	// After syncing stack-2 onto stack-1 (before syncinc stack-3), our commit
 	// graph looks like:
-	// 		stack-1: main -> 1a -> 1b
-	// 		stack-2: 		        \ -> 2a'
+	//      stack-1: main -> 1a -> 1b
+	//      stack-2:                 \ -> 2a'
 	//      stack-3:          \ -> 2a -> 3a
+
 	// (remember that we haven't yet modified stack-3, so 3a still has parent 2a,
 	// but 2a is actually not even associated with stack-2 anymore since we had
 	// to rebase sync it on top of 1b, creating new commit 2a').
