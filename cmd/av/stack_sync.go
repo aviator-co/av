@@ -92,17 +92,9 @@ base branch.
 			return errors.New("cannot use --continue and --abort together")
 		}
 
-		// Check for unstaged changes
 		repo, repoMeta, err := getRepoInfo()
 		if err != nil {
 			return err
-		}
-		diff, err := repo.Diff(&git.DiffOpts{Quiet: true})
-		if err != nil {
-			return err
-		}
-		if !diff.Empty {
-			return errors.New("refusing to sync: there are unstaged changes in the working tree (use `git add` to stage changes)")
 		}
 
 		// Read any pre-existing state.
@@ -122,13 +114,32 @@ base branch.
 			if state.CurrentBranch == "" {
 				return errors.New("no sync in progress")
 			}
+
+			// Abort the rebase if we need to
+			if stat, _ := os.Stat(path.Join(repo.GitDir(), "REBASE_HEAD")); stat != nil {
+				if _, err := repo.Rebase(git.RebaseOpts{Abort: true}); err != nil {
+					return errors.WrapIf(err, "failed to abort in-progress rebase")
+				}
+			}
+
 			err := writeStackSyncState(repo, nil)
 			if err != nil {
 				return errors.Wrap(err, "failed to reset stack sync state")
 			}
 			_, _ = fmt.Fprintf(os.Stderr, "Aborted stack sync for branch %q\n", state.CurrentBranch)
 			return nil
-		} else if stackSyncFlags.Continue {
+		}
+
+		// Make sure all changes are staged
+		diff, err := repo.Diff(&git.DiffOpts{Quiet: true})
+		if err != nil {
+			return err
+		}
+		if !diff.Empty {
+			return errors.New("refusing to sync: there are unstaged changes in the working tree (use `git add` to stage changes)")
+		}
+
+		if stackSyncFlags.Continue {
 			if state.CurrentBranch == "" {
 				return errors.New("no sync in progress")
 			}

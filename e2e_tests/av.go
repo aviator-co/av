@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,6 +65,12 @@ func Cmd(t *testing.T, exe string, args ...string) AvOutput {
 	return output
 }
 
+func RequireCmd(t *testing.T, exe string, args ...string) AvOutput {
+	output := Cmd(t, exe, args...)
+	require.Equal(t, 0, output.ExitCode, "cmd %s: exited with %v", args, output.ExitCode)
+	return output
+}
+
 func Av(t *testing.T, args ...string) AvOutput {
 	args = append([]string{"--debug"}, args...)
 	return Cmd(t, avCmdPath, args...)
@@ -71,9 +78,7 @@ func Av(t *testing.T, args ...string) AvOutput {
 
 func RequireAv(t *testing.T, args ...string) AvOutput {
 	output := Av(t, args...)
-	if output.ExitCode != 0 {
-		logrus.Panicf("av %s: exited with %v", args, output.ExitCode)
-	}
+	require.Equal(t, 0, output.ExitCode, "av %s: exited with %v", args, output.ExitCode)
 	return output
 }
 
