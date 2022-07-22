@@ -166,10 +166,19 @@ base branch.
 		if state.Config.Parent != "" {
 			var res *actions.ReparentResult
 			var err error
+			defaultBranch, err := repo.DefaultBranch()
+			if err != nil {
+				return err
+			}
+			opts := actions.ReparentOpts{
+				Branch:         state.CurrentBranch,
+				NewParent:      state.Config.Parent,
+				NewParentTrunk: state.Config.Parent == defaultBranch,
+			}
 			if state.Continue {
-				res, err = actions.ReparentContinue(repo, state.CurrentBranch, state.Config.Parent)
+				res, err = actions.ReparentContinue(repo, opts)
 			} else {
-				res, err = actions.Reparent(repo, state.CurrentBranch, state.Config.Parent)
+				res, err = actions.Reparent(repo, opts)
 			}
 			if err != nil {
 				return err
@@ -271,7 +280,8 @@ base branch.
 				}
 			}
 
-			if currentMeta.Parent == "" {
+			parentState := currentMeta.Parent
+			if parentState.Trunk {
 				// This should be the first branch in the stack. We don't need
 				// to rebase it (at least not yet -- at some point we need to
 				// implement rebasing on top of trunk...), but we still need to
@@ -296,7 +306,7 @@ base branch.
 				"parent":  currentMeta.Parent,
 			})
 
-			parentMeta, ok := branches[currentMeta.Parent]
+			parentMeta, ok := branches[parentState.Name]
 			if ok && parentMeta.PullRequest != nil && parentMeta.PullRequest.State == githubv4.PullRequestStateMerged {
 				defaultBranch, err := repo.DefaultBranch()
 				if err != nil {
@@ -317,7 +327,7 @@ base branch.
 			}
 			_, _ = fmt.Fprint(os.Stderr,
 				"  - syncing ", colors.UserInput(currentBranch),
-				" on top of ", colors.UserInput(currentMeta.Parent), "... ",
+				" on top of ", colors.UserInput(currentMeta.Parent.Name), "... ",
 			)
 
 			// Checkout the branch (unless we need to continue a rebase, in which
@@ -337,7 +347,9 @@ base branch.
 					return err
 				}
 				res, err = stacks.SyncBranch(repo, &stacks.SyncBranchOpts{
-					Parent:   currentMeta.Parent,
+					Branch:   currentBranch,
+					Parent:   currentMeta.Parent.Name,
+					Base:     currentMeta.Parent.Head,
 					Strategy: stacks.StrategyRebase,
 				})
 			}
@@ -428,11 +440,6 @@ base branch.
 	},
 }
 
-type syncResult struct {
-	Conflict      bool
-	CurrentBranch string
-}
-
 // Find all the ancestor branches of the given branch name and append them to
 // the given slice (in topological order: a comes before b if a is an ancestor
 // of b).
@@ -441,17 +448,18 @@ func previousBranches(branches map[string]meta.Branch, name string) ([]string, e
 	if !ok {
 		return nil, errors.Errorf("branch metadata not found for %q", name)
 	}
-	if current.Parent == "" {
+	parent := current.Parent
+	if parent.Trunk {
 		return nil, nil
 	}
-	if current.Parent == name {
+	if parent.Name == name {
 		logrus.Fatalf("invariant error: branch %q is its own parent (this is probably a bug with av)", name)
 	}
-	previous, err := previousBranches(branches, current.Parent)
+	previous, err := previousBranches(branches, parent.Name)
 	if err != nil {
 		return nil, err
 	}
-	return append(previous, current.Parent), nil
+	return append(previous, parent.Name), nil
 }
 
 func subsequentBranches(branches map[string]meta.Branch, name string) ([]string, error) {

@@ -36,9 +36,8 @@ type AvOutput struct {
 	Stderr   string
 }
 
-func Av(t *testing.T, args ...string) AvOutput {
-	args = append([]string{"--debug"}, args...)
-	cmd := exec.Command(avCmdPath, args...)
+func Cmd(t *testing.T, exe string, args ...string) AvOutput {
+	cmd := exec.Command(exe, args...)
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	cmd.Stdout = stdout
@@ -56,13 +55,18 @@ func Av(t *testing.T, args ...string) AvOutput {
 		Stderr:   stderr.String(),
 	}
 
-	fmt.Printf("\nRunning command:\n    av %v\n", args)
+	fmt.Printf("\nRunning command:\n    %v\n", args)
 	fmt.Printf("    exit code: %v\n", cmd.ProcessState.ExitCode())
 	fmt.Printf("    stdout:\n%s\n", text.Indent(stdout.String(), "        "))
 	fmt.Printf("    stderr:\n%s\n", text.Indent(stderr.String(), "        "))
 	fmt.Printf("\n")
 
 	return output
+}
+
+func Av(t *testing.T, args ...string) AvOutput {
+	args = append([]string{"--debug"}, args...)
+	return Cmd(t, avCmdPath, args...)
 }
 
 func RequireAv(t *testing.T, args ...string) AvOutput {

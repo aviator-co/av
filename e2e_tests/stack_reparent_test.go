@@ -37,6 +37,8 @@ func TestStackSyncReparent(t *testing.T) {
 	requireFileContent(t, "spam.txt", "spam")
 	requireFileContent(t, "foo.txt", "foo", "foo.txt should be set after reparenting onto foo branch")
 	require.NoFileExists(t, "bar.txt", "bar.txt should not exist after reparenting onto foo branch")
+
+	Cmd(t, "git", "log")
 }
 
 func requireFileContent(t *testing.T, file string, expected string, args ...any) {

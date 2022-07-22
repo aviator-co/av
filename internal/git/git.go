@@ -86,6 +86,11 @@ type Output struct {
 	Stderr   []byte
 }
 
+func (o Output) Lines() []string {
+	s := strings.TrimSpace(string(o.Stdout))
+	return strings.Split(s, "\n")
+}
+
 func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 	cmd := exec.Command("git", opts.Args...)
 	cmd.Dir = r.repoDir
@@ -170,14 +175,15 @@ func (r *Repo) CheckoutBranch(opts *CheckoutBranch) (string, error) {
 		Args: args,
 	})
 	if err != nil {
-	    return "", err
+		return "", err
 	}
 	if res.ExitCode != 0 {
 		logrus.WithFields(logrus.Fields{
-		    "stdout": string(res.Stdout),
-		    "stderr": string(res.Stderr),
+			"stdout": string(res.Stdout),
+			"stderr": string(res.Stderr),
 		}).Debug("git checkout failed")
-        return "", errors.Errorf("failed to checkout branch %q: %s", opts.Name, string(res.Stderr))	}
+		return "", errors.Errorf("failed to checkout branch %q: %s", opts.Name, string(res.Stderr))
+	}
 	return previousBranchName, nil
 }
 

@@ -81,12 +81,10 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		)
 	}
 
-	branchMeta, ok := meta.ReadBranch(repo, currentBranch)
-
 	// figure this out based on whether or not we're on a stacked branch
-	var prBaseBranch string
-	if ok && branchMeta.Parent != "" {
-		prBaseBranch = branchMeta.Parent
+	branchMeta, _ := meta.ReadBranch(repo, currentBranch)
+	prBaseBranch := branchMeta.Parent.Name
+	if !branchMeta.Parent.Trunk {
 		// check if the base branch also has an associated PR
 		baseMeta, ok := meta.ReadBranch(repo, prBaseBranch)
 		if !ok {
@@ -102,18 +100,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 			)
 		}
 	} else {
-		defaultBranch, err := repo.DefaultBranch()
-		if err != nil {
-			return nil, errors.WrapIf(err, "failed to determine repository default branch")
-		}
-		if currentBranch == defaultBranch {
-			return nil, errors.Errorf(
-				"cannot create pull request for default branch %q "+
-					"(did you mean to checkout a different branch before running this command?)",
-				defaultBranch,
-			)
-		}
-		prBaseBranch = defaultBranch
+		logrus.WithField("base", prBaseBranch).Debug("base branch is a trunk branch")
 	}
 
 	commitsList, err := repo.Git("rev-list", "--reverse", fmt.Sprintf("%s..HEAD", prBaseBranch))

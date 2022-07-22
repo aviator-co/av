@@ -46,8 +46,7 @@ var stackTreeCmd = &cobra.Command{
 			fmt.Println(defaultBranch)
 		}
 		for branch, branchMeta := range branches {
-			if branchMeta.Parent != "" {
-				// not a stack root
+			if !branchMeta.IsStackRoot() {
 				continue
 			}
 			printStackTree(repo, branches, currentBranch, branch, 1)
