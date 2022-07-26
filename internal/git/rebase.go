@@ -7,6 +7,8 @@ type RebaseOpts struct {
 	// Optional (mutually exclusive with all other options)
 	// If set, continue a rebase (all other options are ignored).
 	Continue bool
+	// Optional (mutually exclusive with all other options)
+	Abort bool
 	// Optional
 	// If set, use `git rebase --onto <upstream> ...`
 	Onto string
@@ -28,6 +30,10 @@ func (r *Repo) Rebase(opts RebaseOpts) (*Output, error) {
 			// specify `true` here (which is a command that does nothing and
 			// simply exits 0) to disable the editor.
 			Env: []string{"GIT_EDITOR=true"},
+		})
+	} else if opts.Abort {
+		return r.Run(&RunOpts{
+			Args: []string{"rebase", "--abort"},
 		})
 	}
 	if opts.Onto != "" {

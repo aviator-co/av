@@ -5,7 +5,9 @@ import (
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
+	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -120,4 +122,35 @@ func TestStackSync(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, 4, len(revs))
+}
+
+func TestStackSyncAbort(t *testing.T) {
+	repo := gittest.NewTempRepo(t)
+	Chdir(t, repo.Dir())
+
+	// Create a two stack...
+	RequireCmd(t, "git", "checkout", "-b", "stack-1")
+	gittest.CommitFile(t, repo, "my-file", []byte("1a\n"), gittest.WithMessage("Commit 1a"))
+	RequireAv(t, "stack", "branch", "stack-2")
+	gittest.CommitFile(t, repo, "my-file", []byte("1a\n2a\n"), gittest.WithMessage("Commit 2a"))
+
+	// ... and introduce a commit onto stack-1 that will conflict with stack-2...
+	gittest.WithCheckoutBranch(t, repo, "stack-1", func() {
+		gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"), gittest.WithMessage("Commit 1b"))
+	})
+
+	// ... and make sure we get a conflict on sync...
+	syncConflict := Av(t, "stack", "sync", "--no-fetch", "--no-push")
+	require.NotEqual(t, 0, syncConflict.ExitCode, "stack sync should return non-zero exit code if conflicts")
+	require.FileExists(t, path.Join(repo.GitDir(), "REBASE_HEAD"), "REBASE_HEAD should be created for conflict")
+
+	// ... and then abort the sync...
+	RequireAv(t, "stack", "sync", "--abort")
+	require.NoFileExists(t, path.Join(repo.GitDir(), "REBASE_HEAD"), "REBASE_HEAD should be removed after abort")
+
+	// ... and finally make sure normal things work...
+	// (make sure we're not in a detached HEAD state)
+	RequireAv(t, "stack", "tree")
+	currentBranchOutput := RequireCmd(t, "git", "branch", "--show-current")
+	require.Equal(t, strings.TrimSpace(currentBranchOutput.Stdout), "stack-2")
 }
