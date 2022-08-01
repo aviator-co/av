@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
@@ -36,6 +37,20 @@ var stackSubmitCmd = &cobra.Command{
 			return err
 		}
 		for _, currentMeta := range branches {
+			_, err := actions.CreatePullRequest(
+				ctx, repo, client,
+				actions.CreatePullRequestOpts{
+					BranchName: currentMeta.Name,
+					Title:      "",
+					Body:       "",
+					NoPush:     false,
+					Force:      false,
+					Draft:      false,
+				},
+			)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil

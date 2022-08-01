@@ -19,6 +19,8 @@ import (
 )
 
 type CreatePullRequestOpts struct {
+	BranchName string
+
 	Title string
 	Body  string
 	//LabelNames      []string
@@ -31,21 +33,23 @@ type CreatePullRequestOpts struct {
 	Force bool
 }
 
+type CreatePullRequestResult struct {
+	// True if the pull request was created
+	Created bool
+	// The pull request object that was returned from GitHub
+	Pull *gh.PullRequest
+}
+
 // CreatePullRequest creates a pull request on GitHub for the current branch, if
 // one doesn't already exist.
-func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, opts CreatePullRequestOpts) (*gh.PullRequest, error) {
+func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, opts CreatePullRequestOpts) (*CreatePullRequestResult, error) {
 	repoMeta, err := meta.ReadRepository(repo)
 	if err != nil {
 		return nil, err
 	}
 
-	currentBranch, err := repo.CurrentBranchName()
-	if err != nil {
-		return nil, errors.WrapIf(err, "failed to determine current branch")
-	}
-
 	_, _ = fmt.Fprint(os.Stderr,
-		"Creating pull request for branch ", colors.UserInput(currentBranch), ":",
+		"Creating pull request for branch ", colors.UserInput(opts.BranchName), ":",
 		"\n",
 	)
 	if !opts.NoPush {
@@ -60,8 +64,8 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		})
 		if err != nil {
 			// Set the upstream branch
-			upstream = "origin/" + currentBranch
-			pushFlags = append(pushFlags, "--set-upstream", "origin", currentBranch)
+			upstream = "origin/" + opts.BranchName
+			pushFlags = append(pushFlags, "--set-upstream", "origin", opts.BranchName)
 		} else {
 			upstream = strings.TrimPrefix(upstream, "refs/remotes/")
 		}
@@ -82,7 +86,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	}
 
 	// figure this out based on whether or not we're on a stacked branch
-	branchMeta, _ := meta.ReadBranch(repo, currentBranch)
+	branchMeta, _ := meta.ReadBranch(repo, opts.BranchName)
 	prBaseBranch := branchMeta.Parent.Name
 	if !branchMeta.Parent.Trunk {
 		// check if the base branch also has an associated PR
@@ -108,7 +112,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		return nil, errors.WrapIf(err, "failed to determine commits to include in PR")
 	}
 	if commitsList == "" {
-		return nil, errors.Errorf("no commits between %q and %q", prBaseBranch, currentBranch)
+		return nil, errors.Errorf("no commits between %q and %q", prBaseBranch, opts.BranchName)
 	}
 	commits := strings.Split(commitsList, "\n")
 	firstCommit, err := repo.CommitInfo(git.CommitInfoOpts{Rev: commits[0]})
@@ -135,7 +139,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 
 	pull, didCreatePR, err := getOrCreatePR(ctx, client, repoMeta, getOrCreatePROpts{
 		baseRefName: prBaseBranch,
-		headRefName: currentBranch,
+		headRefName: opts.BranchName,
 		title:       opts.Title,
 		body:        opts.Body,
 		draft:       opts.Draft,
@@ -171,7 +175,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		action = "fetched existing"
 	}
 	_, _ = fmt.Fprint(os.Stderr,
-		"  - ", action, " pull request for branch ", colors.UserInput(currentBranch),
+		"  - ", action, " pull request for branch ", colors.UserInput(opts.BranchName),
 		" (into branch ", colors.UserInput(prBaseBranch), "): ",
 		colors.UserInput(pull.Permalink),
 		"\n",
@@ -188,7 +192,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		}
 	}
 
-	return pull, nil
+	return &CreatePullRequestResult{didCreatePR, pull}, nil
 }
 
 type getOrCreatePROpts struct {
