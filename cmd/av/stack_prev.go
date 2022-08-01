@@ -66,7 +66,7 @@ var stackPrevCmd = &cobra.Command{
 			return fmt.Errorf("invalid number (there are only %d previous branches in the stack)", len(previousBranches))
 		}
 
-		// if we are trying to go to the last branch then set things
+		// if we are trying to go to the first branch then set things
 		if stackPrevFlags.First {
 			n = len(previousBranches)
 		}
