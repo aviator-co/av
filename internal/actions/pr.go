@@ -36,6 +36,8 @@ type CreatePullRequestOpts struct {
 type CreatePullRequestResult struct {
 	// True if the pull request was created
 	Created bool
+	// The (updated) branch metadata.
+	Branch meta.Branch
 	// The pull request object that was returned from GitHub
 	Pull *gh.PullRequest
 }
@@ -192,7 +194,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		}
 	}
 
-	return &CreatePullRequestResult{didCreatePR, pull}, nil
+	return &CreatePullRequestResult{didCreatePR, branchMeta, pull}, nil
 }
 
 type getOrCreatePROpts struct {

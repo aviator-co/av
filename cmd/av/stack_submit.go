@@ -8,6 +8,7 @@ import (
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
 
@@ -37,19 +38,32 @@ var stackSubmitCmd = &cobra.Command{
 			return err
 		}
 		for _, currentMeta := range branches {
-			_, err := actions.CreatePullRequest(
+			result, err := actions.CreatePullRequest(
 				ctx, repo, client,
 				actions.CreatePullRequestOpts{
 					BranchName: currentMeta.Name,
-					Title:      "",
-					Body:       "",
-					NoPush:     false,
-					Force:      false,
-					Draft:      false,
+					// TODO: currently just set things as empty but it might be nice to have an interactive mode
+					//	that would let us set the title and body, etc. per branch in the stack
+					Title:  "",
+					Body:   "",
+					NoPush: false,
+					Force:  false,
+					Draft:  false,
 				},
 			)
 			if err != nil {
 				return err
+			}
+			// make sure the base branch of the PR is up to date if it already exists
+			if !result.Created {
+				if _, err := client.UpdatePullRequest(
+					ctx, githubv4.UpdatePullRequestInput{
+						PullRequestID: githubv4.ID(result.Branch.PullRequest.ID),
+						BaseRefName:   gh.Ptr(githubv4.String(result.Branch.Parent.Name)),
+					},
+				); err != nil {
+					return errors.Wrap(err, "failed to update PR base branch")
+				}
 			}
 		}
 
