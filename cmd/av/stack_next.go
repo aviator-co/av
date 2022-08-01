@@ -12,12 +12,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var stackNextFlags struct {
+	// should we go to the last
+	Last bool
+}
+
 var stackNextCmd = &cobra.Command{
-	Use:   "next <n>",
+	Use:   "next <n> or next --last",
 	Short: "checkout the next branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var n int = 1
-		if len(args) == 1 {
+		if len(args) == 1 && !stackNextFlags.Last {
 			var err error
 			n, err = strconv.Atoi(args[0])
 			if err != nil {
@@ -58,6 +63,11 @@ var stackNextCmd = &cobra.Command{
 			return fmt.Errorf("invalid number (there are only %d subsequent branches in the stack)", len(subsequentBranches))
 		}
 
+		// if we are trying to go to the last branch then set things
+		if stackNextFlags.Last {
+			n = len(subsequentBranches)
+		}
+
 		// checkout nth branch
 		var branchToCheckout = subsequentBranches[n-1]
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
@@ -70,4 +80,11 @@ var stackNextCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func init() {
+	stackNextCmd.Flags().BoolVar(
+		&stackNextFlags.Last, "last", false,
+		"go to the last branch in the current stack",
+	)
 }

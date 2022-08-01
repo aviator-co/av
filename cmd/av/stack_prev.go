@@ -12,12 +12,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var stackPrevFlags struct {
+	// should we go to the first
+	First bool
+}
+
 var stackPrevCmd = &cobra.Command{
-	Use:   "prev <n>",
+	Use:   "prev <n> or prev --first",
 	Short: "checkout the previous branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var n int = 1
-		if len(args) == 1 {
+		if len(args) == 1 && !stackPrevFlags.First {
 			var err error
 			n, err = strconv.Atoi(args[0])
 			if err != nil {
@@ -58,6 +63,11 @@ var stackPrevCmd = &cobra.Command{
 			return fmt.Errorf("invalid number (there are only %d previous branches in the stack)", len(previousBranches))
 		}
 
+		// if we are trying to go to the last branch then set things
+		if stackPrevFlags.First {
+			n = len(previousBranches)
+		}
+
 		// checkout nth previous branch
 		var branchToCheckout = previousBranches[len(previousBranches)-n]
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
@@ -70,4 +80,11 @@ var stackPrevCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func init() {
+	stackPrevCmd.Flags().BoolVar(
+		&stackPrevFlags.First, "first", false,
+		"go to the first branch in the current stack",
+	)
 }
