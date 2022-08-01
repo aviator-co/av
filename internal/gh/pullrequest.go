@@ -125,7 +125,7 @@ func (c *Client) UpdatePullRequest(ctx context.Context, input githubv4.UpdatePul
 		} `graphql:"updatePullRequest(input: $input)"`
 	}
 	if err := c.mutate(ctx, &mutation, input, nil); err != nil {
-		return nil, errors.Wrap(err, "failed to create pull request: github error")
+		return nil, errors.Wrap(err, "failed to update pull request: github error")
 	}
 	return &mutation.UpdatePullRequest.PullRequest, nil
 }
