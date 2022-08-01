@@ -56,8 +56,11 @@ var stackPrevCmd = &cobra.Command{
 		}
 
 		// confirm we can in fact do the operation given current branch state
-		if len(previousBranches) == 0 {
+		if len(previousBranches) == 0 && !stackPrevFlags.First {
 			return errors.New("there is no previous branch")
+		} else if len(previousBranches) == 0 && stackPrevFlags.First {
+			_, _ = fmt.Fprint(os.Stderr, "already on first branch in stack\n")
+			return nil
 		}
 		if n > len(previousBranches) {
 			return fmt.Errorf("invalid number (there are only %d previous branches in the stack)", len(previousBranches))

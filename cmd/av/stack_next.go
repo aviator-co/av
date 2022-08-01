@@ -56,8 +56,11 @@ var stackNextCmd = &cobra.Command{
 		}
 
 		// confirm we can in fact do the operation given current branch state
-		if len(subsequentBranches) == 0 {
+		if len(subsequentBranches) == 0 && !stackNextFlags.Last {
 			return errors.New("there is no next branch")
+		} else if len(subsequentBranches) == 0 && stackNextFlags.Last {
+			_, _ = fmt.Fprint(os.Stderr, "already on last branch in stack\n")
+			return nil
 		}
 		if n > len(subsequentBranches) {
 			return fmt.Errorf("invalid number (there are only %d subsequent branches in the stack)", len(subsequentBranches))
