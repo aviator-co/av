@@ -1,9 +1,12 @@
 package main
 
 import (
-	"strconv"
+	"context"
 
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/config"
+	"github.com/aviator-co/av/internal/gh"
+	"github.com/aviator-co/av/internal/meta"
 	"github.com/spf13/cobra"
 )
 
@@ -11,22 +14,30 @@ var stackSubmitCmd = &cobra.Command{
 	Use:   "submit",
 	Short: "create pull requests for the current stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var n int = 1
-		if len(args) == 1 {
-			var err error
-			n, err = strconv.Atoi(args[0])
-			if err != nil {
-				return errors.Wrap(err, "invalid number")
-			}
-		} else if len(args) > 1 {
+		if len(args) > 0 {
 			_ = cmd.Usage()
-			return errors.New("too many arguments")
+			return errors.New("this command takes no arguments")
 		}
 
-		if n <= 0 {
-			return errors.New("invalid number (must be >= 1)")
+		// Get the all branches in the stack
+		repo, _, err := getRepoInfo()
+		if err != nil {
+			return err
+		}
+		branches, err := meta.ReadAllBranches(repo)
+		if err != nil {
+			return err
 		}
 
-		return errors.New("unimplemented")
+		// ensure pull requests for each branch in the stack
+		ctx := context.Background()
+		client, err := gh.NewClient(config.Av.GitHub.Token)
+		if err != nil {
+			return err
+		}
+		for _, currentMeta := range branches {
+		}
+
+		return nil
 	},
 }
