@@ -18,23 +18,12 @@ var stackPrevFlags struct {
 }
 
 var stackPrevCmd = &cobra.Command{
-	Use:   "prev <n> or prev --first",
+	Use:   "prev [<n>|--first]",
 	Short: "checkout the previous branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var n int = 1
-		if len(args) == 1 && !stackPrevFlags.First {
-			var err error
-			n, err = strconv.Atoi(args[0])
-			if err != nil {
-				return errors.Wrap(err, "invalid number")
-			}
-		} else if len(args) > 1 {
+		if len(args) > 1 {
 			_ = cmd.Usage()
 			return errors.New("too many arguments")
-		}
-
-		if n <= 0 {
-			return errors.New("invalid number (must be >= 1)")
 		}
 
 		// Get the previous branches so we can checkout the nth one
@@ -55,24 +44,29 @@ var stackPrevCmd = &cobra.Command{
 			return err
 		}
 
-		// confirm we can in fact do the operation given current branch state
-		if len(previousBranches) == 0 && !stackPrevFlags.First {
-			return errors.New("there is no previous branch")
-		} else if len(previousBranches) == 0 && stackPrevFlags.First {
-			_, _ = fmt.Fprint(os.Stderr, "already on first branch in stack\n")
-			return nil
-		}
-		if n > len(previousBranches) {
-			return fmt.Errorf("invalid number (there are only %d previous branches in the stack)", len(previousBranches))
+		var branchToCheckout string
+		if !stackPrevFlags.First {
+			if len(previousBranches) == 0 {
+				return errors.New("there is no previous branch")
+			}
+			n, err := strconv.Atoi(args[0])
+			if err != nil {
+				return errors.New("invalid number (unable to parse)")
+			}
+			if n <= 0 {
+				return errors.New("invalid number (must be >= 1)")
+			}
+			if n > len(previousBranches) {
+				return fmt.Errorf("invalid number (there are only %d previous branches in the stack)", len(previousBranches))
+			}
+			branchToCheckout = previousBranches[len(previousBranches)-n]
+		} else {
+			if len(previousBranches) == 0 {
+				return errors.New("already on first branch in stack\n")
+			}
+			branchToCheckout = previousBranches[0]
 		}
 
-		// if we are trying to go to the first branch then set things
-		if stackPrevFlags.First {
-			n = len(previousBranches)
-		}
-
-		// checkout nth previous branch
-		var branchToCheckout = previousBranches[len(previousBranches)-n]
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
 			Name: branchToCheckout,
 		}); err != nil {
