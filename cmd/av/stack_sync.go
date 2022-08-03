@@ -361,7 +361,7 @@ base branch.
 				state.Continue = false
 			} else {
 				log.Debug("syncing branch...")
-				_, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: currentBranch})
+				_, err = repo.CheckoutBranch(&git.CheckoutBranch{Name: currentBranch})
 				if err != nil {
 					return err
 				}

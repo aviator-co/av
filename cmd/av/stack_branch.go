@@ -64,6 +64,9 @@ var stackBranchCmd = &cobra.Command{
 		// (where some stacks assume a branch is a trunk and others don't).
 		isBranchFromTrunk := parentBranchName == defaultBranch
 		parentState, err := meta.ReadBranchState(repo, parentBranchName, isBranchFromTrunk)
+		if err != nil {
+			return errors.WrapIf(err, "failed to read parent branch state")
+		}
 
 		// Create a new branch off of the parent
 		logrus.WithFields(logrus.Fields{

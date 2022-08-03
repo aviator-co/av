@@ -140,6 +140,9 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		body:        opts.Body,
 		draft:       opts.Draft,
 	})
+	if err != nil {
+		return nil, errors.WrapIf(err, "failed to create PR")
+	}
 
 	branchMeta.PullRequest = &meta.PullRequest{
 		Number:    pull.Number,
@@ -277,9 +280,10 @@ func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Clie
 	var currentPull *gh.PullRequest
 	// The current open pull request (if any)
 	var openPull *gh.PullRequest
-	for _, pull := range page.PullRequests {
+	for i := range page.PullRequests {
+		pull := &page.PullRequests[i]
 		if branch.PullRequest != nil && pull.ID == branch.PullRequest.ID {
-			currentPull = &pull
+			currentPull = pull
 		}
 		if pull.State != githubv4.PullRequestStateOpen {
 			continue
@@ -297,7 +301,7 @@ func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Clie
 				pull.Number, pull.BaseRefName,
 			)
 		}
-		openPull = &pull
+		openPull = pull
 	}
 
 	changed := false

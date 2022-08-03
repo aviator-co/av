@@ -75,6 +75,8 @@ func Push(repo *git.Repo, opts PushOpts) error {
 	)
 	pushArgs := []string{"push", "--set-upstream"}
 	switch opts.Force {
+	case NoForce:
+		// pass
 	case ForceWithLease:
 		pushArgs = append(pushArgs, "--force-with-lease")
 	case ForcePush:
