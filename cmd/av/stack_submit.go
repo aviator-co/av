@@ -65,7 +65,7 @@ var stackSubmitCmd = &cobra.Command{
 				return err
 			}
 			// make sure the base branch of the PR is up to date if it already exists
-			if !result.Created {
+			if !result.Created && result.Pull.BaseRefName != result.Branch.Parent.Name {
 				if _, err := client.UpdatePullRequest(
 					ctx, githubv4.UpdatePullRequestInput{
 						PullRequestID: githubv4.ID(result.Branch.PullRequest.ID),

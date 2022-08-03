@@ -20,9 +20,8 @@ import (
 
 type CreatePullRequestOpts struct {
 	BranchName string
-
-	Title string
-	Body  string
+	Title      string
+	Body       string
 	//LabelNames      []string
 
 	// If true, create the pull request as a GitHub draft PR.
