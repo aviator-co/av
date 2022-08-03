@@ -14,7 +14,7 @@ import (
 
 var stackSubmitCmd = &cobra.Command{
 	Use:   "submit",
-	Short: "create pull requests for the current stack",
+	Short: "create/synchronize pull requests for the current stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) > 0 {
 			_ = cmd.Usage()
@@ -42,13 +42,7 @@ var stackSubmitCmd = &cobra.Command{
 				ctx, repo, client,
 				actions.CreatePullRequestOpts{
 					BranchName: currentMeta.Name,
-					// TODO: currently just set things as empty but it might be nice to have an interactive mode
-					//	that would let us set the title and body, etc. per branch in the stack
-					Title:  "",
-					Body:   "",
-					NoPush: false,
-					Force:  false,
-					Draft:  false,
+					Draft:      config.Av.PullRequest.Draft,
 				},
 			)
 			if err != nil {
