@@ -30,6 +30,22 @@ var stackSubmitCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		currentBranch, err := repo.CurrentBranchName()
+		if err != nil {
+			return err
+		}
+		previousBranches, err := meta.PreviousBranches(branches, currentBranch)
+		if err != nil {
+			return err
+		}
+		subsequentBranches, err := meta.SubsequentBranches(branches, currentBranch)
+		if err != nil {
+			return err
+		}
+		var branchesToSubmit []string
+		branchesToSubmit = append(branchesToSubmit, previousBranches...)
+		branchesToSubmit = append(branchesToSubmit, currentBranch)
+		branchesToSubmit = append(branchesToSubmit, subsequentBranches...)
 
 		// ensure pull requests for each branch in the stack
 		ctx := context.Background()
@@ -37,11 +53,11 @@ var stackSubmitCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		for _, currentMeta := range branches {
+		for _, branchName := range branchesToSubmit {
 			result, err := actions.CreatePullRequest(
 				ctx, repo, client,
 				actions.CreatePullRequestOpts{
-					BranchName: currentMeta.Name,
+					BranchName: branchName,
 					Draft:      config.Av.PullRequest.Draft,
 				},
 			)

@@ -2,13 +2,15 @@ package meta
 
 import (
 	"bytes"
-	"emperror.dev/errors"
 	"encoding/json"
+	"fmt"
+	"strings"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
-	"strings"
 )
 
 type Branch struct {
@@ -177,6 +179,53 @@ func ReadAllBranches(repo *git.Repo) (map[string]Branch, error) {
 		branches[name] = branch
 	}
 	return branches, nil
+}
+
+// Find all the ancestor branches of the given branch name and append them to
+// the given slice (in topological order: a comes before b if a is an ancestor
+// of b).
+func PreviousBranches(branches map[string]Branch, name string) ([]string, error) {
+	current, ok := branches[name]
+	if !ok {
+		return nil, errors.Errorf("branch metadata not found for %q", name)
+	}
+	parent := current.Parent
+	if parent.Trunk {
+		return nil, nil
+	}
+	if parent.Name == name {
+		logrus.Fatalf("invariant error: branch %q is its own parent (this is probably a bug with av)", name)
+	}
+	previous, err := PreviousBranches(branches, parent.Name)
+	if err != nil {
+		return nil, err
+	}
+	return append(previous, parent.Name), nil
+}
+
+// Find all the child branches of the given branch name and append them to
+// the given slice (in topological order: a comes before b if a is an ancestor
+// of b).
+func SubsequentBranches(branches map[string]Branch, name string) ([]string, error) {
+	logrus.Debugf("finding subsequent branches for %q", name)
+	var res []string
+	branchMeta, ok := branches[name]
+	if !ok {
+		return nil, fmt.Errorf("branch metadata not found for %q", name)
+	}
+	if len(branchMeta.Children) == 0 {
+		return res, nil
+	}
+	for _, child := range branchMeta.Children {
+		res = append(res, child)
+		desc, err := SubsequentBranches(branches, child)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, desc...)
+	}
+
+	return res, nil
 }
 
 // WriteBranch writes branch metadata to the git repository.

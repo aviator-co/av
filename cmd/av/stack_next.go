@@ -34,7 +34,7 @@ var stackNextCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		subsequentBranches, err := subsequentBranches(branches, currentBranch)
+		subsequentBranches, err := meta.SubsequentBranches(branches, currentBranch)
 		if err != nil {
 			return err
 		}
