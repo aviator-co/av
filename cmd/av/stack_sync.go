@@ -258,12 +258,20 @@ base branch.
 		logrus.WithField("branches", branchesToSync).Debug("determined branches to sync")
 		var resErr error
 	loop:
-		for _, currentBranch := range branchesToSync {
+		for i, currentBranch := range branchesToSync {
 			state.CurrentBranch = currentBranch
 			currentMeta, ok := branches[currentBranch]
 			if !ok {
 				return errors.Errorf("stack metadata not found for branch %q", currentBranch)
 			}
+
+			if i > 0 {
+				_, _ = fmt.Fprint(os.Stderr, "\n")
+			}
+			_, _ = fmt.Fprint(os.Stderr,
+				colors.FaintC.Sprintf("[%d/%d] ", i+1, len(branchesToSync)),
+				"Synchronizing branch ", colors.UserInput(currentBranch), ":\n",
+			)
 
 			if !state.Config.NoFetch {
 				if ghClient == nil {
@@ -303,12 +311,12 @@ base branch.
 				}); err != nil {
 					return errors.WrapIff(err, "failed to check out branch %q", currentBranch)
 				}
-				if !state.Config.NoPush {
-					if err := actions.Push(repo, actions.PushOpts{
-						Force: actions.ForceWithLease,
-					}); err != nil {
-						return err
-					}
+				if err := actions.Push(repo, actions.PushOpts{
+					Force:                 actions.ForceWithLease,
+					SkipIfUpstreamNotSet:  true,
+					SkipIfUpstreamMatches: true,
+				}); err != nil {
+					return err
 				}
 				continue
 			}
@@ -413,12 +421,12 @@ base branch.
 				logrus.Panicf("invariant error: unknown sync result: %v", res)
 			}
 
-			if !state.Config.NoPush {
-				if err := actions.Push(repo, actions.PushOpts{
-					Force: actions.ForceWithLease,
-				}); err != nil {
-					return err
-				}
+			if err := actions.Push(repo, actions.PushOpts{
+				Force:                 actions.ForceWithLease,
+				SkipIfUpstreamNotSet:  true,
+				SkipIfUpstreamMatches: true,
+			}); err != nil {
+				return err
 			}
 		}
 
@@ -439,7 +447,7 @@ base branch.
 			return errors.Wrap(err, "failed to reset stack sync state")
 		}
 
-		_, _ = fmt.Fprintf(os.Stderr, "Stack sync complete\n")
+		_, _ = fmt.Fprint(os.Stderr, "\n", colors.Success("Stack sync complete!\n"))
 
 		// Return to the starting branch when we're done
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{

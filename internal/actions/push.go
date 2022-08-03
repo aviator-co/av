@@ -24,6 +24,13 @@ const (
 
 type PushOpts struct {
 	Force ForceOpt
+	// If true, require the upstream tracking information to already be set
+	// (otherwise, don't push).
+	SkipIfUpstreamNotSet bool
+	// If true, skip pushing the branch if the upstream commit is the same as
+	// the local HEAD commit. The caller should probably call `git fetch` before
+	// running this to make sure remote tracking information is up-to-date.
+	SkipIfUpstreamMatches bool
 }
 
 // Push pushes the current branch to the Git origin.
@@ -32,6 +39,35 @@ func Push(repo *git.Repo, opts PushOpts) error {
 	currentBranch, err := repo.CurrentBranchName()
 	if err != nil {
 		return errors.WrapIff(err, "failed to determine current branch")
+	}
+
+	if opts.SkipIfUpstreamNotSet || opts.SkipIfUpstreamMatches {
+		upstream, err := repo.RevParse(&git.RevParse{Rev: "@{upstream}"})
+		if opts.SkipIfUpstreamMatches && git.StderrMatches(err, "no upstream") {
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - not pushing branch ", colors.UserInput(currentBranch),
+				" (no upstream is set)\n",
+				colors.Troubleshooting("      - HINT: create a pr with "),
+				colors.CliCmd("av pr create"),
+				colors.Troubleshooting(" to automatically push the branch to GitHub and create a pull request\n"),
+			)
+			return nil
+		} else if err != nil {
+			// This usually indicates a detached HEAD state
+			return errors.WrapIff(err, "failed to determine upstream tracking information for branch %q", currentBranch)
+		}
+
+		head, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
+		if err != nil {
+			return errors.WrapIff(err, "failed to determine branch HEAD for branch %q", currentBranch)
+		}
+		if opts.SkipIfUpstreamMatches && upstream == head {
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - not pushing branch ", colors.UserInput(currentBranch),
+				" (upstream is already up-to-date)\n",
+			)
+			return nil
+		}
 	}
 
 	_, _ = fmt.Fprint(os.Stderr,
