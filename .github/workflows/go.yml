@@ -11,8 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Set up Go
-      uses: actions/setup-go@v3
+    - uses: actions/setup-go@v3
       with:
         go-version: 1.18
     - name: Build
@@ -21,3 +20,13 @@ jobs:
       run: go test -v --vet=all ./...
     - name: CLI smoke test
       run: go run ./cmd/av --help
+
+  golangci-lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+    - uses: golangci/golangci-lint-action@v3
+

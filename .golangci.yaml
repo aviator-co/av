@@ -1,0 +1,14 @@
+linters:
+  enable:
+    - exhaustive
+    - importas
+    - gofmt
+    - gosec
+    - structcheck
+    - tagliatelle
+    - wastedassign
+
+issues:
+  exclude:
+    - "Expect WriteFile permissions to be 0600 or less"
+    - "Subprocess launched with a potential tainted input or cmd arguments"
