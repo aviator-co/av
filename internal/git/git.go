@@ -105,7 +105,7 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 		return nil, errors.Wrapf(err, "git %s", opts.Args)
 	}
 	if err != nil && opts.ExitError && exitError.ExitCode() != 0 {
-		return nil, errors.Errorf("git %s: %s: %s", opts.Args, err, string(stderr.Bytes()))
+		return nil, errors.Errorf("git %s: %s: %s", opts.Args, err, stderr.String())
 	}
 	return &Output{
 		ExitCode: cmd.ProcessState.ExitCode(),
