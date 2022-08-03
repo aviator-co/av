@@ -21,11 +21,6 @@ var stackPrevCmd = &cobra.Command{
 	Use:   "prev [<n>|--first]",
 	Short: "checkout the previous branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) > 1 {
-			_ = cmd.Usage()
-			return errors.New("too many arguments")
-		}
-
 		// Get the previous branches so we can checkout the nth one
 		repo, _, err := getRepoInfo()
 		if err != nil {
@@ -45,13 +40,26 @@ var stackPrevCmd = &cobra.Command{
 		}
 
 		var branchToCheckout string
-		if !stackPrevFlags.First {
+		if stackPrevFlags.First {
+			if len(previousBranches) == 0 {
+				_, _ = fmt.Fprint(os.Stderr, "already on first branch in stack\n")
+				return nil
+			}
+			branchToCheckout = previousBranches[0]
+		} else {
 			if len(previousBranches) == 0 {
 				return errors.New("there is no previous branch")
 			}
-			n, err := strconv.Atoi(args[0])
-			if err != nil {
-				return errors.New("invalid number (unable to parse)")
+			var n int = 1
+			if len(args) == 1 {
+				var err error
+				n, err = strconv.Atoi(args[0])
+				if err != nil {
+					return errors.New("invalid number (unable to parse)")
+				}
+			} else if len(args) > 1 {
+				_ = cmd.Usage()
+				return errors.New("too many arguments")
 			}
 			if n <= 0 {
 				return errors.New("invalid number (must be >= 1)")
@@ -60,11 +68,6 @@ var stackPrevCmd = &cobra.Command{
 				return fmt.Errorf("invalid number (there are only %d previous branches in the stack)", len(previousBranches))
 			}
 			branchToCheckout = previousBranches[len(previousBranches)-n]
-		} else {
-			if len(previousBranches) == 0 {
-				return errors.New("already on first branch in stack\n")
-			}
-			branchToCheckout = previousBranches[0]
 		}
 
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{

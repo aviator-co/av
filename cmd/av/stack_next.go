@@ -21,11 +21,6 @@ var stackNextCmd = &cobra.Command{
 	Use:   "next [<n>|--last]",
 	Short: "checkout the next branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) > 1 {
-			_ = cmd.Usage()
-			return errors.New("too many arguments")
-		}
-
 		// Get the subsequent branches so we can checkout the nth one
 		repo, _, err := getRepoInfo()
 		if err != nil {
@@ -45,13 +40,25 @@ var stackNextCmd = &cobra.Command{
 		}
 
 		var branchToCheckout string
-		if !stackNextFlags.Last {
+		if stackNextFlags.Last {
+			if len(subsequentBranches) == 0 {
+				return errors.New("already on last branch in stack\n")
+			}
+			branchToCheckout = subsequentBranches[len(subsequentBranches)-1]
+		} else {
 			if len(subsequentBranches) == 0 {
 				return errors.New("there is no next branch")
 			}
-			n, err := strconv.Atoi(args[0])
-			if err != nil {
-				return errors.New("invalid number (unable to parse)")
+			var n int = 1
+			if len(args) == 1 {
+				var err error
+				n, err = strconv.Atoi(args[0])
+				if err != nil {
+					return errors.New("invalid number (unable to parse)")
+				}
+			} else if len(args) > 1 {
+				_ = cmd.Usage()
+				return errors.New("too many arguments")
 			}
 			if n <= 0 {
 				return errors.New("invalid number (must be >= 1)")
@@ -60,11 +67,6 @@ var stackNextCmd = &cobra.Command{
 				return fmt.Errorf("invalid number (there are only %d subsequent branches in the stack)", len(subsequentBranches))
 			}
 			branchToCheckout = subsequentBranches[n-1]
-		} else {
-			if len(subsequentBranches) == 0 {
-				return errors.New("already on last branch in stack\n")
-			}
-			branchToCheckout = subsequentBranches[len(subsequentBranches)-1]
 		}
 
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
