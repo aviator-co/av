@@ -214,7 +214,6 @@ func getOrCreatePR(ctx context.Context, client *gh.Client, repoMeta meta.Reposit
 		Owner:       repoMeta.Owner,
 		Repo:        repoMeta.Name,
 		HeadRefName: opts.headRefName,
-		BaseRefName: opts.baseRefName,
 		States:      []githubv4.PullRequestState{githubv4.PullRequestStateOpen},
 	})
 	if err != nil {
