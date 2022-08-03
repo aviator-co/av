@@ -2,10 +2,11 @@ package gh
 
 import (
 	"context"
-	"emperror.dev/errors"
 	"fmt"
-	"github.com/shurcooL/githubv4"
 	"strings"
+
+	"emperror.dev/errors"
+	"github.com/shurcooL/githubv4"
 )
 
 type PullRequest struct {
@@ -115,6 +116,18 @@ func (c *Client) CreatePullRequest(ctx context.Context, input githubv4.CreatePul
 		return nil, errors.Wrap(err, "failed to create pull request: github error")
 	}
 	return &mutation.CreatePullRequest.PullRequest, nil
+}
+
+func (c *Client) UpdatePullRequest(ctx context.Context, input githubv4.UpdatePullRequestInput) (*PullRequest, error) {
+	var mutation struct {
+		UpdatePullRequest struct {
+			PullRequest PullRequest
+		} `graphql:"updatePullRequest(input: $input)"`
+	}
+	if err := c.mutate(ctx, &mutation, input, nil); err != nil {
+		return nil, errors.Wrap(err, "failed to update pull request: github error")
+	}
+	return &mutation.UpdatePullRequest.PullRequest, nil
 }
 
 type AddIssueLabelInput struct {

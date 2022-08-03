@@ -34,7 +34,7 @@ var stackPrevCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		previousBranches, err := previousBranches(branches, currentBranch)
+		previousBranches, err := meta.PreviousBranches(branches, currentBranch)
 		if err != nil {
 			return err
 		}
