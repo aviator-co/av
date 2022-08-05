@@ -12,26 +12,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var stackPrevFlags struct {
+	// should we go to the first
+	First bool
+}
+
 var stackPrevCmd = &cobra.Command{
-	Use:   "prev <n>",
+	Use:   "prev [<n>|--first]",
 	Short: "checkout the previous branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var n int = 1
-		if len(args) == 1 {
-			var err error
-			n, err = strconv.Atoi(args[0])
-			if err != nil {
-				return errors.Wrap(err, "invalid number")
-			}
-		} else if len(args) > 1 {
-			_ = cmd.Usage()
-			return errors.New("too many arguments")
-		}
-
-		if n <= 0 {
-			return errors.New("invalid number (must be >= 1)")
-		}
-
 		// Get the previous branches so we can checkout the nth one
 		repo, _, err := getRepoInfo()
 		if err != nil {
@@ -45,21 +34,42 @@ var stackPrevCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		previousBranches, err := previousBranches(branches, currentBranch)
+		previousBranches, err := meta.PreviousBranches(branches, currentBranch)
 		if err != nil {
 			return err
 		}
 
-		// confirm we can in fact do the operation given current branch state
-		if len(previousBranches) == 0 {
-			return errors.New("there is no previous branch")
-		}
-		if n > len(previousBranches) {
-			return fmt.Errorf("invalid number (there are only %d previous branches in the stack)", len(previousBranches))
+		var branchToCheckout string
+		if stackPrevFlags.First {
+			if len(previousBranches) == 0 {
+				_, _ = fmt.Fprint(os.Stderr, "already on first branch in stack\n")
+				return nil
+			}
+			branchToCheckout = previousBranches[0]
+		} else {
+			if len(previousBranches) == 0 {
+				return errors.New("there is no previous branch")
+			}
+			var n int = 1
+			if len(args) == 1 {
+				var err error
+				n, err = strconv.Atoi(args[0])
+				if err != nil {
+					return errors.New("invalid number (unable to parse)")
+				}
+			} else if len(args) > 1 {
+				_ = cmd.Usage()
+				return errors.New("too many arguments")
+			}
+			if n <= 0 {
+				return errors.New("invalid number (must be >= 1)")
+			}
+			if n > len(previousBranches) {
+				return fmt.Errorf("invalid number (there are only %d previous branches in the stack)", len(previousBranches))
+			}
+			branchToCheckout = previousBranches[len(previousBranches)-n]
 		}
 
-		// checkout nth previous branch
-		var branchToCheckout = previousBranches[len(previousBranches)-n]
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
 			Name: branchToCheckout,
 		}); err != nil {
@@ -70,4 +80,11 @@ var stackPrevCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func init() {
+	stackPrevCmd.Flags().BoolVar(
+		&stackPrevFlags.First, "first", false,
+		"go to the first branch in the current stack",
+	)
 }

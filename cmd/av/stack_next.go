@@ -12,26 +12,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var stackNextFlags struct {
+	// should we go to the last
+	Last bool
+}
+
 var stackNextCmd = &cobra.Command{
-	Use:   "next <n>",
+	Use:   "next [<n>|--last]",
 	Short: "checkout the next branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var n int = 1
-		if len(args) == 1 {
-			var err error
-			n, err = strconv.Atoi(args[0])
-			if err != nil {
-				return errors.New("invalid number")
-			}
-		} else if len(args) > 1 {
-			_ = cmd.Usage()
-			return errors.New("too many arguments")
-		}
-
-		if n <= 0 {
-			return errors.New("invalid number (must be >= 1)")
-		}
-
 		// Get the subsequent branches so we can checkout the nth one
 		repo, _, err := getRepoInfo()
 		if err != nil {
@@ -45,21 +34,41 @@ var stackNextCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		subsequentBranches, err := subsequentBranches(branches, currentBranch)
+		subsequentBranches, err := meta.SubsequentBranches(branches, currentBranch)
 		if err != nil {
 			return err
 		}
 
-		// confirm we can in fact do the operation given current branch state
-		if len(subsequentBranches) == 0 {
-			return errors.New("there is no next branch")
-		}
-		if n > len(subsequentBranches) {
-			return fmt.Errorf("invalid number (there are only %d subsequent branches in the stack)", len(subsequentBranches))
+		var branchToCheckout string
+		if stackNextFlags.Last {
+			if len(subsequentBranches) == 0 {
+				return errors.New("already on last branch in stack\n")
+			}
+			branchToCheckout = subsequentBranches[len(subsequentBranches)-1]
+		} else {
+			if len(subsequentBranches) == 0 {
+				return errors.New("there is no next branch")
+			}
+			var n int = 1
+			if len(args) == 1 {
+				var err error
+				n, err = strconv.Atoi(args[0])
+				if err != nil {
+					return errors.New("invalid number (unable to parse)")
+				}
+			} else if len(args) > 1 {
+				_ = cmd.Usage()
+				return errors.New("too many arguments")
+			}
+			if n <= 0 {
+				return errors.New("invalid number (must be >= 1)")
+			}
+			if n > len(subsequentBranches) {
+				return fmt.Errorf("invalid number (there are only %d subsequent branches in the stack)", len(subsequentBranches))
+			}
+			branchToCheckout = subsequentBranches[n-1]
 		}
 
-		// checkout nth branch
-		var branchToCheckout = subsequentBranches[n-1]
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
 			Name: branchToCheckout,
 		}); err != nil {
@@ -70,4 +79,11 @@ var stackNextCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func init() {
+	stackNextCmd.Flags().BoolVar(
+		&stackNextFlags.Last, "last", false,
+		"go to the last branch in the current stack",
+	)
 }

@@ -46,6 +46,10 @@ Examples:
 		if err != nil {
 			return err
 		}
+		branchName, err := repo.CurrentBranchName()
+		if err != nil {
+			return errors.WrapIf(err, "failed to determine current branch")
+		}
 		client, err := gh.NewClient(config.Av.GitHub.Token)
 		if err != nil {
 			return err
@@ -64,10 +68,11 @@ Examples:
 		if _, err := actions.CreatePullRequest(
 			context.Background(), repo, client,
 			actions.CreatePullRequestOpts{
-				Title:  prCreateFlags.Title,
-				Body:   body,
-				NoPush: prCreateFlags.NoPush,
-				Force:  prCreateFlags.Force,
+				BranchName: branchName,
+				Title:      prCreateFlags.Title,
+				Body:       body,
+				NoPush:     prCreateFlags.NoPush,
+				Force:      prCreateFlags.Force,
 				// TODO: this means we can't override with --draft=false if the
 				//       config has draft=true. We need to figure out how to
 				//       unify config and flags (the latter should always

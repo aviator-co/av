@@ -11,13 +11,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Set up Go
-      uses: actions/setup-go@v3
+    - uses: actions/setup-go@v3
       with:
-        go-version: 1.18
+        cache: true
+        go-version-file: go.mod
+        cache-dependency-path: go.sum
     - name: Build
       run: go build -v ./...
     - name: Test
       run: go test -v --vet=all ./...
     - name: CLI smoke test
       run: go run ./cmd/av --help
+
+  golangci-lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v3
+      with:
+        cache: true
+        go-version-file: go.mod
+        cache-dependency-path: go.sum
+    - run: >
+        go run github.com/golangci/golangci-lint/cmd/golangci-lint
+        run --version --out-format github-actions
+

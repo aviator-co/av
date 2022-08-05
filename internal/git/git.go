@@ -105,7 +105,7 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 		return nil, errors.Wrapf(err, "git %s", opts.Args)
 	}
 	if err != nil && opts.ExitError && exitError.ExitCode() != 0 {
-		return nil, errors.Errorf("git %s: %s: %s", opts.Args, err, string(stderr.Bytes()))
+		return nil, errors.Errorf("git %s: %s: %s", opts.Args, err, stderr.String())
 	}
 	return &Output{
 		ExitCode: cmd.ProcessState.ExitCode(),
@@ -141,7 +141,7 @@ func (r *Repo) GitStdin(args []string, stdin io.Reader) (string, error) {
 func (r *Repo) CurrentBranchName() (string, error) {
 	branch, err := r.Git("symbolic-ref", "--short", "HEAD")
 	if err != nil {
-		return "", errors.Wrap(err, "failed to determine current branch")
+		return "", errors.Wrap(err, "failed to determine current branch (are you in detached HEAD or is a rebase in progress?)")
 	}
 	return branch, nil
 }

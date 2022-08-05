@@ -2,9 +2,14 @@ package main
 
 import (
 	"context"
-	"emperror.dev/errors"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
+	"strings"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
@@ -17,10 +22,6 @@ import (
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"io/ioutil"
-	"os"
-	"path"
-	"strings"
 )
 
 // stackSyncConfig contains the configuration for a sync operation.
@@ -238,14 +239,14 @@ base branch.
 			if err != nil {
 				return err
 			}
-			branchesToSync, err = previousBranches(branches, currentBranch)
+			branchesToSync, err = meta.PreviousBranches(branches, currentBranch)
 			if err != nil {
 				return err
 			}
 			branchesToSync = append(branchesToSync, currentBranch)
 		}
 		// Either way (--continue or not), we sync all subsequent branches.
-		nextBranches, err := subsequentBranches(branches, branchesToSync[len(branchesToSync)-1])
+		nextBranches, err := meta.SubsequentBranches(branches, branchesToSync[len(branchesToSync)-1])
 		if err != nil {
 			return err
 		}
@@ -257,12 +258,20 @@ base branch.
 		logrus.WithField("branches", branchesToSync).Debug("determined branches to sync")
 		var resErr error
 	loop:
-		for _, currentBranch := range branchesToSync {
+		for i, currentBranch := range branchesToSync {
 			state.CurrentBranch = currentBranch
 			currentMeta, ok := branches[currentBranch]
 			if !ok {
 				return errors.Errorf("stack metadata not found for branch %q", currentBranch)
 			}
+
+			if i > 0 {
+				_, _ = fmt.Fprint(os.Stderr, "\n")
+			}
+			_, _ = fmt.Fprint(os.Stderr,
+				colors.FaintC.Sprintf("[%d/%d] ", i+1, len(branchesToSync)),
+				"Synchronizing branch ", colors.UserInput(currentBranch), ":\n",
+			)
 
 			if !state.Config.NoFetch {
 				if ghClient == nil {
@@ -302,12 +311,12 @@ base branch.
 				}); err != nil {
 					return errors.WrapIff(err, "failed to check out branch %q", currentBranch)
 				}
-				if !state.Config.NoPush {
-					if err := actions.Push(repo, actions.PushOpts{
-						Force: actions.ForceWithLease,
-					}); err != nil {
-						return err
-					}
+				if err := actions.Push(repo, actions.PushOpts{
+					Force:                 actions.ForceWithLease,
+					SkipIfUpstreamNotSet:  true,
+					SkipIfUpstreamMatches: true,
+				}); err != nil {
+					return err
 				}
 				continue
 			}
@@ -353,7 +362,7 @@ base branch.
 				state.Continue = false
 			} else {
 				log.Debug("syncing branch...")
-				_, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: currentBranch})
+				_, err = repo.CheckoutBranch(&git.CheckoutBranch{Name: currentBranch})
 				if err != nil {
 					return err
 				}
@@ -412,12 +421,12 @@ base branch.
 				logrus.Panicf("invariant error: unknown sync result: %v", res)
 			}
 
-			if !state.Config.NoPush {
-				if err := actions.Push(repo, actions.PushOpts{
-					Force: actions.ForceWithLease,
-				}); err != nil {
-					return err
-				}
+			if err := actions.Push(repo, actions.PushOpts{
+				Force:                 actions.ForceWithLease,
+				SkipIfUpstreamNotSet:  true,
+				SkipIfUpstreamMatches: true,
+			}); err != nil {
+				return err
 			}
 		}
 
@@ -438,7 +447,7 @@ base branch.
 			return errors.Wrap(err, "failed to reset stack sync state")
 		}
 
-		_, _ = fmt.Fprintf(os.Stderr, "Stack sync complete\n")
+		_, _ = fmt.Fprint(os.Stderr, "\n", colors.Success("Stack sync complete!\n"))
 
 		// Return to the starting branch when we're done
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
@@ -449,50 +458,6 @@ base branch.
 
 		return nil
 	},
-}
-
-// Find all the ancestor branches of the given branch name and append them to
-// the given slice (in topological order: a comes before b if a is an ancestor
-// of b).
-func previousBranches(branches map[string]meta.Branch, name string) ([]string, error) {
-	current, ok := branches[name]
-	if !ok {
-		return nil, errors.Errorf("branch metadata not found for %q", name)
-	}
-	parent := current.Parent
-	if parent.Trunk {
-		return nil, nil
-	}
-	if parent.Name == name {
-		logrus.Fatalf("invariant error: branch %q is its own parent (this is probably a bug with av)", name)
-	}
-	previous, err := previousBranches(branches, parent.Name)
-	if err != nil {
-		return nil, err
-	}
-	return append(previous, parent.Name), nil
-}
-
-func subsequentBranches(branches map[string]meta.Branch, name string) ([]string, error) {
-	logrus.Debugf("finding subsequent branches for %q", name)
-	var res []string
-	branchMeta, ok := branches[name]
-	if !ok {
-		return nil, fmt.Errorf("branch metadata not found for %q", name)
-	}
-	if len(branchMeta.Children) == 0 {
-		return res, nil
-	}
-	for _, child := range branchMeta.Children {
-		res = append(res, child)
-		desc, err := subsequentBranches(branches, child)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, desc...)
-	}
-
-	return res, nil
 }
 
 const stackSyncStateFile = "stack-sync.state.json"
