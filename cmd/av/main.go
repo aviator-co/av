@@ -150,7 +150,7 @@ func getRepo() (*git.Repo, error) {
 		}
 		toplevel, err := cmd.Output()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to determine repo toplevel")
+			return nil, errors.Wrap(err, "failed to determine repo toplevel (are you running inside a Git repo?)")
 		}
 		cachedRepo, err = git.OpenRepo(strings.TrimSpace(string(toplevel)))
 		if err != nil {
