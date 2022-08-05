@@ -10,3 +10,16 @@ func DeleteElement[T comparable](slice []T, element T) []T {
 	}
 	return slice
 }
+
+// Replace replaces every instance of oldVal with newVal in the given slice.
+// It returns true if
+func Replace[T comparable](slice []T, oldVal T, newVal T) int {
+	replaced := 0
+	for i := range slice {
+		if slice[i] == oldVal {
+			slice[i] = newVal
+			replaced++
+		}
+	}
+	return replaced
+}
