@@ -141,7 +141,7 @@ func (r *Repo) GitStdin(args []string, stdin io.Reader) (string, error) {
 func (r *Repo) CurrentBranchName() (string, error) {
 	branch, err := r.Git("symbolic-ref", "--short", "HEAD")
 	if err != nil {
-		return "", errors.Wrap(err, "failed to determine current branch")
+		return "", errors.Wrap(err, "failed to determine current branch (are you in detached HEAD or is a rebase in progress?)")
 	}
 	return branch, nil
 }
