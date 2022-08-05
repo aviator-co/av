@@ -14,12 +14,21 @@ var stackBranchFlags struct {
 	// The parent branch to base the new branch off.
 	// By default, this is the current branch.
 	Parent string
-	// If true, move/rename the current branch.
-	Move bool
+	// If true, rename the current branch ("move" in Git parlance, though we
+	// avoid that language here since we're not changing the branch's position
+	// within the stack).
+	Rename bool
 }
 var stackBranchCmd = &cobra.Command{
 	Use:   "branch [flags] <branch-name>",
 	Short: "create a new stacked branch",
+	Long: `Create a new branch that is stacked on the current branch.
+
+If the --rename/-m flag is given, the current branch is renamed to the name
+given as the first argument to the command. Branches should only be renamed
+with this command (not with git branch -m ...) because av needs to update
+internal tracking metadata that defines the order of branches within a stack.`,
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
 			_ = cmd.Usage()
@@ -32,7 +41,7 @@ var stackBranchCmd = &cobra.Command{
 			return err
 		}
 
-		if stackBranchFlags.Move {
+		if stackBranchFlags.Rename {
 			return stackBranchMove(repo, branchName)
 		}
 
@@ -113,9 +122,10 @@ var stackBranchCmd = &cobra.Command{
 }
 
 func init() {
-	// pass
 	stackBranchCmd.Flags().StringVar(&stackBranchFlags.Parent, "parent", "", "the parent branch to base the new branch off of")
-	stackBranchCmd.Flags().BoolVarP(&stackBranchFlags.Move, "move", "m", false, "if true, move/rename the current branch")
+	// NOTE: We use -m as the shorthand here to match `git branch -m ...`.
+	// See the comment on stackBranchFlags.Rename.
+	stackBranchCmd.Flags().BoolVarP(&stackBranchFlags.Rename, "rename", "m", false, "rename the current branch")
 }
 
 func stackBranchMove(repo *git.Repo, newBranch string) error {
@@ -137,6 +147,8 @@ func stackBranchMove(repo *git.Repo, newBranch string) error {
 		return err
 	}
 
+	// Update the parent's reference to the child (unless the parent is a trunk
+	// which doesn't maintain references to children).
 	if !currentMeta.Parent.Trunk {
 		parentMeta, _ := meta.ReadBranch(repo, currentMeta.Parent.Name)
 		sliceutils.Replace(parentMeta.Children, oldBranch, newBranch)
@@ -145,6 +157,7 @@ func stackBranchMove(repo *git.Repo, newBranch string) error {
 		}
 	}
 
+	// Update all child branches to refer to the correct (renamed) parent.
 	for _, child := range currentMeta.Children {
 		childMeta, _ := meta.ReadBranch(repo, child)
 		childMeta.Parent.Name = newBranch
