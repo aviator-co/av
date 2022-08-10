@@ -334,7 +334,7 @@ base branch.
 				}
 				_, _ = fmt.Fprint(os.Stderr,
 					"  - pull request ", colors.UserInput("#", parentMeta.PullRequest.Number),
-					" was merged, this branch should be synced on top of the merge commit:\n",
+					" was merged, syncing branch on top of the merge commit...\n",
 				)
 				// TODO:
 				//     We should do this automatically for the user
@@ -344,7 +344,19 @@ base branch.
 					"        av stack sync --parent ", defaultBranch, "\n",
 				)
 				continue
+			} else if ok && parentMeta.PullRequest != nil && parentMeta.PullRequest.State == githubv4.PullRequestStateClosed {
+				// pull requests are closed on fast-forward so look for a closing commit
+				defaultBranch, err := repo.DefaultBranch()
+				if err != nil {
+					return errors.Wrap(err, "failed to determine default branch")
+				}
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - pull request ", colors.UserInput("#", parentMeta.PullRequest.Number),
+					" was closed, checking for closing commit...\n",
+				)
+				continue
 			}
+
 			_, _ = fmt.Fprint(os.Stderr,
 				"  - syncing ", colors.UserInput(currentBranch),
 				" on top of ", colors.UserInput(currentMeta.Parent.Name), "... ",
