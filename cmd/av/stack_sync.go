@@ -326,21 +326,19 @@ base branch.
 					return errors.Wrap(err, "failed to determine default branch")
 				}
 				_, _ = fmt.Fprint(os.Stderr,
-					"  - pull request ", colors.UserInput("#", parentMeta.PullRequest.Number),
-					" was merged, syncing branch on top of the trunk commit...\n",
+					"  - parent pull request ", colors.UserInput("#", parentMeta.PullRequest.Number),
+					" was merged, syncing branch on top of trunk commit ", colors.UserInput(parentMeta.TrunkCommit),
+					"\n",
 				)
 				// update the default branch
 				_, err = repo.Git("fetch", "origin", fmt.Sprint(defaultBranch, ":", defaultBranch))
 				if err != nil {
 					return err
 				}
-				// we run the following to auto rebase
-				// git rebase --onto <new-parent> <old-parent> <until>
-				// git rebase --onto trunk-commit parent-head current-head
-				_, err = repo.Rebase(git.RebaseOpts{
-					Onto:     *parentMeta.TrunkCommit,
-					Upstream: parentMeta.Name,
-					Branch:   currentBranch,
+				_, err = actions.Reparent(repo, actions.ReparentOpts{
+					Branch:         currentBranch,
+					NewParent:      *parentMeta.TrunkCommit,
+					NewParentTrunk: true, // since we are parenting
 				})
 				if err != nil {
 					return err
