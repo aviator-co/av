@@ -27,6 +27,10 @@ type Branch struct {
 
 	// The associated pull request information, if any.
 	PullRequest *PullRequest `json:"pullRequest,omitempty"`
+
+	// The commit onto the trunk branch, if any
+	// This will be the merge commit if the PR was merged
+	TrunkCommit *string `json:"trunkCommit,omitempty"`
 }
 
 func (b *Branch) IsStackRoot() bool {

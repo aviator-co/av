@@ -29,7 +29,7 @@ var fetchCmd = &cobra.Command{
 			return errors.Wrap(err, "failed to read av branch metadata")
 		}
 
-		client, err := gh.NewClient(config.Av.GitHub.Token)
+		client, err := gh.GetClient(config.Av.GitHub.Token)
 		if err != nil {
 			return err
 		}

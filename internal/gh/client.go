@@ -3,15 +3,17 @@ package gh
 import (
 	"bytes"
 	"context"
-	"emperror.dev/errors"
 	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"sync"
+	"time"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/utils/logutils"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
-	"io/ioutil"
-	"net/http"
-	"time"
 )
 
 type Client struct {
@@ -20,6 +22,9 @@ type Client struct {
 }
 
 const githubApiBaseUrl = "https://api.github.com"
+
+var once sync.Once
+var client *Client // lazy init
 
 func NewClient(token string) (*Client, error) {
 	if token == "" {
@@ -30,6 +35,14 @@ func NewClient(token string) (*Client, error) {
 	)
 	httpClient := oauth2.NewClient(context.Background(), src)
 	return &Client{httpClient, githubv4.NewClient(httpClient)}, nil
+}
+
+func GetClient(token string) (*Client, error) {
+	var err error
+	once.Do(func() {
+		client, err = NewClient(token)
+	})
+	return client, err
 }
 
 func (c *Client) query(ctx context.Context, query any, variables map[string]any) (reterr error) {

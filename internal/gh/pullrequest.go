@@ -211,3 +211,79 @@ func (c *Client) RepoPullRequests(ctx context.Context, opts RepoPullRequestOpts)
 		PullRequests: query.Repository.PullRequests.Nodes,
 	}, nil
 }
+
+type PullRequestByNumberInput struct {
+	Owner  string
+	Repo   string
+	Number int64
+}
+
+type Commit struct {
+	Oid string
+}
+
+func (c *Client) PullRequestMergeCommit(ctx context.Context, opts PullRequestByNumberInput) (*string, error) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				MergeCommit *Commit
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+
+	vars := map[string]any{
+		"owner":  githubv4.String(opts.Owner),
+		"repo":   githubv4.String(opts.Repo),
+		"number": githubv4.Int(opts.Number),
+	}
+	if err := c.query(ctx, &query, vars); err != nil {
+		return nil, errors.Wrap(err, "failed to query merge commit")
+	}
+	if query.Repository.PullRequest.MergeCommit == nil {
+		return nil, nil
+	}
+	return &query.Repository.PullRequest.MergeCommit.Oid, nil
+}
+
+type TimelineItemCloserCommit struct {
+	Commit struct {
+		Oid string
+	} `graphql:"... on Commit"`
+}
+
+type TimelineItemClosedEvent struct {
+	ClosedEvent struct {
+		Closer *TimelineItemCloserCommit
+	} `graphql:"... on ClosedEvent"`
+}
+
+func (c *Client) PullRequestFastForwardCommit(ctx context.Context, opts PullRequestByNumberInput) (*string, error) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				TimeLineItems struct {
+					Nodes []TimelineItemClosedEvent
+				} `graphql:"timelineItems(last: 10, itemType: CLOSED_EVENT)"`
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+
+	vars := map[string]any{
+		"owner":  githubv4.String(opts.Owner),
+		"repo":   githubv4.String(opts.Repo),
+		"number": githubv4.Int(opts.Number),
+	}
+	if err := c.query(ctx, &query, vars); err != nil {
+		return nil, errors.Wrap(err, "failed to query merge commit")
+	}
+	if len(query.Repository.PullRequest.TimeLineItems.Nodes) == 0 {
+		// if we don't find a closing event so return no error
+		return nil, nil
+	}
+	if query.Repository.PullRequest.TimeLineItems.Nodes[0].ClosedEvent.Closer == nil {
+		// if the closer is nil then we don't do anything
+		return nil, nil
+	}
+	// get the first closing event commit
+	return &query.Repository.PullRequest.TimeLineItems.Nodes[0].ClosedEvent.Closer.Commit.Oid, nil
+}

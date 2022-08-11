@@ -19,7 +19,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stringutils"
 	"github.com/kr/text"
-	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -253,8 +252,6 @@ base branch.
 		branchesToSync = append(branchesToSync, nextBranches...)
 
 		ctx := context.Background()
-		var ghClient *gh.Client // lazy init only if needed
-
 		logrus.WithField("branches", branchesToSync).Debug("determined branches to sync")
 		var resErr error
 	loop:
@@ -274,12 +271,9 @@ base branch.
 			)
 
 			if !state.Config.NoFetch {
-				if ghClient == nil {
-					var err error
-					ghClient, err = gh.NewClient(config.Av.GitHub.Token)
-					if err != nil {
-						return err
-					}
+				ghClient, err := gh.GetClient(config.Av.GitHub.Token)
+				if err != nil {
+					return err
 				}
 				update, err := actions.UpdatePullRequestState(ctx, repo, ghClient, repoMeta, currentBranch)
 				if err != nil {
@@ -287,17 +281,16 @@ base branch.
 				}
 				branches[currentBranch] = update.Branch
 				currentMeta = update.Branch
+			}
 
-				if update.Pull != nil && update.Pull.Merged && len(currentMeta.Children) > 0 {
-					// Not sure if we should always do this, but seems like a relatively
-					// safe bet (that we don't need to sync branches that have been merged).
-					_, _ = fmt.Fprint(os.Stderr,
-						"  - pull request ", colors.UserInput("#", update.Pull.Number),
-						" for branch ", colors.UserInput(currentBranch),
-						" was merged, skipping sync...\n",
-					)
-					continue
-				}
+			// if we have found a related commit in trunk for the PR then skip syncing
+			if currentMeta.TrunkCommit != nil && len(currentMeta.Children) > 0 {
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - pull request ", colors.UserInput("#", currentMeta.PullRequest.Number),
+					" for branch ", colors.UserInput(currentBranch),
+					" was merged, skipping sync...\n",
+				)
+				continue loop
 			}
 
 			parentState := currentMeta.Parent
@@ -327,34 +320,32 @@ base branch.
 			})
 
 			parentMeta, ok := branches[parentState.Name]
-			if ok && parentMeta.PullRequest != nil && parentMeta.PullRequest.State == githubv4.PullRequestStateMerged {
+			if ok && parentMeta.TrunkCommit != nil {
 				defaultBranch, err := repo.DefaultBranch()
 				if err != nil {
 					return errors.Wrap(err, "failed to determine default branch")
 				}
 				_, _ = fmt.Fprint(os.Stderr,
 					"  - pull request ", colors.UserInput("#", parentMeta.PullRequest.Number),
-					" was merged, syncing branch on top of the merge commit...\n",
+					" was merged, syncing branch on top of the trunk commit...\n",
 				)
-				// TODO:
-				//     We should do this automatically for the user
-				_, _ = colors.CliCmdC.Fprint(os.Stderr,
-					"        git fetch origin ", defaultBranch, ":", defaultBranch, "\n",
-					"        git checkout ", currentBranch, "\n",
-					"        av stack sync --parent ", defaultBranch, "\n",
-				)
-				continue
-			} else if ok && parentMeta.PullRequest != nil && parentMeta.PullRequest.State == githubv4.PullRequestStateClosed {
-				// pull requests are closed on fast-forward so look for a closing commit
-				defaultBranch, err := repo.DefaultBranch()
+				// update the default branch
+				_, err = repo.Git("fetch", "origin", fmt.Sprint(defaultBranch, ":", defaultBranch))
 				if err != nil {
-					return errors.Wrap(err, "failed to determine default branch")
+					return err
 				}
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - pull request ", colors.UserInput("#", parentMeta.PullRequest.Number),
-					" was closed, checking for closing commit...\n",
-				)
-				continue
+				// we run the following to auto rebase
+				// git rebase --onto <new-parent> <old-parent> <until>
+				// git rebase --onto trunk-commit parent-head current-head
+				_, err = repo.Rebase(git.RebaseOpts{
+					Onto:     *parentMeta.TrunkCommit,
+					Upstream: parentMeta.Name,
+					Branch:   currentBranch,
+				})
+				if err != nil {
+					return err
+				}
+				continue loop
 			}
 
 			_, _ = fmt.Fprint(os.Stderr,
