@@ -325,20 +325,43 @@ base branch.
 				if err != nil {
 					return errors.Wrap(err, "failed to determine default branch")
 				}
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - parent pull request ", colors.UserInput("#", parentMeta.PullRequest.Number),
-					" was merged, syncing branch on top of trunk commit ", colors.UserInput(parentMeta.TrunkCommit),
-					"\n",
-				)
-				// update the default branch
+				// update the default branch so the merged PR is there
 				_, err = repo.Git("fetch", "origin", fmt.Sprint(defaultBranch, ":", defaultBranch))
 				if err != nil {
 					return err
 				}
+				var newParentBranch string
+				stackRoot := meta.GetStackRoot(repo, currentBranch)
+				headRefOid := *parentMeta.TrunkCommit
+				if stackRoot.Parent.Head == headRefOid {
+					_, _ = fmt.Fprint(os.Stderr,
+						"  - parent pull request ", colors.UserInput("#", parentMeta.PullRequest.Number),
+						" was merged, syncing branch on top of trunk ", colors.UserInput(stackRoot.Parent.Name),
+						"\n",
+					)
+					newParentBranch = stackRoot.Parent.Name
+				} else {
+					// the trunk commit we want to reparent to
+					_, _ = fmt.Fprint(os.Stderr,
+						"  - parent pull request ", colors.UserInput("#", parentMeta.PullRequest.Number),
+						" was merged, syncing branch on top of trunk commit ", colors.UserInput(parentMeta.TrunkCommit),
+						"\n",
+					)
+					newParentBranch = fmt.Sprint("trunk-", headRefOid[0:7])
+					_, err = repo.CheckoutBranch(&git.CheckoutBranch{
+						Name:       newParentBranch,
+						NewHeadRef: headRefOid,
+						NewBranch:  true,
+					})
+					if err != nil {
+						return errors.WrapIf(err, "failed to make new trunk branch")
+					}
+				}
+				// reparent onto the new branch
 				_, err = actions.Reparent(repo, actions.ReparentOpts{
 					Branch:         currentBranch,
-					NewParent:      *parentMeta.TrunkCommit,
-					NewParentTrunk: true, // since we are parenting
+					NewParent:      newParentBranch,
+					NewParentTrunk: true, // we are parenting onto trunk
 				})
 				if err != nil {
 					return err

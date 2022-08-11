@@ -37,6 +37,14 @@ func (b *Branch) IsStackRoot() bool {
 	return b.Parent.Trunk
 }
 
+func GetStackRoot(repo *git.Repo, name string) Branch {
+	current, _ := ReadBranch(repo, name)
+	if current.Parent.Trunk {
+		return current
+	}
+	return GetStackRoot(repo, current.Parent.Name)
+}
+
 func (b *Branch) UnmarshalJSON(bytes []byte) error {
 	// We have to do a bit of backwards-compatible trickery here to support the
 	// fact that "parent" used to be a string field and now it's a struct
