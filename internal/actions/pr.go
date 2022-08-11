@@ -341,10 +341,9 @@ func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Clie
 				Repo:   repoMeta.Name,
 				Number: currentPull.Number,
 			}
-			switch currentPull.State {
-			case githubv4.PullRequestStateMerged:
+			if currentPull.State == githubv4.PullRequestStateMerged {
 				oid, err = client.PullRequestMergeCommit(ctx, opts)
-			case githubv4.PullRequestStateClosed:
+			} else if currentPull.State == githubv4.PullRequestStateClosed {
 				oid, err = client.PullRequestFastForwardCommit(ctx, opts)
 			}
 			if err != nil {
