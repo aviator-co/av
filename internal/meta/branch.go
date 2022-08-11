@@ -28,21 +28,12 @@ type Branch struct {
 	// The associated pull request information, if any.
 	PullRequest *PullRequest `json:"pullRequest,omitempty"`
 
-	// The commit onto the trunk branch, if any
-	// This will be the merge commit if the PR was merged
-	TrunkCommit *string `json:"trunkCommit,omitempty"`
+	// The merge commit onto the trunk branch, if any
+	MergeCommit string `json:"mergeCommit,omitempty"`
 }
 
 func (b *Branch) IsStackRoot() bool {
 	return b.Parent.Trunk
-}
-
-func GetStackRoot(repo *git.Repo, name string) Branch {
-	current, _ := ReadBranch(repo, name)
-	if current.Parent.Trunk {
-		return current
-	}
-	return GetStackRoot(repo, current.Parent.Name)
 }
 
 func (b *Branch) UnmarshalJSON(bytes []byte) error {

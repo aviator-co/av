@@ -334,22 +334,7 @@ func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Clie
 	} else {
 		// openPull is nil so the PR should be merged or closed
 		if currentPull != nil {
-			var oid *string
-			var err error
-			var opts = gh.PullRequestByNumberInput{
-				Owner:  repoMeta.Owner,
-				Repo:   repoMeta.Name,
-				Number: currentPull.Number,
-			}
-			if currentPull.State == githubv4.PullRequestStateMerged {
-				oid, err = client.PullRequestMergeCommit(ctx, opts)
-			} else if currentPull.State == githubv4.PullRequestStateClosed {
-				oid, err = client.PullRequestFastForwardCommit(ctx, opts)
-			}
-			if err != nil {
-				return nil, errors.WrapIf(err, "querying GitHub pull requests")
-			}
-			branch.TrunkCommit = oid
+			branch.MergeCommit = currentPull.MergeCommit()
 			branch.PullRequest = &meta.PullRequest{
 				ID:        currentPull.ID,
 				Number:    currentPull.Number,

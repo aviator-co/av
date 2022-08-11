@@ -24,6 +24,17 @@ type PullRequest struct {
 	Permalink   string
 	State       githubv4.PullRequestState
 	Title       string
+	// private
+	mergeCommit struct {
+		Oid string
+	}
+	timeLineItems struct {
+		Nodes []struct {
+			Closer struct {
+				Oid string
+			} `graphql:"... on Commit"`
+		} `graphql:"... on ClosedEvent"`
+	} `graphql:"timelineItems(last: 10, itemType: CLOSED_EVENT)"`
 }
 
 func (p *PullRequest) HeadBranchName() string {
@@ -36,6 +47,17 @@ func (p *PullRequest) HeadBranchName() string {
 func (p *PullRequest) BaseBranchName() string {
 	// See comment in HeadBranchName above.
 	return strings.TrimPrefix(p.BaseRefName, "refs/heads/")
+}
+
+func (p *PullRequest) MergeCommit() string {
+	if p.State == githubv4.PullRequestStateOpen {
+		return ""
+	} else if p.State == githubv4.PullRequestStateMerged {
+		return p.mergeCommit.Oid
+	} else if p.State == githubv4.PullRequestStateClosed && len(p.timeLineItems.Nodes) != 0 {
+		return p.timeLineItems.Nodes[0].Closer.Oid
+	}
+	return ""
 }
 
 type PullRequestOpts struct {
@@ -220,70 +242,4 @@ type PullRequestByNumberInput struct {
 
 type Commit struct {
 	Oid string
-}
-
-func (c *Client) PullRequestMergeCommit(ctx context.Context, opts PullRequestByNumberInput) (*string, error) {
-	var query struct {
-		Repository struct {
-			PullRequest struct {
-				MergeCommit *Commit
-			} `graphql:"pullRequest(number: $number)"`
-		} `graphql:"repository(owner: $owner, name: $repo)"`
-	}
-
-	vars := map[string]any{
-		"owner":  githubv4.String(opts.Owner),
-		"repo":   githubv4.String(opts.Repo),
-		"number": githubv4.Int(opts.Number),
-	}
-	if err := c.query(ctx, &query, vars); err != nil {
-		return nil, errors.Wrap(err, "failed to query merge commit")
-	}
-	if query.Repository.PullRequest.MergeCommit == nil {
-		return nil, nil
-	}
-	return &query.Repository.PullRequest.MergeCommit.Oid, nil
-}
-
-type TimelineItemCloserCommit struct {
-	Commit struct {
-		Oid string
-	} `graphql:"... on Commit"`
-}
-
-type TimelineItemClosedEvent struct {
-	ClosedEvent struct {
-		Closer *TimelineItemCloserCommit
-	} `graphql:"... on ClosedEvent"`
-}
-
-func (c *Client) PullRequestFastForwardCommit(ctx context.Context, opts PullRequestByNumberInput) (*string, error) {
-	var query struct {
-		Repository struct {
-			PullRequest struct {
-				TimeLineItems struct {
-					Nodes []TimelineItemClosedEvent
-				} `graphql:"timelineItems(last: 10, itemType: CLOSED_EVENT)"`
-			} `graphql:"pullRequest(number: $number)"`
-		} `graphql:"repository(owner: $owner, name: $repo)"`
-	}
-
-	vars := map[string]any{
-		"owner":  githubv4.String(opts.Owner),
-		"repo":   githubv4.String(opts.Repo),
-		"number": githubv4.Int(opts.Number),
-	}
-	if err := c.query(ctx, &query, vars); err != nil {
-		return nil, errors.Wrap(err, "failed to query merge commit")
-	}
-	if len(query.Repository.PullRequest.TimeLineItems.Nodes) == 0 {
-		// if we don't find a closing event so return no error
-		return nil, nil
-	}
-	if query.Repository.PullRequest.TimeLineItems.Nodes[0].ClosedEvent.Closer == nil {
-		// if the closer is nil then we don't do anything
-		return nil, nil
-	}
-	// get the first closing event commit
-	return &query.Repository.PullRequest.TimeLineItems.Nodes[0].ClosedEvent.Closer.Commit.Oid, nil
 }

@@ -284,7 +284,7 @@ base branch.
 			}
 
 			// if we have found a related commit in trunk for the PR then skip syncing
-			if currentMeta.TrunkCommit != nil && len(currentMeta.Children) > 0 {
+			if currentMeta.MergeCommit != "" && len(currentMeta.Children) > 0 {
 				_, _ = fmt.Fprint(os.Stderr,
 					"  - pull request ", colors.UserInput("#", currentMeta.PullRequest.Number),
 					" for branch ", colors.UserInput(currentBranch),
@@ -320,52 +320,38 @@ base branch.
 			})
 
 			parentMeta, ok := branches[parentState.Name]
-			if ok && parentMeta.TrunkCommit != nil {
+			if ok && parentMeta.MergeCommit != "" {
 				defaultBranch, err := repo.DefaultBranch()
 				if err != nil {
 					return errors.Wrap(err, "failed to determine default branch")
 				}
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - parent pull request ",
+					colors.UserInput("#", parentMeta.PullRequest.Number),
+					" was merged into trunk, syncing branch on merge commit ",
+					git.ShortSha(parentMeta.MergeCommit),
+					"\n",
+				)
 				// update the default branch so the merged PR is there
 				_, err = repo.Git("fetch", "origin", fmt.Sprint(defaultBranch, ":", defaultBranch))
 				if err != nil {
 					return err
 				}
-				var newParentBranch string
-				stackRoot := meta.GetStackRoot(repo, currentBranch)
-				headRefOid := *parentMeta.TrunkCommit
-				if stackRoot.Parent.Head == headRefOid {
-					_, _ = fmt.Fprint(os.Stderr,
-						"  - parent pull request ", colors.UserInput("#", parentMeta.PullRequest.Number),
-						" was merged, syncing branch on top of trunk ", colors.UserInput(stackRoot.Parent.Name),
-						"\n",
-					)
-					newParentBranch = stackRoot.Parent.Name
-				} else {
-					// the trunk commit we want to reparent to
-					_, _ = fmt.Fprint(os.Stderr,
-						"  - parent pull request ", colors.UserInput("#", parentMeta.PullRequest.Number),
-						" was merged, syncing branch on top of trunk commit ", colors.UserInput(parentMeta.TrunkCommit),
-						"\n",
-					)
-					newParentBranch = fmt.Sprint("trunk-", headRefOid[0:7])
-					_, err = repo.CheckoutBranch(&git.CheckoutBranch{
-						Name:       newParentBranch,
-						NewHeadRef: headRefOid,
-						NewBranch:  true,
-					})
-					if err != nil {
-						return errors.WrapIf(err, "failed to make new trunk branch")
-					}
-				}
-				// reparent onto the new branch
-				_, err = actions.Reparent(repo, actions.ReparentOpts{
-					Branch:         currentBranch,
-					NewParent:      newParentBranch,
-					NewParentTrunk: true, // we are parenting onto trunk
+				// rebase onto the merge commit from the old parent
+				_, err = repo.Rebase(git.RebaseOpts{
+					Onto:     parentMeta.MergeCommit,
+					Upstream: parentMeta.Name,
+					Branch:   currentBranch,
 				})
 				if err != nil {
 					return err
 				}
+				// now that we have rebased onto trunk - update current branch
+				actions.ReparentWriteMetaData(repo, actions.ReparentOpts{
+					Branch:         currentBranch,
+					NewParent:      defaultBranch,
+					NewParentTrunk: true,
+				})
 				continue loop
 			}
 
