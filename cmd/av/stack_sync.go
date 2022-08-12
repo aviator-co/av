@@ -347,11 +347,14 @@ base branch.
 					return err
 				}
 				// now that we have rebased onto trunk - update current branch
-				actions.ReparentWriteMetaData(repo, actions.ReparentOpts{
+				err = actions.ReparentWriteMetaData(repo, actions.ReparentOpts{
 					Branch:         currentBranch,
 					NewParent:      defaultBranch,
 					NewParentTrunk: true,
 				})
+				if err != nil {
+					return err
+				}
 				continue loop
 			}
 
