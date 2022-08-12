@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"sync"
 	"time"
 
 	"emperror.dev/errors"
@@ -23,9 +22,6 @@ type Client struct {
 
 const githubApiBaseUrl = "https://api.github.com"
 
-var once sync.Once
-var client *Client // lazy init
-
 func NewClient(token string) (*Client, error) {
 	if token == "" {
 		return nil, errors.Errorf("no GitHub token provided (do you need to configure one?)")
@@ -35,14 +31,6 @@ func NewClient(token string) (*Client, error) {
 	)
 	httpClient := oauth2.NewClient(context.Background(), src)
 	return &Client{httpClient, githubv4.NewClient(httpClient)}, nil
-}
-
-func GetClient(token string) (*Client, error) {
-	var err error
-	once.Do(func() {
-		client, err = NewClient(token)
-	})
-	return client, err
 }
 
 func (c *Client) query(ctx context.Context, query any, variables map[string]any) (reterr error) {

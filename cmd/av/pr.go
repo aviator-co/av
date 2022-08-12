@@ -9,7 +9,6 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
-	"github.com/aviator-co/av/internal/gh"
 	"github.com/spf13/cobra"
 )
 
@@ -50,7 +49,7 @@ Examples:
 		if err != nil {
 			return errors.WrapIf(err, "failed to determine current branch")
 		}
-		client, err := gh.GetClient(config.Av.GitHub.Token)
+		client, err := getClient(config.Av.GitHub.Token)
 		if err != nil {
 			return err
 		}

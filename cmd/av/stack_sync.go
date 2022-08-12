@@ -12,7 +12,6 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
-	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/stacks"
@@ -271,7 +270,7 @@ base branch.
 			)
 
 			if !state.Config.NoFetch {
-				ghClient, err := gh.GetClient(config.Av.GitHub.Token)
+				ghClient, err := getClient(config.Av.GitHub.Token)
 				if err != nil {
 					return err
 				}
