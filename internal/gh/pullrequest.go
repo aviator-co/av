@@ -30,11 +30,15 @@ type PullRequest struct {
 	}
 	timeLineItems struct {
 		Nodes []struct {
-			Closer struct {
-				Oid string
-			} `graphql:"... on Commit"`
-		} `graphql:"... on ClosedEvent"`
-	} `graphql:"timelineItems(last: 10, itemType: CLOSED_EVENT)"`
+			ClosedEvent struct {
+				Closer struct {
+					Commit struct {
+						Oid string
+					} `graphql:"... on Commit"`
+				}
+			} `graphql:"... on ClosedEvent"`
+		}
+	} `graphql:"timelineItems(last: 10, itemTypes: CLOSED_EVENT)"`
 }
 
 func (p *PullRequest) HeadBranchName() string {
@@ -55,7 +59,7 @@ func (p *PullRequest) MergeCommit() string {
 	} else if p.State == githubv4.PullRequestStateMerged {
 		return p.mergeCommit.Oid
 	} else if p.State == githubv4.PullRequestStateClosed && len(p.timeLineItems.Nodes) != 0 {
-		return p.timeLineItems.Nodes[0].Closer.Oid
+		return p.timeLineItems.Nodes[0].ClosedEvent.Closer.Commit.Oid
 	}
 	return ""
 }
