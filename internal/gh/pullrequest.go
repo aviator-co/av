@@ -233,13 +233,3 @@ func (c *Client) RepoPullRequests(ctx context.Context, opts RepoPullRequestOpts)
 		PullRequests: query.Repository.PullRequests.Nodes,
 	}, nil
 }
-
-type PullRequestByNumberInput struct {
-	Owner  string
-	Repo   string
-	Number int64
-}
-
-type Commit struct {
-	Oid string
-}
