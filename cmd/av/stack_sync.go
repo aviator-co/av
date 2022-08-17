@@ -354,6 +354,14 @@ base branch.
 				if err != nil {
 					return err
 				}
+				// force push the updated branch
+				if err := actions.Push(repo, actions.PushOpts{
+					Force:                 actions.ForceWithLease,
+					SkipIfUpstreamNotSet:  true,
+					SkipIfUpstreamMatches: true,
+				}); err != nil {
+					return err
+				}
 				continue loop
 			}
 
