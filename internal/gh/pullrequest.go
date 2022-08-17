@@ -15,15 +15,29 @@ type PullRequest struct {
 	Author struct {
 		Login string
 	}
-	HeadRefName string
-	HeadRefOID  string
-	BaseRefName string
-	IsDraft     bool
-	Mergeable   githubv4.MergeableState
-	Merged      bool
-	Permalink   string
-	State       githubv4.PullRequestState
-	Title       string
+	HeadRefName         string
+	HeadRefOID          string
+	BaseRefName         string
+	IsDraft             bool
+	Mergeable           githubv4.MergeableState
+	Merged              bool
+	Permalink           string
+	State               githubv4.PullRequestState
+	Title               string
+	PRIVATE_MergeCommit struct {
+		Oid string
+	} `graphql:"mergeCommit"`
+	PRIVATE_TimelineItems struct {
+		Nodes []struct {
+			ClosedEvent struct {
+				Closer struct {
+					Commit struct {
+						Oid string
+					} `graphql:"... on Commit"`
+				}
+			} `graphql:"... on ClosedEvent"`
+		}
+	} `graphql:"timelineItems(last: 10, itemTypes: CLOSED_EVENT)"`
 }
 
 func (p *PullRequest) HeadBranchName() string {
@@ -36,6 +50,17 @@ func (p *PullRequest) HeadBranchName() string {
 func (p *PullRequest) BaseBranchName() string {
 	// See comment in HeadBranchName above.
 	return strings.TrimPrefix(p.BaseRefName, "refs/heads/")
+}
+
+func (p *PullRequest) GetMergeCommit() string {
+	if p.State == githubv4.PullRequestStateOpen {
+		return ""
+	} else if p.State == githubv4.PullRequestStateMerged {
+		return p.PRIVATE_MergeCommit.Oid
+	} else if p.State == githubv4.PullRequestStateClosed && len(p.PRIVATE_TimelineItems.Nodes) != 0 {
+		return p.PRIVATE_TimelineItems.Nodes[0].ClosedEvent.Closer.Commit.Oid
+	}
+	return ""
 }
 
 type PullRequestOpts struct {

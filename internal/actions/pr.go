@@ -28,6 +28,8 @@ type CreatePullRequestOpts struct {
 	Draft bool
 	// If true, do not push the branch to GitHub
 	NoPush bool
+	// If true, force push the branch to GitHub
+	ForcePush bool
 	// If true, create a PR even if we think one already exists
 	Force bool
 }
@@ -53,8 +55,12 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		"Creating pull request for branch ", colors.UserInput(opts.BranchName), ":",
 		"\n",
 	)
-	if !opts.NoPush {
+	if !opts.NoPush || opts.ForcePush {
 		pushFlags := []string{"push"}
+
+		if opts.ForcePush {
+			pushFlags = append(pushFlags, "--force")
+		}
 
 		// Check if the upstream is set. If not, we set it during push.
 		// TODO: Should we store this somewhere? I think currently things will
@@ -332,8 +338,9 @@ func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Clie
 		}
 		newPull = openPull
 	} else {
-		// openPull is nil
+		// openPull is nil so the PR should be merged or closed
 		if currentPull != nil {
+			branch.MergeCommit = currentPull.GetMergeCommit()
 			branch.PullRequest = &meta.PullRequest{
 				ID:        currentPull.ID,
 				Number:    currentPull.Number,

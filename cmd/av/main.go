@@ -5,10 +5,12 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
+	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/fatih/color"
 	"github.com/kr/text"
@@ -158,4 +160,15 @@ func getRepo() (*git.Repo, error) {
 		}
 	}
 	return cachedRepo, nil
+}
+
+var once sync.Once
+var lazyGithubClient *gh.Client
+
+func getClient(token string) (*gh.Client, error) {
+	var err error
+	once.Do(func() {
+		lazyGithubClient, err = gh.NewClient(token)
+	})
+	return lazyGithubClient, err
 }

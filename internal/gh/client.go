@@ -3,15 +3,16 @@ package gh
 import (
 	"bytes"
 	"context"
-	"emperror.dev/errors"
 	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"time"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/utils/logutils"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
-	"io/ioutil"
-	"net/http"
-	"time"
 )
 
 type Client struct {

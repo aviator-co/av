@@ -49,7 +49,7 @@ var stackSubmitCmd = &cobra.Command{
 
 		// ensure pull requests for each branch in the stack
 		ctx := context.Background()
-		client, err := gh.NewClient(config.Av.GitHub.Token)
+		client, err := getClient(config.Av.GitHub.Token)
 		if err != nil {
 			return err
 		}

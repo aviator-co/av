@@ -6,7 +6,6 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
-	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/spf13/cobra"
 )
@@ -32,7 +31,7 @@ var initCmd = &cobra.Command{
 		if config.Av.GitHub.Token == "" {
 			return errors.New("github token must be set")
 		}
-		client, err := gh.NewClient(config.Av.GitHub.Token)
+		client, err := getClient(config.Av.GitHub.Token)
 		if err != nil {
 			return err
 		}

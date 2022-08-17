@@ -2,9 +2,6 @@ package git
 
 import (
 	"bytes"
-	"emperror.dev/errors"
-	"github.com/sirupsen/logrus"
-	giturls "github.com/whilp/git-urls"
 	"io"
 	"net/url"
 	"os"
@@ -12,6 +9,10 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"emperror.dev/errors"
+	"github.com/sirupsen/logrus"
+	giturls "github.com/whilp/git-urls"
 )
 
 type Repo struct {
@@ -152,6 +153,9 @@ type CheckoutBranch struct {
 	// Specifies the "-b" flag to git.
 	// The checkout will fail if the branch already exists.
 	NewBranch bool
+	// Specifies the ref that new branch will have HEAD at
+	// Requires the "-b" flag to be specified
+	NewHeadRef string
 }
 
 // CheckoutBranch performs a checkout of the given branch and returns the name
@@ -171,6 +175,9 @@ func (r *Repo) CheckoutBranch(opts *CheckoutBranch) (string, error) {
 		args = append(args, "-b")
 	}
 	args = append(args, opts.Name)
+	if opts.NewBranch && opts.NewHeadRef != "" {
+		args = append(args, opts.NewHeadRef)
+	}
 	res, err := r.Run(&RunOpts{
 		Args: args,
 	})
