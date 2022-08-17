@@ -334,7 +334,7 @@ func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Clie
 	} else {
 		// openPull is nil so the PR should be merged or closed
 		if currentPull != nil {
-			branch.MergeCommit = currentPull.MergeCommit()
+			branch.MergeCommit = currentPull.GetMergeCommit()
 			branch.PullRequest = &meta.PullRequest{
 				ID:        currentPull.ID,
 				Number:    currentPull.Number,

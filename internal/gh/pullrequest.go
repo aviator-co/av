@@ -24,11 +24,10 @@ type PullRequest struct {
 	Permalink   string
 	State       githubv4.PullRequestState
 	Title       string
-	// private
-	mergeCommit struct {
+	MergeCommit struct {
 		Oid string
 	}
-	timeLineItems struct {
+	TimeLineItems struct {
 		Nodes []struct {
 			ClosedEvent struct {
 				Closer struct {
@@ -53,13 +52,13 @@ func (p *PullRequest) BaseBranchName() string {
 	return strings.TrimPrefix(p.BaseRefName, "refs/heads/")
 }
 
-func (p *PullRequest) MergeCommit() string {
+func (p *PullRequest) GetMergeCommit() string {
 	if p.State == githubv4.PullRequestStateOpen {
 		return ""
 	} else if p.State == githubv4.PullRequestStateMerged {
-		return p.mergeCommit.Oid
-	} else if p.State == githubv4.PullRequestStateClosed && len(p.timeLineItems.Nodes) != 0 {
-		return p.timeLineItems.Nodes[0].ClosedEvent.Closer.Commit.Oid
+		return p.MergeCommit.Oid
+	} else if p.State == githubv4.PullRequestStateClosed && len(p.TimeLineItems.Nodes) != 0 {
+		return p.TimeLineItems.Nodes[0].ClosedEvent.Closer.Commit.Oid
 	}
 	return ""
 }
