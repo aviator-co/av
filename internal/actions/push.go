@@ -1,14 +1,15 @@
 package actions
 
 import (
-	"emperror.dev/errors"
 	"fmt"
+	"os"
+	"strings"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
-	"os"
-	"strings"
 )
 
 type ForceOpt int

@@ -336,6 +336,7 @@ base branch.
 				if err != nil {
 					return err
 				}
+
 				// rebase onto the merge commit from the old parent
 				_, err = repo.Rebase(git.RebaseOpts{
 					Onto:     parentMeta.MergeCommit,
@@ -355,6 +356,11 @@ base branch.
 					return err
 				}
 				// force push the updated branch
+				if _, err = repo.CheckoutBranch(&git.CheckoutBranch{
+					Name: currentBranch,
+				}); err != nil {
+					return err
+				}
 				if err := actions.Push(repo, actions.PushOpts{
 					Force:                 actions.ForceWithLease,
 					SkipIfUpstreamNotSet:  true,
