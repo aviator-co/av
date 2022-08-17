@@ -15,19 +15,19 @@ type PullRequest struct {
 	Author struct {
 		Login string
 	}
-	HeadRefName string
-	HeadRefOID  string
-	BaseRefName string
-	IsDraft     bool
-	Mergeable   githubv4.MergeableState
-	Merged      bool
-	Permalink   string
-	State       githubv4.PullRequestState
-	Title       string
-	MergeCommit struct {
+	HeadRefName         string
+	HeadRefOID          string
+	BaseRefName         string
+	IsDraft             bool
+	Mergeable           githubv4.MergeableState
+	Merged              bool
+	Permalink           string
+	State               githubv4.PullRequestState
+	Title               string
+	PRIVATE_MergeCommit struct {
 		Oid string
-	}
-	TimeLineItems struct {
+	} `graphql:"mergeCommit"`
+	PRIVATE_TimelineItems struct {
 		Nodes []struct {
 			ClosedEvent struct {
 				Closer struct {
@@ -56,9 +56,9 @@ func (p *PullRequest) GetMergeCommit() string {
 	if p.State == githubv4.PullRequestStateOpen {
 		return ""
 	} else if p.State == githubv4.PullRequestStateMerged {
-		return p.MergeCommit.Oid
-	} else if p.State == githubv4.PullRequestStateClosed && len(p.TimeLineItems.Nodes) != 0 {
-		return p.TimeLineItems.Nodes[0].ClosedEvent.Closer.Commit.Oid
+		return p.PRIVATE_MergeCommit.Oid
+	} else if p.State == githubv4.PullRequestStateClosed && len(p.PRIVATE_TimelineItems.Nodes) != 0 {
+		return p.PRIVATE_TimelineItems.Nodes[0].ClosedEvent.Closer.Commit.Oid
 	}
 	return ""
 }
