@@ -16,6 +16,7 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/stacks"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/stringutils"
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
@@ -347,13 +348,17 @@ base branch.
 					return err
 				}
 				// now that we have rebased onto trunk - update current branch
-				err = actions.ReparentWriteMetaData(repo, actions.ReparentOpts{
-					Branch:         currentBranch,
-					NewParent:      defaultBranch,
-					NewParentTrunk: true,
-				})
+				currentMeta.Parent, err = meta.ReadBranchState(repo, defaultBranch, true)
 				if err != nil {
 					return err
+				}
+				if err := meta.WriteBranch(repo, currentMeta); err != nil {
+					return errors.WrapIff(err, "failed to write branch meta for %q", currentBranch)
+				}
+				// remove the current branch from the old parent's children
+				parentMeta.Children = sliceutils.DeleteElement(parentMeta.Children, currentBranch)
+				if err := meta.WriteBranch(repo, parentMeta); err != nil {
+					return errors.WrapIff(err, "failed to write branch meta for %q", parentMeta.Name)
 				}
 				// force push the updated branch
 				if _, err = repo.CheckoutBranch(&git.CheckoutBranch{

@@ -115,7 +115,7 @@ func ReparentContinue(repo *git.Repo, opts ReparentOpts) (*ReparentResult, error
 			"no rebase in progress -- assuming rebase was completed (not aborted)",
 			"\n",
 		)
-		if err := ReparentWriteMetaData(repo, opts); err != nil {
+		if err := reparentWriteMetadata(repo, opts); err != nil {
 			return nil, err
 		}
 		return &ReparentResult{Success: true}, nil
@@ -123,7 +123,7 @@ func ReparentContinue(repo *git.Repo, opts ReparentOpts) (*ReparentResult, error
 	return handleReparentRebaseOutput(repo, opts, output)
 }
 
-func ReparentWriteMetaData(repo *git.Repo, opts ReparentOpts) error {
+func reparentWriteMetadata(repo *git.Repo, opts ReparentOpts) error {
 	branch := opts.Branch
 	newParentName := opts.NewParent
 	branchMeta, _ := meta.ReadBranch(repo, branch)
@@ -173,7 +173,7 @@ func handleReparentRebaseOutput(repo *git.Repo, opts ReparentOpts, output *git.O
 		return &ReparentResult{Success: false, Hint: string(output.Stderr)}, nil
 	}
 
-	if err := ReparentWriteMetaData(repo, opts); err != nil {
+	if err := reparentWriteMetadata(repo, opts); err != nil {
 		return nil, err
 	}
 	return &ReparentResult{Success: true}, nil
