@@ -231,6 +231,17 @@ func SubsequentBranches(branches map[string]Branch, name string) ([]string, erro
 	return res, nil
 }
 
+func FindStackRoot(branches map[string]Branch, name string) (Branch, bool) {
+	branchMeta, ok := branches[name]
+	if !ok {
+		return Branch{}, false
+	}
+	if branchMeta.Parent.Trunk {
+		return branchMeta, true
+	}
+	return FindStackRoot(branches, branchMeta.Parent.Name)
+}
+
 // WriteBranch writes branch metadata to the git repository.
 // It can be loaded again with ReadBranch.
 func WriteBranch(repo *git.Repo, s Branch) error {

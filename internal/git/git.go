@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -92,6 +93,24 @@ func (o Output) Lines() []string {
 	return strings.Split(s, "\n")
 }
 
+type RunError struct {
+	ExitError *exec.ExitError
+	Args      []string
+	Output    *Output
+}
+
+func (r *RunError) Error() string {
+	return fmt.Sprintf("git %s: %s: %s", r.Args, r.ExitError, string(r.Output.Stderr))
+}
+
+func (r *RunError) ExitCode() int {
+	return r.ExitError.ExitCode()
+}
+
+func (r *RunError) StderrContains(s string) bool {
+	return strings.Contains(string(r.Output.Stderr), s)
+}
+
 func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 	cmd := exec.Command("git", opts.Args...)
 	cmd.Dir = r.repoDir
@@ -105,14 +124,15 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 	if err != nil && !errors.As(err, &exitError) {
 		return nil, errors.Wrapf(err, "git %s", opts.Args)
 	}
-	if err != nil && opts.ExitError && exitError.ExitCode() != 0 {
-		return nil, errors.Errorf("git %s: %s: %s", opts.Args, err, stderr.String())
-	}
-	return &Output{
+	output := &Output{
 		ExitCode: cmd.ProcessState.ExitCode(),
 		Stdout:   stdout.Bytes(),
 		Stderr:   stderr.Bytes(),
-	}, nil
+	}
+	if err != nil && opts.ExitError && exitError.ExitCode() != 0 {
+		return nil, errors.WithStack(&RunError{exitError, opts.Args, output})
+	}
+	return output, nil
 }
 
 func (r *Repo) GitStdin(args []string, stdin io.Reader) (string, error) {
