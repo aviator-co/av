@@ -147,6 +147,9 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	}
 
 	trunkBranch, err := meta.Trunk(repo, opts.BranchName)
+	if err != nil {
+		return nil, errors.WrapIf(err, "failed to determine trunk branch")
+	}
 	prMeta := WritePRMetadata(PRMetadata{
 		Parent:     prBaseBranch,
 		ParentHead: branchMeta.Parent.Head,
