@@ -1,7 +1,9 @@
 package actions
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -144,11 +146,20 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		opts.Body = firstCommit.Body
 	}
 
+	trunkBranch, err := meta.Trunk(repo, opts.BranchName)
+	if err != nil {
+		return nil, errors.WrapIf(err, "failed to determine trunk branch")
+	}
+	prMeta := WritePRMetadata(PRMetadata{
+		Parent:     prBaseBranch,
+		ParentHead: branchMeta.Parent.Head,
+		Trunk:      trunkBranch,
+	})
 	pull, didCreatePR, err := getOrCreatePR(ctx, client, repoMeta, getOrCreatePROpts{
 		baseRefName: prBaseBranch,
 		headRefName: opts.BranchName,
 		title:       opts.Title,
-		body:        opts.Body,
+		body:        opts.Body + "\n\n" + prMeta,
 		draft:       opts.Draft,
 	})
 	if err != nil {
@@ -179,6 +190,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	if didCreatePR {
 		action = "created"
 	} else {
+		// TODO: need to update the PR metadata possibly here
 		action = "fetched existing"
 	}
 	_, _ = fmt.Fprint(os.Stderr,
@@ -369,4 +381,64 @@ func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Clie
 	}
 
 	return &UpdatePullRequestResult{changed, branch, newPull}, nil
+}
+
+type PRMetadata struct {
+	Parent     string `json:"parent"`
+	ParentHead string `json:"parentHead"`
+	Trunk      string `json:"trunk"`
+}
+
+const PRMetadataCommentStart = "<!-- av pr metadata\n"
+const PRMetadataCommentHelpText = "This information is embedded by the av CLI when creating PRs to track the status of stacks when using Aviator. Please do not delete or edit this section of the PR.\n"
+const PRMetadataCommentEnd = "-->\n"
+
+func ReadPRMetadata(body string) (PRMetadata, error) {
+	var metadata PRMetadata
+	buf := bytes.NewBufferString(body)
+
+	// Read until we find the "<!-- av pr metadata" line
+	if err := readLineUntil(buf, PRMetadataCommentStart); err != nil {
+		return metadata, errors.WrapIff(err, "expecting %q", PRMetadataCommentStart)
+	}
+
+	// Read until we find the "```" line (which indicates that json starts
+	// on the following line)
+	if err := readLineUntil(buf, "```\n"); err != nil {
+		return metadata, errors.WrapIff(err, "expecting \"```\"")
+	}
+
+	if err := json.NewDecoder(buf).Decode(&metadata); err != nil {
+		return PRMetadata{}, errors.WrapIf(err, "parsing PR metadata")
+	}
+	return metadata, nil
+
+}
+
+func readLineUntil(b *bytes.Buffer, line string) error {
+	for {
+		l, err := b.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		if l == line {
+			return nil
+		}
+	}
+}
+
+func WritePRMetadata(metadata PRMetadata) string {
+	var buf bytes.Buffer
+	buf.WriteString(PRMetadataCommentStart)
+	buf.WriteString(PRMetadataCommentHelpText)
+	buf.WriteString("```\n")
+	// Note: Encoder.Encode implicitly adds a newline at the end of the JSON
+	// which is important here so that the ``` below appears on its own line.
+	if err := json.NewEncoder(&buf).Encode(metadata); err != nil {
+		// This should never happen since we're marshalling a struct with only scalar fields
+		panic(err)
+	}
+	buf.WriteString("```\n")
+	buf.WriteString(PRMetadataCommentEnd)
+	return buf.String()
 }
