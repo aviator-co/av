@@ -91,6 +91,12 @@ base branch.
 		if stackSyncFlags.Continue && stackSyncFlags.Abort {
 			return errors.New("cannot use --continue and --abort together")
 		}
+		if stackSyncFlags.Current && stackSyncFlags.Trunk {
+			return errors.New("cannot use --current and --trunk together")
+		}
+		if stackSyncFlags.Parent != "" && stackSyncFlags.Trunk {
+			return errors.New("cannot use --parent and --trunk together")
+		}
 
 		repo, repoMeta, err := getRepoInfo()
 		if err != nil {
@@ -217,8 +223,97 @@ base branch.
 		// we won't try to reparent again later.
 		state.Config.Parent = ""
 
-		// Construct the list of branches we need to sync
 		branches, err := meta.ReadAllBranches(repo)
+		if state.Config.Trunk {
+			root, ok := meta.FindStackRoot(branches, state.OriginalBranch)
+			if !ok {
+				return errors.Errorf("failed to determine stack root for branch %q", state.OriginalBranch)
+			}
+			trunk := root.Parent.Name
+			if trunk == "" {
+				return errors.Errorf("failed to determine stack trunk for branch %q", state.OriginalBranch)
+			}
+
+			_, _ = fmt.Fprint(os.Stderr,
+				"Syncing stack root branch ", colors.UserInput(root.Name),
+				" to trunk branch ", colors.UserInput(trunk),
+				"...\n",
+			)
+
+			var syncResult *stacks.SyncResult
+			var err error
+			if !state.Continue {
+				// Start a new rebase
+				if _, err := repo.Run(&git.RunOpts{
+					Args: []string{"fetch", "origin", trunk},
+				}); err != nil {
+					return errors.WrapIff(err, "failed to fetch trunk branch %q from origin", trunk)
+				}
+				if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+					Name: root.Name,
+				}); err != nil {
+					return errors.WrapIff(err, "failed to checkout branch %q", root.Name)
+				}
+
+				syncResult, err = stacks.SyncBranch(repo, &stacks.SyncBranchOpts{
+					Branch:   root.Name,
+					Parent:   trunk,
+					Strategy: stacks.StrategyRebase,
+				})
+			} else {
+				syncResult, err = stacks.SyncContinue(repo, stacks.StrategyRebase)
+			}
+
+			if err != nil {
+				return errors.WrapIf(err, "failed to start rebase")
+			}
+			switch syncResult.Status {
+			case stacks.SyncConflict:
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - ", colors.Failure("Conflicts detected"),
+					" while synchronizing branch ", colors.UserInput(state.CurrentBranch),
+					" with trunk branch ", colors.UserInput(trunk),
+					": resolve the conflicts and continue the sync with ", colors.CliCmd("av stack sync --continue"),
+					"\n",
+				)
+				if err := writeStackSyncState(repo, &state); err != nil {
+					return errors.Wrap(err, "failed to write stack sync state")
+				}
+				return nil
+			// Note: we lump SyncNotInProgress and SyncUpdated together here since
+			// SyncNotInProgress probably means that the user did a
+			// `git rebase --continue` themselves.
+			case stacks.SyncUpdated, stacks.SyncNotInProgress:
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - ", colors.Success("Updated"),
+					" branch ", colors.UserInput(state.CurrentBranch),
+					" to trunk branch ", colors.UserInput(trunk),
+					"\n",
+				)
+			case stacks.SyncAlreadyUpToDate:
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - Branch ", colors.UserInput(state.CurrentBranch),
+					" is already up to date with trunk branch ", colors.UserInput(trunk),
+					"\n",
+				)
+			default:
+				panic(fmt.Sprintf("unknown sync status: %v", syncResult.Status))
+			}
+
+			// Set to false so that we don't try to re-sync the trunk branch again later
+			state.Config.Trunk = false
+			state.Continue = false
+			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+				Name: state.OriginalBranch,
+			}); err != nil {
+				return errors.WrapIff(err, "failed to checkout branch %q", state.OriginalBranch)
+			}
+
+			// Add extra newline for clear separation
+			_, _ = fmt.Fprint(os.Stderr, "\n")
+		}
+
+		// Construct the list of branches we need to sync
 		if err != nil {
 			return err
 		}
