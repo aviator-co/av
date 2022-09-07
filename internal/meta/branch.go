@@ -184,6 +184,14 @@ func ReadAllBranches(repo *git.Repo) (map[string]Branch, error) {
 	return branches, nil
 }
 
+func Trunk(repo *git.Repo, branchName string) (string, error) {
+	branch, _ := ReadBranch(repo, branchName)
+	if branch.Parent.Trunk {
+		return branch.Parent.Name, nil
+	}
+	return Trunk(repo, branch.Parent.Name)
+}
+
 // Find all the ancestor branches of the given branch name and append them to
 // the given slice (in topological order: a comes before b if a is an ancestor
 // of b).

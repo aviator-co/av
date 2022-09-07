@@ -146,9 +146,11 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		opts.Body = firstCommit.Body
 	}
 
+	trunkBranch, err := meta.Trunk(repo, opts.BranchName)
 	prMeta := WritePRMetadata(PRMetadata{
 		Parent:     prBaseBranch,
 		ParentHead: branchMeta.Parent.Head,
+		Trunk:      trunkBranch,
 	})
 	pull, didCreatePR, err := getOrCreatePR(ctx, client, repoMeta, getOrCreatePROpts{
 		baseRefName: prBaseBranch,
@@ -381,6 +383,7 @@ func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Clie
 type PRMetadata struct {
 	Parent     string `json:"parent"`
 	ParentHead string `json:"parentHead"`
+	Trunk      string `json:"trunk"`
 }
 
 const PRMetadataCommentStart = "<!-- av pr metadata\n"
