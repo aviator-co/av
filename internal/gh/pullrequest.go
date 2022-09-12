@@ -24,6 +24,7 @@ type PullRequest struct {
 	Permalink           string
 	State               githubv4.PullRequestState
 	Title               string
+	Body                string
 	PRIVATE_MergeCommit struct {
 		Oid string
 	} `graphql:"mergeCommit"`

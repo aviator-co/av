@@ -48,6 +48,10 @@ type CreatePullRequestResult struct {
 // CreatePullRequest creates a pull request on GitHub for the current branch, if
 // one doesn't already exist.
 func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, opts CreatePullRequestOpts) (*CreatePullRequestResult, error) {
+	if opts.BranchName == "" {
+		logrus.Panicf("internal invariant error: CreatePullRequest called with empty branch name")
+	}
+
 	repoMeta, err := meta.ReadRepository(repo)
 	if err != nil {
 		return nil, err
@@ -69,7 +73,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		//       break if the upstream name is not the same name as the local
 		upstream, err := repo.RevParse(&git.RevParse{
 			SymbolicFullName: true,
-			Rev:              "HEAD@{u}",
+			Rev:              fmt.Sprintf("%s@{u}", opts.BranchName),
 		})
 		if err != nil {
 			// Set the upstream branch
@@ -81,7 +85,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		logrus.WithField("upstream", upstream).Debug("pushing latest changes")
 
 		_, _ = fmt.Fprint(os.Stderr,
-			"  - pushing branch to GitHub (", color.CyanString("%s", upstream), ")",
+			"  - pushing to ", color.CyanString("%s", upstream),
 			"\n",
 		)
 		if _, err := repo.Git(pushFlags...); err != nil {
@@ -97,13 +101,15 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	// figure this out based on whether or not we're on a stacked branch
 	branchMeta, _ := meta.ReadBranch(repo, opts.BranchName)
 	prBaseBranch := branchMeta.Parent.Name
+	var parentMeta meta.Branch
 	if !branchMeta.Parent.Trunk {
 		// check if the base branch also has an associated PR
-		baseMeta, ok := meta.ReadBranch(repo, prBaseBranch)
+		var ok bool
+		parentMeta, ok = meta.ReadBranch(repo, prBaseBranch)
 		if !ok {
 			return nil, errors.WrapIff(err, "failed to read branch metadata for %q", prBaseBranch)
 		}
-		if baseMeta.PullRequest == nil {
+		if parentMeta.PullRequest == nil {
 			// TODO:
 			//     We should automagically create PRs for every branch in the stack
 			return nil, errors.Errorf(
@@ -150,16 +156,22 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	if err != nil {
 		return nil, errors.WrapIf(err, "failed to determine trunk branch")
 	}
-	prMeta := WritePRMetadata(PRMetadata{
+
+	prMeta := PRMetadata{
 		Parent:     prBaseBranch,
 		ParentHead: branchMeta.Parent.Head,
 		Trunk:      trunkBranch,
-	})
-	pull, didCreatePR, err := getOrCreatePR(ctx, client, repoMeta, getOrCreatePROpts{
+	}
+	if parentMeta.PullRequest != nil {
+		prMeta.ParentPull = parentMeta.PullRequest.Number
+	}
+
+	pull, didCreatePR, err := ensurePR(ctx, client, repoMeta, ensurePROpts{
 		baseRefName: prBaseBranch,
 		headRefName: opts.BranchName,
 		title:       opts.Title,
-		body:        opts.Body + "\n\n" + prMeta,
+		body:        opts.Body,
+		meta:        prMeta,
 		draft:       opts.Draft,
 	})
 	if err != nil {
@@ -190,19 +202,16 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	if didCreatePR {
 		action = "created"
 	} else {
-		// TODO: need to update the PR metadata possibly here
-		action = "fetched existing"
+		action = "sychronized"
 	}
 	_, _ = fmt.Fprint(os.Stderr,
-		"  - ", action, " pull request for branch ", colors.UserInput(opts.BranchName),
-		" (into branch ", colors.UserInput(prBaseBranch), "): ",
-		colors.UserInput(pull.Permalink),
-		"\n",
+		"  - ", action, " pull request ",
+		colors.UserInput(pull.Permalink), "\n",
 	)
 
-	if config.Av.PullRequest.OpenBrowser {
+	if didCreatePR && config.Av.PullRequest.OpenBrowser {
 		if err := browser.Open(pull.Permalink); err != nil {
-			fmt.Fprint(os.Stderr,
+			_, _ = fmt.Fprint(os.Stderr,
 				"  - couldn't open browser ",
 				colors.UserInput(err),
 				" for pull request link ",
@@ -214,19 +223,20 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	return &CreatePullRequestResult{didCreatePR, branchMeta, pull}, nil
 }
 
-type getOrCreatePROpts struct {
+type ensurePROpts struct {
 	baseRefName string
 	headRefName string
 	title       string
 	body        string
+	meta        PRMetadata
 	draft       bool
 }
 
-// getOrCreatePR returns the pull request for the given input, creating a new
+// ensurePR returns the pull request for the given input, creating a new
 // pull request if one doesn't exist. It returns the pull request, a boolean
 // indicating whether or not the pull request was created, and an error if one
 // occurred.
-func getOrCreatePR(ctx context.Context, client *gh.Client, repoMeta meta.Repository, opts getOrCreatePROpts) (*gh.PullRequest, bool, error) {
+func ensurePR(ctx context.Context, client *gh.Client, repoMeta meta.Repository, opts ensurePROpts) (*gh.PullRequest, bool, error) {
 	existing, err := client.GetPullRequests(ctx, gh.GetPullRequestsInput{
 		Owner:       repoMeta.Owner,
 		Repo:        repoMeta.Name,
@@ -237,6 +247,29 @@ func getOrCreatePR(ctx context.Context, client *gh.Client, repoMeta meta.Reposit
 		return nil, false, errors.WrapIf(err, "querying existing pull requests")
 	}
 	if len(existing.PullRequests) > 0 {
+		pr := &existing.PullRequests[0]
+		existingMeta, err := ReadPRMetadata(pr.Body)
+		if err != nil {
+			logrus.WithError(err).Debug("failed to read PR metadata")
+		}
+
+		// Check if we need to update the metadata that's stored in the body of
+		// the PR.
+		if existingMeta != opts.meta {
+			logrus.WithFields(logrus.Fields{
+				"existingMeta": existingMeta,
+				"optsMeta":     opts.meta,
+			}).Debug("PR metadata doesn't match")
+			newBody := AddPRMetadata(pr.Body, opts.meta)
+			updatedPR, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
+				PullRequestID: pr.ID,
+				Body:          gh.Ptr(githubv4.String(newBody)),
+			})
+			if err != nil {
+				return nil, false, errors.WrapIf(err, "updating PR body text")
+			}
+			return updatedPR, false, nil
+		}
 		return &existing.PullRequests[0], false, nil
 	}
 
@@ -245,7 +278,7 @@ func getOrCreatePR(ctx context.Context, client *gh.Client, repoMeta meta.Reposit
 		BaseRefName:  githubv4.String(opts.baseRefName),
 		HeadRefName:  githubv4.String(opts.headRefName),
 		Title:        githubv4.String(opts.title),
-		Body:         gh.Ptr(githubv4.String(opts.body)),
+		Body:         gh.Ptr(githubv4.String(AddPRMetadata(opts.body, opts.meta))),
 		Draft:        gh.Ptr(githubv4.Boolean(opts.draft)),
 	})
 	if err != nil {
@@ -386,6 +419,7 @@ func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Clie
 type PRMetadata struct {
 	Parent     string `json:"parent"`
 	ParentHead string `json:"parentHead"`
+	ParentPull int64  `json:"parentPull,omitempty"`
 	Trunk      string `json:"trunk"`
 }
 
@@ -393,26 +427,80 @@ const PRMetadataCommentStart = "<!-- av pr metadata\n"
 const PRMetadataCommentHelpText = "This information is embedded by the av CLI when creating PRs to track the status of stacks when using Aviator. Please do not delete or edit this section of the PR.\n"
 const PRMetadataCommentEnd = "-->\n"
 
-func ReadPRMetadata(body string) (PRMetadata, error) {
-	var metadata PRMetadata
-	buf := bytes.NewBufferString(body)
+func ParsePRMetadata(input string) (commentStart int, commentEnd int, prMeta PRMetadata, reterr error) {
+	buf := bytes.NewBufferString(input)
 
 	// Read until we find the "<!-- av pr metadata" line
 	if err := readLineUntil(buf, PRMetadataCommentStart); err != nil {
-		return metadata, errors.WrapIff(err, "expecting %q", PRMetadataCommentStart)
+		reterr = errors.WrapIff(err, "expecting %q", PRMetadataCommentStart)
+		return
 	}
+	commentStart = len(input) - buf.Len() - len(PRMetadataCommentStart)
 
 	// Read until we find the "```" line (which indicates that json starts
 	// on the following line)
 	if err := readLineUntil(buf, "```\n"); err != nil {
-		return metadata, errors.WrapIff(err, "expecting \"```\"")
+		reterr = errors.WrapIff(err, "expecting \"```\"")
+		return
 	}
 
-	if err := json.NewDecoder(buf).Decode(&metadata); err != nil {
-		return PRMetadata{}, errors.WrapIf(err, "parsing PR metadata")
+	// We need to create a copy of the buffer here since json.Decoder may read
+	// past the end of the JSON data (and we need to access that data below!)
+	if err := json.NewDecoder(bytes.NewBuffer(buf.Bytes())).Decode(&prMeta); err != nil {
+		reterr = errors.WrapIff(err, "decoding PR metadata")
+		return
 	}
-	return metadata, nil
 
+	// This will skip over any data lines (since those weren't consumed by buf,
+	// only by the copy of buf).
+	if err := readLineUntil(buf, "```\n"); err != nil {
+		reterr = errors.WrapIff(err, "expecting closing \"```\"")
+		return
+	}
+	if err := readLineUntil(buf, PRMetadataCommentEnd); err != nil {
+		reterr = errors.WrapIff(err, "expecting %q", PRMetadataCommentEnd)
+		return
+	}
+	commentEnd = len(input) - buf.Len()
+	return
+}
+
+func ReadPRMetadata(body string) (PRMetadata, error) {
+	_, _, prMeta, err := ParsePRMetadata(body)
+	return prMeta, err
+}
+
+func AddPRMetadata(body string, prMeta PRMetadata) string {
+	buf := bytes.NewBufferString(body)
+	if commentStart, commentEnd, _, err := ParsePRMetadata(body); err != nil {
+		// No existing metadata comment, so add one.
+		logrus.WithError(err).Debug("could not parse PR metadata (assuming it doesn't exist)")
+		buf.WriteString("\n\n")
+	} else {
+		buf.Truncate(commentStart)
+		if commentEnd < len(body) {
+			// The PR body doesn't end with the metadata comment. This probably
+			// means that the PR was edited after it was created with the av CLI
+			// (so we should preserve that text that comes after the comment).
+			buf.WriteString(body[commentEnd:])
+			// We also need newlines here to separate the metadata comment from
+			// the text that comes before it.
+			buf.WriteString("\n\n")
+		}
+	}
+
+	buf.WriteString(PRMetadataCommentStart)
+	buf.WriteString(PRMetadataCommentHelpText)
+	buf.WriteString("```\n")
+	// Note: Encoder.Encode implicitly adds a newline at the end of the JSON
+	// which is important here so that the ``` below appears on its own line.
+	if err := json.NewEncoder(buf).Encode(prMeta); err != nil {
+		// shouldn't ever happen since we're encoding a simple struct to a buffer
+		panic(errors.WrapIff(err, "encoding PR metadata"))
+	}
+	buf.WriteString("```\n")
+	buf.WriteString(PRMetadataCommentEnd)
+	return buf.String()
 }
 
 func readLineUntil(b *bytes.Buffer, line string) error {
@@ -425,20 +513,4 @@ func readLineUntil(b *bytes.Buffer, line string) error {
 			return nil
 		}
 	}
-}
-
-func WritePRMetadata(metadata PRMetadata) string {
-	var buf bytes.Buffer
-	buf.WriteString(PRMetadataCommentStart)
-	buf.WriteString(PRMetadataCommentHelpText)
-	buf.WriteString("```\n")
-	// Note: Encoder.Encode implicitly adds a newline at the end of the JSON
-	// which is important here so that the ``` below appears on its own line.
-	if err := json.NewEncoder(&buf).Encode(metadata); err != nil {
-		// This should never happen since we're marshalling a struct with only scalar fields
-		panic(err)
-	}
-	buf.WriteString("```\n")
-	buf.WriteString(PRMetadataCommentEnd)
-	return buf.String()
 }
