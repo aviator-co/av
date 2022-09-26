@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"path"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -78,7 +77,10 @@ func TestStackSync(t *testing.T) {
 		t, 0, syncConflict.ExitCode,
 		"stack sync should return non-zero exit code if conflicts",
 	)
-	require.Contains(t, syncConflict.Stderr, "conflict detected")
+	require.Contains(
+		t, syncConflict.Stderr,
+		"error: could not apply", "stack sync should include error message on rebase",
+	)
 	require.Contains(
 		t, syncConflict.Stderr, "av stack sync --continue",
 		"stack sync should print a message with instructions to continue",
@@ -135,9 +137,8 @@ func TestStackSyncAbort(t *testing.T) {
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n2a\n"), gittest.WithMessage("Commit 2a"))
 
 	// ... and introduce a commit onto stack-1 that will conflict with stack-2...
-	gittest.WithCheckoutBranch(t, repo, "stack-1", func() {
-		gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"), gittest.WithMessage("Commit 1b"))
-	})
+	gittest.CheckoutBranch(t, repo, "stack-1")
+	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"), gittest.WithMessage("Commit 1b"))
 
 	// ... and make sure we get a conflict on sync...
 	syncConflict := Av(t, "stack", "sync", "--no-fetch", "--no-push")
@@ -148,9 +149,10 @@ func TestStackSyncAbort(t *testing.T) {
 	RequireAv(t, "stack", "sync", "--abort")
 	require.NoFileExists(t, path.Join(repo.GitDir(), "REBASE_HEAD"), "REBASE_HEAD should be removed after abort")
 
-	// ... and finally make sure normal things work...
-	// (make sure we're not in a detached HEAD state)
-	RequireAv(t, "stack", "tree")
-	currentBranchOutput := RequireCmd(t, "git", "branch", "--show-current")
-	require.Equal(t, strings.TrimSpace(currentBranchOutput.Stdout), "stack-2")
+	// ... and make sure that we return to stack-1 (where we started).
+	// (this also makes sure that we've actually aborted the rebase and are not
+	// in a detached HEAD state).
+	currentBranch, err := repo.RevParse(&git.RevParse{Rev: "HEAD", SymbolicFullName: true})
+	require.NoError(t, err, "failed to get current branch")
+	require.Equal(t, "refs/heads/stack-1", currentBranch, "current branch should be reset to starting branch (stack-1) after abort")
 }

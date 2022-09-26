@@ -5,6 +5,7 @@ import "github.com/fatih/color"
 var (
 	CliCmdC          = color.New(color.FgMagenta)
 	SuccessC         = color.New(color.FgGreen)
+	WarningC         = color.New(color.FgYellow)
 	FailureC         = color.New(color.FgRed)
 	TroubleshootingC = color.New(color.Faint)
 	UserInputC       = color.New(color.FgCyan)
@@ -14,6 +15,7 @@ var (
 var (
 	CliCmd          = CliCmdC.Sprint
 	Success         = SuccessC.Sprint
+	Warning         = WarningC.Sprint
 	Failure         = FailureC.Sprint
 	Troubleshooting = TroubleshootingC.Sprint
 	UserInput       = UserInputC.Sprint

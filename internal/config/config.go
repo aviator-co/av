@@ -3,6 +3,7 @@ package config
 import (
 	"emperror.dev/errors"
 	"github.com/spf13/viper"
+	"os"
 )
 
 type GitHub struct {
@@ -33,6 +34,12 @@ var Av = struct {
 // Returns a boolean indicating whether or not a config file was loaded and an
 // error if one occurred.
 func Load(paths []string) (bool, error) {
+	loaded, err := loadFromFile(paths)
+	loadFromEnv()
+	return loaded, err
+}
+
+func loadFromFile(paths []string) (bool, error) {
 	config := viper.New()
 
 	// Viper has support for various formats, so it supports kson, toml, yaml,
@@ -62,5 +69,12 @@ func Load(paths []string) (bool, error) {
 		return true, errors.Wrap(err, "failed to read av configs")
 	}
 
-	return true, nil
+	return false, nil
+}
+
+func loadFromEnv() {
+	// TODO: integrate this better with cobra/viper/whatever
+	if githubToken := os.Getenv("AV_GITHUB_TOKEN"); githubToken != "" {
+		Av.GitHub.Token = githubToken
+	}
 }
