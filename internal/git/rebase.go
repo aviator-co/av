@@ -128,7 +128,7 @@ func parseRebaseResult(opts RebaseOpts, out *Output) (*RebaseResult, error) {
 		return &RebaseResult{Status: RebaseUpdated}, nil
 	}
 
-	var status RebaseStatus = -1
+	var status RebaseStatus
 	switch {
 	case strings.Contains(stderr, "No rebase in progress"):
 		status = RebaseNotInProgress

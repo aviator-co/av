@@ -131,7 +131,11 @@ func SyncBranch(
 			Branch:   opts.Branch,
 			Upstream: trunkHead,
 		})
+		if err != nil {
+			return nil, err
+		}
 		msgRebaseResult(rebase)
+		//nolint:exhaustive
 		switch rebase.Status {
 		case git.RebaseConflict:
 			return &SyncBranchResult{
@@ -158,16 +162,6 @@ func SyncBranch(
 	// Scenario 1: the parent branch has been merged.
 	parent, _ := meta.ReadBranch(repo, branch.Parent.Name)
 	if parent.MergeCommit != "" {
-		// Figure out what the trunk branch is.
-		trunk := parent.Parent.Name
-		if trunk == "" {
-			var err error
-			trunk, err = repo.DefaultBranch()
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to get determine branch")
-			}
-		}
-
 		short := git.ShortSha(parent.MergeCommit)
 		_, _ = fmt.Fprint(os.Stderr,
 			"  - parent ", colors.UserInput(branch.Parent.Name),
@@ -290,6 +284,8 @@ func SyncBranch(
 		return nil, err
 	}
 	msgRebaseResult(rebase)
+
+	//nolint:exhaustive
 	switch rebase.Status {
 	case git.RebaseConflict:
 		return &SyncBranchResult{
@@ -320,6 +316,8 @@ func syncBranchContinue(
 	if err != nil {
 		return nil, err
 	}
+
+	//nolint:exhaustive
 	switch rebase.Status {
 	case git.RebaseNotInProgress:
 		// TODO:

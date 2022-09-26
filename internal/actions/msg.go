@@ -31,5 +31,7 @@ func msgRebaseResult(rebase *git.RebaseResult) {
 			colors.Warning(" command directly: use "), colors.CliCmd("av stack sync"),
 			colors.Warning(" instead"), "\n",
 		)
+	case git.RebaseAborted, git.RebaseNotInProgress:
+		// these should be handled externally
 	}
 }
