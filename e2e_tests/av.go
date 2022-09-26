@@ -16,6 +16,10 @@ import (
 var avCmdPath string
 
 func init() {
+	if err := os.Setenv("AV_GITHUB_TOKEN", "ghp_thisisntarealltokenitsjustfortesting"); err != nil {
+		logrus.WithError(err).Fatal("failed to set AV_GITHUB_TOKEN env var")
+	}
+
 	logrus.SetLevel(logrus.DebugLevel)
 	cmd := exec.Command("go", "build", "../cmd/av")
 	cmd.Stdout = os.Stderr

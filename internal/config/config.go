@@ -3,6 +3,7 @@ package config
 import (
 	"emperror.dev/errors"
 	"github.com/spf13/viper"
+	"os"
 )
 
 type GitHub struct {
@@ -60,6 +61,12 @@ func Load(paths []string) (bool, error) {
 
 	if err := config.Unmarshal(&Av); err != nil {
 		return true, errors.Wrap(err, "failed to read av configs")
+	}
+
+	// env overrides
+	// TODO: integrate this better with cobra/viper/whatever
+	if githubToken := os.Getenv("AV_GITHUB_TOKEN"); githubToken != "" {
+		Av.GitHub.Token = githubToken
 	}
 
 	return true, nil
