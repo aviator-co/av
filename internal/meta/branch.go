@@ -93,6 +93,14 @@ type PullRequest struct {
 	State githubv4.PullRequestState
 }
 
+// GetNumber returns the number of the pull request or zero if the PullRequest is nil.
+func (p *PullRequest) GetNumber() int64 {
+	if p == nil {
+		return 0
+	}
+	return p.Number
+}
+
 func unmarshalBranch(repo *git.Repo, name string, refName string, blob string) (Branch, bool) {
 	branch := Branch{Name: name}
 	if err := json.Unmarshal([]byte(blob), &branch); err != nil {

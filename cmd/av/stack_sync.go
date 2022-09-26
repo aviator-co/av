@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"io/ioutil"
 	"os"
 	"path"
@@ -14,9 +15,7 @@ import (
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
-	"github.com/aviator-co/av/internal/stacks"
 	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/stringutils"
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
@@ -49,13 +48,17 @@ type stackSyncConfig struct {
 type stackSyncState struct {
 	// The branch to return to when the sync is complete.
 	OriginalBranch string `json:"originalBranch"`
-	// The current branch being synced.
+	// The branch that's currently being synced.
 	CurrentBranch string `json:"currentBranch"`
-	// If set, we need to continue the current sync step before syncing the
-	// remaining branches. Not serialized to JSON because it's only set by the
-	// --continue flag.
-	Continue bool            `json:"-"`
-	Config   stackSyncConfig `json:"config"`
+	// All of the branches that are being synced (including branches that have
+	// already been synced).
+	// TODO: We should probably store the original HEAD commit for each branch
+	//       and revert each branch individually if we --abort.
+	Branches []string `json:"branches"`
+	// The continuation state for the current branch.
+	Continuation *actions.SyncBranchContinuation `json:"continuation,omitempty"`
+	// The config of the sync.
+	Config stackSyncConfig `json:"config"`
 }
 
 var stackSyncFlags struct {
@@ -98,6 +101,8 @@ base branch.
 			return errors.New("cannot use --parent and --trunk together")
 		}
 
+		ctx := context.Background()
+
 		repo, repoMeta, err := getRepoInfo()
 		if err != nil {
 			return err
@@ -110,14 +115,10 @@ base branch.
 			return err
 		}
 
-		// TODO[mvp]:
-		//     Let's make sure we have a reasonable story around what happens in
-		//     edge cases. When we relinquish control of the repo back to the
-		//     user, they might do wild things (checkout a different branch,
-		//     run the continue seventeen days and seventy seven commits later,
-		//     etc.).
 		if stackSyncFlags.Abort {
-			if state.CurrentBranch == "" {
+			if state.CurrentBranch == "" || state.Continuation == nil {
+				// Try to clear the state file if it exists just to be safe.
+				_ = writeStackSyncState(repo, nil)
 				return errors.New("no sync in progress")
 			}
 
@@ -132,6 +133,9 @@ base branch.
 			if err != nil {
 				return errors.Wrap(err, "failed to reset stack sync state")
 			}
+			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: state.OriginalBranch}); err != nil {
+				return errors.Wrap(err, "failed to checkout original branch")
+			}
 			_, _ = fmt.Fprintf(os.Stderr, "Aborted stack sync for branch %q\n", state.CurrentBranch)
 			return nil
 		}
@@ -145,12 +149,13 @@ base branch.
 			return errors.New("refusing to sync: there are unstaged changes in the working tree (use `git add` to stage changes)")
 		}
 
+		var currentBranch string
 		if stackSyncFlags.Continue {
 			if state.CurrentBranch == "" {
 				return errors.New("no sync in progress")
 			}
-			state.Continue = true
 		} else {
+			// Not a --continue, we're trying to start a new sync from scratch.
 			if state.CurrentBranch != "" {
 				return errors.New("a sync is already in progress: use --continue or --abort")
 			}
@@ -161,11 +166,12 @@ base branch.
 			// conflict (and this command will not work).
 			// Since we're *not* continuing a sync, we assume we're not in
 			// detached HEAD and so this is a reasonable thing to do.
-			var err error
-			state.CurrentBranch, err = repo.CurrentBranchName()
+			currentBranch, err = repo.CurrentBranchName()
 			if err != nil {
 				return err
 			}
+
+			state.OriginalBranch = currentBranch
 			state.Config = stackSyncConfig{
 				stackSyncFlags.Current,
 				stackSyncFlags.Trunk,
@@ -175,11 +181,9 @@ base branch.
 			}
 		}
 
-		// Set the original branch so we can return to it when the sync is done
-		if state.OriginalBranch == "" {
-			state.OriginalBranch = state.CurrentBranch
-		}
-
+		// If we're doing a reparent, that needs to happen first.
+		// After that, it's just a normal sync for all of the children branches
+		// of the newly-reparented current branch.
 		if state.Config.Parent != "" {
 			var res *actions.ReparentResult
 			var err error
@@ -188,11 +192,11 @@ base branch.
 				return err
 			}
 			opts := actions.ReparentOpts{
-				Branch:         state.CurrentBranch,
+				Branch:         currentBranch,
 				NewParent:      state.Config.Parent,
 				NewParentTrunk: state.Config.Parent == defaultBranch,
 			}
-			if state.Continue {
+			if stackSyncFlags.Continue {
 				res, err = actions.ReparentContinue(repo, opts)
 			} else {
 				res, err = actions.Reparent(repo, opts)
@@ -217,108 +221,32 @@ base branch.
 				)
 				return nil
 			}
-			state.Continue = false
-		}
-		// We're done with the reparenting process, so set this to zero so that
-		// we won't try to reparent again later.
-		state.Config.Parent = ""
 
+			// We're done with the reparenting process, so set this to zero so that
+			// we won't try to reparent again later if we have to do a --continue.
+			state.Config.Parent = ""
+		}
+
+		// For a trunk sync, we need to rebase the stack root against the HEAD
+		// of the trunk branch. After that, it's just a normal sync.
 		branches, err := meta.ReadAllBranches(repo)
-		if state.Config.Trunk {
-			root, ok := meta.FindStackRoot(branches, state.OriginalBranch)
-			if !ok {
-				return errors.Errorf("failed to determine stack root for branch %q", state.OriginalBranch)
-			}
-			trunk := root.Parent.Name
-			if trunk == "" {
-				return errors.Errorf("failed to determine stack trunk for branch %q", state.OriginalBranch)
-			}
-
-			_, _ = fmt.Fprint(os.Stderr,
-				"Syncing stack root branch ", colors.UserInput(root.Name),
-				" to trunk branch ", colors.UserInput(trunk),
-				"...\n",
-			)
-
-			var syncResult *stacks.SyncResult
-			var err error
-			if !state.Continue {
-				// Start a new rebase
-				if _, err := repo.Run(&git.RunOpts{
-					Args: []string{"fetch", "origin", trunk},
-				}); err != nil {
-					return errors.WrapIff(err, "failed to fetch trunk branch %q from origin", trunk)
-				}
-				if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
-					Name: root.Name,
-				}); err != nil {
-					return errors.WrapIff(err, "failed to checkout branch %q", root.Name)
-				}
-
-				syncResult, err = stacks.SyncBranch(repo, &stacks.SyncBranchOpts{
-					Branch:   root.Name,
-					Parent:   trunk,
-					Strategy: stacks.StrategyRebase,
-				})
-			} else {
-				syncResult, err = stacks.SyncContinue(repo, stacks.StrategyRebase)
-			}
-
-			if err != nil {
-				return errors.WrapIf(err, "failed to start rebase")
-			}
-			switch syncResult.Status {
-			case stacks.SyncConflict:
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - ", colors.Failure("Conflicts detected"),
-					" while synchronizing branch ", colors.UserInput(state.CurrentBranch),
-					" with trunk branch ", colors.UserInput(trunk),
-					": resolve the conflicts and continue the sync with ", colors.CliCmd("av stack sync --continue"),
-					"\n",
-				)
-				if err := writeStackSyncState(repo, &state); err != nil {
-					return errors.Wrap(err, "failed to write stack sync state")
-				}
-				return nil
-			// Note: we lump SyncNotInProgress and SyncUpdated together here since
-			// SyncNotInProgress probably means that the user did a
-			// `git rebase --continue` themselves.
-			case stacks.SyncUpdated, stacks.SyncNotInProgress:
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - ", colors.Success("Updated"),
-					" branch ", colors.UserInput(state.CurrentBranch),
-					" to trunk branch ", colors.UserInput(trunk),
-					"\n",
-				)
-			case stacks.SyncAlreadyUpToDate:
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - Branch ", colors.UserInput(state.CurrentBranch),
-					" is already up to date with trunk branch ", colors.UserInput(trunk),
-					"\n",
-				)
-			default:
-				panic(fmt.Sprintf("unknown sync status: %v", syncResult.Status))
-			}
-
-			// Set to false so that we don't try to re-sync the trunk branch again later
-			state.Config.Trunk = false
-			state.Continue = false
-			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
-				Name: state.OriginalBranch,
-			}); err != nil {
-				return errors.WrapIff(err, "failed to checkout branch %q", state.OriginalBranch)
-			}
-
-			// Add extra newline for clear separation
-			_, _ = fmt.Fprint(os.Stderr, "\n")
-		}
 
 		// Construct the list of branches we need to sync
 		if err != nil {
 			return err
 		}
 		var branchesToSync []string
-		if state.Continue || state.Config.Current {
+
+		if len(state.Branches) != 0 {
+			currentIdx := slices.Index(state.Branches, state.CurrentBranch)
+			if currentIdx == -1 {
+				return errors.Errorf(
+					"INTERNAL INVARIANT ERROR: current branch %q not found in list of branches for current sync",
+					state.CurrentBranch,
+				)
+			}
+			branchesToSync = state.Branches[currentIdx:]
+		} else if state.Config.Current {
 			// If we're continuing, we assume the previous branches are already
 			// synced correctly and we just need to sync the subsequent
 			// branches. (This matters because if we're here, that means there
@@ -338,6 +266,7 @@ base branch.
 				return err
 			}
 			branchesToSync = append(branchesToSync, currentBranch)
+			state.Branches = branchesToSync
 		}
 		// Either way (--continue or not), we sync all subsequent branches.
 		nextBranches, err := meta.SubsequentBranches(branches, branchesToSync[len(branchesToSync)-1])
@@ -346,242 +275,42 @@ base branch.
 		}
 		branchesToSync = append(branchesToSync, nextBranches...)
 
-		ctx := context.Background()
 		logrus.WithField("branches", branchesToSync).Debug("determined branches to sync")
-		var resErr error
-	loop:
-		for i, currentBranch := range branchesToSync {
-			state.CurrentBranch = currentBranch
-			currentMeta, ok := branches[currentBranch]
-			if !ok {
-				return errors.Errorf("stack metadata not found for branch %q", currentBranch)
-			}
-
-			if i > 0 {
-				_, _ = fmt.Fprint(os.Stderr, "\n")
-			}
-			_, _ = fmt.Fprint(os.Stderr,
-				colors.FaintC.Sprintf("[%d/%d] ", i+1, len(branchesToSync)),
-				"Synchronizing branch ", colors.UserInput(currentBranch), ":\n",
-			)
-
-			if !state.Config.NoFetch {
-				ghClient, err := getClient(config.Av.GitHub.Token)
-				if err != nil {
-					return err
-				}
-				update, err := actions.UpdatePullRequestState(ctx, repo, ghClient, repoMeta, currentBranch)
-				if err != nil {
-					return errors.Wrap(err, "failed to fetch latest PR info")
-				}
-				branches[currentBranch] = update.Branch
-				currentMeta = update.Branch
-			}
-
-			// if we have found a related commit in trunk for the PR then skip syncing
-			if currentMeta.MergeCommit != "" && len(currentMeta.Children) > 0 {
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - pull request ", colors.UserInput("#", currentMeta.PullRequest.Number),
-					" for branch ", colors.UserInput(currentBranch),
-					" was merged, skipping sync...\n",
-				)
-				continue loop
-			}
-
-			parentState := currentMeta.Parent
-			if parentState.Trunk {
-				// This should be the first branch in the stack. We don't need
-				// to rebase it (at least not yet -- at some point we need to
-				// implement rebasing on top of trunk...), but we still need to
-				// push it to GitHub.
-				if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
-					Name: currentBranch,
-				}); err != nil {
-					return errors.WrapIff(err, "failed to check out branch %q", currentBranch)
-				}
-				if err := actions.Push(repo, actions.PushOpts{
-					Force:                 actions.ForceWithLease,
-					SkipIfUpstreamNotSet:  true,
-					SkipIfUpstreamMatches: true,
-				}); err != nil {
-					return err
-				}
-				continue
-			}
-
-			log := logrus.WithFields(logrus.Fields{
-				"current": currentBranch,
-				"parent":  currentMeta.Parent,
-			})
-
-			parentMeta, ok := branches[parentState.Name]
-			if ok && parentMeta.MergeCommit != "" {
-				defaultBranch, err := repo.DefaultBranch()
-				if err != nil {
-					return errors.Wrap(err, "failed to determine default branch")
-				}
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - parent pull request ",
-					colors.UserInput("#", parentMeta.PullRequest.Number),
-					" was merged into trunk, syncing branch on merge commit ",
-					git.ShortSha(parentMeta.MergeCommit),
-					"\n",
-				)
-				// update the default branch so the merged PR is there
-				_, err = repo.Git("fetch", "origin", fmt.Sprint(defaultBranch, ":", defaultBranch))
-				if err != nil {
-					return err
-				}
-
-				// rebase onto the merge commit from the old parent
-				_, err = repo.Rebase(git.RebaseOpts{
-					Onto:     parentMeta.MergeCommit,
-					Upstream: parentMeta.Name,
-					Branch:   currentBranch,
-				})
-				if err != nil {
-					return err
-				}
-				// now that we have rebased onto trunk - update current branch
-				currentMeta.Parent, err = meta.ReadBranchState(repo, defaultBranch, true)
-				if err != nil {
-					return err
-				}
-				if err := meta.WriteBranch(repo, currentMeta); err != nil {
-					return errors.WrapIff(err, "failed to write branch meta for %q", currentBranch)
-				}
-				// remove the current branch from the old parent's children
-				parentMeta.Children = sliceutils.DeleteElement(parentMeta.Children, currentBranch)
-				if err := meta.WriteBranch(repo, parentMeta); err != nil {
-					return errors.WrapIff(err, "failed to write branch meta for %q", parentMeta.Name)
-				}
-				// force push the updated branch
-				if _, err = repo.CheckoutBranch(&git.CheckoutBranch{
-					Name: currentBranch,
-				}); err != nil {
-					return err
-				}
-				if err := actions.Push(repo, actions.PushOpts{
-					Force:                 actions.ForceWithLease,
-					SkipIfUpstreamNotSet:  true,
-					SkipIfUpstreamMatches: true,
-				}); err != nil {
-					return err
-				}
-				continue loop
-			}
-
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - syncing ", colors.UserInput(currentBranch),
-				" on top of ", colors.UserInput(currentMeta.Parent.Name), "... ",
-			)
-
-			// Checkout the branch (unless we need to continue a rebase, in which
-			// case Git will yell at us)
-			var res *stacks.SyncResult
-			if state.Continue {
-				log.Debug("finishing previous interrupted sync...")
-				res, err = stacks.SyncContinue(repo, stacks.StrategyRebase)
-
-				// Only the first branch needs to be --continue'd, for the rest
-				// we just do a normal merge/rebase
-				state.Continue = false
-			} else {
-				log.Debug("syncing branch...")
-				_, err = repo.CheckoutBranch(&git.CheckoutBranch{Name: currentBranch})
-				if err != nil {
-					return err
-				}
-				res, err = stacks.SyncBranch(repo, &stacks.SyncBranchOpts{
-					Branch:   currentBranch,
-					Parent:   currentMeta.Parent.Name,
-					Base:     currentMeta.Parent.Head,
-					Strategy: stacks.StrategyRebase,
-				})
-			}
-			log.WithField("result", res).WithError(err).Debug("sync finished")
-			if err != nil {
-				return errors.WrapIff(err, "failed to sync branch %q", currentBranch)
-			}
-
-			switch res.Status {
-			case stacks.SyncAlreadyUpToDate:
-				_, _ = fmt.Fprint(os.Stderr,
-					colors.Success("already up-to-date"), "\n",
-				)
-			case stacks.SyncUpdated:
-				_, _ = fmt.Fprint(os.Stderr,
-					colors.Success("updated"), "\n",
-				)
-			case stacks.SyncConflict:
-				_, _ = fmt.Fprint(os.Stderr,
-					colors.Failure("conflict"), "\n",
-				)
-				if res.Hint != "" {
-					// Remove the "hint: ..." lines from the output since they
-					// contain instructions that tell the user to run
-					// `git rebase --continue` which we actually *don't* want
-					// them to do.
-					hint := stringutils.RemoveLines(res.Hint, "hint: ")
-					_, _ = fmt.Println(text.Indent(hint, "    "))
-				}
-				resErr = errors.Errorf("conflict detected: please resolve and then run `av stack sync --continue`")
-				break loop
-			case stacks.SyncNotInProgress:
-				fmt.Println("invalid state")
-				// TODO:
-				// 		Would be nice to have some way to show more details than
-				// 		this, but having multi-line error's is not very idiomatic
-				//		with go. A future improvement might be having an
-				//		interface like ErrorDetails that can be used to show
-				//		help text if it's the return error from a CLI
-				//		invocation.
-				// Note:
-				//		We don't just auto-abort here because it's unclear what
-				//		the actual state is here. We'd rather err on the side of
-				// 		making the user be explicit than do something unexpected
-				//		with their code/repository.
-				resErr = errors.Errorf("rebase was completed or cancelled outside of av: please run `av stack sync --abort` to abort the current sync and then retry")
-				break loop
-			default:
-				logrus.Panicf("invariant error: unknown sync result: %v", res)
-			}
-
-			if err := actions.Push(repo, actions.PushOpts{
-				Force:                 actions.ForceWithLease,
-				SkipIfUpstreamNotSet:  true,
-				SkipIfUpstreamMatches: true,
-			}); err != nil {
-				return err
-			}
-		}
-
-		// TODO:
-		// 		this weird thing where we set resErr then break outside of the
-		//		loop is a code smell which probably indicates we should have
-		//		another function wrapping a lot of the logic above, but we'll
-		//		fix that at some point
-		if resErr != nil {
-			if err := writeStackSyncState(repo, &state); err != nil {
-				logrus.WithError(resErr).Warn("while handling error, failed to write stack sync state")
-				return errors.Wrap(err, "failed to write stack sync state")
-			}
-			return resErr
-		}
-
-		if err := writeStackSyncState(repo, nil); err != nil {
-			return errors.Wrap(err, "failed to reset stack sync state")
-		}
-
-		_, _ = fmt.Fprint(os.Stderr, "\n", colors.Success("Stack sync complete!\n"))
-
-		// Return to the starting branch when we're done
-		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
-			Name: state.OriginalBranch,
-		}); err != nil {
+		//var resErr error
+		client, err := getClient(config.Av.GitHub.Token)
+		if err != nil {
 			return err
 		}
+		for _, currentBranch := range branchesToSync {
+			state.CurrentBranch = currentBranch
+			res, err := actions.SyncBranch(ctx, repo, client, repoMeta, actions.SyncBranchOpts{
+				Branch:       currentBranch,
+				NoFetch:      state.Config.NoFetch,
+				NoPush:       state.Config.NoPush,
+				Continuation: state.Continuation,
+				ToTrunk:      state.Config.Trunk,
+			})
+			if err != nil {
+				return err
+			}
+			if res.Status == git.RebaseConflict {
+				state.Continuation = res.Continuation
+				if err := writeStackSyncState(repo, &state); err != nil {
+					return errors.Wrap(err, "failed to write stack sync state")
+				}
+				return errExitSilently{1}
+			}
 
+			state.Continuation = nil
+		}
+
+		// Return to the original branch
+		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: state.OriginalBranch}); err != nil {
+			return err
+		}
+		if err := writeStackSyncState(repo, nil); err != nil {
+			return errors.Wrap(err, "failed to write stack sync state")
+		}
 		return nil
 	},
 }
