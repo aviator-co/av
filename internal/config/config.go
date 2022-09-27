@@ -14,6 +14,14 @@ type GitHub struct {
 type PullRequest struct {
 	Draft       bool
 	OpenBrowser bool
+	// If true, the pull request will be converted to a draft if the base branch
+	// needs to be changed after the pull request has been changed. This avoids
+	// accidentally adding lots of unnecessary auto-added reviewers (via GitHub's
+	// CODEOWNERS feature) to the pull request while the PR is in a transient
+	// state.
+	// If not set, the value should be considered true iff there is a CODEOWNERS
+	// file in the repository.
+	RebaseWithDraft *bool
 }
 
 var Av = struct {
