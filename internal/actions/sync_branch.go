@@ -4,10 +4,14 @@ import (
 	"context"
 	"emperror.dev/errors"
 	"fmt"
+	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/ghutils"
+	"github.com/aviator-co/av/internal/utils/sliceutils"
+	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 	"os"
 )
@@ -55,40 +59,73 @@ func SyncBranch(
 	branch, _ := meta.ReadBranch(repo, opts.Branch)
 	_, _ = fmt.Fprint(os.Stderr, "Synchronizing branch ", colors.UserInput(branch.Name), "...\n")
 
+	var res *SyncBranchResult
+	var pull *gh.PullRequest
+
 	if opts.Continuation != nil {
-		return syncBranchContinue(ctx, repo, opts, branch)
-	}
-
-	if !opts.NoFetch {
-		update, err := UpdatePullRequestState(ctx, repo, client, repoMeta, branch.Name)
+		var err error
+		res, err = syncBranchContinue(ctx, repo, opts, branch)
 		if err != nil {
-			_, _ = fmt.Fprint(os.Stderr, colors.Failure("      - error: ", err.Error()), "\n")
-			return nil, errors.Wrap(err, "failed to fetch latest PR info")
+			return nil, err
 		}
-		if update.Changed {
-			_, _ = fmt.Fprint(os.Stderr, "      - found updated pull request: ", colors.UserInput(update.Pull.Permalink), "\n")
+	} else {
+		if !opts.NoFetch {
+			update, err := UpdatePullRequestState(ctx, repo, client, repoMeta, branch.Name)
+			branch = update.Branch
+			if err != nil {
+				_, _ = fmt.Fprint(os.Stderr, colors.Failure("      - error: ", err.Error()), "\n")
+				return nil, errors.Wrap(err, "failed to fetch latest PR info")
+			}
+			pull = update.Pull
+			if update.Changed {
+				_, _ = fmt.Fprint(os.Stderr, "      - found updated pull request: ", colors.UserInput(update.Pull.Permalink), "\n")
+			}
+			branch = update.Branch
+			if branch.PullRequest == nil {
+				_, _ = fmt.Fprint(os.Stderr,
+					"      - this branch does not have an open pull request"+
+						" (create one with ", colors.CliCmd("av pr create"),
+					" or ", colors.CliCmd("av stack submit"), ")\n",
+				)
+			}
 		}
-		branch = update.Branch
-		if branch.PullRequest == nil {
+
+		if branch.MergeCommit != "" {
 			_, _ = fmt.Fprint(os.Stderr,
-				"      - this branch does not have an open pull request"+
-					" (create one with ", colors.CliCmd("av pr create"),
-				" or ", colors.CliCmd("av stack submit"), ")\n",
+				"  - skipping sync for merged branch "+
+					"(merged in commit ", colors.UserInput(git.ShortSha(branch.MergeCommit)), ")"+
+					"\n",
 			)
+			return &SyncBranchResult{
+				RebaseResult: git.RebaseResult{Status: git.RebaseAlreadyUpToDate},
+			}, nil
+		}
+
+		var err error
+		res, err = syncBranchRebase(ctx, repo, opts, branch)
+		if err != nil {
+			return nil, err
 		}
 	}
 
-	if branch.MergeCommit != "" {
-		_, _ = fmt.Fprint(os.Stderr,
-			"  - skipping sync for merged branch "+
-				"(merged in commit ", colors.UserInput(git.ShortSha(branch.MergeCommit)), ")"+
-				"\n",
-		)
-		return &SyncBranchResult{
-			RebaseResult: git.RebaseResult{Status: git.RebaseAlreadyUpToDate},
-		}, nil
+	branch = res.Branch
+	if res.Status == git.RebaseConflict {
+		return res, nil
 	}
 
+	if !opts.NoPush {
+		if err := syncBranchPushAndUpdatePullRequest(ctx, repo, client, branch, pull); err != nil {
+			return nil, err
+		}
+	}
+
+	return res, nil
+}
+
+// syncBranchRebase does the actual rebase part of SyncBranch
+func syncBranchRebase(
+	ctx context.Context, repo *git.Repo, opts SyncBranchOpts, branch meta.Branch,
+) (*SyncBranchResult, error) {
 	branchHead, err := repo.RevParse(&git.RevParse{Rev: branch.Name})
 	if err != nil {
 		return nil, errors.WrapIff(err, "failed to get head of branch %q", branch.Name)
@@ -103,7 +140,9 @@ func SyncBranch(
 				" to sync against the latest commit in ", colors.UserInput(trunk), ")\n",
 			)
 			return &SyncBranchResult{
-				RebaseResult: git.RebaseResult{Status: git.RebaseAlreadyUpToDate},
+				git.RebaseResult{Status: git.RebaseAlreadyUpToDate},
+				nil,
+				branch,
 			}, nil
 		}
 
@@ -218,6 +257,10 @@ func SyncBranch(
 			}, nil
 		}
 
+		branch, err = syncBranchUpdateNewTrunk(repo, branch, parent.Parent.Name)
+		if err != nil {
+			return nil, err
+		}
 		return &SyncBranchResult{*rebase, nil, branch}, nil
 	}
 
@@ -340,18 +383,97 @@ func syncBranchContinue(
 	// Finish setting the new trunk for the branch
 	if opts.Continuation.NewTrunk != "" {
 		var err error
-		branch.Parent, err = meta.ReadBranchState(repo, opts.Continuation.NewTrunk, true)
+		branch, err = syncBranchUpdateNewTrunk(repo, branch, opts.Continuation.NewTrunk)
 		if err != nil {
-			return nil, err
-		}
-		_, _ = fmt.Fprint(os.Stderr,
-			"  - this branch is now a stack root based on trunk branch ",
-			colors.UserInput(branch.Parent.Name), "\n",
-		)
-		if err := meta.WriteBranch(repo, branch); err != nil {
 			return nil, err
 		}
 	}
 
 	return &SyncBranchResult{*rebase, nil, branch}, nil
+}
+
+func syncBranchUpdateNewTrunk(repo *git.Repo, branch meta.Branch, newTrunk string) (meta.Branch, error) {
+	oldParent, _ := meta.ReadBranch(repo, branch.Parent.Name)
+	var err error
+	branch.Parent, err = meta.ReadBranchState(repo, newTrunk, true)
+	if err != nil {
+		return branch, err
+	}
+	_, _ = fmt.Fprint(os.Stderr,
+		"  - this branch is now a stack root based on trunk branch ",
+		colors.UserInput(branch.Parent.Name), "\n",
+	)
+	if err := meta.WriteBranch(repo, branch); err != nil {
+		return branch, err
+	}
+
+	// Remove from the old parent branches metadata
+	if len(oldParent.Children) > 0 {
+		oldParent.Children = sliceutils.DeleteElement(oldParent.Children, branch.Name)
+		if err := meta.WriteBranch(repo, oldParent); err != nil {
+			return branch, err
+		}
+	}
+
+	return branch, nil
+}
+
+func syncBranchPushAndUpdatePullRequest(
+	ctx context.Context, repo *git.Repo, client *gh.Client, branch meta.Branch,
+	// pull can be nil, in which case the PR info is fetched from GitHub
+	pr *gh.PullRequest,
+) error {
+	if branch.PullRequest == nil || branch.PullRequest.ID == "" {
+		return nil
+	}
+
+	if pr == nil {
+		var err error
+		pr, err = client.PullRequest(ctx, branch.PullRequest.ID)
+		if err != nil {
+			return errors.WrapIff(err, "failed to fetch pull request info for %q", branch.Name)
+		}
+	}
+
+	var rebaseWithDraft bool
+	if pr.BaseBranchName() != branch.Parent.Name {
+		_, _ = fmt.Fprint(os.Stderr,
+			"  - updating pull request base branch to ", colors.UserInput(branch.Parent.Name), "\n",
+		)
+		if config.Av.PullRequest.RebaseWithDraft == nil {
+			if ghutils.HasCodeowners(repo) {
+				rebaseWithDraft = true
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - converting pull request to draft for rebase since this repo has CODEOWNERS\n",
+					"      - set ", colors.CliCmd("pullRequest.rebaseWithDraft"), " in your configuration file to explicitly control this behavior and to suppress this message\n",
+					"      - see https://docs.aviator.co/reference/aviator-cli/configuration#config-option-reference for more information\n",
+				)
+			}
+		} else {
+			rebaseWithDraft = *config.Av.PullRequest.RebaseWithDraft
+		}
+	}
+
+	if err := Push(repo, PushOpts{
+		Force:                 ForceWithLease,
+		SkipIfUpstreamNotSet:  true,
+		SkipIfUpstreamMatches: true,
+	}); err != nil {
+		return err
+	}
+
+	if _, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
+		PullRequestID: branch.PullRequest.ID,
+		BaseRefName:   gh.Ptr(githubv4.String(branch.Parent.Name)),
+	}); err != nil {
+		return err
+	}
+
+	if rebaseWithDraft {
+		if _, err := client.MarkPullRequestReadyForReview(ctx, pr.ID); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

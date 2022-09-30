@@ -70,20 +70,21 @@ type PullRequestOpts struct {
 	Number int64
 }
 
-func (c *Client) PullRequest(ctx context.Context, opts PullRequestOpts) (*PullRequest, error) {
+func (c *Client) PullRequest(ctx context.Context, id string) (*PullRequest, error) {
 	var query struct {
-		Repository struct {
-			PullRequest PullRequest `graphql:"pullRequest(number: $number)"`
-		} `graphql:"repository(owner:$owner, name:$repo)"`
+		Node struct {
+			PullRequest PullRequest `graphql:"... on PullRequest"`
+		} `graphql:"node(id: $id)"`
 	}
 	if err := c.query(ctx, &query, map[string]interface{}{
-		"owner":  githubv4.String(opts.Owner),
-		"repo":   githubv4.String(opts.Repo),
-		"number": githubv4.Int(opts.Number),
+		"id": githubv4.ID(id),
 	}); err != nil {
-		return nil, errors.WrapIff(err, "failed to query pull request #%d", opts.Number)
+		return nil, errors.Wrap(err, "failed to query pull request")
 	}
-	return &query.Repository.PullRequest, nil
+	if query.Node.PullRequest.ID == "" {
+		return nil, errors.Errorf("pull request %q not found", id)
+	}
+	return &query.Node.PullRequest, nil
 }
 
 type GetPullRequestsInput struct {
@@ -154,6 +155,30 @@ func (c *Client) UpdatePullRequest(ctx context.Context, input githubv4.UpdatePul
 		return nil, errors.Wrap(err, "failed to update pull request: github error")
 	}
 	return &mutation.UpdatePullRequest.PullRequest, nil
+}
+
+func (c *Client) ConvertPullRequestToDraft(ctx context.Context, id string) (*PullRequest, error) {
+	var mutation struct {
+		ConvertPullRequestToDraft struct {
+			PullRequest PullRequest
+		} `graphql:"convertPullRequestToDraft(input: $input)"`
+	}
+	if err := c.mutate(ctx, &mutation, githubv4.ConvertPullRequestToDraftInput{PullRequestID: id}, nil); err != nil {
+		return nil, errors.Wrap(err, "failed to convert pull request to draft: github error")
+	}
+	return &mutation.ConvertPullRequestToDraft.PullRequest, nil
+}
+
+func (c *Client) MarkPullRequestReadyForReview(ctx context.Context, id string) (*PullRequest, error) {
+	var mutation struct {
+		MarkPullRequestReadyForReview struct {
+			PullRequest PullRequest
+		} `graphql:"markPullRequestReadyForReview(input: $input)"`
+	}
+	if err := c.mutate(ctx, &mutation, githubv4.MarkPullRequestReadyForReviewInput{PullRequestID: id}, nil); err != nil {
+		return nil, errors.Wrap(err, "failed to mark pull request ready for review: github error")
+	}
+	return &mutation.MarkPullRequestReadyForReview.PullRequest, nil
 }
 
 type AddIssueLabelInput struct {
