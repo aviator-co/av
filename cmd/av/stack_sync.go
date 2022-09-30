@@ -238,6 +238,8 @@ base branch.
 		var branchesToSync []string
 
 		if len(state.Branches) != 0 {
+			// This is a --continue, so we need to sync the current branch and
+			// everything after it.
 			currentIdx := slices.Index(state.Branches, state.CurrentBranch)
 			if currentIdx == -1 {
 				return errors.Errorf(
@@ -254,9 +256,8 @@ base branch.
 			// before we can sync the next branch, and git will scream at us if
 			// we try to do something in the repo before we finish that)
 			branchesToSync = []string{state.CurrentBranch}
+			state.Branches = branchesToSync
 		} else {
-			// Otherwise, this is not a --continue, so we want to sync every
-			// ancestor first.
 			currentBranch, err := repo.CurrentBranchName()
 			if err != nil {
 				return err
@@ -266,14 +267,14 @@ base branch.
 				return err
 			}
 			branchesToSync = append(branchesToSync, currentBranch)
+			nextBranches, err := meta.SubsequentBranches(branches, branchesToSync[len(branchesToSync)-1])
+			if err != nil {
+				return err
+			}
+			branchesToSync = append(branchesToSync, nextBranches...)
 			state.Branches = branchesToSync
 		}
-		// Either way (--continue or not), we sync all subsequent branches.
-		nextBranches, err := meta.SubsequentBranches(branches, branchesToSync[len(branchesToSync)-1])
-		if err != nil {
-			return err
-		}
-		branchesToSync = append(branchesToSync, nextBranches...)
+		// Either way (--continue or not), we sync all subsequent branches
 
 		logrus.WithField("branches", branchesToSync).Debug("determined branches to sync")
 		//var resErr error
