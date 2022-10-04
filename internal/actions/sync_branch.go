@@ -71,11 +71,11 @@ func SyncBranch(
 	} else {
 		if !opts.NoFetch {
 			update, err := UpdatePullRequestState(ctx, repo, client, repoMeta, branch.Name)
-			branch = update.Branch
 			if err != nil {
 				_, _ = fmt.Fprint(os.Stderr, colors.Failure("      - error: ", err.Error()), "\n")
 				return nil, errors.Wrap(err, "failed to fetch latest PR info")
 			}
+			branch = update.Branch
 			pull = update.Pull
 			if update.Changed {
 				_, _ = fmt.Fprint(os.Stderr, "      - found updated pull request: ", colors.UserInput(update.Pull.Permalink), "\n")
@@ -211,8 +211,10 @@ func syncBranchRebase(
 			"  - rebasing ", colors.UserInput(branch.Name),
 			" on top of merge commit ", colors.UserInput(short), "\n",
 		)
-		if _, err := repo.Git("fetch", "origin", branch.MergeCommit); err != nil {
-			return nil, errors.WrapIff(err, "failed to fetch merge commit %q from origin", short)
+		if !opts.NoFetch {
+			if _, err := repo.Git("fetch", "origin", branch.MergeCommit); err != nil {
+				return nil, errors.WrapIff(err, "failed to fetch merge commit %q from origin", short)
+			}
 		}
 
 		rebase, err := repo.RebaseParse(git.RebaseOpts{
