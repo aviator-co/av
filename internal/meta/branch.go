@@ -60,10 +60,14 @@ func (b *Branch) UnmarshalJSON(bytes []byte) error {
 		return err
 	}
 
-	// Everything except name (since that is set externally) and parent is set
-	// on the actual Branch object we're unmarshalling into
-	b.Children = d.Children
-	b.PullRequest = d.PullRequest
+	// Copy over all the data that we unmarshalled into BranchAlias. This is
+	// everything except since Parent which we'll handle next. We need to take
+	// special care to copy name since it won't be defined on BranchAlias (since
+	// Name is not serialized to JSON). Instead we expect that the struct is
+	// always initialized with the name defined, so we have to copy it over here.
+	// (Doing just "*b = ..." will result in us erasing the name.)
+	d.BranchAlias.Name = b.Name
+	*b = Branch(d.BranchAlias)
 
 	// Parse the parent information (which can either be a string or a JSON)
 	var err error
@@ -71,10 +75,6 @@ func (b *Branch) UnmarshalJSON(bytes []byte) error {
 	if err != nil {
 		return err
 	}
-	// can't do this because sometimes we read an uninitialized branch
-	//if b.Parent.Name == "" {
-	//	return errors.Errorf("cannot unmarshal Branch from JSON: parent branch of %q is unset", b.Name)
-	//}
 
 	logrus.Debugf("parsed branch metadata: %s => %#+v %#+v", bytes, d, b)
 	return nil
