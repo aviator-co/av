@@ -84,5 +84,7 @@ func loadFromEnv() {
 	// TODO: integrate this better with cobra/viper/whatever
 	if githubToken := os.Getenv("AV_GITHUB_TOKEN"); githubToken != "" {
 		Av.GitHub.Token = githubToken
+	} else if githubToken := os.Getenv("GITHUB_TOKEN"); githubToken != "" {
+		Av.GitHub.Token = githubToken
 	}
 }
