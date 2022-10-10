@@ -282,7 +282,11 @@ base branch.
 		if err != nil {
 			return err
 		}
-		for _, currentBranch := range branchesToSync {
+		for i, currentBranch := range branchesToSync {
+			if i > 0 {
+				// Add spacing in the output between each branch sync
+				_, _ = fmt.Fprint(os.Stderr, "\n\n")
+			}
 			state.CurrentBranch = currentBranch
 			res, err := actions.SyncBranch(ctx, repo, client, repoMeta, actions.SyncBranchOpts{
 				Branch:       currentBranch,

@@ -14,6 +14,7 @@ import (
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 	"os"
+	"strings"
 )
 
 type SyncBranchOpts struct {
@@ -435,6 +436,20 @@ func syncBranchPushAndUpdatePullRequest(
 		if err != nil {
 			return errors.WrapIff(err, "failed to fetch pull request info for %q", branch.Name)
 		}
+	}
+
+	if pr.State == githubv4.PullRequestStateClosed || pr.State == githubv4.PullRequestStateMerged {
+		_, _ = fmt.Fprint(os.Stderr,
+			"  - ", colors.Warning("WARNING:"),
+			" pull request ", colors.UserInput("#", pr.Number),
+			" is ", colors.UserInput(strings.ToLower(string(pr.State))),
+			", skipping push\n",
+		)
+		_, _ = fmt.Fprint(os.Stderr,
+			"      - re-open the pull request (or create a new one with ",
+			colors.CliCmd("av pr create"), ") to push changes\n",
+		)
+		return nil
 	}
 
 	var rebaseWithDraft bool
