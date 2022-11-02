@@ -108,7 +108,7 @@ base branch.
 			return err
 		}
 
-		// Read any pre-existing state.
+		// Read any preexisting state.
 		// This is required to allow us to handle --continue/--abort
 		state, err := readStackSyncState(repo)
 		if err != nil && !os.IsNotExist(err) {
