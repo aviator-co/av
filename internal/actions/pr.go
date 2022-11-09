@@ -45,6 +45,32 @@ type CreatePullRequestResult struct {
 	Pull *gh.PullRequest
 }
 
+// getPRMetadata constructs the PRMetadata for the current state of the branch.
+// TODO:
+// The way we pass/load all the relevant data here is not great(tm). The
+// `parent` argument is optional because sometimes it's loadeed by the
+// calling function and sometimes not. :shrug: It can also be nil if the
+// branch doesn't have a parent (i.e., the branch is a stack root).
+func getPRMetadata(repo *git.Repo, branch meta.Branch, parent *meta.Branch) (PRMetadata, error) {
+	trunk, err := meta.Trunk(repo, branch.Name)
+	if err != nil {
+		return PRMetadata{}, err
+	}
+	prMeta := PRMetadata{
+		Parent:     branch.Parent.Name,
+		ParentHead: branch.Parent.Head,
+		Trunk:      trunk,
+	}
+	if parent == nil && branch.Parent.Name != "" {
+		p, _ := meta.ReadBranch(repo, branch.Parent.Name)
+		parent = &p
+	}
+	if parent != nil && parent.PullRequest != nil {
+		prMeta.ParentPull = parent.PullRequest.Number
+	}
+	return prMeta, nil
+}
+
 // CreatePullRequest creates a pull request on GitHub for the current branch, if
 // one doesn't already exist.
 func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, opts CreatePullRequestOpts) (*CreatePullRequestResult, error) {
@@ -152,18 +178,9 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		opts.Body = firstCommit.Body
 	}
 
-	trunkBranch, err := meta.Trunk(repo, opts.BranchName)
+	prMeta, err := getPRMetadata(repo, branchMeta, &parentMeta)
 	if err != nil {
-		return nil, errors.WrapIf(err, "failed to determine trunk branch")
-	}
-
-	prMeta := PRMetadata{
-		Parent:     prBaseBranch,
-		ParentHead: branchMeta.Parent.Head,
-		Trunk:      trunkBranch,
-	}
-	if parentMeta.PullRequest != nil {
-		prMeta.ParentPull = parentMeta.PullRequest.Number
+		return nil, err
 	}
 
 	pull, didCreatePR, err := ensurePR(ctx, client, repoMeta, ensurePROpts{

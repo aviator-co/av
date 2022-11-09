@@ -479,9 +479,15 @@ func syncBranchPushAndUpdatePullRequest(
 		return err
 	}
 
+	prMeta, err := getPRMetadata(repo, branch, nil)
+	if err != nil {
+		return err
+	}
+	prBody := AddPRMetadata(pr.Body, prMeta)
 	if _, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
 		PullRequestID: branch.PullRequest.ID,
 		BaseRefName:   gh.Ptr(githubv4.String(branch.Parent.Name)),
+		Body:          gh.Ptr(githubv4.String(prBody)),
 	}); err != nil {
 		return err
 	}
