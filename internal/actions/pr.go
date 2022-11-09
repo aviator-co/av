@@ -219,7 +219,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	if didCreatePR {
 		action = "created"
 	} else {
-		action = "sychronized"
+		action = "synchronized"
 	}
 	_, _ = fmt.Fprint(os.Stderr,
 		"  - ", action, " pull request ",

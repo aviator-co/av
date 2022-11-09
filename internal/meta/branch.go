@@ -46,7 +46,7 @@ func (b *Branch) UnmarshalJSON(bytes []byte) error {
 	// 1. We want to still use the normal JSON machinery to parse most fields
 	//    out of Branch (without having to write our own JSON parsing logic
 	//    here). To do that, we have to define a type alias for Branch which
-	// 	  effectively erases the UnmorshalJSON method (otherwise we get a stack
+	// 	  effectively erases the UnmarshalJSON method (otherwise we get a stack
 	//	  overflow as this function would be called recursively).
 	// 2. We define a new type that embeds BranchAlias but overrides the Parent
 	//    field so we can parse that manually ourselves.
