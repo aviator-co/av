@@ -12,9 +12,10 @@ type CommitInfoOpts struct {
 }
 
 type CommitInfo struct {
-	Hash    string
-	Subject string
-	Body    string
+	Hash      string
+	ShortHash string
+	Subject   string
+	Body      string
 }
 
 func (r *Repo) CommitInfo(opts CommitInfoOpts) (*CommitInfo, error) {
@@ -34,6 +35,7 @@ func (r *Repo) CommitInfo(opts CommitInfoOpts) (*CommitInfo, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "git show: failed to parse commit hash")
 	}
+	info.ShortHash = ShortSha(info.Hash)
 	info.Subject, err = readLine(buf)
 	if err != nil {
 		return nil, errors.Wrap(err, "git show: failed to parse commit subject")

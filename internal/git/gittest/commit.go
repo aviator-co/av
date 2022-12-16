@@ -10,7 +10,8 @@ import (
 )
 
 type commitFileOpts struct {
-	msg string
+	msg   string
+	amend bool
 }
 
 type CommitFileOpt func(*commitFileOpts)
@@ -18,6 +19,12 @@ type CommitFileOpt func(*commitFileOpts)
 func WithMessage(msg string) CommitFileOpt {
 	return func(opts *commitFileOpts) {
 		opts.msg = msg
+	}
+}
+
+func WithAmend() CommitFileOpt {
+	return func(opts *commitFileOpts) {
+		opts.amend = true
 	}
 }
 
@@ -36,6 +43,10 @@ func CommitFile(t *testing.T, repo *git.Repo, filename string, body []byte, os .
 	_, err = repo.Git("add", filepath)
 	require.NoError(t, err, "failed to add file: %s", filename)
 
-	_, err = repo.Git("commit", "-m", opts.msg)
+	args := []string{"commit", "-m", opts.msg}
+	if opts.amend {
+		args = append(args, "--amend")
+	}
+	_, err = repo.Git(args...)
 	require.NoError(t, err, "failed to commit file: %s", filename)
 }
