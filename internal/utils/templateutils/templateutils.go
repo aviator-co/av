@@ -14,3 +14,11 @@ func String(t *template.Template, data interface{}) (string, error) {
 	}
 	return buf.String(), nil
 }
+
+func MustString(t *template.Template, data interface{}) string {
+	s, err := String(t, data)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}

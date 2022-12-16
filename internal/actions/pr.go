@@ -5,8 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/aviator-co/av/internal/editor"
+	"github.com/aviator-co/av/internal/utils/stringutils"
+	"github.com/aviator-co/av/internal/utils/templateutils"
 	"os"
+	"path/filepath"
 	"strings"
+	"text/template"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
@@ -155,27 +160,49 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	if commitsList == "" {
 		return nil, errors.Errorf("no commits between %q and %q", prBaseBranch, opts.BranchName)
 	}
-	commits := strings.Split(commitsList, "\n")
-	firstCommit, err := repo.CommitInfo(git.CommitInfoOpts{Rev: commits[0]})
-	if err != nil {
-		return nil, errors.WrapIf(err, "failed to read first commit")
+	var commits []git.CommitInfo
+	for _, commitHash := range strings.Split(commitsList, "\n") {
+		commit, err := repo.CommitInfo(git.CommitInfoOpts{Rev: commitHash})
+		if err != nil {
+			return nil, errors.WrapIff(err, "failed to get commit info for %q", commitHash)
+		}
+		commits = append(commits, *commit)
 	}
 
-	if opts.Title == "" {
-		opts.Title = firstCommit.Subject
-	}
-	if opts.Body == "" {
-		// Commits bodies are often in a fixed-width format (e.g., 80 characters
-		// wide) so most newlines should actually be spaces. Unfortunately,
-		// GitHub renders newlines in the commit body (which goes against the
-		// Markdown spec, but whatever) which makes it a little bit weird to
-		// directly include in the PR body. We could convert singe newlines to
-		// spaces to make GitHub happy, but that's not trivial without using a
-		// full-on Markdown parser (e.g., "foo\nbar" should become "foo bar" but
-		// "foo\n* bar" should stay the same).
-		// Maybe someday we can invest in making this better, but it's not the
-		// end of the world.
-		opts.Body = firstCommit.Body
+	if opts.Body == "" || opts.Title == "" {
+		// We need to open an editor to ask the user. Try to populate with
+		// reasonable defaults here.
+		if opts.Title == "" {
+			opts.Title = commits[0].Subject
+		}
+		// Reasonable defaults for body:
+		// 1. Try and find a pull request template
+		if opts.Body == "" {
+			opts.Body = readDefaultPullRequestTemplate(repo)
+		}
+		// 2. Use the commit message from the first PR
+		if opts.Body == "" {
+			opts.Body = commits[0].Body
+		}
+
+		editorText := templateutils.MustString(prBodyTemplate, prBodyTemplateData{
+			Branch:  opts.BranchName,
+			Title:   opts.Title,
+			Body:    opts.Body,
+			Commits: commits,
+		})
+		res, err := editor.Launch(repo, editor.Config{
+			Text:           editorText,
+			TmpFilePattern: "pr-*.md",
+			CommentPrefix:  "%% ",
+		})
+		if err != nil {
+			return nil, errors.WrapIf(err, "failed to launch text editor")
+		}
+		opts.Title, opts.Body = stringutils.ParseSubjectBody(res)
+		if opts.Title == "" {
+			return nil, errors.New("aborting pull request due to empty message")
+		}
 	}
 
 	prMeta, err := getPRMetadata(repo, branchMeta, &parentMeta)
@@ -238,6 +265,38 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	}
 
 	return &CreatePullRequestResult{didCreatePR, branchMeta, pull}, nil
+}
+
+type prBodyTemplateData struct {
+	Branch  string
+	Title   string
+	Body    string
+	Commits []git.CommitInfo
+}
+
+var prBodyTemplate = template.Must(template.New("prBody").Parse(`%% Creating pull request for branch '{{ .Branch }}'
+%% Lines starting with '%%' will be ignored and an empty message aborts the
+%% creation of the pull request.
+
+%% Pull request title (single line)
+{{ .Title }}
+
+%% Pull request body (multiple lines)
+{{ .Body }}
+
+%% This branch includes the following commits:
+{{- range $c := .Commits }}
+%%     {{ $c.ShortHash }}    {{ $c.Subject }}
+{{- end }}
+`))
+
+func readDefaultPullRequestTemplate(repo *git.Repo) string {
+	tpl := filepath.Join(repo.Dir(), ".github", "PULL_REQUEST_TEMPLATE.md")
+	data, err := os.ReadFile(tpl)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 type ensurePROpts struct {
