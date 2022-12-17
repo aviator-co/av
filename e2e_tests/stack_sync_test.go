@@ -4,7 +4,6 @@ import (
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -93,7 +92,7 @@ func TestStackSync(t *testing.T) {
 		"stack sync --continue should return non-zero exit code if conflicts have not been resolved",
 	)
 	// resolve the conflict
-	err := ioutil.WriteFile(filepath.Join(repo.Dir(), "my-file"), []byte("1a\n1b\n2a\n"), 0644)
+	err := os.WriteFile(filepath.Join(repo.Dir(), "my-file"), []byte("1a\n1b\n2a\n"), 0644)
 	require.NoError(t, err)
 	_, err = repo.Git("add", "my-file")
 	require.NoError(t, err, "failed to stage file")

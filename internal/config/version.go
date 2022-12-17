@@ -3,7 +3,6 @@ package config
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
@@ -28,7 +27,7 @@ func FetchLatestVersion() (string, error) {
 	stat, _ := os.Stat(cacheFile)
 
 	if stat != nil && time.Since(stat.ModTime()) <= (24*time.Hour) {
-		data, err := ioutil.ReadFile(cacheFile)
+		data, err := os.ReadFile(cacheFile)
 		if err != nil {
 			return "", err
 		}
@@ -55,7 +54,7 @@ func FetchLatestVersion() (string, error) {
 		return "", err
 	}
 
-	if err := ioutil.WriteFile(cacheFile, []byte(data.Name), os.ModePerm); err != nil {
+	if err := os.WriteFile(cacheFile, []byte(data.Name), os.ModePerm); err != nil {
 		return "", err
 	}
 

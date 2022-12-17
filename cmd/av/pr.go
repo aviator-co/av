@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
@@ -57,7 +57,7 @@ Examples:
 		body := prCreateFlags.Body
 		// Special case: ready body from stdin
 		if prCreateFlags.Body == "-" {
-			bodyBytes, err := ioutil.ReadAll(os.Stdin)
+			bodyBytes, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				return errors.Wrap(err, "failed to read body from stdin")
 			}

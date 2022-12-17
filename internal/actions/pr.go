@@ -39,6 +39,7 @@ type CreatePullRequestOpts struct {
 	ForcePush bool
 	// If true, create a PR even if we think one already exists
 	Force bool
+	RemoteLabel string
 }
 
 type CreatePullRequestResult struct {
@@ -87,6 +88,11 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	if err != nil {
 		return nil, err
 	}
+	
+    remote, err := repo.DefaultRemote()
+    if err != nil {
+        return nil, err
+    }
 
 	_, _ = fmt.Fprint(os.Stderr,
 		"Creating pull request for branch ", colors.UserInput(opts.BranchName), ":",
@@ -108,8 +114,8 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		})
 		if err != nil {
 			// Set the upstream branch
-			upstream = "origin/" + opts.BranchName
-			pushFlags = append(pushFlags, "--set-upstream", "origin", opts.BranchName)
+			upstream = remote.Label + "/" + opts.BranchName
+			pushFlags = append(pushFlags, "--set-upstream", remote.Label, opts.BranchName)
 		} else {
 			upstream = strings.TrimPrefix(upstream, "refs/remotes/")
 		}

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 )
@@ -28,16 +28,16 @@ func WithAmend() CommitFileOpt {
 	}
 }
 
-func CommitFile(t *testing.T, repo *git.Repo, filename string, body []byte, os ...CommitFileOpt) {
+func CommitFile(t *testing.T, repo *git.Repo, filename string, body []byte, optArgs ...CommitFileOpt) {
 	opts := commitFileOpts{
 		msg: fmt.Sprintf("Write %s", filename),
 	}
-	for _, o := range os {
+	for _, o := range optArgs {
 		o(&opts)
 	}
 
 	filepath := path.Join(repo.Dir(), filename)
-	err := ioutil.WriteFile(filepath, body, 0644)
+	err := os.WriteFile(filepath, body, 0644)
 	require.NoError(t, err, "failed to write file: %s", filename)
 
 	_, err = repo.Git("add", filepath)

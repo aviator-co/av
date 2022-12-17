@@ -36,12 +36,13 @@ var initCmd = &cobra.Command{
 			return err
 		}
 
-		origin, err := repo.Origin()
+        // for now we only work with default remote config
+		remote, err := repo.DefaultRemote()
 		if err != nil {
 			return err
 		}
 
-		ghRepo, err := client.GetRepositoryBySlug(context.Background(), origin.RepoSlug)
+		ghRepo, err := client.GetRepositoryBySlug(context.Background(), remote.RepoSlug)
 		if err != nil {
 			return err
 		}

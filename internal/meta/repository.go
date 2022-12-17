@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
 	"os"
 	"path"
 )
@@ -27,7 +26,7 @@ func ReadRepository(repo *git.Repo) (Repository, error) {
 	var meta Repository
 
 	metaPath := path.Join(repo.Dir(), ".git", "av", "repo-metadata.json")
-	data, err := ioutil.ReadFile(metaPath)
+	data, err := os.ReadFile(metaPath)
 	if err != nil {
 		return meta, ErrRepoNotInitialized
 	}
@@ -49,7 +48,7 @@ func WriteRepository(repo *git.Repo, meta Repository) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal repository metadata")
 	}
-	if err := ioutil.WriteFile(metaPath, data, 0644); err != nil {
+	if err := os.WriteFile(metaPath, data, 0644); err != nil {
 		return errors.Wrap(err, "failed to write repository metadata")
 	}
 	return nil

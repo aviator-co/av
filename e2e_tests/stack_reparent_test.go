@@ -3,7 +3,7 @@ package e2e_tests
 import (
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
+	"os"
 	"testing"
 )
 
@@ -42,7 +42,7 @@ func TestStackSyncReparent(t *testing.T) {
 }
 
 func requireFileContent(t *testing.T, file string, expected string, args ...any) {
-	actual, err := ioutil.ReadFile(file)
+	actual, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -5,7 +5,6 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"testing"
@@ -47,7 +46,7 @@ func NewTempRepo(t *testing.T) *git.Repo {
 	_, err = repo.Git("remote", "add", "origin", "git@github.com:aviator-co/nonexistent-repo.git", "--master=main")
 	require.NoError(t, err, "failed to set remote")
 
-	err = ioutil.WriteFile(dir+"/README.md", []byte("# Hello World"), 0644)
+	err = os.WriteFile(dir+"/README.md", []byte("# Hello World"), 0644)
 	require.NoError(t, err, "failed to write README.md")
 
 	_, err = repo.Git("add", "README.md")

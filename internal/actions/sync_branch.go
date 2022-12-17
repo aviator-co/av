@@ -131,6 +131,11 @@ func syncBranchRebase(
 	if err != nil {
 		return nil, errors.WrapIff(err, "failed to get head of branch %q", branch.Name)
 	}
+	
+	remote, err := repo.DefaultRemote()
+	if err != nil {
+        return nil, errors.WrapIf(err, "unable to determine remote target")
+	}
 
 	if branch.IsStackRoot() {
 		trunk := branch.Parent.Name
@@ -149,17 +154,17 @@ func syncBranchRebase(
 
 		// First, try to fetch latest commit from the trunk...
 		_, _ = fmt.Fprint(os.Stderr,
-			"  - fetching latest commit from ", colors.UserInput("origin/", trunk), "\n",
+			"  - fetching latest commit from ", colors.UserInput(remote.Label, trunk), "\n",
 		)
 		if _, err := repo.Run(&git.RunOpts{
-			Args: []string{"fetch", "origin", trunk},
+			Args: []string{"fetch", remote.Label, trunk},
 		}); err != nil {
 			_, _ = fmt.Fprint(os.Stderr,
 				"  - ",
 				colors.Failure("error: failed to fetch HEAD of "), colors.UserInput(trunk),
-				colors.Failure(" from origin: ", err.Error()), "\n",
+				colors.Failure(" from remote: ", err.Error()), "\n",
 			)
-			return nil, errors.WrapIff(err, "failed to fetch trunk branch %q from origin", trunk)
+			return nil, errors.WrapIff(err, "failed to fetch trunk branch %q from remote", trunk)
 		}
 
 		trunkHead, err := repo.RevParse(&git.RevParse{Rev: trunk})
@@ -213,8 +218,8 @@ func syncBranchRebase(
 			" on top of merge commit ", colors.UserInput(short), "\n",
 		)
 		if !opts.NoFetch {
-			if _, err := repo.Git("fetch", "origin", branch.MergeCommit); err != nil {
-				return nil, errors.WrapIff(err, "failed to fetch merge commit %q from origin", short)
+			if _, err := repo.Git("fetch", remote.Label, branch.MergeCommit); err != nil {
+				return nil, errors.WrapIff(err, "failed to fetch merge commit %q from remote", short)
 			}
 		}
 

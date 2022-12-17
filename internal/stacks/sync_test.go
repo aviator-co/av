@@ -5,7 +5,7 @@ import (
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/aviator-co/av/internal/stacks"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 )
@@ -44,7 +44,7 @@ func TestSyncBranch_NoConflicts(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, stacks.SyncUpdated, res.Status)
 
-		data, err := ioutil.ReadFile(path.Join(repo.Dir(), "file1.txt"))
+		data, err := os.ReadFile(path.Join(repo.Dir(), "file1.txt"))
 		require.NoError(t, err)
 		require.Equal(t, "file1 updated", string(data), "file1 should have been updated after stack sync")
 	}

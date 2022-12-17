@@ -34,7 +34,7 @@ type PushOpts struct {
 	SkipIfUpstreamMatches bool
 }
 
-// Push pushes the current branch to the Git origin.
+// Push pushes the current branch to the Git remote.
 // It does not check out the given branch.
 func Push(repo *git.Repo, opts PushOpts) error {
 	currentBranch, err := repo.CurrentBranchName()
