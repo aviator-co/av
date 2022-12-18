@@ -39,7 +39,6 @@ type CreatePullRequestOpts struct {
 	ForcePush bool
 	// If true, create a PR even if we think one already exists
 	Force bool
-	RemoteLabel string
 }
 
 type CreatePullRequestResult struct {
@@ -84,10 +83,10 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		logrus.Panicf("internal invariant error: CreatePullRequest called with empty branch name")
 	}
 
-	repoMeta, err := meta.ReadRepository(repo)
-	if err != nil {
-		return nil, err
-	}
+    repoMeta, err := meta.ReadRepository(repo)
+    if err != nil {
+        return nil, err
+    }
 	
     remote, err := repo.DefaultRemote()
     if err != nil {

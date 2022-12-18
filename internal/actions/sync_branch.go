@@ -154,7 +154,7 @@ func syncBranchRebase(
 
 		// First, try to fetch latest commit from the trunk...
 		_, _ = fmt.Fprint(os.Stderr,
-			"  - fetching latest commit from ", colors.UserInput(remote.Label, trunk), "\n",
+			"  - fetching latest commit from ", colors.UserInput(remote.Label + "/", trunk), "\n",
 		)
 		if _, err := repo.Run(&git.RunOpts{
 			Args: []string{"fetch", remote.Label, trunk},
