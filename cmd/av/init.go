@@ -36,7 +36,7 @@ var initCmd = &cobra.Command{
 			return err
 		}
 
-        // for now we only work with default remote config
+		// for now we only work with default remote config
 		remote, err := repo.DefaultRemote()
 		if err != nil {
 			return err

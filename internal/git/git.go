@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"emperror.dev/errors"
-    "github.com/aviator-co/av/internal/utils/stringutils"
+	"github.com/aviator-co/av/internal/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	giturls "github.com/whilp/git-urls"
 )
@@ -39,12 +39,12 @@ func (r *Repo) GitDir() string {
 }
 
 func (r *Repo) DefaultBranch() (string, error) {
-    remote, err := r.DefaultRemote()
-    if err != nil {
-        return "", err
-    }
-    
-	ref, err := r.Git("symbolic-ref", "refs/remotes/" + remote.Label + "/HEAD")
+	remote, err := r.DefaultRemote()
+	if err != nil {
+		return "", err
+	}
+
+	ref, err := r.Git("symbolic-ref", "refs/remotes/"+remote.Label+"/HEAD")
 	if err != nil {
 		logrus.WithError(err).Debug("failed to determine remote HEAD")
 		// this communicates with the remote, so we probably don't want to run
@@ -56,7 +56,7 @@ func (r *Repo) DefaultBranch() (string, error) {
 		)
 		return "", errors.New("failed to determine remote HEAD")
 	}
-	return strings.TrimPrefix(ref, "refs/remotes/" + remote.Label + "/"), nil
+	return strings.TrimPrefix(ref, "refs/remotes/"+remote.Label+"/"), nil
 }
 
 func (r *Repo) Git(args ...string) (string, error) {
@@ -250,27 +250,27 @@ func (r *Repo) UpdateRef(update *UpdateRef) error {
 
 type Remote struct {
 	// the label given to the remote config, typically "origin"
-    Label string
-	URL *url.URL
+	Label string
+	URL   *url.URL
 	// The URL slug that corresponds to repository.
 	// For example, github.com/my-org/my-repo becomes my-org/my-repo.
 	RepoSlug string
 }
 
 func getRemote(repoDir string, label string) (*Remote, error) {
-    // Note: 'git remote get-url' gets the "real" URL of the remote (taking
-    // 'insteadOf' from git config into account) whereas 'git config --get ...'
-    // does *not*. Not sure if it matters here.
-    cmd := exec.Command("git", "remote", "get-url", label)
-    cmd.Dir = repoDir
-    out, err := cmd.Output()
+	// Note: 'git remote get-url' gets the "real" URL of the remote (taking
+	// 'insteadOf' from git config into account) whereas 'git config --get ...'
+	// does *not*. Not sure if it matters here.
+	cmd := exec.Command("git", "remote", "get-url", label)
+	cmd.Dir = repoDir
+	out, err := cmd.Output()
 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	remoteUrl := strings.TrimSpace(string(out))
-	
+
 	if remoteUrl == "" {
 		return nil, errors.New("remote URL is empty")
 	}
@@ -283,73 +283,73 @@ func getRemote(repoDir string, label string) (*Remote, error) {
 	repoSlug := strings.TrimSuffix(u.Path, ".git")
 	repoSlug = strings.TrimPrefix(repoSlug, "/")
 	return &Remote{
-	    Label:    label,
+		Label:    label,
 		URL:      u,
 		RepoSlug: repoSlug,
 	}, nil
 }
 
 type RemoteConfig struct {
-    defaultRemote string
-    remoteMap map[string]*Remote 
+	defaultRemote string
+	remoteMap     map[string]*Remote
 }
 
 func (r *Repo) RemoteConfig() (*RemoteConfig, error) {
-    cmd := exec.Command("git", "remote")
-    cmd.Dir = r.repoDir
-    out, err := cmd.Output()
-    
-    if err != nil {
-        return nil, err
-    }
-    
-    strOut := string(out)
-    defaultRemote := ""
-    remoteMap := make(map[string]*Remote)
-    
-    if strOut == "" {
-        return nil, errors.New("no remote config found")
-    }
-    
-    remoteLabels := stringutils.SplitLines(strOut)
-    
-    for i, label := range remoteLabels {
-        // use "origin" as default remote if found, otherwise first listed remote
-        if i == 0 || label == "origin" {
-            defaultRemote = label
-        }
-        
-        remote, err := getRemote(r.repoDir, label)
-        
-        if err != nil {
-            return nil, err
-        }
-        
-        remoteMap[label] = remote
-    }
-    
-    return &RemoteConfig{defaultRemote, remoteMap}, nil
+	cmd := exec.Command("git", "remote")
+	cmd.Dir = r.repoDir
+	out, err := cmd.Output()
+
+	if err != nil {
+		return nil, err
+	}
+
+	strOut := string(out)
+	defaultRemote := ""
+	remoteMap := make(map[string]*Remote)
+
+	if strOut == "" {
+		return nil, errors.New("no remote config found")
+	}
+
+	remoteLabels := stringutils.SplitLines(strOut)
+
+	for i, label := range remoteLabels {
+		// use "origin" as default remote if found, otherwise first listed remote
+		if i == 0 || label == "origin" {
+			defaultRemote = label
+		}
+
+		remote, err := getRemote(r.repoDir, label)
+
+		if err != nil {
+			return nil, err
+		}
+
+		remoteMap[label] = remote
+	}
+
+	return &RemoteConfig{defaultRemote, remoteMap}, nil
 }
 
 func (r *Repo) Remote(label string) (*Remote, error) {
-    remoteConfig, err := r.RemoteConfig()
-    if err !=nil {
-        return nil, err
-    }
-    
-    remote, ok := remoteConfig.remoteMap[label]
-    if !ok {
-        return nil, errors.New("no remote config found for " + label)
-    }
-    
-    return remote, nil
+	remoteConfig, err := r.RemoteConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	remote, ok := remoteConfig.remoteMap[label]
+	if !ok {
+		return nil, errors.New("no remote config found for " + label)
+	}
+
+	return remote, nil
 }
 
 func (r *Repo) DefaultRemote() (*Remote, error) {
-    remoteConfig, err := r.RemoteConfig()
-    if err !=nil {
-        return nil, err
-    }
-    
-    return remoteConfig.remoteMap[remoteConfig.defaultRemote], nil
+	remoteConfig, err := r.RemoteConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return remoteConfig.remoteMap[remoteConfig.defaultRemote], nil
 }

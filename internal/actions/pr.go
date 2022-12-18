@@ -83,15 +83,15 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		logrus.Panicf("internal invariant error: CreatePullRequest called with empty branch name")
 	}
 
-    repoMeta, err := meta.ReadRepository(repo)
-    if err != nil {
-        return nil, err
-    }
-	
-    remote, err := repo.DefaultRemote()
-    if err != nil {
-        return nil, err
-    }
+	repoMeta, err := meta.ReadRepository(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	remote, err := repo.DefaultRemote()
+	if err != nil {
+		return nil, err
+	}
 
 	_, _ = fmt.Fprint(os.Stderr,
 		"Creating pull request for branch ", colors.UserInput(opts.BranchName), ":",

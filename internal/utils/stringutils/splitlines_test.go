@@ -19,5 +19,5 @@ line4
 	input = ""
 	expected = []string(nil)
 
-    require.Equal(t, expected, stringutils.SplitLines(input))
+	require.Equal(t, expected, stringutils.SplitLines(input))
 }
