@@ -230,18 +230,6 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	if err := meta.WriteBranch(repo, branchMeta); err != nil {
 		return nil, err
 	}
-
-	// add the avbeta-stackedprs label to enable Aviator server-side stacked
-	// PRs functionality
-	if err := client.AddIssueLabels(ctx, gh.AddIssueLabelInput{
-		Owner:      repoMeta.Owner,
-		Repo:       repoMeta.Name,
-		Number:     pull.Number,
-		LabelNames: []string{"avbeta-stackedprs"},
-	}); err != nil {
-		return nil, errors.WrapIf(err, "adding avbeta-stackedprs label")
-	}
-
 	var action string
 	if didCreatePR {
 		action = "created"
