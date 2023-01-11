@@ -149,7 +149,6 @@ base branch.
 			return errors.New("refusing to sync: there are unstaged changes in the working tree (use `git add` to stage changes)")
 		}
 
-		var currentBranch string
 		if stackSyncFlags.Continue {
 			if state.CurrentBranch == "" {
 				return errors.New("no sync in progress")
@@ -166,12 +165,13 @@ base branch.
 			// conflict (and this command will not work).
 			// Since we're *not* continuing a sync, we assume we're not in
 			// detached HEAD and so this is a reasonable thing to do.
-			currentBranch, err = repo.CurrentBranchName()
+			var err error
+			state.CurrentBranch, err = repo.CurrentBranchName()
 			if err != nil {
 				return err
 			}
 
-			state.OriginalBranch = currentBranch
+			state.OriginalBranch = state.CurrentBranch
 			state.Config = stackSyncConfig{
 				stackSyncFlags.Current,
 				stackSyncFlags.Trunk,
@@ -192,7 +192,7 @@ base branch.
 				return err
 			}
 			opts := actions.ReparentOpts{
-				Branch:         currentBranch,
+				Branch:         state.CurrentBranch,
 				NewParent:      state.Config.Parent,
 				NewParentTrunk: state.Config.Parent == defaultBranch,
 			}

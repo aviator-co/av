@@ -452,22 +452,11 @@ func syncBranchPushAndUpdatePullRequest(
 		return nil
 	}
 
-	var rebaseWithDraft bool
-	if pr.BaseBranchName() != branch.Parent.Name {
-		_, _ = fmt.Fprint(os.Stderr,
-			"  - updating pull request base branch to ", colors.UserInput(branch.Parent.Name), "\n",
-		)
-		if config.Av.PullRequest.RebaseWithDraft == nil {
-			if ghutils.HasCodeowners(repo) {
-				rebaseWithDraft = true
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - converting pull request to draft for rebase since this repo has CODEOWNERS\n",
-					"      - set ", colors.CliCmd("pullRequest.rebaseWithDraft"), " in your configuration file to explicitly control this behavior and to suppress this message\n",
-					"      - see https://docs.aviator.co/reference/aviator-cli/configuration#config-option-reference for more information\n",
-				)
-			}
-		} else {
-			rebaseWithDraft = *config.Av.PullRequest.RebaseWithDraft
+	rebaseWithDraft := shouldRebaseWithDraft(repo, pr)
+	if rebaseWithDraft {
+		_, err := client.ConvertPullRequestToDraft(ctx, pr.ID)
+		if err != nil {
+			return errors.WrapIff(err, "failed to convert pull request to draft")
 		}
 	}
 
@@ -499,4 +488,27 @@ func syncBranchPushAndUpdatePullRequest(
 	}
 
 	return nil
+}
+
+func shouldRebaseWithDraft(repo *git.Repo, pr *gh.PullRequest) bool {
+	if pr.IsDraft {
+		// If the PR is already a draft, then we don't need to do anything.
+		// This prevents us from accidentally un-drafting a draft PR when we're
+		// done rebasing it.
+		return false
+	}
+
+	if config.Av.PullRequest.RebaseWithDraft == nil {
+		if ghutils.HasCodeowners(repo) {
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - converting pull request to draft for rebase to avoid adding unnecessary CODEOWNERS\n",
+				"      - set ", colors.CliCmd("pullRequest.rebaseWithDraft"), " in your configuration file to explicitly control this behavior and to suppress this message\n",
+				"      - see https://docs.aviator.co/reference/aviator-cli/configuration#config-option-reference for more information\n",
+			)
+			return true
+		}
+		return false
+	}
+
+	return *config.Av.PullRequest.RebaseWithDraft
 }
