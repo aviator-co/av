@@ -97,6 +97,11 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 
 		if opts.ForcePush {
 			pushFlags = append(pushFlags, "--force")
+		} else {
+			// Use --force-with-lease to allow pushing branches that have been
+			// rebased but don't overwrite changes if we don't expect them to
+			// be there.
+			pushFlags = append(pushFlags, "--force-with-lease")
 		}
 
 		// Check if the upstream is set. If not, we set it during push.
