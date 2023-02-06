@@ -28,7 +28,7 @@ func TestEditor(t *testing.T) {
 		},
 		{
 			name:    "error",
-			command: "true",
+			command: "false",
 			in:      "Hello world!\n\nBonjour le monde!\n",
 			error:   true,
 		},
