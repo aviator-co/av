@@ -3,7 +3,9 @@ package editor
 import (
 	"bufio"
 	"bytes"
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
+	"github.com/kballard/go-shellquote"
 	"github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
@@ -23,12 +25,22 @@ type Config struct {
 	Command string
 }
 
+// CommandNoOp is a special command that indicates that no editor should be
+// launched and the text should be returned as-is.
+// This behavior is copied from git's GIT_EDITOR.
+// https://github.com/git/git/blob/5699ec1b0aec51b9e9ba5a2785f65970c5a95d84/editor.c#L57
+const CommandNoOp = ":"
+
 func Launch(repo *git.Repo, config Config) (string, error) {
 	switch {
 	case config.Command == "":
 		config.Command = DefaultCommand(repo)
 	case config.TmpFilePattern == "":
 		config.TmpFilePattern = "av-message-*"
+	}
+
+	if config.Command == CommandNoOp {
+		return config.Text, nil
 	}
 
 	tmp, err := os.CreateTemp("", config.TmpFilePattern)
@@ -47,8 +59,17 @@ func Launch(repo *git.Repo, config Config) (string, error) {
 		return "", err
 	}
 
-	// launch the editor as a subprocess
-	cmd := exec.Command(config.Command, tmp.Name())
+	// Launch the editor as a subprocess.
+	// We interpret the command with shell syntax to allow users to specify
+	// both flags and use editor executables with spaces.
+	// e.g., EDITOR="'/path/with spaces/editor'" or
+	// EDITOR="code --wait" work.
+	args, err := shellquote.Split(config.Command)
+	if err != nil {
+		return "", errors.Wrapf(err, "invalid editor command: %q", config.Command)
+	}
+	args = append(args, tmp.Name())
+	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	stderr := bytes.NewBuffer(nil)
