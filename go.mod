@@ -6,6 +6,7 @@ require (
 	emperror.dev/errors v0.8.1
 	github.com/fatih/color v1.13.0
 	github.com/golangci/golangci-lint v1.48.0
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kr/text v0.2.0
 	github.com/segmentio/golines v0.10.0
 	github.com/shurcooL/githubv4 v0.0.0-20220115235240-a14260e6f8a2
