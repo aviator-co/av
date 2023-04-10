@@ -79,6 +79,9 @@ type RunOpts struct {
 	// If true, return a non-nil error if the command exited with a non-zero
 	// exit code.
 	ExitError bool
+	// If true, the standard I/Os are connected to the console, allowing the git command to
+	// interact with the user. Stdout and Stderr will be empty.
+	Interactive bool
 }
 
 type Output struct {
@@ -97,8 +100,14 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 	cmd.Dir = r.repoDir
 	r.log.Debugf("git %s", opts.Args)
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	if opts.Interactive {
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	} else {
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+	}
 	cmd.Env = append(os.Environ(), opts.Env...)
 	err := cmd.Run()
 	var exitError *exec.ExitError
