@@ -162,7 +162,10 @@ func syncBranchRebase(
 			return nil, errors.WrapIff(err, "failed to fetch trunk branch %q from origin", trunk)
 		}
 
-		trunkHead, err := repo.RevParse(&git.RevParse{Rev: trunk})
+		// NOTE: Strictly speaking, if a user doesn't use the default refspec (e.g. fetch is
+		// not +refs/heads/*:refs/remotes/origin/*, the remote tracking branch is not
+		// origin/$TRUNK. As we just fetched from a remote, it'd be safe to use FETCH_HEAD.
+		trunkHead, err := repo.RevParse(&git.RevParse{Rev: "origin/" + trunk})
 		if err != nil {
 			return nil, errors.WrapIff(err, "failed to get HEAD of %q", trunk)
 		}
