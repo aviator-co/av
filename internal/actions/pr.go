@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/aviator-co/av/internal/editor"
-	"github.com/aviator-co/av/internal/utils/stringutils"
-	"github.com/aviator-co/av/internal/utils/templateutils"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/aviator-co/av/internal/editor"
+	"github.com/aviator-co/av/internal/utils/stringutils"
+	"github.com/aviator-co/av/internal/utils/templateutils"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
@@ -137,6 +138,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	// figure this out based on whether or not we're on a stacked branch
 	branchMeta, _ := meta.ReadBranch(repo, opts.BranchName)
 	prBaseBranch := branchMeta.Parent.Name
+	prCompareRef := prBaseBranch
 	var parentMeta meta.Branch
 	if !branchMeta.Parent.Trunk {
 		// check if the base branch also has an associated PR
@@ -156,14 +158,15 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		}
 	} else {
 		logrus.WithField("base", prBaseBranch).Debug("base branch is a trunk branch")
+		prCompareRef = "origin/" + prBaseBranch
 	}
 
-	commitsList, err := repo.Git("rev-list", "--reverse", fmt.Sprintf("%s..HEAD", prBaseBranch))
+	commitsList, err := repo.Git("rev-list", "--reverse", fmt.Sprintf("%s..HEAD", prCompareRef))
 	if err != nil {
 		return nil, errors.WrapIf(err, "failed to determine commits to include in PR")
 	}
 	if commitsList == "" {
-		return nil, errors.Errorf("no commits between %q and %q", prBaseBranch, opts.BranchName)
+		return nil, errors.Errorf("no commits between %q and %q", prCompareRef, opts.BranchName)
 	}
 	var commits []git.CommitInfo
 	for _, commitHash := range strings.Split(commitsList, "\n") {
