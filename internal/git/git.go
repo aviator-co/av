@@ -156,6 +156,29 @@ func (r *Repo) CurrentBranchName() (string, error) {
 	return branch, nil
 }
 
+// CheckCleanWorkdir returns if the workdir is clean.
+func (r *Repo) CheckCleanWorkdir() (bool, error) {
+	out, err := r.Git("status", "--porcelain")
+	if err != nil {
+		return false, errors.Errorf("failed to check if the working directory is clean: %v", err)
+	}
+	return out == "", nil
+}
+
+// HasChangesToBeCommitted returns if there's a staged changes to be committed.
+func (r *Repo) HasChangesToBeCommitted() (bool, error) {
+	out, err := r.Run(&RunOpts{
+		Args: []string{"diff-index", "--quiet", "--cached", "HEAD"},
+	})
+	if err != nil {
+		return false, errors.Errorf("failed to check if there are changes to be committed: %v", err)
+	}
+	if out.ExitCode != 0 && out.ExitCode != 1 {
+		return false, errors.Errorf("failed to check if there are changes to be committed: exit code %d", out.ExitCode)
+	}
+	return out.ExitCode == 1, nil
+}
+
 type CheckoutBranch struct {
 	// The name of the branch to checkout.
 	Name string
@@ -238,6 +261,9 @@ type UpdateRef struct {
 	// this object ID. Use Missing to only create the ref if it didn't
 	// already exists (e.g., to avoid overwriting a branch).
 	Old string
+
+	// Create a reflog for this ref change.
+	CreateReflog bool
 }
 
 // UpdateRef updates the specified ref within the Git repository.
@@ -245,6 +271,9 @@ func (r *Repo) UpdateRef(update *UpdateRef) error {
 	args := []string{"update-ref", update.Ref, update.New}
 	if update.Old != "" {
 		args = append(args, update.Old)
+	}
+	if update.CreateReflog {
+		args = append(args, "--create-reflog")
 	}
 	_, err := r.Git(args...)
 	return errors.WrapIff(err, "failed to write ref %q (%s)", update.Ref, ShortSha(update.New))
