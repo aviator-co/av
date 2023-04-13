@@ -11,9 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-go@v3
+    - uses: actions/setup-go@v4
       with:
-        cache: true
         go-version-file: go.mod
         cache-dependency-path: go.sum
     - name: Build
@@ -27,12 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-go@v3
+    - uses: actions/setup-go@v4
       with:
-        cache: true
         go-version-file: go.mod
         cache-dependency-path: go.sum
     - run: >
         go run github.com/golangci/golangci-lint/cmd/golangci-lint
         run --version --out-format github-actions
-
