@@ -270,7 +270,9 @@ type prBodyTemplateData struct {
 	Commits []git.CommitInfo
 }
 
-var prBodyTemplate = template.Must(template.New("prBody").Parse(`%% Creating pull request for branch '{{ .Branch }}'
+var templateFuncs = template.FuncMap{"trimSpace": strings.TrimSpace}
+
+var prBodyTemplate = template.Must(template.New("prBody").Funcs(templateFuncs).Parse(`%% Creating pull request for branch '{{ .Branch }}'
 %% Lines starting with '%%' will be ignored and an empty message aborts the
 %% creation of the pull request.
 
@@ -283,6 +285,11 @@ var prBodyTemplate = template.Must(template.New("prBody").Parse(`%% Creating pul
 %% This branch includes the following commits:
 {{- range $c := .Commits }}
 %%     {{ $c.ShortHash }}    {{ $c.Subject }}
+{{- if trimSpace $c.Body }}
+{{- range $line := $c.BodyWithPrefix "%%         " }}
+{{ trimSpace $line }}
+{{- end }}
+{{- end }}
 {{- end }}
 `))
 

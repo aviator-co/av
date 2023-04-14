@@ -18,6 +18,14 @@ type CommitInfo struct {
 	Body      string
 }
 
+func (c CommitInfo) BodyWithPrefix(prefix string) []string {
+	var lines []string
+	for _, line := range strings.Split(strings.TrimSpace(c.Body), "\n") {
+		lines = append(lines, prefix + line)
+	}
+	return lines
+}
+
 func (r *Repo) CommitInfo(opts CommitInfoOpts) (*CommitInfo, error) {
 	// Need --quiet to suppress the diff that would otherwise be printed at the
 	// end
