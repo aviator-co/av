@@ -202,7 +202,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		res, err := editor.Launch(repo, editor.Config{
 			Text:           editorText,
 			TmpFilePattern: "pr-*.md",
-			CommentPrefix:  "%% ",
+			CommentPrefix:  "%%",
 		})
 		if err != nil {
 			return nil, errors.WrapIf(err, "failed to launch text editor")
