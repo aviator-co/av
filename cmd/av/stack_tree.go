@@ -29,9 +29,14 @@ var stackTreeCmd = &cobra.Command{
 			return err
 		}
 
-		currentBranch, err := repo.CurrentBranchName()
-		if err != nil {
+		var currentBranch string
+		if dh, err := repo.DetachedHead(); err != nil {
 			return err
+		} else if !dh {
+			currentBranch, err = repo.CurrentBranchName()
+			if err != nil {
+				return err
+			}
 		}
 
 		// TODO[polish]:

@@ -144,6 +144,19 @@ func (r *Repo) GitStdin(args []string, stdin io.Reader) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// DetachedHead returns true if the repository is in the detached HEAD.
+func (r *Repo) DetachedHead() (bool, error) {
+	ret, err := r.Run(&RunOpts{
+		Args: []string{
+			"symbolic-ref", "--quiet", "HEAD",
+		},
+	})
+	if err != nil {
+		return false, err
+	}
+	return ret.ExitCode == 1, nil
+}
+
 // CurrentBranchName returns the name of the current branch.
 // The name is return in "short" format -- i.e., without the "refs/heads/" prefix.
 // IMPORTANT: This function will return an error if the repository is currently
