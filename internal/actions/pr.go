@@ -111,7 +111,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		logrus.Debug("pushing latest changes")
 
 		_, _ = fmt.Fprint(os.Stderr,
-			"  - pushing to origin's ", color.CyanString("%s", opts.BranchName),
+			"  - pushing to ", color.CyanString("origin/%s", opts.BranchName),
 			"\n",
 		)
 		if _, err := repo.Git(pushFlags...); err != nil {
