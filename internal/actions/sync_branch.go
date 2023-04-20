@@ -2,8 +2,11 @@ package actions
 
 import (
 	"context"
-	"emperror.dev/errors"
 	"fmt"
+	"os"
+	"strings"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
@@ -13,8 +16,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
-	"os"
-	"strings"
 )
 
 type SyncBranchOpts struct {
@@ -464,9 +465,9 @@ func syncBranchPushAndUpdatePullRequest(
 	}
 
 	if err := Push(repo, PushOpts{
-		Force:                 ForceWithLease,
-		SkipIfUpstreamNotSet:  true,
-		SkipIfUpstreamMatches: true,
+		Force:                        ForceWithLease,
+		SkipIfRemoteBranchNotExist:   true,
+		SkipIfRemoteBranchIsUpToDate: true,
 	}); err != nil {
 		return err
 	}

@@ -105,24 +105,13 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 			pushFlags = append(pushFlags, "--force-with-lease")
 		}
 
-		// Check if the upstream is set. If not, we set it during push.
-		// TODO: Should we store this somewhere? I think currently things will
-		//       break if the upstream name is not the same name as the local
-		upstream, err := repo.RevParse(&git.RevParse{
-			SymbolicFullName: true,
-			Rev:              fmt.Sprintf("%s@{u}", opts.BranchName),
-		})
-		if err != nil {
-			// Set the upstream branch
-			upstream = "origin/" + opts.BranchName
-			pushFlags = append(pushFlags, "--set-upstream", "origin", opts.BranchName)
-		} else {
-			upstream = strings.TrimPrefix(upstream, "refs/remotes/")
-		}
-		logrus.WithField("upstream", upstream).Debug("pushing latest changes")
+		// NOTE: This assumes that the user use the default push strategy (simple). It would
+		// be rare to use the upstream strategy.
+		pushFlags = append(pushFlags, "origin", opts.BranchName)
+		logrus.Debug("pushing latest changes")
 
 		_, _ = fmt.Fprint(os.Stderr,
-			"  - pushing to ", color.CyanString("%s", upstream),
+			"  - pushing to ", color.CyanString("origin/%s", opts.BranchName),
 			"\n",
 		)
 		if _, err := repo.Git(pushFlags...); err != nil {
