@@ -25,13 +25,12 @@ const (
 
 type PushOpts struct {
 	Force ForceOpt
-	// If true, require the upstream tracking information to already be set
-	// (otherwise, don't push).
-	SkipIfUpstreamNotSet bool
-	// If true, skip pushing the branch if the upstream commit is the same as
-	// the local HEAD commit. The caller should probably call `git fetch` before
+	// If true, require the corresponding branch exist on the remote (otherwise, don't push).
+	SkipIfRemoteBranchNotExist bool
+	// If true, skip pushing the branch if the corresponding branch on the remote points to the
+	// same commit as the local HEAD commit. The caller should probably call `git fetch` before
 	// running this to make sure remote tracking information is up-to-date.
-	SkipIfUpstreamMatches bool
+	SkipIfRemoteBranchIsUpToDate bool
 }
 
 // Push pushes the current branch to the Git origin.
@@ -42,27 +41,21 @@ func Push(repo *git.Repo, opts PushOpts) error {
 		return errors.WrapIff(err, "failed to determine current branch")
 	}
 
-	if opts.SkipIfUpstreamNotSet || opts.SkipIfUpstreamMatches {
-		upstream, err := repo.RevParse(&git.RevParse{Rev: "@{upstream}"})
-		if opts.SkipIfUpstreamMatches && git.StderrMatches(err, "no upstream") {
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - not pushing branch ", colors.UserInput(currentBranch),
-				" (no upstream is set)\n",
-				colors.Troubleshooting("      - HINT: create a pr with "),
-				colors.CliCmd("av pr create"),
-				colors.Troubleshooting(" to automatically push the branch to GitHub and create a pull request\n"),
-			)
-			return nil
-		} else if err != nil {
-			// This usually indicates a detached HEAD state
-			return errors.WrapIff(err, "failed to determine upstream tracking information for branch %q", currentBranch)
+	if opts.SkipIfRemoteBranchNotExist || opts.SkipIfRemoteBranchIsUpToDate {
+		// NOTE: This remote branch pattern is configurable with the fetch spec. This code
+		// assumes that the user won't change the fetch spec from the default. Technically,
+		// this must be generated from the fetch spec.
+		remoteBranch := "refs/remotes/origin/" + currentBranch
+		remoteBranchCommit, err := repo.RevParse(&git.RevParse{Rev: remoteBranch})
+		if err != nil {
+			return errors.WrapIff(err, "corresponding remote branch %q doesn't exist", remoteBranch)
 		}
 
 		head, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
 		if err != nil {
 			return errors.WrapIff(err, "failed to determine branch HEAD for branch %q", currentBranch)
 		}
-		if opts.SkipIfUpstreamMatches && upstream == head {
+		if opts.SkipIfRemoteBranchIsUpToDate && remoteBranchCommit == head {
 			_, _ = fmt.Fprint(os.Stderr,
 				"  - not pushing branch ", colors.UserInput(currentBranch),
 				" (upstream is already up-to-date)\n",
@@ -74,7 +67,7 @@ func Push(repo *git.Repo, opts PushOpts) error {
 	_, _ = fmt.Fprint(os.Stderr,
 		"  - pushing ", colors.UserInput(currentBranch), "... ",
 	)
-	pushArgs := []string{"push", "--set-upstream"}
+	pushArgs := []string{"push"}
 	switch opts.Force {
 	case NoForce:
 		// pass
@@ -83,6 +76,7 @@ func Push(repo *git.Repo, opts PushOpts) error {
 	case ForcePush:
 		pushArgs = append(pushArgs, "--force")
 	}
+	pushArgs = append(pushArgs, "origin", currentBranch)
 	res, err := repo.Run(&git.RunOpts{
 		Args: pushArgs,
 	})
