@@ -23,6 +23,7 @@ var prCreateFlags struct {
 	NoPush bool
 	Title  string
 	Body   string
+	Edit   bool
 }
 var prCreateCmd = &cobra.Command{
 	Use:   "create",
@@ -77,6 +78,7 @@ Examples:
 				//       unify config and flags (the latter should always
 				//       override the former).
 				Draft: prCreateFlags.Draft || config.Av.PullRequest.Draft,
+				Edit:  prCreateFlags.Edit,
 			},
 		); err != nil {
 			return err
@@ -112,5 +114,9 @@ func init() {
 	prCreateCmd.Flags().StringVarP(
 		&prCreateFlags.Body, "body", "b", "",
 		"body of the pull request to create (a value of - will read from stdin)",
+	)
+	prCreateCmd.Flags().BoolVar(
+		&prCreateFlags.Edit, "edit", false,
+		"open the editor for editing always",
 	)
 }

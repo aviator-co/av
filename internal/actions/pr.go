@@ -40,6 +40,9 @@ type CreatePullRequestOpts struct {
 	ForcePush bool
 	// If true, create a PR even if we think one already exists
 	Force bool
+
+	// If true, open an editor for editing the title and body
+	Edit bool
 }
 
 type CreatePullRequestResult struct {
@@ -75,6 +78,36 @@ func getPRMetadata(repo *git.Repo, branch meta.Branch, parent *meta.Branch) (PRM
 		prMeta.ParentPull = parent.PullRequest.Number
 	}
 	return prMeta, nil
+}
+
+func getExistingOpenPR(ctx context.Context, client *gh.Client, repoMeta meta.Repository, branchMeta meta.Branch, baseRefName string) (*gh.PullRequest, error) {
+	if branchMeta.PullRequest != nil {
+		pr, err := client.PullRequest(ctx, branchMeta.PullRequest.ID)
+		if err != nil {
+			return nil, errors.WrapIf(err, "querying existing pull request")
+		}
+		if pr.State != githubv4.PullRequestStateOpen {
+			// This is already closed. Create a new one.
+			return nil, nil
+		}
+		return pr, nil
+	}
+	existing, err := client.GetPullRequests(ctx, gh.GetPullRequestsInput{
+		Owner:       repoMeta.Owner,
+		Repo:        repoMeta.Name,
+		HeadRefName: branchMeta.Name,
+		BaseRefName: baseRefName,
+		States:      []githubv4.PullRequestState{githubv4.PullRequestStateOpen},
+	})
+	if err != nil {
+		return nil, errors.WrapIf(err, "querying existing pull requests")
+	}
+	if len(existing.PullRequests) > 1 {
+		return nil, errors.Errorf("multiple existing PRs found for %q", branchMeta.Name)
+	} else if len(existing.PullRequests) == 1 {
+		return &existing.PullRequests[0], nil
+	}
+	return nil, nil
 }
 
 // CreatePullRequest creates a pull request on GitHub for the current branch, if
@@ -157,16 +190,32 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	if commitsList == "" {
 		return nil, errors.Errorf("no commits between %q and %q", prCompareRef, opts.BranchName)
 	}
-	var commits []git.CommitInfo
-	for _, commitHash := range strings.Split(commitsList, "\n") {
-		commit, err := repo.CommitInfo(git.CommitInfoOpts{Rev: commitHash})
-		if err != nil {
-			return nil, errors.WrapIff(err, "failed to get commit info for %q", commitHash)
+
+	existingPR, err := getExistingOpenPR(ctx, client, repoMeta, branchMeta, prBaseBranch)
+	if err != nil {
+		return nil, err
+	}
+	if existingPR != nil {
+		// If there's an existing PR, use that as the new PR title and body. If --edit is
+		// used, an editor is opened later.
+		if opts.Title == "" {
+			opts.Title = existingPR.Title
 		}
-		commits = append(commits, *commit)
+		if opts.Body == "" {
+			opts.Body = existingPR.Body
+		}
 	}
 
-	if opts.Body == "" || opts.Title == "" {
+	if opts.Edit || opts.Body == "" || opts.Title == "" {
+		var commits []git.CommitInfo
+		for _, commitHash := range strings.Split(commitsList, "\n") {
+			commit, err := repo.CommitInfo(git.CommitInfoOpts{Rev: commitHash})
+			if err != nil {
+				return nil, errors.WrapIff(err, "failed to get commit info for %q", commitHash)
+			}
+			commits = append(commits, *commit)
+		}
+
 		// We need to open an editor to ask the user. Try to populate with
 		// reasonable defaults here.
 		if opts.Title == "" {
@@ -214,6 +263,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		body:        opts.Body,
 		meta:        prMeta,
 		draft:       opts.Draft,
+		existingPR:  existingPR,
 	})
 	if err != nil {
 		return nil, errors.WrapIf(err, "failed to create PR")
@@ -224,6 +274,8 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		ID:        pull.ID,
 		Permalink: pull.Permalink,
 	}
+	// It's possible that a new PR is created with the same branch. Reset the MergeCommit.
+	branchMeta.MergeCommit = ""
 	if err := meta.WriteBranch(repo, branchMeta); err != nil {
 		return nil, err
 	}
@@ -298,6 +350,7 @@ type ensurePROpts struct {
 	body        string
 	meta        PRMetadata
 	draft       bool
+	existingPR  *gh.PullRequest
 }
 
 // ensurePR returns the pull request for the given input, creating a new
@@ -305,42 +358,18 @@ type ensurePROpts struct {
 // indicating whether or not the pull request was created, and an error if one
 // occurred.
 func ensurePR(ctx context.Context, client *gh.Client, repoMeta meta.Repository, opts ensurePROpts) (*gh.PullRequest, bool, error) {
-	existing, err := client.GetPullRequests(ctx, gh.GetPullRequestsInput{
-		Owner:       repoMeta.Owner,
-		Repo:        repoMeta.Name,
-		HeadRefName: opts.headRefName,
-		States:      []githubv4.PullRequestState{githubv4.PullRequestStateOpen},
-	})
-	if err != nil {
-		return nil, false, errors.WrapIf(err, "querying existing pull requests")
-	}
-	if len(existing.PullRequests) > 0 {
-		pr := &existing.PullRequests[0]
-		existingMeta, err := ReadPRMetadata(pr.Body)
+	if opts.existingPR != nil {
+		newBody := AddPRMetadata(opts.body, opts.meta)
+		updatedPR, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
+			PullRequestID: opts.existingPR.ID,
+			Title:         gh.Ptr(githubv4.String(opts.title)),
+			Body:          gh.Ptr(githubv4.String(newBody)),
+		})
 		if err != nil {
-			logrus.WithError(err).Debug("failed to read PR metadata")
+			return nil, false, errors.WrapIf(err, "updating PR")
 		}
-
-		// Check if we need to update the metadata that's stored in the body of
-		// the PR.
-		if existingMeta != opts.meta {
-			logrus.WithFields(logrus.Fields{
-				"existingMeta": existingMeta,
-				"optsMeta":     opts.meta,
-			}).Debug("PR metadata doesn't match")
-			newBody := AddPRMetadata(pr.Body, opts.meta)
-			updatedPR, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
-				PullRequestID: pr.ID,
-				Body:          gh.Ptr(githubv4.String(newBody)),
-			})
-			if err != nil {
-				return nil, false, errors.WrapIf(err, "updating PR body text")
-			}
-			return updatedPR, false, nil
-		}
-		return &existing.PullRequests[0], false, nil
+		return updatedPR, false, nil
 	}
-
 	pull, err := client.CreatePullRequest(ctx, githubv4.CreatePullRequestInput{
 		RepositoryID: githubv4.ID(repoMeta.ID),
 		BaseRefName:  githubv4.String(opts.baseRefName),
