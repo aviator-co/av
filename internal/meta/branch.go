@@ -312,6 +312,32 @@ func DeleteBranch(repo *git.Repo, name string) error {
 	return nil
 }
 
+// RebuildChildren reads all branch metadata and rebuild Children.
+func RebuildChildren(repo *git.Repo) error {
+	branches, err := ReadAllBranches(repo)
+	if err != nil {
+		return err
+	}
+	// NOTE: The value of the branches is a value type, not a reference. When modifying its
+	// field, we need to write it back to the original map.
+	for name, branch := range branches {
+		branch.Children = nil
+		branches[name] = branch
+	}
+	for name, branch := range branches {
+		if parent, ok := branches[branch.Parent.Name]; ok {
+			parent.Children = append(parent.Children, name)
+			branches[branch.Parent.Name] = parent
+		}
+	}
+	for _, branch := range branches {
+		if err := WriteBranch(repo, branch); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 const branchMetaRefPrefix = "refs/av/branch-metadata/"
 
 func branchMetaRefName(branchName string) string {
