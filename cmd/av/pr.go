@@ -117,6 +117,6 @@ func init() {
 	)
 	prCreateCmd.Flags().BoolVar(
 		&prCreateFlags.Edit, "edit", false,
-		"open the editor for editing always",
+		"always open an editor to edit the pull request title and description",
 	)
 }
