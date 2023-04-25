@@ -13,6 +13,8 @@ type DiffOpts struct {
 	// If true, don't actually generate the diff, just return whether or not its
 	// empty. If set, Diff.Contents will always be an empty string.
 	Quiet bool
+	// If true, shows the colored diff.
+	Color bool
 }
 
 type Diff struct {
@@ -28,6 +30,9 @@ func (r *Repo) Diff(d *DiffOpts) (*Diff, error) {
 	}
 	if d.Commit != "" {
 		args = append(args, d.Commit)
+	}
+	if d.Color {
+		args = append(args, "--color=always")
 	}
 	contents, err := r.Git(args...)
 	var exitError *exec.ExitError

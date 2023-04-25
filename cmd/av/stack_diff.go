@@ -6,15 +6,17 @@ import (
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
-	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/meta"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
 var stackDiffCmd = &cobra.Command{
 	Use:          "diff",
-	Short:        "generate diff between working tree and current index",
+	Short:        "generate diff between working tree and the parent branch",
 	Long: strings.TrimSpace(`
-Generates the diff between the working tree and the current index (i.e., the diff containing all unstaged changes).
+Generates the diff between the working tree and the parent branch 
+(i.e., the diff between the current branch and the previous branch in the stack).
 `),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -23,39 +25,24 @@ Generates the diff between the working tree and the current index (i.e., the dif
 			return err
 		}
 
-		diff, err := repo.Diff(&git.DiffOpts{})
+		currentBranchName, err := repo.CurrentBranchName()
 		if err != nil {
 			return err
 		}
 
-		diffLines := strings.Split(diff.Contents, "\n")
+		branch, _ := meta.ReadBranch(repo, currentBranchName)
 
-		for _, line := range diffLines {
-			if strings.HasPrefix(line, "diff ") ||
-				strings.HasPrefix(line, "index ") ||
-				strings.HasPrefix(line, "+++") ||
-				strings.HasPrefix(line, "---") {
-				_, _ = fmt.Fprint(os.Stderr,
-					colors.Bold(line),
-					"\n",
-				)
-			} else if strings.HasPrefix(line, "+") {
-				_, _ = fmt.Fprint(os.Stderr,
-					colors.Success(line),
-					"\n",
-				)
-			} else if strings.HasPrefix(line, "-") {
-				_, _ = fmt.Fprint(os.Stderr,
-					colors.Failure(line),
-					"\n",
-				)
-			} else {
-				_, _ = fmt.Fprint(os.Stderr,
-					colors.Faint(line),
-					"\n",
-				)
-			}
+		var opts = &git.DiffOpts{
+			Color: !color.NoColor,
+			Commit: branch.Parent.Head,
 		}
+
+		diff, err := repo.Diff(opts)
+		if err != nil {
+			return err
+		}
+
+		_, _ = fmt.Fprint(os.Stderr, diff.Contents)
 
 		return nil
 	},
