@@ -17,7 +17,7 @@ type Branch struct {
 	// The branch name associated with this stack.
 	// Not stored in JSON because the name can always be derived from the name
 	// of the git ref.
-	Name string `json:"-"`
+	Name string `json:"name"`
 
 	// Information about the parent branch.
 	Parent BranchState `json:"parent,omitempty"`
@@ -60,13 +60,9 @@ func (b *Branch) UnmarshalJSON(bytes []byte) error {
 		return err
 	}
 
-	// Copy over all the data that we unmarshalled into BranchAlias. This is
-	// everything except since Parent which we'll handle next. We need to take
-	// special care to copy name since it won't be defined on BranchAlias (since
-	// Name is not serialized to JSON). Instead we expect that the struct is
-	// always initialized with the name defined, so we have to copy it over here.
-	// (Doing just "*b = ..." will result in us erasing the name.)
-	d.BranchAlias.Name = b.Name
+	if b.Name != "" {
+		d.BranchAlias.Name = b.Name
+	}
 	*b = Branch(d.BranchAlias)
 
 	// Parse the parent information (which can either be a string or a JSON)
