@@ -13,6 +13,7 @@ func init() {
 	stackCmd.AddCommand(
 		stackBranchCmd,
 		stackBranchCommitCmd,
+		stackDiffCmd,
 		stackNextCmd,
 		stackPrevCmd,
 		stackReparentCmd,

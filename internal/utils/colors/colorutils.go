@@ -10,6 +10,7 @@ var (
 	TroubleshootingC = color.New(color.Faint)
 	UserInputC       = color.New(color.FgCyan)
 	FaintC           = color.New(color.Faint)
+	BoldC			 = color.New(color.Bold)
 )
 
 var (
@@ -20,4 +21,5 @@ var (
 	Troubleshooting = TroubleshootingC.Sprint
 	UserInput       = UserInputC.Sprint
 	Faint           = FaintC.Sprint
+	Bold			= BoldC.Sprint
 )
