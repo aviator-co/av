@@ -34,7 +34,7 @@ Generates the diff between the working tree and the parent branch
 
 		var opts = &git.DiffOpts{
 			Color: !color.NoColor,
-			Commit: branch.Parent.Head,
+			Commit: branch.Parent.Name,
 		}
 
 		diff, err := repo.Diff(opts)
