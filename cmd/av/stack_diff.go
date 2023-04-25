@@ -32,12 +32,10 @@ Generates the diff between the working tree and the parent branch
 
 		branch, _ := meta.ReadBranch(repo, currentBranchName)
 
-		var opts = &git.DiffOpts{
+		diff, err := repo.Diff(&git.DiffOpts{
 			Color: !color.NoColor,
 			Commit: branch.Parent.Name,
-		}
-
-		diff, err := repo.Diff(opts)
+		})
 		if err != nil {
 			return err
 		}
