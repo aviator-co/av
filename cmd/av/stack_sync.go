@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/aviator-co/av/internal/utils/cleanup"
+	"golang.org/x/exp/slices"
 	"io/ioutil"
 	"os"
 	"path"
 	"strings"
-
-	"golang.org/x/exp/slices"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
@@ -104,10 +104,17 @@ base branch.
 
 		ctx := context.Background()
 
-		repo, repoMeta, err := getRepoInfo()
+		repo, err := getRepo()
 		if err != nil {
 			return err
 		}
+		db, err := getDB(repo)
+		if err != nil {
+			return err
+		}
+		tx := db.WriteTx()
+		cu := cleanup.New(func() { tx.Abort() })
+		defer cu.Cleanup()
 
 		// Read any preexisting state.
 		// This is required to allow us to handle --continue/--abort
@@ -198,9 +205,9 @@ base branch.
 				NewParentTrunk: state.Config.Parent == defaultBranch,
 			}
 			if stackSyncFlags.Continue {
-				res, err = actions.ReparentContinue(repo, opts)
+				res, err = actions.ReparentContinue(repo, tx, opts)
 			} else {
-				res, err = actions.Reparent(repo, opts)
+				res, err = actions.Reparent(repo, tx, opts)
 			}
 			if err != nil {
 				return err
@@ -230,14 +237,7 @@ base branch.
 
 		// For a trunk sync, we need to rebase the stack root against the HEAD
 		// of the trunk branch. After that, it's just a normal sync.
-		branches, err := meta.ReadAllBranches(repo)
-
-		// Construct the list of branches we need to sync
-		if err != nil {
-			return err
-		}
 		var branchesToSync []string
-
 		if len(state.Branches) != 0 {
 			// This is a --continue, so we need to sync the current branch and
 			// everything after it.
@@ -263,12 +263,12 @@ base branch.
 			if err != nil {
 				return err
 			}
-			branchesToSync, err = meta.PreviousBranches(branches, currentBranch)
+			branchesToSync, err = meta.PreviousBranches(tx, currentBranch)
 			if err != nil {
 				return err
 			}
 			branchesToSync = append(branchesToSync, currentBranch)
-			nextBranches, err := meta.SubsequentBranches(branches, branchesToSync[len(branchesToSync)-1])
+			nextBranches, err := meta.SubsequentBranches(tx, branchesToSync[len(branchesToSync)-1])
 			if err != nil {
 				return err
 			}
@@ -289,7 +289,7 @@ base branch.
 				_, _ = fmt.Fprint(os.Stderr, "\n\n")
 			}
 			state.CurrentBranch = currentBranch
-			res, err := actions.SyncBranch(ctx, repo, client, repoMeta, actions.SyncBranchOpts{
+			res, err := actions.SyncBranch(ctx, repo, client, tx, actions.SyncBranchOpts{
 				Branch:       currentBranch,
 				Fetch:        !state.Config.NoFetch,
 				Push:         !state.Config.NoPush,

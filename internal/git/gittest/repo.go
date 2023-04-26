@@ -3,11 +3,13 @@ package gittest
 import (
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"testing"
 )
 
@@ -56,16 +58,20 @@ func NewTempRepo(t *testing.T) *git.Repo {
 	_, err = repo.Git("commit", "-m", "Initial commit")
 	require.NoError(t, err, "failed to create initial commit")
 
+	db, err := jsonfiledb.Open(path.Join(repo.GitDir(), "av", "av.db"))
+	require.NoError(t, err, "failed to open database")
+
 	// Write metadata because some commands expect it to be there.
 	// This repository obviously doesn't exist so tests still need to be careful
 	// not to invoke operations that would communicate with GitHub (e.g.,
 	// by using the `--no-fetch` and `--no-push` flags).
-	err = meta.WriteRepository(repo, meta.Repository{
+	tx := db.WriteTx()
+	tx.SetRepository(meta.Repository{
 		ID:    "R_nonexistent_",
 		Owner: "aviator-co",
 		Name:  "nonexistent",
 	})
-	require.NoError(t, err, "failed to write repository metadata")
+	require.NoError(t, tx.Commit(), "failed to write repository metadata")
 
 	return repo
 }

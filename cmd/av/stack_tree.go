@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/aviator-co/av/internal/utils/cleanup"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -19,15 +20,20 @@ var stackTreeCmd = &cobra.Command{
 			return err
 		}
 
+		db, err := getDB(repo)
+		if err != nil {
+			return err
+		}
+		tx := db.WriteTx()
+		cu := cleanup.New(func() { tx.Abort() })
+		defer cu.Cleanup()
+
 		defaultBranch, err := repo.DefaultBranch()
 		if err != nil {
 			return err
 		}
 
-		branches, err := meta.ReadAllBranches(repo)
-		if err != nil {
-			return err
-		}
+		branches := tx.AllBranches()
 
 		var currentBranch string
 		if dh, err := repo.DetachedHead(); err != nil {

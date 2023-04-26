@@ -60,18 +60,19 @@ type CreatePullRequestResult struct {
 // `parent` argument is optional because sometimes it's loadeed by the
 // calling function and sometimes not. :shrug: It can also be nil if the
 // branch doesn't have a parent (i.e., the branch is a stack root).
-func getPRMetadata(repo *git.Repo, branch meta.Branch, parent *meta.Branch) (PRMetadata, error) {
-	trunk, err := meta.Trunk(repo, branch.Name)
-	if err != nil {
-		return PRMetadata{}, err
-	}
+func getPRMetadata(
+	tx meta.ReadTx,
+	branch meta.Branch,
+	parent *meta.Branch,
+) (PRMetadata, error) {
+	trunk, _ := meta.Trunk(tx, branch.Name)
 	prMeta := PRMetadata{
 		Parent:     branch.Parent.Name,
 		ParentHead: branch.Parent.Head,
 		Trunk:      trunk,
 	}
 	if parent == nil && branch.Parent.Name != "" {
-		p, _ := meta.ReadBranch(repo, branch.Parent.Name)
+		p, _ := tx.Branch(branch.Parent.Name)
 		parent = &p
 	}
 	if parent != nil && parent.PullRequest != nil {
@@ -112,14 +113,20 @@ func getExistingOpenPR(ctx context.Context, client *gh.Client, repoMeta meta.Rep
 
 // CreatePullRequest creates a pull request on GitHub for the current branch, if
 // one doesn't already exist.
-func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, opts CreatePullRequestOpts) (*CreatePullRequestResult, error) {
+func CreatePullRequest(
+	ctx context.Context,
+	repo *git.Repo,
+	client *gh.Client,
+	tx meta.WriteTx,
+	opts CreatePullRequestOpts,
+) (_ *CreatePullRequestResult, reterr error) {
 	if opts.BranchName == "" {
 		logrus.Panicf("internal invariant error: CreatePullRequest called with empty branch name")
 	}
 
-	repoMeta, err := meta.ReadRepository(repo)
-	if err != nil {
-		return nil, err
+	repoMeta, ok := tx.Repository()
+	if !ok {
+		return nil, ErrRepoNotInitialized
 	}
 
 	_, _ = fmt.Fprint(os.Stderr,
@@ -158,16 +165,26 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	}
 
 	// figure this out based on whether or not we're on a stacked branch
-	branchMeta, _ := meta.ReadBranch(repo, opts.BranchName)
-	prBaseBranch := branchMeta.Parent.Name
-	prCompareRef := prBaseBranch
+	branchMeta, _ := tx.Branch(opts.BranchName)
+	parentState := branchMeta.Parent
+	if parentState.Name == "" {
+		defaultBranch, err := repo.DefaultBranch()
+		if err != nil {
+			return nil, errors.WrapIf(err, "failed to determine default branch")
+		}
+		parentState = meta.BranchState{
+			Name:  defaultBranch,
+			Trunk: true,
+		}
+	}
+	prCompareRef := parentState.Name
 	var parentMeta meta.Branch
-	if !branchMeta.Parent.Trunk {
+	if !parentState.Trunk {
 		// check if the base branch also has an associated PR
 		var ok bool
-		parentMeta, ok = meta.ReadBranch(repo, prBaseBranch)
+		parentMeta, ok = tx.Branch(parentState.Name)
 		if !ok {
-			return nil, errors.WrapIff(err, "failed to read branch metadata for %q", prBaseBranch)
+			return nil, errors.Errorf("failed to read branch metadata for %q", parentState.Name)
 		}
 		if parentMeta.PullRequest == nil {
 			// TODO:
@@ -175,12 +192,12 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 			return nil, errors.Errorf(
 				"base branch %q does not have an associated pull request "+
 					"(create one by checking out the branch and running `av pr create`)",
-				prBaseBranch,
+				parentState.Name,
 			)
 		}
 	} else {
-		logrus.WithField("base", prBaseBranch).Debug("base branch is a trunk branch")
-		prCompareRef = "origin/" + prBaseBranch
+		logrus.WithField("base", parentState.Name).Debug("base branch is a trunk branch")
+		prCompareRef = "origin/" + parentState.Name
 	}
 
 	commitsList, err := repo.Git("rev-list", "--reverse", fmt.Sprintf("%s..HEAD", prCompareRef))
@@ -251,13 +268,13 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		}
 	}
 
-	prMeta, err := getPRMetadata(repo, branchMeta, &parentMeta)
+	prMeta, err := getPRMetadata(tx, branchMeta, &parentMeta)
 	if err != nil {
 		return nil, err
 	}
 
 	pull, didCreatePR, err := ensurePR(ctx, client, repoMeta, ensurePROpts{
-		baseRefName: prBaseBranch,
+		baseRefName: parentState.Name,
 		headRefName: opts.BranchName,
 		title:       opts.Title,
 		body:        opts.Body,
@@ -276,9 +293,6 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 	}
 	// It's possible that a new PR is created with the same branch. Reset the MergeCommit.
 	branchMeta.MergeCommit = ""
-	if err := meta.WriteBranch(repo, branchMeta); err != nil {
-		return nil, err
-	}
 	var action string
 	if didCreatePR {
 		action = "created"
@@ -301,6 +315,7 @@ func CreatePullRequest(ctx context.Context, repo *git.Repo, client *gh.Client, o
 		}
 	}
 
+	tx.SetBranch(branchMeta)
 	return &CreatePullRequestResult{didCreatePR, branchMeta, pull}, nil
 }
 
@@ -396,14 +411,22 @@ type UpdatePullRequestResult struct {
 
 // UpdatePullRequestState fetches the latest pull request information from GitHub
 // and writes the relevant branch metadata.
-func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Client, repoMeta meta.Repository, branchName string) (*UpdatePullRequestResult, error) {
+func UpdatePullRequestState(
+	ctx context.Context,
+	client *gh.Client,
+	tx meta.WriteTx,
+	branchName string,
+) (*UpdatePullRequestResult, error) {
+	repoMeta, ok := tx.Repository()
+	if !ok {
+		return nil, ErrRepoNotInitialized
+	}
+	branch, _ := tx.Branch(branchName)
+
 	_, _ = fmt.Fprint(os.Stderr,
 		"  - fetching latest pull request information for ", colors.UserInput(branchName),
 		"\n",
 	)
-
-	branch, _ := meta.ReadBranch(repo, branchName)
-
 	page, err := client.GetPullRequests(ctx, gh.GetPullRequestsInput{
 		Owner:       repoMeta.Owner,
 		Repo:        repoMeta.Name,
@@ -505,11 +528,7 @@ func UpdatePullRequestState(ctx context.Context, repo *git.Repo, client *gh.Clie
 		newPull = currentPull
 	}
 
-	// Write branch metadata regardless of changed to make sure it's in consistent state
-	if err := meta.WriteBranch(repo, branch); err != nil {
-		return nil, errors.WrapIf(err, "writing branch metadata")
-	}
-
+	tx.SetBranch(branch)
 	return &UpdatePullRequestResult{changed, branch, newPull}, nil
 }
 

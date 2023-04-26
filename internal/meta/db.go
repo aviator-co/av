@@ -30,6 +30,8 @@ type WriteTx interface {
 	Commit() error
 	// SetBranch sets the given branch in the database.
 	SetBranch(branch Branch)
+	// DeleteBranch deletes the given branch in the database.
+	DeleteBranch(name string)
 	// SetRepository sets the repository information in the database.
 	SetRepository(repository Repository)
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/aviator-co/av/internal/utils/cleanup"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
@@ -22,23 +23,28 @@ var stackSubmitCmd = &cobra.Command{
 		}
 
 		// Get the all branches in the stack
-		repo, _, err := getRepoInfo()
+		repo, err := getRepo()
 		if err != nil {
 			return err
 		}
-		branches, err := meta.ReadAllBranches(repo)
+
+		db, err := getDB(repo)
 		if err != nil {
 			return err
 		}
+		tx := db.WriteTx()
+		cu := cleanup.New(func() { tx.Abort() })
+		defer cu.Cleanup()
+
 		currentBranch, err := repo.CurrentBranchName()
 		if err != nil {
 			return err
 		}
-		previousBranches, err := meta.PreviousBranches(branches, currentBranch)
+		previousBranches, err := meta.PreviousBranches(tx, currentBranch)
 		if err != nil {
 			return err
 		}
-		subsequentBranches, err := meta.SubsequentBranches(branches, currentBranch)
+		subsequentBranches, err := meta.SubsequentBranches(tx, currentBranch)
 		if err != nil {
 			return err
 		}
@@ -54,8 +60,10 @@ var stackSubmitCmd = &cobra.Command{
 			return err
 		}
 		for _, branchName := range branchesToSubmit {
+			// TODO: should probably commit database after every call to this
+			// since we're just syncing state from GitHub
 			result, err := actions.CreatePullRequest(
-				ctx, repo, client,
+				ctx, repo, client, tx,
 				actions.CreatePullRequestOpts{
 					BranchName: branchName,
 					Draft:      config.Av.PullRequest.Draft,
@@ -77,6 +85,10 @@ var stackSubmitCmd = &cobra.Command{
 			}
 		}
 
+		cu.Cancel()
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 		return nil
 	},
 }

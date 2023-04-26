@@ -3,15 +3,12 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 	"sync"
 	"time"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
-	"github.com/aviator-co/av/internal/git"
 	"github.com/fatih/color"
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
@@ -158,26 +155,6 @@ func checkCliVersion() {
 			c.Sprint(">> https://docs.aviator.co/reference/aviator-cli/installation#upgrade\n"),
 		)
 	}
-}
-
-var cachedRepo *git.Repo
-
-func getRepo() (*git.Repo, error) {
-	if cachedRepo == nil {
-		cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-		if rootFlags.Directory != "" {
-			cmd.Dir = rootFlags.Directory
-		}
-		toplevel, err := cmd.Output()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to determine repo toplevel (are you running inside a Git repo?)")
-		}
-		cachedRepo, err = git.OpenRepo(strings.TrimSpace(string(toplevel)))
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to open git repo")
-		}
-	}
-	return cachedRepo, nil
 }
 
 var once sync.Once

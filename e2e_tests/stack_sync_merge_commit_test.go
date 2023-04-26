@@ -3,7 +3,6 @@ package e2e_tests
 import (
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
-	"github.com/aviator-co/av/internal/meta"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -46,9 +45,9 @@ func TestStackSyncMergeCommit(t *testing.T) {
 		require.NotEqual(t, oldHead, squashCommit, "squash commit should be different from old HEAD")
 	})
 
-	stack1Meta, _ := meta.ReadBranch(repo, "stack-1")
+	stack1Meta, _ := tx.Branch("stack-1")
 	stack1Meta.MergeCommit = squashCommit
-	require.NoError(t, meta.WriteBranch(repo, stack1Meta))
+	require.NoError(t, tx.SetBranch(stack1Meta))
 
 	require.Equal(t, 0,
 		Cmd(t, "git", "merge-base", "--is-ancestor", "stack-1", "stack-2").ExitCode,

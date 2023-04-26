@@ -1,5 +1,11 @@
 package cleanup
 
+func New(
+	fns ...func(),
+) Cleanup {
+	return Cleanup{fns}
+}
+
 // Cleanup provides an easy way to clean up resources after an operation fails.
 type Cleanup struct {
 	fns []func()

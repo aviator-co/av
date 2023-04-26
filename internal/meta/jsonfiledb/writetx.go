@@ -15,6 +15,10 @@ func (tx *writeTx) SetBranch(branch meta.Branch) {
 	tx.state.BranchState[branch.Name] = branch
 }
 
+func (tx *writeTx) DeleteBranch(name string) {
+	delete(tx.state.BranchState, name)
+}
+
 func (tx *writeTx) Abort() {
 	tx.db.stateMu.Unlock()
 	tx.db = nil
