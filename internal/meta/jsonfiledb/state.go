@@ -24,23 +24,14 @@ func readState(filepath string) (*state, error) {
 }
 
 type state struct {
-	Branches map[string]meta.Branch `json:"branches"`
-}
-
-var _ meta.ReadTx = &state{}
-
-func (d *state) Branch(name string) (meta.Branch, bool) {
-	branch, ok := d.Branches[name]
-	return branch, ok
-}
-
-func (d *state) AllBranches() map[string]meta.Branch {
-	return maputils.Copy(d.Branches)
+	BranchState     map[string]meta.Branch `json:"branches"`
+	RepositoryState meta.Repository        `json:"repository"`
 }
 
 func (d *state) copy() state {
 	return state{
-		maputils.Copy(d.Branches),
+		maputils.Copy(d.BranchState),
+		d.RepositoryState,
 	}
 }
 

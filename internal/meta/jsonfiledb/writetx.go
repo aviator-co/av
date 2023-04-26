@@ -7,8 +7,12 @@ type writeTx struct {
 	readTx
 }
 
+func (tx *writeTx) SetRepository(repository meta.Repository) {
+	tx.state.RepositoryState = repository
+}
+
 func (tx *writeTx) SetBranch(branch meta.Branch) {
-	tx.state.Branches[branch.Name] = branch
+	tx.state.BranchState[branch.Name] = branch
 }
 
 func (tx *writeTx) Abort() {

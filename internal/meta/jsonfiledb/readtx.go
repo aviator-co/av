@@ -11,11 +11,15 @@ type readTx struct {
 
 var _ meta.ReadTx = &readTx{}
 
+func (tx *readTx) Repository() (meta.Repository, bool) {
+	return tx.state.RepositoryState, tx.state.RepositoryState.ID != ""
+}
+
 func (tx *readTx) Branch(name string) (branch meta.Branch, ok bool) {
-	branch, ok = tx.state.Branches[name]
+	branch, ok = tx.state.BranchState[name]
 	return
 }
 
 func (tx *readTx) AllBranches() map[string]meta.Branch {
-	return maputils.Copy(tx.state.Branches)
+	return maputils.Copy(tx.state.BranchState)
 }

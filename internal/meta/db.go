@@ -8,6 +8,8 @@ type DB interface {
 // ReadTx is a transaction that can be used to read from the database.
 // It presents a consistent view of the underlying database.
 type ReadTx interface {
+	// Repository returns the repository information.
+	Repository() (Repository, bool)
 	// Branch returns the branch with the given name. If no such branch exists,
 	// the second return value is false.
 	Branch(name string) (Branch, bool)
@@ -28,4 +30,6 @@ type WriteTx interface {
 	Commit() error
 	// SetBranch sets the given branch in the database.
 	SetBranch(branch Branch)
+	// SetRepository sets the repository information in the database.
+	SetRepository(repository Repository)
 }
