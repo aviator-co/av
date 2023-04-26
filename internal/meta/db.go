@@ -1,13 +1,12 @@
 package meta
 
 type DB interface {
-	ReadTx
-	// WithTx runs the given function in a transaction. The transaction is
-	// committed when the function returns (unless it has been aborted by
-	// calling WriteTx.Abort).
-	WithTx(func(tx WriteTx)) error
+	ReadTx() ReadTx
+	WriteTx() WriteTx
 }
 
+// ReadTx is a transaction that can be used to read from the database.
+// It presents a consistent view of the underlying database.
 type ReadTx interface {
 	// Branch returns the branch with the given name. If no such branch exists,
 	// the second return value is false.
@@ -20,7 +19,13 @@ type ReadTx interface {
 type WriteTx interface {
 	ReadTx
 	// Abort aborts the transaction (no changes will be committed).
+	// The transaction cannot be used after it has been aborted.
 	Abort()
+	// Commit commits the transaction (all changes will be committed).
+	// If an error is returned, the data could not be commited.
+	// The transaction cannot be used after it has been committed (even if an
+	// error is returned).
+	Commit() error
 	// SetBranch sets the given branch in the database.
 	SetBranch(branch Branch)
 }

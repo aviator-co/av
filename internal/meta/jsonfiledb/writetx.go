@@ -3,16 +3,29 @@ package jsonfiledb
 import "github.com/aviator-co/av/internal/meta"
 
 type writeTx struct {
-	state
-	aborted bool
+	db *DB
+	readTx
 }
 
 func (tx *writeTx) SetBranch(branch meta.Branch) {
-	tx.Branches[branch.Name] = branch
+	tx.state.Branches[branch.Name] = branch
 }
 
 func (tx *writeTx) Abort() {
-	tx.aborted = true
+	tx.db.stateMu.Unlock()
+	tx.db = nil
+}
+
+func (tx *writeTx) Commit() error {
+	// Always unlock the database even if there is an error.
+	defer tx.db.stateMu.Unlock()
+	err := tx.state.write(tx.db.filepath)
+	if err != nil {
+		return err
+	}
+	*tx.db.state = tx.state
+	tx.db = nil
+	return nil
 }
 
 var _ meta.WriteTx = &writeTx{}
