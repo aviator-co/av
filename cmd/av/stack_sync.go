@@ -227,6 +227,9 @@ base branch.
 					text.Indent(hint, "    "),
 					"\n",
 				)
+				if err := tx.Commit(); err != nil {
+					return err
+				}
 				return nil
 			}
 
@@ -304,6 +307,9 @@ base branch.
 				if err := writeStackSyncState(repo, &state); err != nil {
 					return errors.Wrap(err, "failed to write stack sync state")
 				}
+				if err := tx.Commit(); err != nil {
+					return err
+				}
 				return errExitSilently{1}
 			}
 
@@ -316,6 +322,9 @@ base branch.
 		}
 		if err := writeStackSyncState(repo, nil); err != nil {
 			return errors.Wrap(err, "failed to write stack sync state")
+		}
+		if err := tx.Commit(); err != nil {
+			return err
 		}
 		return nil
 	},

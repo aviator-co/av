@@ -18,15 +18,16 @@ type ReadTx interface {
 }
 
 // WriteTx is a transaction that can be used to modify the database.
+// The transaction MUST be finalized by calling either Abort or Commit.
 type WriteTx interface {
 	ReadTx
-	// Abort aborts the transaction (no changes will be committed).
-	// The transaction cannot be used after it has been aborted.
+	// Abort finalizes the transaction without committing any changes.
+	// Abort can be called even after the transaction has been finalized (which
+	// is effectively a no-op).
 	Abort()
-	// Commit commits the transaction (all changes will be committed).
-	// If an error is returned, the data could not be commited.
-	// The transaction cannot be used after it has been committed (even if an
-	// error is returned).
+	// Commit finalizes the transaction and commits all changes.
+	// If an error is returned, the data could not be committed.
+	// Commit will panic if called after the transaction has been finalized.
 	Commit() error
 	// SetBranch sets the given branch in the database.
 	SetBranch(branch Branch)

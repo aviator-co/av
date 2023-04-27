@@ -1,7 +1,10 @@
 package jsonfiledb
 
 import (
+	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"os"
+	"path"
 	"sync"
 )
 
@@ -12,9 +15,19 @@ type DB struct {
 	state   *state
 }
 
-// Open opens a JSON file database at the given path.
+func RepoPath(repo *git.Repo) string {
+	return path.Join(repo.GitDir(), "av", "av.db")
+}
+
+func OpenRepo(repo *git.Repo) (*DB, error) {
+	repoPath := RepoPath(repo)
+	_ = os.MkdirAll(path.Dir(repoPath), 0755)
+	return OpenPath(repoPath)
+}
+
+// OpenPath opens a JSON file database at the given path.
 // If the file does not exist, it is created.
-func Open(filepath string) (*DB, error) {
+func OpenPath(filepath string) (*DB, error) {
 	state, err := readState(filepath)
 	if err != nil {
 		return nil, err

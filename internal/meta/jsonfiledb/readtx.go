@@ -17,6 +17,9 @@ func (tx *readTx) Repository() (meta.Repository, bool) {
 
 func (tx *readTx) Branch(name string) (branch meta.Branch, ok bool) {
 	branch, ok = tx.state.BranchState[name]
+	if !ok {
+		branch.Name = name
+	}
 	return
 }
 

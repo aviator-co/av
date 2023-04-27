@@ -92,7 +92,7 @@ internal tracking metadata that defines the order of branches within a stack.`,
 		var parentHead string
 		if !isBranchFromTrunk {
 			var err error
-			parentHead, err := repo.RevParse(&git.RevParse{Rev: parentBranchName})
+			parentHead, err = repo.RevParse(&git.RevParse{Rev: parentBranchName})
 			if err != nil {
 				return errors.WrapIff(err, "failed to determine head commit of branch %q", parentHead)
 			}
@@ -122,7 +122,21 @@ internal tracking metadata that defines the order of branches within a stack.`,
 		// If this isn't a new stack root, update the parent metadata to include
 		// the new branch as a child.
 		if !isBranchFromTrunk {
-			parentMeta, _ := tx.Branch(parentBranchName)
+			parentMeta, ok := tx.Branch(parentBranchName)
+			if !ok {
+				// Handle case where the user created first branch by
+				// `git switch -c` from trunk (i.e., created first branch
+				// without using av), then wants to create a stacked branch
+				// after it.
+				parentMeta = meta.Branch{
+					Name: parentBranchName,
+					Parent: meta.BranchState{
+						// Assume the parent is a branch from the default branch
+						Name:  defaultBranch,
+						Trunk: true,
+					},
+				}
+			}
 			parentMeta.Children = append(parentMeta.Children, branchName)
 			logrus.WithField("meta", parentMeta).Debug("writing parent branch metadata")
 			tx.SetBranch(parentMeta)

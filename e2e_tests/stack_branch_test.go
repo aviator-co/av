@@ -2,7 +2,7 @@ package e2e_tests
 
 import (
 	"github.com/aviator-co/av/internal/git/gittest"
-	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -39,8 +39,9 @@ func TestStackBranchMove(t *testing.T) {
 	RequireCurrentBranchName(t, repo, "trois")
 
 	// Make sure we've handled all the parent/child renames correctly
-	branches, err := meta.ReadAllBranches(repo)
-	require.NoError(t, err)
+	db, err := jsonfiledb.OpenRepo(repo)
+	require.NoError(t, err, "failed to open repo db")
+	branches := db.ReadTx().AllBranches()
 	require.Equal(t, true, branches["un"].Parent.Trunk, "expected parent(un) to be a trunk")
 	require.Equal(t, []string{"deux"}, branches["un"].Children, "expected un to have children [deux]")
 	require.Equal(t, "un", branches["deux"].Parent.Name, "expected parent(deux) to be un")

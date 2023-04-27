@@ -12,6 +12,9 @@ func (tx *writeTx) SetRepository(repository meta.Repository) {
 }
 
 func (tx *writeTx) SetBranch(branch meta.Branch) {
+	if branch.Name == "" {
+		panic("cannot set branch with empty name")
+	}
 	tx.state.BranchState[branch.Name] = branch
 }
 
@@ -20,11 +23,18 @@ func (tx *writeTx) DeleteBranch(name string) {
 }
 
 func (tx *writeTx) Abort() {
+	// Abort after finalize is a no-op.
+	if tx.db == nil {
+		return
+	}
 	tx.db.stateMu.Unlock()
 	tx.db = nil
 }
 
 func (tx *writeTx) Commit() error {
+	if tx.db == nil {
+		panic("cannot commit transaction: already finalized")
+	}
 	// Always unlock the database even if there is an error.
 	defer tx.db.stateMu.Unlock()
 	err := tx.state.write(tx.db.filepath)

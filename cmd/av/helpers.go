@@ -7,7 +7,6 @@ import (
 	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/sirupsen/logrus"
 	"os/exec"
-	"path"
 	"strings"
 )
 
@@ -32,7 +31,7 @@ func getRepo() (*git.Repo, error) {
 }
 
 func getDB(repo *git.Repo) (meta.DB, error) {
-	db, err := jsonfiledb.Open(path.Join(repo.GitDir(), "av", "av.db"))
+	db, err := jsonfiledb.OpenRepo(repo)
 	if err != nil {
 		return nil, err
 	}

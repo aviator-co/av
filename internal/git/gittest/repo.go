@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path"
 	"testing"
 )
 
@@ -58,7 +57,7 @@ func NewTempRepo(t *testing.T) *git.Repo {
 	_, err = repo.Git("commit", "-m", "Initial commit")
 	require.NoError(t, err, "failed to create initial commit")
 
-	db, err := jsonfiledb.Open(path.Join(repo.GitDir(), "av", "av.db"))
+	db, err := jsonfiledb.OpenRepo(repo)
 	require.NoError(t, err, "failed to open database")
 
 	// Write metadata because some commands expect it to be there.
