@@ -20,14 +20,13 @@ func RepoPath(repo *git.Repo) string {
 }
 
 func OpenRepo(repo *git.Repo) (*DB, error) {
-	repoPath := RepoPath(repo)
-	_ = os.MkdirAll(path.Dir(repoPath), 0755)
-	return OpenPath(repoPath)
+	return OpenPath(RepoPath(repo))
 }
 
 // OpenPath opens a JSON file database at the given path.
-// If the file does not exist, it is created.
+// If the file does not exist, it is created (as well as all ancestor directories).
 func OpenPath(filepath string) (*DB, error) {
+	_ = os.MkdirAll(path.Dir(filepath), 0755)
 	state, err := readState(filepath)
 	if err != nil {
 		return nil, err

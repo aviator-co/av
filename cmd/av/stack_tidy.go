@@ -1,6 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/textutils"
+	"os"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -51,9 +55,11 @@ operates on only av's internal metadata, and it won't delete the actual Git bran
 		}
 		rebuildChildren(branches)
 
+		nDeleted := 0
 		for name, br := range branches {
 			if _, deleted := newParents[name]; deleted {
 				tx.DeleteBranch(name)
+				nDeleted += 1
 				continue
 			}
 			tx.SetBranch(*br)
@@ -61,6 +67,16 @@ operates on only av's internal metadata, and it won't delete the actual Git bran
 
 		if err := tx.Commit(); err != nil {
 			return err
+		}
+
+		if nDeleted > 0 {
+			_, _ = fmt.Fprint(os.Stderr,
+				"Tidied ", colors.UserInput(nDeleted), " ",
+				textutils.Pluralize(nDeleted, "branch", "branches"),
+				".\n",
+			)
+		} else {
+			_, _ = fmt.Fprintln(os.Stderr, "No branches to tidy.")
 		}
 		return nil
 	},
