@@ -68,14 +68,66 @@ func printStackTree(repo *git.Repo, branches map[string]meta.Branch, currentBran
 		fmt.Printf("%s<ERROR: unknown branch: %s>\n", indent, root)
 		return
 	}
+
+	branchInfo := getBranchInfo(repo, branch)	
+
 	if currentBranch == branch.Name {
 		_, _ = fmt.Print(
-			indent, colors.Success("* "), colors.Success(branch.Name), "\n",
+			indent, colors.Success("* "), colors.Success(branch.Name), " ", colors.Faint(branchInfo), "\n",
 		)
 	} else {
-		_, _ = fmt.Printf("%s%s\n", indent, branch.Name)
+		_, _ = fmt.Print(indent, branch.Name, " ", colors.Faint(branchInfo), "\n")
 	}
 	for _, next := range branch.Children {
 		printStackTree(repo, branches, currentBranch, next, depth+1)
 	}
+}
+
+func getBranchInfo(repo *git.Repo, branch meta.Branch) string {
+	var branchInfo string
+
+	parentStatus := getParentStatus(repo, branch)
+	upstreamStatus := getUpstreamStatus(repo, branch)
+
+	branchStatus := strings.Trim(fmt.Sprintf("%s %s", parentStatus, upstreamStatus), " ")
+	if branchStatus != "" {
+		branchInfo = fmt.Sprintf("(%s)", branchStatus)
+	}
+
+	if branch.PullRequest != nil && branch.PullRequest.Permalink != "" {
+		branchInfo = branch.PullRequest.Permalink + " " + branchInfo
+	}
+
+	return branchInfo
+}
+
+// Check if branch is up to date with the parent branch.
+// This is doing `git diff <parentBranch> <givenBranch>`
+func getParentStatus(repo *git.Repo, branch meta.Branch) string {
+	parentDiff, err := repo.Diff(&git.DiffOpts{Quiet: true, Branch1: branch.Parent.Name, Branch2: branch.Name})
+	if err != nil {
+		return ""
+	} 
+	
+	if parentDiff.Empty {
+		return "parent \u2713"
+	}
+	
+	return "parent \u2717"
+}
+
+// Check if branch is up to date with the upstream branch.
+// This is doing `git diff <givenBranch> remotes/origin/<givenBranch>`
+func getUpstreamStatus(repo *git.Repo, branch meta.Branch) string {
+	upstreamBranch := fmt.Sprintf("remotes/origin/%s", branch.Name)
+	upstreamDiff, err := repo.Diff(&git.DiffOpts{Quiet: true, Branch1: branch.Name, Branch2: upstreamBranch})
+	if err != nil {
+		return ""
+	} 
+	
+	if upstreamDiff.Empty {
+		return "upstream \u2713"
+	}
+		
+	return "upstream \u2717"
 }

@@ -15,6 +15,10 @@ type DiffOpts struct {
 	Quiet bool
 	// If true, shows the colored diff.
 	Color bool
+	// Both branches need to be specified in order to find the diff between the two branches.
+	// If a Commit is specified, the branches will not be used.
+	Branch1 string
+	Branch2 string
 }
 
 type Diff struct {
@@ -30,7 +34,11 @@ func (r *Repo) Diff(d *DiffOpts) (*Diff, error) {
 	}
 	if d.Commit != "" {
 		args = append(args, d.Commit)
+	} else if d.Branch1 != "" && d.Branch2 != "" {
+		args = append(args, d.Branch1)
+		args = append(args, d.Branch2)
 	}
+
 	if d.Color {
 		args = append(args, "--color=always")
 	}
