@@ -110,10 +110,10 @@ func getParentStatus(repo *git.Repo, branch meta.Branch) string {
 	} 
 	
 	if parentDiff.Empty {
-		return "parent \u2713"
+		return ""
 	}
 	
-	return "parent \u2717"
+	return "needs sync"
 }
 
 // Check if branch is up to date with the upstream branch.
@@ -126,8 +126,8 @@ func getUpstreamStatus(repo *git.Repo, branch meta.Branch) string {
 	} 
 	
 	if upstreamDiff.Empty {
-		return "upstream \u2713"
+		return ""
 	}
 		
-	return "upstream \u2717"
+	return "not pushed"
 }
