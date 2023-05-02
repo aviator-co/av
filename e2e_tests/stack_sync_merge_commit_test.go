@@ -5,7 +5,9 @@ import (
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
+	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/meta/jsonfiledb"
+	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/require"
 )
 
@@ -55,6 +57,9 @@ func TestStackSyncMergeCommit(t *testing.T) {
 	require.NoError(t, err, "failed to open repo db")
 	tx := db.WriteTx()
 	stack1Meta, _ := tx.Branch("stack-1")
+	stack1Meta.PullRequest = &meta.PullRequest{
+		State: githubv4.PullRequestStateMerged,
+	}
 	stack1Meta.MergeCommit = squashCommit
 	tx.SetBranch(stack1Meta)
 	require.NoError(t, tx.Commit())
@@ -68,10 +73,29 @@ func TestStackSyncMergeCommit(t *testing.T) {
 		"squash commit of stack-1 should not be an ancestor of HEAD of stack-1 before running sync",
 	)
 
+	// Trying to sync the stack-1 to the squashed commit. From human's perspective, this should
+	// be clean rebase, but since git cannot tell that stack-1 changes and the squash commit
+	// changes are equivalent, it makes a merge conflict.
+	syncConflict := Av(t, "stack", "sync", "--no-fetch", "--no-push")
+	require.NotEqual(
+		t, 0, syncConflict.ExitCode,
+		"stack sync should return non-zero exit code if conflicts",
+	)
+	require.Contains(
+		t, syncConflict.Stderr,
+		"error: could not apply", "stack sync should include error message on rebase",
+	)
+	RequireAv(t, "stack", "sync", "--skip")
+
 	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
 
 	require.Equal(t, 0,
 		Cmd(t, "git", "merge-base", "--is-ancestor", squashCommit, "stack-2").ExitCode,
 		"squash commit of stack-1 should be an ancestor of HEAD of stack-1 after running sync",
+	)
+
+	require.Equal(t, 1,
+		Cmd(t, "git", "show-ref", "refs/heads/stack-1").ExitCode,
+		"merged branch stack-1 should be deleted after sync",
 	)
 }

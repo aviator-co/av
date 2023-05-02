@@ -58,6 +58,8 @@ type stackSyncState struct {
 	Continuation *actions.SyncBranchContinuation `json:"continuation,omitempty"`
 	// The config of the sync.
 	Config stackSyncConfig `json:"config"`
+	// The branches that should be deleted after sync.
+	DeletionPendingBranches []string `json:"deletionPendingBranches"`
 }
 
 var stackSyncFlags struct {
@@ -283,7 +285,6 @@ base branch.
 		// Either way (--continue or not), we sync all subsequent branches
 
 		logrus.WithField("branches", branchesToSync).Debug("determined branches to sync")
-		//var resErr error
 		client, err := getClient(config.Av.GitHub.Token)
 		if err != nil {
 			return err
@@ -315,8 +316,27 @@ base branch.
 				}
 				return errExitSilently{1}
 			}
+			if res.DeleteBranch {
+				state.DeletionPendingBranches = append(state.DeletionPendingBranches, currentBranch)
+			}
 
 			state.Continuation = nil
+		}
+		for _, branch := range state.DeletionPendingBranches {
+			br, _ := tx.Branch(branch)
+			for _, chName := range br.Children {
+				if ch, ok := tx.Branch(chName); ok {
+					ch.Parent = br.Parent
+					tx.SetBranch(ch)
+				}
+			}
+			tx.DeleteBranch(branch)
+			if _, err := repo.Git("switch", "--detach"); err != nil {
+				return err
+			}
+			if _, err := repo.Git("branch", "--delete", branch); err != nil {
+				return err
+			}
 		}
 
 		// Return to the original branch

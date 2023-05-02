@@ -13,7 +13,7 @@ import (
 func msgRebaseResult(rebase *git.RebaseResult) {
 	switch rebase.Status {
 	case git.RebaseAlreadyUpToDate:
-		_, _ = fmt.Fprint(os.Stderr, "  - already up to date\n")
+		_, _ = fmt.Fprint(os.Stderr, "  - already up-to-date\n")
 	case git.RebaseUpdated:
 		_, _ = fmt.Fprint(os.Stderr, "  - ", colors.Success("rebased without conflicts"), "\n")
 	case git.RebaseConflict:

@@ -15,7 +15,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/ghutils"
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/shurcooL/githubv4"
-	"github.com/sirupsen/logrus"
 )
 
 type SyncBranchOpts struct {
@@ -39,18 +38,15 @@ type SyncBranchResult struct {
 
 	// The updated branch metadata (if the rebase was successful)
 	Branch meta.Branch
+
+	// The branch should be deleted.
+	DeleteBranch bool
 }
 
 type (
 	SyncBranchContinuation struct {
 		// The original HEAD commit of the branch.
 		OldHead string `json:"oldHead"`
-		// The commit that we were rebasing the branch on top of.
-		ParentCommit string `json:"parentCommit"`
-
-		// If set, we need to re-assign the branch to be a stack root that is
-		// based on this trunk branch.
-		NewTrunk string `json:"newTrunk,omitempty"`
 	}
 )
 
@@ -95,17 +91,6 @@ func SyncBranch(
 			}
 		}
 
-		if branch.MergeCommit != "" {
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - skipping sync for merged branch "+
-					"(merged in commit ", colors.UserInput(git.ShortSha(branch.MergeCommit)), ")"+
-					"\n",
-			)
-			return &SyncBranchResult{
-				RebaseResult: git.RebaseResult{Status: git.RebaseAlreadyUpToDate},
-			}, nil
-		}
-
 		var err error
 		res, err = syncBranchRebase(ctx, repo, tx, opts, branch)
 		if err != nil {
@@ -118,7 +103,25 @@ func SyncBranch(
 		return res, nil
 	}
 
-	if opts.Push {
+	if branch.PullRequest != nil && branch.PullRequest.State != githubv4.PullRequestStateOpen {
+		if lo, err := hasLeftover(repo, branch, opts); err != nil {
+			return nil, err
+		} else if lo {
+			if !opts.ToTrunk {
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - ", colors.Warning("WARNING: The PR is closed, but without --trunk, we cannot tell if we can safely delete the branch."),
+				)
+			} else {
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - ", colors.Warning("WARNING: The PR is closed, but after rebasing, there are still some changes left locally."),
+				)
+				// TODO(draftcode): Ask what to do with the leftovers. Right now
+				// this keeps the leftover to the merged branch.
+			}
+		} else {
+			res.DeleteBranch = true
+		}
+	} else if opts.Push {
 		if err := syncBranchPushAndUpdatePullRequest(ctx, repo, client, tx, branch, pull); err != nil {
 			return nil, err
 		}
@@ -139,174 +142,14 @@ func syncBranchRebase(
 		return nil, errors.WrapIff(err, "failed to get head of branch %q", branch.Name)
 	}
 
-	if branch.IsStackRoot() {
-		trunk := branch.Parent.Name
-		if !opts.ToTrunk {
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - branch is a stack root, nothing to do",
-				" (run ", colors.CliCmd("av stack sync --trunk"),
-				" to sync against the latest commit in ", colors.UserInput(trunk), ")\n",
-			)
-			return &SyncBranchResult{
-				git.RebaseResult{Status: git.RebaseAlreadyUpToDate},
-				nil,
-				branch,
-			}, nil
-		}
-
-		// First, try to fetch latest commit from the trunk...
-		_, _ = fmt.Fprint(os.Stderr,
-			"  - fetching latest commit from ", colors.UserInput("origin/", trunk), "\n",
-		)
-		if _, err := repo.Run(&git.RunOpts{
-			Args: []string{"fetch", "origin", trunk},
-		}); err != nil {
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - ",
-				colors.Failure("error: failed to fetch HEAD of "), colors.UserInput(trunk),
-				colors.Failure(" from origin: ", err.Error()), "\n",
-			)
-			return nil, errors.WrapIff(err, "failed to fetch trunk branch %q from origin", trunk)
-		}
-
-		// NOTE: Strictly speaking, if a user doesn't use the default refspec (e.g. fetch is
-		// not +refs/heads/*:refs/remotes/origin/*, the remote tracking branch is not
-		// origin/$TRUNK. As we just fetched from a remote, it'd be safe to use FETCH_HEAD.
-		trunkHead, err := repo.RevParse(&git.RevParse{Rev: "origin/" + trunk})
-		if err != nil {
-			return nil, errors.WrapIff(err, "failed to get HEAD of %q", trunk)
-		}
-
-		rebase, err := repo.RebaseParse(git.RebaseOpts{
-			Branch:   opts.Branch,
-			Upstream: trunkHead,
-		})
-		if err != nil {
-			return nil, err
-		}
-		msgRebaseResult(rebase)
-		//nolint:exhaustive
-		switch rebase.Status {
-		case git.RebaseConflict:
-			return &SyncBranchResult{
-				*rebase,
-				&SyncBranchContinuation{
-					OldHead: branchHead,
-				},
-				branch,
-			}, nil
-		default:
-			return &SyncBranchResult{*rebase, nil, branch}, nil
-		}
+	rebaseOpt := git.RebaseOpts{
+		Branch: opts.Branch,
 	}
 
-	// We have three possibilities here:
-	//   1. The parent branch has been merged. We need to rebase this branch
-	//      on top of the commit that was actually merged into the trunk.
-	//   2. The branch is up-to-date with its parent. This is defined as
-	//      merge-base(branch, parent) = head(parent).
-	//   3. The branch is not up-to-date with its parent (usually this means
-	//      that a commit was added to parent in the meantime, but can also
-	//      happen if the parent branch was rebased itself).
-
-	// Scenario 1: the parent branch has been merged.
-	parent, _ := tx.Branch(branch.Parent.Name)
-	if parent.MergeCommit != "" {
-		short := git.ShortSha(parent.MergeCommit)
-		_, _ = fmt.Fprint(os.Stderr,
-			"  - parent ", colors.UserInput(branch.Parent.Name),
-			" (pull ", colors.UserInput("#", parent.PullRequest.GetNumber()), ")",
-			" was merged\n",
-		)
-		_, _ = fmt.Fprint(os.Stderr,
-			"  - rebasing ", colors.UserInput(branch.Name),
-			" on top of merge commit ", colors.UserInput(short), "\n",
-		)
-		if opts.Fetch {
-			if _, err := repo.Git("fetch", "origin", branch.MergeCommit); err != nil {
-				return nil, errors.WrapIff(err, "failed to fetch merge commit %q from origin", short)
-			}
-		}
-
-		rebase, err := repo.RebaseParse(git.RebaseOpts{
-			Branch:   branch.Name,
-			Upstream: branch.Parent.Name,
-			// Replay the commits from this branch directly onto the merge commit.
-			// The HEAD of trunk might have moved forward since this, but this is
-			// probably the best thing to do here (we bias towards introducing as
-			// few unrelated commits into the history as possible -- we have to
-			// introduce everything that landed in trunk before the merge commit,
-			// but we hold off on introducing anything that landed after).
-			// The user can always run `av stack sync --trunk` to sync against the
-			// tip of master.
-			// For example if we have
-			//        A---B---M---C---D  main
-			//         \     /
-			//          Q---R  stacked-1
-			//               \
-			//                X---Y  stacked-2
-			// (where M is the commit that merged stacked-1 into main, **even
-			// if it's actually a squash merge and not a real merge commit),
-			// then after the sync we'll have
-			//        A---B---M---C---D  main
-			//                 \
-			//                  X'--Y'  stacked-2
-			// Note that we've introduced B into the history of stacked-2, but
-			// not C or D since those commits come after M.
-			Onto: parent.MergeCommit,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if rebase.Status == git.RebaseConflict {
-			return &SyncBranchResult{
-				*rebase,
-				&SyncBranchContinuation{
-					OldHead:      branchHead,
-					ParentCommit: parent.MergeCommit,
-					NewTrunk:     parent.Parent.Name,
-				},
-				branch,
-			}, nil
-		}
-
-		branch, err = syncBranchUpdateNewTrunk(tx, branch, parent.Parent.Name)
-		if err != nil {
-			return nil, err
-		}
-		return &SyncBranchResult{*rebase, nil, branch}, nil
-	}
-
-	// Scenario 2: the branch is up-to-date with its parent.
-	parentHead, err := repo.RevParse(&git.RevParse{Rev: parent.Name})
-	if err != nil {
-		return nil, errors.WrapIff(err, "failed to resolve HEAD of parent branch %q", parent.Name)
-	}
-	mergeBase, err := repo.MergeBase(&git.MergeBase{
-		Revs: []string{parentHead, branch.Name},
-	})
-	if err != nil {
-		return nil, errors.WrapIff(err, "failed to compute merge base of %q and %q", parent.Name, branch.Name)
-	}
-	if mergeBase == parentHead {
-		_, _ = fmt.Fprint(os.Stderr,
-			"  - already up-to-date with parent ", colors.UserInput(parent.Name),
-			"\n",
-		)
-		return &SyncBranchResult{git.RebaseResult{Status: git.RebaseAlreadyUpToDate}, nil, branch}, nil
-	}
-
-	// Scenario 3: the branch is not up-to-date with its parent.
-	_, _ = fmt.Fprint(os.Stderr,
-		"  - synching branch ", colors.UserInput(branch.Name),
-		" on latest commit ", git.ShortSha(parentHead),
-		" of parent branch ", colors.UserInput(parent.Name),
-		"\n",
-	)
 	// We need to use `rebase --onto` here and be very careful about how we
 	// determine the commits that are being rebased on top of parentHead.
 	// Suppose we have a history like
-	// 	   A---B---C---D  main
+	//     A---B---C---D  main
 	//      \
 	//       Q---R  stacked-1
 	//        \
@@ -315,7 +158,7 @@ func syncBranchRebase(
 	//           W  stacked-3
 	// where R is a commit that was added to stacked-1 after stacked-2 was
 	// created. After syncing stacked-2 against stacked-1, we have
-	// 	   A---B---C---D  main
+	//     A---B---C---D  main
 	//      \
 	//       Q---R  stacked-1
 	//        \    \
@@ -331,14 +174,92 @@ func syncBranchRebase(
 	// With `git rebase --onto stacked-2 T stacked-3`, Git looks at the
 	// difference between T and stacked-3, determines that it's only the
 	// commit W, and then plays the commit W **onto** stacked-2 (aka T').
-	rebase, err := repo.RebaseParse(git.RebaseOpts{
-		Branch:   branch.Name,
-		Onto:     parentHead,
-		Upstream: branch.Parent.Head,
-	})
+	if branch.IsStackRoot() {
+		if opts.ToTrunk {
+			trunk := branch.Parent.Name
+			// First, try to fetch latest commit from the trunk...
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - fetching latest commit from ", colors.UserInput("origin/", trunk), "\n",
+			)
+			if _, err := repo.Run(&git.RunOpts{
+				Args: []string{"fetch", "origin", trunk},
+			}); err != nil {
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - ",
+					colors.Failure("error: failed to fetch HEAD of "), colors.UserInput(trunk),
+					colors.Failure(" from origin: ", err.Error()), "\n",
+				)
+				return nil, errors.WrapIff(err, "failed to fetch trunk branch %q from origin", trunk)
+			}
+
+			// NOTE: Strictly speaking, if a user doesn't use the default refspec (e.g.
+			// fetch is not +refs/heads/*:refs/remotes/origin/*, the remote tracking
+			// branch is not origin/$TRUNK. As we just fetched from a remote, it'd be
+			// safe to use FETCH_HEAD.
+			trunkHead, err := repo.RevParse(&git.RevParse{Rev: "origin/" + trunk})
+			if err != nil {
+				return nil, errors.WrapIff(err, "failed to get HEAD of %q", trunk)
+			}
+			rebaseOpt.Upstream = trunkHead
+			rebaseOpt.Onto = trunkHead
+		} else if branch.MergeCommit == "" {
+			// Do not rebase the stack root unless --trunk or it's merged.
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - branch is a stack root, nothing to do",
+				" (run ", colors.CliCmd("av stack sync --trunk"),
+				" to sync against the latest commit in ", colors.UserInput(branch.Parent.Name), ")\n",
+			)
+			return &SyncBranchResult{
+				git.RebaseResult{Status: git.RebaseAlreadyUpToDate},
+				nil,
+				branch,
+				false,
+			}, nil
+		} else {
+			short := git.ShortSha(branch.MergeCommit)
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - branch ", colors.UserInput(branch.Name),
+				" (pull ", colors.UserInput("#", branch.PullRequest.GetNumber()), ")",
+				" was merged\n",
+			)
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - rebasing ", colors.UserInput(branch.Name),
+				" on top of merge commit ", colors.UserInput(short), "\n",
+			)
+			if opts.Fetch {
+				if _, err := repo.Git("fetch", "origin", branch.MergeCommit); err != nil {
+					return nil, errors.WrapIff(err, "failed to fetch merge commit %q from origin", short)
+				}
+			}
+			// Ideally, this makes the branch.Name points to branch.MergeCommit. If the result
+			// is different from MergeCommit, it means that there's a leftover change that was
+			// not a part of the merged PR.
+			rebaseOpt.Upstream = branch.MergeCommit
+			rebaseOpt.Onto = branch.MergeCommit
+		}
+	} else {
+		currParentHead, err := repo.RevParse(&git.RevParse{Rev: branch.Parent.Name})
+		if err != nil {
+			return nil, errors.WrapIff(err, "failed to resolve HEAD of parent branch %q", branch.Parent.Name)
+		}
+		short := git.ShortSha(currParentHead)
+		_, _ = fmt.Fprint(os.Stderr,
+			"  - rebasing ", colors.UserInput(branch.Name),
+			" on top of parent commit ", colors.UserInput(short), "\n",
+		)
+		rebaseOpt.Upstream = branch.Parent.Head
+		rebaseOpt.Onto = currParentHead
+	}
+
+	rebase, err := repo.RebaseParse(rebaseOpt)
 	if err != nil {
 		return nil, err
 	}
+	if !branch.Parent.Trunk {
+		branch.Parent.Head = rebaseOpt.Onto
+	}
+	tx.SetBranch(branch)
+
 	msgRebaseResult(rebase)
 
 	//nolint:exhaustive
@@ -347,19 +268,57 @@ func syncBranchRebase(
 		return &SyncBranchResult{
 			*rebase,
 			&SyncBranchContinuation{
-				OldHead:      branchHead,
-				ParentCommit: parentHead,
+				OldHead: branchHead,
 			},
 			branch,
+			false,
 		}, nil
-	case git.RebaseUpdated:
-		return &SyncBranchResult{*rebase, nil, branch}, nil
 	default:
-		// We shouldn't even get an already-up-to-date or not-in-progress
-		// here...
-		logrus.Warn("unexpected rebase status: ", rebase.Status)
-		return &SyncBranchResult{*rebase, nil, branch}, nil
+		return &SyncBranchResult{
+			*rebase,
+			nil,
+			branch,
+			false,
+		}, nil
 	}
+}
+
+func hasLeftover(repo *git.Repo, branch meta.Branch, opts SyncBranchOpts) (bool, error) {
+	// The PR is merged. We get the rebase upstream (more strictly speaking the --onto
+	// part) and check if currently the branch points to the same commit. If they are
+	// pointing to the same one, no leftover.
+	var rebaseUpstream string
+	if branch.IsStackRoot() {
+		if opts.ToTrunk {
+			trunk := branch.Parent.Name
+			trunkHead, err := repo.RevParse(&git.RevParse{Rev: "origin/" + trunk})
+			if err != nil {
+				return false, errors.WrapIff(err, "failed to get HEAD of %q", trunk)
+			}
+			rebaseUpstream = trunkHead
+		} else if branch.MergeCommit == "" {
+			// The PR is closed without merge. There are two possibilities (1) the PR is
+			// effectively merged by other ways (e.g. MergeQueue's fast-forward mode) or
+			// (2) the PR is closed by a human. Either way, in order to tell if there's
+			// a leftover, we need to rebase on top of the current trunk, which requires
+			// --trunk. In this case, --trunk is not specified, so we cannot tell if
+			// there's a leftover.
+			return true, nil
+		} else {
+			rebaseUpstream = branch.MergeCommit
+		}
+	} else {
+		parentHead, err := repo.RevParse(&git.RevParse{Rev: branch.Parent.Name})
+		if err != nil {
+			return false, errors.WrapIff(err, "failed to get HEAD of %q", branch.Parent.Name)
+		}
+		rebaseUpstream = parentHead
+	}
+	currentHead, err := repo.RevParse(&git.RevParse{Rev: branch.Name})
+	if err != nil {
+		return false, errors.WrapIff(err, "failed to get HEAD of %q", branch.Name)
+	}
+	return currentHead != rebaseUpstream, nil
 }
 
 func syncBranchContinue(
@@ -395,21 +354,12 @@ func syncBranchContinue(
 		)
 	case git.RebaseConflict:
 		msgRebaseResult(rebase)
-		return &SyncBranchResult{*rebase, opts.Continuation, branch}, nil
+		return &SyncBranchResult{*rebase, opts.Continuation, branch, false}, nil
 	default:
 		msgRebaseResult(rebase)
 	}
 
-	// Finish setting the new trunk for the branch
-	if opts.Continuation.NewTrunk != "" {
-		var err error
-		branch, err = syncBranchUpdateNewTrunk(tx, branch, opts.Continuation.NewTrunk)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &SyncBranchResult{*rebase, nil, branch}, nil
+	return &SyncBranchResult{*rebase, nil, branch, false}, nil
 }
 
 func syncBranchUpdateNewTrunk(
