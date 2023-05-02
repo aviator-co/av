@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/aviator-co/av/internal/utils/cleanup"
 	"golang.org/x/exp/slices"
 	"io/ioutil"
 	"os"
@@ -113,8 +112,7 @@ base branch.
 			return err
 		}
 		tx := db.WriteTx()
-		cu := cleanup.New(func() { tx.Abort() })
-		defer cu.Cleanup()
+		defer tx.Abort()
 
 		// Read any preexisting state.
 		// This is required to allow us to handle --continue/--abort

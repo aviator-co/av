@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/aviator-co/av/internal/utils/cleanup"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -30,8 +29,7 @@ operates on only av's internal metadata, and it won't delete the actual Git bran
 			return err
 		}
 		tx := db.WriteTx()
-		cu := cleanup.New(func() { tx.Abort() })
-		defer cu.Cleanup()
+		defer tx.Abort()
 		origBranches := tx.AllBranches()
 		branches := make(map[string]*meta.Branch)
 		for name, br := range origBranches {
@@ -59,6 +57,10 @@ operates on only av's internal metadata, and it won't delete the actual Git bran
 				continue
 			}
 			tx.SetBranch(*br)
+		}
+
+		if err := tx.Commit(); err != nil {
+			return err
 		}
 		return nil
 	},

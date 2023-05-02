@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/aviator-co/av/internal/utils/cleanup"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -62,12 +60,7 @@ Examples:
 			return err
 		}
 		tx := db.WriteTx()
-		var cu cleanup.Cleanup
-		defer cu.Cleanup()
-		cu.Add(func() {
-			logrus.WithError(reterr).Debug("aborting db transaction")
-			tx.Abort()
-		})
+		defer tx.Abort()
 
 		body := prCreateFlags.Body
 		// Special case: ready body from stdin
@@ -95,6 +88,9 @@ Examples:
 				Edit:  prCreateFlags.Edit,
 			},
 		); err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
 			return err
 		}
 		return nil
