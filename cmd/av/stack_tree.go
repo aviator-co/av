@@ -89,7 +89,7 @@ func getBranchInfo(repo *git.Repo, branch meta.Branch) string {
 	parentStatus := getParentStatus(repo, branch)
 	upstreamStatus := getUpstreamStatus(repo, branch)
 
-	branchStatus := strings.Trim(fmt.Sprintf("%s %s", parentStatus, upstreamStatus), " ")
+	branchStatus := strings.Trim(fmt.Sprintf("%s, %s", parentStatus, upstreamStatus), ", ")
 	if branchStatus != "" {
 		branchInfo = fmt.Sprintf("(%s)", branchStatus)
 	}
@@ -102,14 +102,19 @@ func getBranchInfo(repo *git.Repo, branch meta.Branch) string {
 }
 
 // Check if branch is up to date with the parent branch.
-// This is doing `git diff <parentBranch> <givenBranch>`
 func getParentStatus(repo *git.Repo, branch meta.Branch) string {
-	parentDiff, err := repo.Diff(&git.DiffOpts{Quiet: true, Branch1: branch.Parent.Name, Branch2: branch.Name})
+	parentHead, err := repo.RevParse(&git.RevParse{Rev: branch.Parent.Name})
 	if err != nil {
 		return ""
-	} 
-	
-	if parentDiff.Empty {
+	}
+
+	mergeBase, err := repo.MergeBase(&git.MergeBase{
+		Revs: []string{parentHead, branch.Name},
+	})
+	if err != nil {
+		return ""
+	}
+	if mergeBase == parentHead {
 		return ""
 	}
 	
