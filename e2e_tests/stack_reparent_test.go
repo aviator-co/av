@@ -42,6 +42,22 @@ func TestStackSyncReparent(t *testing.T) {
 	Cmd(t, "git", "log")
 }
 
+func TestStackSyncReparentTrunk(t *testing.T) {
+	repo := gittest.NewTempRepo(t)
+	Chdir(t, repo.Dir())
+
+	RequireAv(t, "stack", "branch", "foo")
+	gittest.CommitFile(t, repo, "foo.txt", []byte("foo"))
+
+	RequireAv(t, "stack", "branch", "bar")
+	gittest.CommitFile(t, repo, "bar.txt", []byte("bar"))
+
+	// Delete the local main. av should use the remote tracking branch.
+	Cmd(t, "git", "branch", "-D", "main")
+
+	RequireAv(t, "stack", "sync", "--parent", "main", "--no-fetch", "--no-push")
+}
+
 func requireFileContent(t *testing.T, file string, expected string, args ...any) {
 	actual, err := os.ReadFile(file)
 	if err != nil {
