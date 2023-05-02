@@ -1,9 +1,10 @@
 package git_test
 
 import (
+	"testing"
+
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestOrigin(t *testing.T) {

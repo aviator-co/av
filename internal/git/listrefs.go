@@ -1,8 +1,9 @@
 package git
 
 import (
-	"emperror.dev/errors"
 	"strings"
+
+	"emperror.dev/errors"
 )
 
 type ListRefs struct {

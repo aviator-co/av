@@ -2,9 +2,10 @@ package git
 
 import (
 	"bytes"
-	"emperror.dev/errors"
 	"fmt"
 	"io"
+
+	"emperror.dev/errors"
 )
 
 type GetRefs struct {
