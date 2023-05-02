@@ -16,6 +16,8 @@ type RebaseOpts struct {
 	Continue bool
 	// Optional (mutually exclusive with all other options)
 	Abort bool
+	// Optional (mutually exclusive with all other options)
+	Skip bool
 	// Optional
 	// If set, use `git rebase --onto <upstream> ...`
 	Onto string
@@ -41,6 +43,10 @@ func (r *Repo) Rebase(opts RebaseOpts) (*Output, error) {
 	} else if opts.Abort {
 		return r.Run(&RunOpts{
 			Args: []string{"rebase", "--abort"},
+		})
+	} else if opts.Skip {
+		return r.Run(&RunOpts{
+			Args: []string{"rebase", "--skip"},
 		})
 	}
 	if opts.Onto != "" {
