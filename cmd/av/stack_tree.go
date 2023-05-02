@@ -69,7 +69,7 @@ func printStackTree(repo *git.Repo, branches map[string]meta.Branch, currentBran
 		return
 	}
 
-	branchInfo := getBranchInfo(repo, branch)	
+	branchInfo := getBranchInfo(repo, branch)
 
 	if currentBranch == branch.Name {
 		_, _ = fmt.Print(
@@ -86,8 +86,17 @@ func printStackTree(repo *git.Repo, branches map[string]meta.Branch, currentBran
 func getBranchInfo(repo *git.Repo, branch meta.Branch) string {
 	var branchInfo string
 
-	parentStatus := getParentStatus(repo, branch)
-	upstreamStatus := getUpstreamStatus(repo, branch)
+	parentStatus, err := getParentStatus(repo, branch)
+	if err != nil {
+		fmt.Printf("<ERROR: could not get status of parent branch: %v>\n", err)
+		return ""
+	}
+
+	upstreamStatus, err := getUpstreamStatus(repo, branch)
+	if err != nil {
+		fmt.Printf("<ERROR: could not get status of upstream branch: %v>\n", err)
+		return ""
+	}
 
 	branchStatus := strings.Trim(fmt.Sprintf("%s, %s", parentStatus, upstreamStatus), ", ")
 	if branchStatus != "" {
@@ -102,37 +111,42 @@ func getBranchInfo(repo *git.Repo, branch meta.Branch) string {
 }
 
 // Check if branch is up to date with the parent branch.
-func getParentStatus(repo *git.Repo, branch meta.Branch) string {
+func getParentStatus(repo *git.Repo, branch meta.Branch) (string, error) {
 	parentHead, err := repo.RevParse(&git.RevParse{Rev: branch.Parent.Name})
 	if err != nil {
-		return ""
+		return "", err
 	}
 
 	mergeBase, err := repo.MergeBase(&git.MergeBase{
 		Revs: []string{parentHead, branch.Name},
 	})
 	if err != nil {
-		return ""
+		return "", err
 	}
 	if mergeBase == parentHead {
-		return ""
+		return "", nil
 	}
 	
-	return "needs sync"
+	return "needs sync", nil
 }
 
 // Check if branch is up to date with the upstream branch.
 // This is doing `git diff <givenBranch> remotes/origin/<givenBranch>`
-func getUpstreamStatus(repo *git.Repo, branch meta.Branch) string {
+func getUpstreamStatus(repo *git.Repo, branch meta.Branch) (string, error) {
+	upstreamExists, err := repo.DoesRemoteBranchExist(branch.Name)
+	if err != nil || !upstreamExists {
+		return "not pushed", nil
+	}
+
 	upstreamBranch := fmt.Sprintf("remotes/origin/%s", branch.Name)
 	upstreamDiff, err := repo.Diff(&git.DiffOpts{Quiet: true, Branch1: branch.Name, Branch2: upstreamBranch})
 	if err != nil {
-		return ""
+		return "", err
 	} 
 	
 	if upstreamDiff.Empty {
-		return ""
+		return "", nil
 	}
 		
-	return "not pushed"
+	return "not pushed", nil
 }
