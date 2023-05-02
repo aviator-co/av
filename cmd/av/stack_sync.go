@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/exp/slices"
 	"io/ioutil"
 	"os"
 	"path"
 	"strings"
+
+	"golang.org/x/exp/slices"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
@@ -290,8 +291,8 @@ base branch.
 			state.CurrentBranch = currentBranch
 			res, err := actions.SyncBranch(ctx, repo, client, repoMeta, actions.SyncBranchOpts{
 				Branch:       currentBranch,
-				NoFetch:      state.Config.NoFetch,
-				NoPush:       state.Config.NoPush,
+				Fetch:        !state.Config.NoFetch,
+				Push:         !state.Config.NoPush,
 				Continuation: state.Continuation,
 				ToTrunk:      state.Config.Trunk,
 			})
