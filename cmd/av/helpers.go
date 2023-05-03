@@ -1,22 +1,50 @@
 package main
 
 import (
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/meta/jsonfiledb"
+	"github.com/aviator-co/av/internal/meta/refmeta"
 	"github.com/sirupsen/logrus"
+	"os"
+	"os/exec"
+	"path"
+	"strings"
 )
 
-func getRepoInfo() (*git.Repo, meta.Repository, error) {
-	repo, err := getRepo()
-	if err != nil {
-		return nil, meta.Repository{}, err
-	}
+var cachedRepo *git.Repo
 
-	repoMeta, err := meta.ReadRepository(repo)
-	if err != nil {
-		return nil, meta.Repository{}, err
+func getRepo() (*git.Repo, error) {
+	if cachedRepo == nil {
+		cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+		if rootFlags.Directory != "" {
+			cmd.Dir = rootFlags.Directory
+		}
+		toplevel, err := cmd.Output()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to determine repo toplevel (are you running inside a Git repo?)")
+		}
+		cachedRepo, err = git.OpenRepo(strings.TrimSpace(string(toplevel)))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to open git repo")
+		}
 	}
+	return cachedRepo, nil
+}
 
-	logrus.Debugf("loaded repository metadata: %+v", repoMeta)
-	return repo, repoMeta, nil
+func getDB(repo *git.Repo) (meta.DB, error) {
+	dbPath := path.Join(repo.GitDir(), "av", "av.db")
+	existingStat, _ := os.Stat(dbPath)
+	db, err := jsonfiledb.OpenPath(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	if existingStat == nil {
+		logrus.Debug("Initializing new av database")
+		if err := refmeta.Import(repo, db); err != nil {
+			return nil, errors.WrapIff(err, "failed to import ref metadata into av database")
+		}
+	}
+	return db, nil
 }

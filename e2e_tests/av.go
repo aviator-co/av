@@ -81,6 +81,7 @@ func Av(t *testing.T, args ...string) AvOutput {
 }
 
 func RequireAv(t *testing.T, args ...string) AvOutput {
+	t.Helper()
 	output := Av(t, args...)
 	require.Equal(t, 0, output.ExitCode, "av %s: exited with %v", args, output.ExitCode)
 	return output

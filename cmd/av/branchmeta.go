@@ -39,17 +39,19 @@ var branchMetaDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		db, err := getDB(repo)
+		if err != nil {
+			return err
+		}
+		tx := db.WriteTx()
+		defer tx.Abort()
 		for _, branch := range args {
-			if err := meta.DeleteBranch(repo, branch); err != nil {
-				return err
-			}
+			tx.DeleteBranch(branch)
 		}
 		if branchMetaFlags.rebuildChildren {
-			if err := meta.RebuildChildren(repo); err != nil {
-				return err
-			}
+			meta.RebuildChildren(tx)
 		}
-		return nil
+		return tx.Commit()
 	},
 }
 
@@ -68,10 +70,12 @@ var branchMetaListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		branches, err := meta.ReadAllBranches(repo)
+		db, err := getDB(repo)
 		if err != nil {
 			return err
 		}
+		tx := db.ReadTx()
+		branches := tx.AllBranches()
 		bs, err := json.MarshalIndent(branches, "", "    ")
 		if err != nil {
 			return err
@@ -89,7 +93,13 @@ var branchMetaRebuildChildrenCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := meta.RebuildChildren(repo); err != nil {
+		db, err := getDB(repo)
+		if err != nil {
+			return err
+		}
+		tx := db.WriteTx()
+		meta.RebuildChildren(tx)
+		if err := tx.Commit(); err != nil {
 			return err
 		}
 		return nil
@@ -97,7 +107,7 @@ var branchMetaRebuildChildrenCmd = &cobra.Command{
 }
 
 var branchMetaSetCmd = &cobra.Command{
-	Use:   "set",
+	Use:   "set branch-name",
 	Short: "modify the branch metadata",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
@@ -108,26 +118,36 @@ var branchMetaSetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		db, err := getDB(repo)
+		if err != nil {
+			return err
+		}
 		if _, err := repo.RevParse(&git.RevParse{Rev: args[0]}); err != nil {
 			return errors.WrapIf(err, "cannot check if a branch exists")
 		}
-		br, _ := meta.ReadBranch(repo, args[0])
+		tx := db.WriteTx()
+		defer tx.Abort()
+		br, _ := tx.Branch(args[0])
 		if branchMetaFlags.parent != "" {
-			br.Parent, err = meta.ReadBranchState(repo, branchMetaFlags.parent, branchMetaFlags.trunk)
-			if err != nil {
-				return err
+			var parentHead string
+			if branchMetaFlags.trunk {
+				var err error
+				parentHead, err = repo.RevParse(&git.RevParse{Rev: branchMetaFlags.parent})
+				if err != nil {
+					return err
+				}
+			}
+			br.Parent = meta.BranchState{
+				Name:  branchMetaFlags.parent,
+				Trunk: branchMetaFlags.trunk,
+				Head:  parentHead,
 			}
 		}
-		if err := meta.WriteBranch(repo, br); err != nil {
-			return errors.WrapIff(err, "failed to write av internal metadata for branch %q", branchMetaFlags.parent)
-		}
-
+		tx.SetBranch(br)
 		if branchMetaFlags.rebuildChildren {
-			if err := meta.RebuildChildren(repo); err != nil {
-				return err
-			}
+			meta.RebuildChildren(tx)
 		}
-		return nil
+		return tx.Commit()
 	},
 }
 

@@ -3,7 +3,7 @@ package e2e_tests
 import (
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
-	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -46,9 +46,17 @@ func TestStackSyncMergeCommit(t *testing.T) {
 		require.NotEqual(t, oldHead, squashCommit, "squash commit should be different from old HEAD")
 	})
 
-	stack1Meta, _ := meta.ReadBranch(repo, "stack-1")
+	// We shouldn't do this as part of an E2E test since it depends on internal
+	// knowledge of the codebase, but :shrug:. We need to set the merge commit
+	// manually since we can't actually communicate with the GitHub API as part
+	// of this test.
+	db, err := jsonfiledb.OpenRepo(repo)
+	require.NoError(t, err, "failed to open repo db")
+	tx := db.WriteTx()
+	stack1Meta, _ := tx.Branch("stack-1")
 	stack1Meta.MergeCommit = squashCommit
-	require.NoError(t, meta.WriteBranch(repo, stack1Meta))
+	tx.SetBranch(stack1Meta)
+	require.NoError(t, tx.Commit())
 
 	require.Equal(t, 0,
 		Cmd(t, "git", "merge-base", "--is-ancestor", "stack-1", "stack-2").ExitCode,

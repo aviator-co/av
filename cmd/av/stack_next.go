@@ -22,19 +22,22 @@ var stackNextCmd = &cobra.Command{
 	Short: "checkout the next branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get the subsequent branches so we can checkout the nth one
-		repo, _, err := getRepoInfo()
+		repo, err := getRepo()
 		if err != nil {
 			return err
 		}
-		branches, err := meta.ReadAllBranches(repo)
+
+		db, err := getDB(repo)
 		if err != nil {
 			return err
 		}
+		tx := db.ReadTx()
+
 		currentBranch, err := repo.CurrentBranchName()
 		if err != nil {
 			return err
 		}
-		subsequentBranches, err := meta.SubsequentBranches(branches, currentBranch)
+		subsequentBranches, err := meta.SubsequentBranches(tx, currentBranch)
 		if err != nil {
 			return err
 		}

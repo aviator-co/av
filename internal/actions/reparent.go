@@ -29,7 +29,11 @@ type ReparentResult struct {
 
 // Reparent changes the parent branch of a stacked branch (performing a rebase
 // if necessary).
-func Reparent(repo *git.Repo, opts ReparentOpts) (*ReparentResult, error) {
+func Reparent(
+	repo *git.Repo,
+	tx meta.WriteTx,
+	opts ReparentOpts,
+) (*ReparentResult, error) {
 	_, _ = fmt.Fprint(os.Stderr,
 		"  - Re-parenting branch ", colors.UserInput(opts.Branch),
 		" onto ", colors.UserInput(opts.NewParent),
@@ -65,7 +69,7 @@ func Reparent(repo *git.Repo, opts ReparentOpts) (*ReparentResult, error) {
 		return nil, errors.Errorf("parent branch %q does not exist", opts.NewParent)
 	}
 
-	branchMeta, _ := meta.ReadBranch(repo, opts.Branch)
+	branchMeta, _ := tx.Branch(opts.Branch)
 	upstream := branchMeta.Parent.Name
 
 	// We might need to rebase the branch on top of the new parent. This
@@ -96,10 +100,14 @@ func Reparent(repo *git.Repo, opts ReparentOpts) (*ReparentResult, error) {
 		return nil, errors.WrapIff(err, "failed to run git rebase")
 	}
 
-	return handleReparentRebaseOutput(repo, opts, output)
+	return handleReparentRebaseOutput(repo, tx, opts, output)
 }
 
-func ReparentContinue(repo *git.Repo, opts ReparentOpts) (*ReparentResult, error) {
+func ReparentContinue(
+	repo *git.Repo,
+	tx meta.WriteTx,
+	opts ReparentOpts,
+) (*ReparentResult, error) {
 	output, err := repo.Rebase(git.RebaseOpts{
 		Continue: true,
 	})
@@ -115,54 +123,63 @@ func ReparentContinue(repo *git.Repo, opts ReparentOpts) (*ReparentResult, error
 			"no rebase in progress -- assuming rebase was completed (not aborted)",
 			"\n",
 		)
-		if err := reparentWriteMetadata(repo, opts); err != nil {
+		if err := reparentWriteMetadata(repo, tx, opts); err != nil {
 			return nil, err
 		}
 		return &ReparentResult{Success: true}, nil
 	}
-	return handleReparentRebaseOutput(repo, opts, output)
+	return handleReparentRebaseOutput(repo, tx, opts, output)
 }
 
-func reparentWriteMetadata(repo *git.Repo, opts ReparentOpts) error {
-	branch := opts.Branch
-	newParentName := opts.NewParent
-	branchMeta, _ := meta.ReadBranch(repo, branch)
-	oldParent := branchMeta.Parent
+func reparentWriteMetadata(
+	repo *git.Repo,
+	tx meta.WriteTx,
+	opts ReparentOpts,
+) error {
+	branch, _ := tx.Branch(opts.Branch)
+	oldParent := branch.Parent
 
-	var err error
-	branchMeta.Parent, err = meta.ReadBranchState(repo, newParentName, opts.NewParentTrunk)
-	if err != nil {
-		return err
+	var parentHead string
+	if !opts.NewParentTrunk {
+		var err error
+		parentHead, err = repo.RevParse(&git.RevParse{Rev: opts.NewParent})
+		if err != nil {
+			return errors.WrapIff(err, "failed to read head commit of %q", opts.NewParent)
+		}
 	}
 
-	if err := meta.WriteBranch(repo, branchMeta); err != nil {
-		return errors.WrapIff(err, "failed to write branch meta for %q", branch)
+	branch.Parent = meta.BranchState{
+		Name:  opts.NewParent,
+		Trunk: opts.NewParentTrunk,
+		Head:  parentHead,
 	}
+	tx.SetBranch(branch)
 
 	// Make sure to delete the reference to this branch from the old parent if
 	// necessary.
 	if !oldParent.Trunk {
-		if oldParentMeta, ok := meta.ReadBranch(repo, oldParent.Name); ok {
-			oldParentMeta.Children = sliceutils.DeleteElement(oldParentMeta.Children, branch)
-			if err := meta.WriteBranch(repo, oldParentMeta); err != nil {
-				return errors.WrapIff(err, "failed to write branch meta for %q", oldParent.Name)
-			}
+		if oldParentMeta, ok := tx.Branch(oldParent.Name); ok {
+			oldParentMeta.Children = sliceutils.DeleteElement(oldParentMeta.Children, opts.Branch)
+			tx.SetBranch(oldParentMeta)
 		}
 	}
 
-	// Add this branch as a child of the new parent (unless its a trunk branch)
+	// Add this branch as a child of the new parent (unless it's a trunk branch)
 	if !opts.NewParentTrunk {
-		newParentMeta, _ := meta.ReadBranch(repo, newParentName)
-		newParentMeta.Children = append(newParentMeta.Children, branch)
-		if err := meta.WriteBranch(repo, newParentMeta); err != nil {
-			return errors.WrapIff(err, "failed to write branch meta for %q", newParentName)
-		}
+		newParentMeta, _ := tx.Branch(opts.NewParent)
+		newParentMeta.Children = append(newParentMeta.Children, opts.Branch)
+		tx.SetBranch(newParentMeta)
 	}
 
 	return nil
 }
 
-func handleReparentRebaseOutput(repo *git.Repo, opts ReparentOpts, output *git.Output) (*ReparentResult, error) {
+func handleReparentRebaseOutput(
+	repo *git.Repo,
+	tx meta.WriteTx,
+	opts ReparentOpts,
+	output *git.Output,
+) (*ReparentResult, error) {
 	if output.ExitCode != 0 {
 		_, _ = fmt.Fprint(os.Stderr,
 			colors.Failure("      - ERROR:"),
@@ -173,7 +190,7 @@ func handleReparentRebaseOutput(repo *git.Repo, opts ReparentOpts, output *git.O
 		return &ReparentResult{Success: false, Hint: string(output.Stderr)}, nil
 	}
 
-	if err := reparentWriteMetadata(repo, opts); err != nil {
+	if err := reparentWriteMetadata(repo, tx, opts); err != nil {
 		return nil, err
 	}
 	return &ReparentResult{Success: true}, nil

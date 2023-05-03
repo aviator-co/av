@@ -19,15 +19,18 @@ var stackTreeCmd = &cobra.Command{
 			return err
 		}
 
+		db, err := getDB(repo)
+		if err != nil {
+			return err
+		}
+		tx := db.ReadTx()
+
 		defaultBranch, err := repo.DefaultBranch()
 		if err != nil {
 			return err
 		}
 
-		branches, err := meta.ReadAllBranches(repo)
-		if err != nil {
-			return err
-		}
+		branches := tx.AllBranches()
 
 		var currentBranch string
 		if dh, err := repo.DetachedHead(); err != nil {

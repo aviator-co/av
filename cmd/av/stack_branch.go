@@ -29,7 +29,7 @@ given as the first argument to the command. Branches should only be renamed
 with this command (not with git branch -m ...) because av needs to update
 internal tracking metadata that defines the order of branches within a stack.`,
 	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
 		if len(args) != 1 {
 			_ = cmd.Usage()
 			return errors.New("exactly one branch name is required")
@@ -41,9 +41,21 @@ internal tracking metadata that defines the order of branches within a stack.`,
 			return err
 		}
 
-		if stackBranchFlags.Rename {
-			return stackBranchMove(repo, branchName)
+		db, err := getDB(repo)
+		if err != nil {
+			return err
 		}
+
+		if stackBranchFlags.Rename {
+			return stackBranchMove(repo, db, branchName)
+		}
+
+		tx := db.WriteTx()
+		cu := cleanup.New(func() {
+			logrus.WithError(reterr).Debug("aborting db transaction")
+			tx.Abort()
+		})
+		defer cu.Cleanup()
 
 		// Determine important contextual information from Git
 		defaultBranch, err := repo.DefaultBranch()
@@ -53,8 +65,6 @@ internal tracking metadata that defines the order of branches within a stack.`,
 
 		// Determine the parent branch and make sure it's checked out
 		var parentBranchName string
-		var cu cleanup.Cleanup
-		defer cu.Cleanup()
 		if stackBranchFlags.Parent != "" {
 			parentBranchName = stackBranchFlags.Parent
 			origBranch, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: parentBranchName})
@@ -79,9 +89,13 @@ internal tracking metadata that defines the order of branches within a stack.`,
 		// that does run the risk of allowing the user to get into a weird state
 		// (where some stacks assume a branch is a trunk and others don't).
 		isBranchFromTrunk := parentBranchName == defaultBranch
-		parentState, err := meta.ReadBranchState(repo, parentBranchName, isBranchFromTrunk)
-		if err != nil {
-			return errors.WrapIf(err, "failed to read parent branch state")
+		var parentHead string
+		if !isBranchFromTrunk {
+			var err error
+			parentHead, err = repo.RevParse(&git.RevParse{Rev: parentBranchName})
+			if err != nil {
+				return errors.WrapIff(err, "failed to determine head commit of branch %q", parentHead)
+			}
 		}
 
 		// Create a new branch off of the parent
@@ -96,27 +110,42 @@ internal tracking metadata that defines the order of branches within a stack.`,
 			return errors.WrapIff(err, "checkout error")
 		}
 
-		branchMeta := meta.Branch{
-			Name:   branchName,
-			Parent: parentState,
-		}
-		logrus.WithField("meta", branchMeta).Debug("writing branch metadata")
-		if err := meta.WriteBranch(repo, branchMeta); err != nil {
-			return errors.WrapIff(err, "failed to write av internal metadata for branch %q", branchName)
-		}
+		tx.SetBranch(meta.Branch{
+			Name: branchName,
+			Parent: meta.BranchState{
+				Name:  parentBranchName,
+				Trunk: isBranchFromTrunk,
+				Head:  parentHead,
+			},
+		})
 
 		// If this isn't a new stack root, update the parent metadata to include
 		// the new branch as a child.
 		if !isBranchFromTrunk {
-			parentMeta, _ := meta.ReadBranch(repo, parentBranchName)
+			parentMeta, ok := tx.Branch(parentBranchName)
+			if !ok {
+				// Handle case where the user created first branch by
+				// `git switch -c` from trunk (i.e., created first branch
+				// without using av), then wants to create a stacked branch
+				// after it.
+				parentMeta = meta.Branch{
+					Name: parentBranchName,
+					Parent: meta.BranchState{
+						// Assume the parent is a branch from the default branch
+						Name:  defaultBranch,
+						Trunk: true,
+					},
+				}
+			}
 			parentMeta.Children = append(parentMeta.Children, branchName)
 			logrus.WithField("meta", parentMeta).Debug("writing parent branch metadata")
-			if err := meta.WriteBranch(repo, parentMeta); err != nil {
-				return errors.WrapIf(err, "failed to write parent branch metadata")
-			}
+			tx.SetBranch(parentMeta)
 		}
 
 		cu.Cancel()
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 		return nil
 	},
 }
@@ -128,53 +157,48 @@ func init() {
 	stackBranchCmd.Flags().BoolVarP(&stackBranchFlags.Rename, "rename", "m", false, "rename the current branch")
 }
 
-func stackBranchMove(repo *git.Repo, newBranch string) error {
+func stackBranchMove(
+	repo *git.Repo,
+	db meta.DB,
+	newBranch string,
+) (reterr error) {
 	oldBranch, err := repo.CurrentBranchName()
 	if err != nil {
 		return err
 	}
 
+	tx := db.WriteTx()
+	cu := cleanup.New(func() {
+		logrus.WithError(reterr).Debug("aborting db transaction")
+		tx.Abort()
+	})
+	defer cu.Cleanup()
+
 	if oldBranch == newBranch {
 		return errors.Errorf("cannot rename branch to itself")
 	}
 
-	currentMeta, _ := meta.ReadBranch(repo, oldBranch)
+	currentMeta, _ := tx.Branch(oldBranch)
 	currentMeta.Name = newBranch
-	if err := meta.DeleteBranch(repo, oldBranch); err != nil {
-		return err
-	}
-	if err := meta.WriteBranch(repo, currentMeta); err != nil {
-		return err
-	}
+	tx.DeleteBranch(oldBranch)
+	tx.SetBranch(currentMeta)
 
 	// Update the parent's reference to the child (unless the parent is a trunk
 	// which doesn't maintain references to children).
 	if !currentMeta.Parent.Trunk {
-		parentMeta, _ := meta.ReadBranch(repo, currentMeta.Parent.Name)
+		parentMeta, _ := tx.Branch(currentMeta.Parent.Name)
 		sliceutils.Replace(parentMeta.Children, oldBranch, newBranch)
-		if err := meta.WriteBranch(repo, parentMeta); err != nil {
-			return err
-		}
+		tx.SetBranch(parentMeta)
 	}
 
 	// Update all child branches to refer to the correct (renamed) parent.
 	for _, child := range currentMeta.Children {
-		childMeta, _ := meta.ReadBranch(repo, child)
+		childMeta, _ := tx.Branch(child)
 		childMeta.Parent.Name = newBranch
-		if err := meta.WriteBranch(repo, childMeta); err != nil {
-			return err
-		}
+		tx.SetBranch(childMeta)
 	}
 
 	// Finally, actually rename the branch in Git
-	// TODO:
-	// 		It would be really nice to have some kind of atomicity and/or
-	//		transactionality with the branch metadatas. Maybe instead of just
-	// 		storing each metadata entry as a blob ref, we could store a single
-	// 		tree ref that points to each of the branch blobs (since it's
-	//	 	possible to update the tree refs atomically w/ Git's CAS).
-	// 		It's possible that we run the operations above but then this fails
-	//		and we're in a weird state.
 	if _, err := repo.Run(&git.RunOpts{
 		Args:      []string{"branch", "-m", newBranch},
 		ExitError: true,
@@ -182,5 +206,9 @@ func stackBranchMove(repo *git.Repo, newBranch string) error {
 		return errors.WrapIff(err, "failed to rename Git branch")
 	}
 
+	cu.Cancel()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
 	return nil
 }

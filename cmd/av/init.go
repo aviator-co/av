@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/aviator-co/av/internal/utils/cleanup"
+	"github.com/sirupsen/logrus"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
@@ -10,23 +12,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var initFlags struct {
-	Force bool
-}
 var initCmd = &cobra.Command{
 	Use: "init",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
 		repo, err := getRepo()
 		if err != nil {
 			return err
 		}
 
-		if !initFlags.Force {
-			_, err := meta.ReadRepository(repo)
-			if err == nil {
-				return errors.New("repository is already initialized for use with av")
-			}
+		db, err := getDB(repo)
+		if err != nil {
+			return err
 		}
+		tx := db.WriteTx()
+		cu := cleanup.New(func() {
+			logrus.WithError(reterr).Debug("aborting db transaction")
+			tx.Abort()
+		})
+		defer cu.Cleanup()
 
 		if config.Av.GitHub.Token == "" {
 			return errors.New("github token must be set")
@@ -46,19 +49,17 @@ var initCmd = &cobra.Command{
 			return err
 		}
 
-		if err := meta.WriteRepository(repo, meta.Repository{
+		tx.SetRepository(meta.Repository{
 			ID:    ghRepo.ID,
 			Owner: ghRepo.Owner.Login,
 			Name:  ghRepo.Name,
-		}); err != nil {
-			return errors.WrapIff(err, "failed to write repository metadata")
-		}
+		})
 
+		cu.Cancel()
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 		_, _ = fmt.Println("Successfully initialized repository for use with av!")
 		return nil
 	},
-}
-
-func init() {
-	initCmd.Flags().BoolVar(&initFlags.Force, "force", false, "force initialization even if metadata already exists")
 }

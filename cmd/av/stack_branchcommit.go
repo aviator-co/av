@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/aviator-co/av/internal/utils/cleanup"
 	"regexp"
 	"strings"
 
@@ -45,7 +46,7 @@ var stackBranchCommitCmd = &cobra.Command{
 	Short:        "create a new stacked branch and a commit",
 	Long:         "Create a new branch that is stacked on the current branch, and call git-commit with the specified arguments.",
 	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
 		branchName := stackBranchCommitFlags.BranchName
 		if branchName == "" {
 			if stackBranchCommitFlags.Message == "" {
@@ -63,6 +64,18 @@ var stackBranchCommitCmd = &cobra.Command{
 			return err
 		}
 
+		db, err := getDB(repo)
+		if err != nil {
+			return err
+		}
+		tx := db.WriteTx()
+		var cu cleanup.Cleanup
+		defer cu.Cleanup()
+		cu.Add(func() {
+			logrus.WithError(reterr).Debug("aborting db transaction")
+			tx.Abort()
+		})
+
 		// Determine important contextual information from Git
 		defaultBranch, err := repo.DefaultBranch()
 		if err != nil {
@@ -79,7 +92,14 @@ var stackBranchCommitCmd = &cobra.Command{
 		// that does run the risk of allowing the user to get into a weird state
 		// (where some stacks assume a branch is a trunk and others don't).
 		isBranchFromTrunk := parentBranchName == defaultBranch
-		parentState, err := meta.ReadBranchState(repo, parentBranchName, isBranchFromTrunk)
+		var parentHead string
+		if !isBranchFromTrunk {
+			parentHead, err = repo.RevParse(&git.RevParse{Rev: parentBranchName})
+			if err != nil {
+				return errors.WrapIf(err, "failed to get parent branch head commit")
+			}
+		}
+
 		if err != nil {
 			return errors.WrapIf(err, "failed to read parent branch state")
 		}
@@ -96,24 +116,34 @@ var stackBranchCommitCmd = &cobra.Command{
 			return errors.WrapIff(err, "checkout error")
 		}
 
-		branchMeta := meta.Branch{
-			Name:   branchName,
-			Parent: parentState,
-		}
-		logrus.WithField("meta", branchMeta).Debug("writing branch metadata")
-		if err := meta.WriteBranch(repo, branchMeta); err != nil {
-			return errors.WrapIff(err, "failed to write av internal metadata for branch %q", branchName)
-		}
+		tx.SetBranch(meta.Branch{
+			Name: branchName,
+			Parent: meta.BranchState{
+				Name:  parentBranchName,
+				Trunk: isBranchFromTrunk,
+				Head:  parentHead,
+			},
+		})
 
 		// If this isn't a new stack root, update the parent metadata to include
 		// the new branch as a child.
 		if !isBranchFromTrunk {
-			parentMeta, _ := meta.ReadBranch(repo, parentBranchName)
+			parentMeta, _ := tx.Branch(parentBranchName)
 			parentMeta.Children = append(parentMeta.Children, branchName)
 			logrus.WithField("meta", parentMeta).Debug("writing parent branch metadata")
-			if err := meta.WriteBranch(repo, parentMeta); err != nil {
-				return errors.WrapIf(err, "failed to write parent branch metadata")
-			}
+			tx.SetBranch(parentMeta)
+		}
+
+		// TODO[UX]
+		// Here, we commit the db changes before actually creating a git commit
+		// since the git commit might fail. It's a little unclear what should
+		// actually happen if that occurs -- at this point we've already checked
+		// out the branch. Should we delete the branch? That would allow the
+		// user to fix any issues (e.g., those surfaced by pre-commit hooks) and
+		// re-run the `av stack branch-commit` command verbatim again.
+		cu.Cancel()
+		if err := tx.Commit(); err != nil {
+			return err
 		}
 
 		commitArgs := []string{"commit"}
