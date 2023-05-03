@@ -147,3 +147,24 @@ func Trunk(tx ReadTx, name string) (string, bool) {
 	}
 	return "", false
 }
+
+func RebuildChildren(tx WriteTx) {
+	branches := tx.AllBranches()
+	for name, branch := range branches {
+		branch.Children = nil
+		// We have to assign the branch back to the map because we're modifying
+		// the value in-place (go has weird map semantics).
+		// `branches[name].Children` = nil will **not** work because
+		// `branches[name]` is a copy of the value in the map.
+		branches[name] = branch
+	}
+	for name, branch := range branches {
+		if parent, ok := branches[branch.Parent.Name]; ok {
+			parent.Children = append(parent.Children, name)
+			branches[branch.Parent.Name] = parent
+		}
+	}
+	for _, branch := range branches {
+		tx.SetBranch(branch)
+	}
+}

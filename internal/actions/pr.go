@@ -208,7 +208,7 @@ func CreatePullRequest(
 		return nil, errors.Errorf("no commits between %q and %q", prCompareRef, opts.BranchName)
 	}
 
-	existingPR, err := getExistingOpenPR(ctx, client, repoMeta, branchMeta, prBaseBranch)
+	existingPR, err := getExistingOpenPR(ctx, client, repoMeta, branchMeta, branchMeta.Parent.Name)
 	if err != nil {
 		return nil, err
 	}
