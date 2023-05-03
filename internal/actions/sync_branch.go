@@ -20,8 +20,8 @@ import (
 
 type SyncBranchOpts struct {
 	Branch  string
-	NoFetch bool
-	NoPush  bool
+	Fetch bool
+	Push  bool
 	// If specified, synchronize the branch against the latest version of the
 	// trunk branch. This value is ignored if the branch is not a stack root.
 	ToTrunk bool
@@ -71,7 +71,7 @@ func SyncBranch(
 			return nil, err
 		}
 	} else {
-		if !opts.NoFetch {
+		if opts.Fetch {
 			update, err := UpdatePullRequestState(ctx, repo, client, repoMeta, branch.Name)
 			if err != nil {
 				_, _ = fmt.Fprint(os.Stderr, colors.Failure("      - error: ", err.Error()), "\n")
@@ -115,7 +115,7 @@ func SyncBranch(
 		return res, nil
 	}
 
-	if !opts.NoPush {
+	if opts.Push {
 		if err := syncBranchPushAndUpdatePullRequest(ctx, repo, client, branch, pull); err != nil {
 			return nil, err
 		}
@@ -216,7 +216,7 @@ func syncBranchRebase(
 			"  - rebasing ", colors.UserInput(branch.Name),
 			" on top of merge commit ", colors.UserInput(short), "\n",
 		)
-		if !opts.NoFetch {
+		if opts.Fetch {
 			if _, err := repo.Git("fetch", "origin", branch.MergeCommit); err != nil {
 				return nil, errors.WrapIff(err, "failed to fetch merge commit %q from origin", short)
 			}
