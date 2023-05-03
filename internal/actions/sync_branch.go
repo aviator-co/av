@@ -25,6 +25,7 @@ type SyncBranchOpts struct {
 	// If specified, synchronize the branch against the latest version of the
 	// trunk branch. This value is ignored if the branch is not a stack root.
 	ToTrunk bool
+	Skip    bool
 
 	Continuation *SyncBranchContinuation
 }
@@ -368,9 +369,13 @@ func syncBranchContinue(
 	opts SyncBranchOpts,
 	branch meta.Branch,
 ) (*SyncBranchResult, error) {
-	rebase, err := repo.RebaseParse(git.RebaseOpts{
-		Continue: true,
-	})
+	var rebaseOpts git.RebaseOpts
+	if opts.Skip {
+		rebaseOpts.Skip = true
+	} else {
+		rebaseOpts.Continue = true
+	}
+	rebase, err := repo.RebaseParse(rebaseOpts)
 	if err != nil {
 		return nil, err
 	}
