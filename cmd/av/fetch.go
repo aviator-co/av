@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/utils/cleanup"
 	"os"
 
 	"emperror.dev/errors"
@@ -19,15 +21,29 @@ import (
 var fetchCmd = &cobra.Command{
 	Use:   "fetch",
 	Short: "fetch latest state from GitHub",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		repo, info, err := getRepoInfo()
+	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
+		repo, err := getRepo()
 		if err != nil {
 			return err
 		}
-		branches, err := meta.ReadAllBranches(repo)
+		db, err := getDB(repo)
 		if err != nil {
-			return errors.Wrap(err, "failed to read av branch metadata")
+			return err
 		}
+
+		tx := db.WriteTx()
+		var cu cleanup.Cleanup
+		defer cu.Cleanup()
+		cu.Add(func() {
+			logrus.WithError(reterr).Debug("aborting db transaction")
+			tx.Abort()
+		})
+
+		info, ok := tx.Repository()
+		if !ok {
+			return actions.ErrRepoNotInitialized
+		}
+		branches := tx.AllBranches()
 
 		client, err := getClient(config.Av.GitHub.Token)
 		if err != nil {
@@ -95,9 +111,7 @@ var fetchCmd = &cobra.Command{
 					Number:    pr.Number,
 					Permalink: pr.Permalink,
 				}
-				if err := meta.WriteBranch(repo, branchMeta); err != nil {
-					return errors.Wrap(err, "failed to write branch metadata")
-				}
+				tx.SetBranch(branchMeta)
 			}
 
 			if prsPage.HasNextPage {
@@ -107,6 +121,10 @@ var fetchCmd = &cobra.Command{
 			}
 		}
 
+		cu.Cancel()
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 		_, _ = fmt.Fprint(
 			os.Stderr,
 			"Updated ", color.GreenString("%d", updatedCount), " pull requests",

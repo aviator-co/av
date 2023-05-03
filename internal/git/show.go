@@ -2,9 +2,10 @@ package git
 
 import (
 	"bytes"
+	"strings"
+
 	"emperror.dev/errors"
 	"github.com/sirupsen/logrus"
-	"strings"
 )
 
 type CommitInfoOpts struct {
@@ -21,7 +22,7 @@ type CommitInfo struct {
 func (c CommitInfo) BodyWithPrefix(prefix string) []string {
 	var lines []string
 	for _, line := range strings.Split(strings.TrimSpace(c.Body), "\n") {
-		lines = append(lines, prefix + line)
+		lines = append(lines, prefix+line)
 	}
 	return lines
 }

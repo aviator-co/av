@@ -1,9 +1,10 @@
 package config
 
 import (
+	"os"
+
 	"emperror.dev/errors"
 	"github.com/spf13/viper"
-	"os"
 )
 
 type GitHub struct {

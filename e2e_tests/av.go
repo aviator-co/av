@@ -2,15 +2,16 @@ package e2e_tests
 
 import (
 	"bytes"
-	"emperror.dev/errors"
 	"fmt"
-	"github.com/kr/text"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"emperror.dev/errors"
+	"github.com/kr/text"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
 var avCmdPath string
@@ -81,6 +82,7 @@ func Av(t *testing.T, args ...string) AvOutput {
 }
 
 func RequireAv(t *testing.T, args ...string) AvOutput {
+	t.Helper()
 	output := Av(t, args...)
 	require.Equal(t, 0, output.ExitCode, "av %s: exited with %v", args, output.ExitCode)
 	return output

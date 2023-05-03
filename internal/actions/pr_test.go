@@ -2,10 +2,11 @@ package actions_test
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestReadPRMetadata(t *testing.T) {

@@ -1,9 +1,10 @@
 package git
 
 import (
-	"emperror.dev/errors"
 	"os/exec"
 	"strings"
+
+	"emperror.dev/errors"
 )
 
 func StderrMatches(err error, target string) bool {

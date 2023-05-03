@@ -19,12 +19,13 @@ import (
 )
 
 type SyncBranchOpts struct {
-	Branch  string
-	Fetch bool
-	Push  bool
+	Branch string
+	Fetch  bool
+	Push   bool
 	// If specified, synchronize the branch against the latest version of the
 	// trunk branch. This value is ignored if the branch is not a stack root.
 	ToTrunk bool
+	Skip    bool
 
 	Continuation *SyncBranchContinuation
 }
@@ -55,10 +56,13 @@ type (
 
 // SyncBranch synchronizes a branch with its parent.
 func SyncBranch(
-	ctx context.Context, repo *git.Repo, client *gh.Client,
-	repoMeta meta.Repository, opts SyncBranchOpts,
+	ctx context.Context,
+	repo *git.Repo,
+	client *gh.Client,
+	tx meta.WriteTx,
+	opts SyncBranchOpts,
 ) (*SyncBranchResult, error) {
-	branch, _ := meta.ReadBranch(repo, opts.Branch)
+	branch, _ := tx.Branch(opts.Branch)
 	_, _ = fmt.Fprint(os.Stderr, "Synchronizing branch ", colors.UserInput(branch.Name), "...\n")
 
 	var res *SyncBranchResult
@@ -66,18 +70,17 @@ func SyncBranch(
 
 	if opts.Continuation != nil {
 		var err error
-		res, err = syncBranchContinue(ctx, repo, opts, branch)
+		res, err = syncBranchContinue(ctx, repo, tx, opts, branch)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		if opts.Fetch {
-			update, err := UpdatePullRequestState(ctx, repo, client, repoMeta, branch.Name)
+			update, err := UpdatePullRequestState(ctx, client, tx, branch.Name)
 			if err != nil {
 				_, _ = fmt.Fprint(os.Stderr, colors.Failure("      - error: ", err.Error()), "\n")
 				return nil, errors.Wrap(err, "failed to fetch latest PR info")
 			}
-			branch = update.Branch
 			pull = update.Pull
 			if update.Changed {
 				_, _ = fmt.Fprint(os.Stderr, "      - found updated pull request: ", colors.UserInput(update.Pull.Permalink), "\n")
@@ -104,7 +107,7 @@ func SyncBranch(
 		}
 
 		var err error
-		res, err = syncBranchRebase(ctx, repo, opts, branch)
+		res, err = syncBranchRebase(ctx, repo, tx, opts, branch)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +119,7 @@ func SyncBranch(
 	}
 
 	if opts.Push {
-		if err := syncBranchPushAndUpdatePullRequest(ctx, repo, client, branch, pull); err != nil {
+		if err := syncBranchPushAndUpdatePullRequest(ctx, repo, client, tx, branch, pull); err != nil {
 			return nil, err
 		}
 	}
@@ -126,7 +129,10 @@ func SyncBranch(
 
 // syncBranchRebase does the actual rebase part of SyncBranch
 func syncBranchRebase(
-	ctx context.Context, repo *git.Repo, opts SyncBranchOpts, branch meta.Branch,
+	ctx context.Context,
+	repo *git.Repo,
+	tx meta.WriteTx,
+	opts SyncBranchOpts, branch meta.Branch,
 ) (*SyncBranchResult, error) {
 	branchHead, err := repo.RevParse(&git.RevParse{Rev: branch.Name})
 	if err != nil {
@@ -204,7 +210,7 @@ func syncBranchRebase(
 	//      happen if the parent branch was rebased itself).
 
 	// Scenario 1: the parent branch has been merged.
-	parent, _ := meta.ReadBranch(repo, branch.Parent.Name)
+	parent, _ := tx.Branch(branch.Parent.Name)
 	if parent.MergeCommit != "" {
 		short := git.ShortSha(parent.MergeCommit)
 		_, _ = fmt.Fprint(os.Stderr,
@@ -264,7 +270,7 @@ func syncBranchRebase(
 			}, nil
 		}
 
-		branch, err = syncBranchUpdateNewTrunk(repo, branch, parent.Parent.Name)
+		branch, err = syncBranchUpdateNewTrunk(tx, branch, parent.Parent.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -357,12 +363,19 @@ func syncBranchRebase(
 }
 
 func syncBranchContinue(
-	ctx context.Context, repo *git.Repo,
-	opts SyncBranchOpts, branch meta.Branch,
+	ctx context.Context,
+	repo *git.Repo,
+	tx meta.WriteTx,
+	opts SyncBranchOpts,
+	branch meta.Branch,
 ) (*SyncBranchResult, error) {
-	rebase, err := repo.RebaseParse(git.RebaseOpts{
-		Continue: true,
-	})
+	var rebaseOpts git.RebaseOpts
+	if opts.Skip {
+		rebaseOpts.Skip = true
+	} else {
+		rebaseOpts.Continue = true
+	}
+	rebase, err := repo.RebaseParse(rebaseOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +403,7 @@ func syncBranchContinue(
 	// Finish setting the new trunk for the branch
 	if opts.Continuation.NewTrunk != "" {
 		var err error
-		branch, err = syncBranchUpdateNewTrunk(repo, branch, opts.Continuation.NewTrunk)
+		branch, err = syncBranchUpdateNewTrunk(tx, branch, opts.Continuation.NewTrunk)
 		if err != nil {
 			return nil, err
 		}
@@ -399,10 +412,18 @@ func syncBranchContinue(
 	return &SyncBranchResult{*rebase, nil, branch}, nil
 }
 
-func syncBranchUpdateNewTrunk(repo *git.Repo, branch meta.Branch, newTrunk string) (meta.Branch, error) {
-	oldParent, _ := meta.ReadBranch(repo, branch.Parent.Name)
+func syncBranchUpdateNewTrunk(
+	tx meta.WriteTx,
+	branch meta.Branch,
+	newTrunk string,
+) (meta.Branch, error) {
+	oldParent, _ := tx.Branch(branch.Parent.Name)
 	var err error
-	branch.Parent, err = meta.ReadBranchState(repo, newTrunk, true)
+
+	branch.Parent = meta.BranchState{
+		Name:  newTrunk,
+		Trunk: true,
+	}
 	if err != nil {
 		return branch, err
 	}
@@ -410,24 +431,24 @@ func syncBranchUpdateNewTrunk(repo *git.Repo, branch meta.Branch, newTrunk strin
 		"  - this branch is now a stack root based on trunk branch ",
 		colors.UserInput(branch.Parent.Name), "\n",
 	)
-	if err := meta.WriteBranch(repo, branch); err != nil {
-		return branch, err
-	}
+	tx.SetBranch(branch)
 
 	// Remove from the old parent branches metadata
 	if len(oldParent.Children) > 0 {
 		oldParent.Children = sliceutils.DeleteElement(oldParent.Children, branch.Name)
-		if err := meta.WriteBranch(repo, oldParent); err != nil {
-			return branch, err
-		}
+		tx.SetBranch(oldParent)
 	}
 
 	return branch, nil
 }
 
 func syncBranchPushAndUpdatePullRequest(
-	ctx context.Context, repo *git.Repo, client *gh.Client, branch meta.Branch,
-	// pull can be nil, in which case the PR info is fetched from GitHub
+	ctx context.Context,
+	repo *git.Repo,
+	client *gh.Client,
+	tx meta.WriteTx,
+	branch meta.Branch,
+	// pr can be nil, in which case the PR info is fetched from GitHub
 	pr *gh.PullRequest,
 ) error {
 	if branch.PullRequest == nil || branch.PullRequest.ID == "" {
@@ -472,7 +493,7 @@ func syncBranchPushAndUpdatePullRequest(
 		return err
 	}
 
-	prMeta, err := getPRMetadata(repo, branch, nil)
+	prMeta, err := getPRMetadata(tx, branch, nil)
 	if err != nil {
 		return err
 	}

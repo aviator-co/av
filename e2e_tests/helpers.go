@@ -1,9 +1,10 @@
 package e2e_tests
 
 import (
+	"testing"
+
 	"github.com/aviator-co/av/internal/git"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func RequireCurrentBranchName(t *testing.T, repo *git.Repo, name string) {

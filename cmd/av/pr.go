@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
@@ -41,7 +41,7 @@ Examples:
     > Can you please review it?
     > EOF
 `),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
 		repo, err := getRepo()
 		if err != nil {
 			return err
@@ -55,10 +55,17 @@ Examples:
 			return err
 		}
 
+		db, err := getDB(repo)
+		if err != nil {
+			return err
+		}
+		tx := db.WriteTx()
+		defer tx.Abort()
+
 		body := prCreateFlags.Body
 		// Special case: ready body from stdin
 		if prCreateFlags.Body == "-" {
-			bodyBytes, err := ioutil.ReadAll(os.Stdin)
+			bodyBytes, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				return errors.Wrap(err, "failed to read body from stdin")
 			}
@@ -66,7 +73,7 @@ Examples:
 		}
 
 		if _, err := actions.CreatePullRequest(
-			context.Background(), repo, client,
+			context.Background(), repo, client, tx,
 			actions.CreatePullRequestOpts{
 				BranchName: branchName,
 				Title:      prCreateFlags.Title,
@@ -81,6 +88,9 @@ Examples:
 				Edit:  prCreateFlags.Edit,
 			},
 		); err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
 			return err
 		}
 		return nil

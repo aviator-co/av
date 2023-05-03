@@ -4,12 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
-
-	"golang.org/x/exp/slices"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
@@ -21,6 +18,7 @@ import (
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 )
 
 // stackSyncConfig contains the configuration for a sync operation.
@@ -69,6 +67,8 @@ var stackSyncFlags struct {
 	Continue bool
 	// If set, abort an in-progress sync operation.
 	Abort bool
+	// If set, skip a commit and continue a previous sync.
+	Skip bool
 }
 
 var stackSyncCmd = &cobra.Command{
@@ -92,8 +92,8 @@ base branch.
 `),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Argument validation
-		if stackSyncFlags.Continue && stackSyncFlags.Abort {
-			return errors.New("cannot use --continue and --abort together")
+		if countBools(stackSyncFlags.Continue, stackSyncFlags.Abort, stackSyncFlags.Skip) > 1 {
+			return errors.New("cannot use --continue, --abort, and --skip together")
 		}
 		if stackSyncFlags.Current && stackSyncFlags.Trunk {
 			return errors.New("cannot use --current and --trunk together")
@@ -104,13 +104,19 @@ base branch.
 
 		ctx := context.Background()
 
-		repo, repoMeta, err := getRepoInfo()
+		repo, err := getRepo()
 		if err != nil {
 			return err
 		}
+		db, err := getDB(repo)
+		if err != nil {
+			return err
+		}
+		tx := db.WriteTx()
+		defer tx.Abort()
 
 		// Read any preexisting state.
-		// This is required to allow us to handle --continue/--abort
+		// This is required to allow us to handle --continue/--abort/--skip
 		state, err := readStackSyncState(repo)
 		if err != nil && !os.IsNotExist(err) {
 			return err
@@ -141,21 +147,24 @@ base branch.
 			return nil
 		}
 
-		// Make sure all changes are staged
-		diff, err := repo.Diff(&git.DiffOpts{Quiet: true})
-		if err != nil {
-			return err
-		}
-		if !diff.Empty {
-			return errors.New("refusing to sync: there are unstaged changes in the working tree (use `git add` to stage changes)")
+		if !stackSyncFlags.Skip {
+			// Make sure all changes are staged unless --skip. git rebase --skip will
+			// clean up the changes.
+			diff, err := repo.Diff(&git.DiffOpts{Quiet: true})
+			if err != nil {
+				return err
+			}
+			if !diff.Empty {
+				return errors.New("refusing to sync: there are unstaged changes in the working tree (use `git add` to stage changes)")
+			}
 		}
 
-		if stackSyncFlags.Continue {
+		if stackSyncFlags.Continue || stackSyncFlags.Skip {
 			if state.CurrentBranch == "" {
 				return errors.New("no sync in progress")
 			}
 		} else {
-			// Not a --continue, we're trying to start a new sync from scratch.
+			// Not a --continue/--skip, we're trying to start a new sync from scratch.
 			if state.CurrentBranch != "" {
 				return errors.New("a sync is already in progress: use --continue or --abort")
 			}
@@ -197,10 +206,10 @@ base branch.
 				NewParent:      state.Config.Parent,
 				NewParentTrunk: state.Config.Parent == defaultBranch,
 			}
-			if stackSyncFlags.Continue {
-				res, err = actions.ReparentContinue(repo, opts)
+			if stackSyncFlags.Continue || stackSyncFlags.Skip {
+				res, err = actions.ReparentSkipContinue(repo, tx, opts, stackSyncFlags.Skip)
 			} else {
-				res, err = actions.Reparent(repo, opts)
+				res, err = actions.Reparent(repo, tx, opts)
 			}
 			if err != nil {
 				return err
@@ -220,6 +229,9 @@ base branch.
 					text.Indent(hint, "    "),
 					"\n",
 				)
+				if err := tx.Commit(); err != nil {
+					return err
+				}
 				return nil
 			}
 
@@ -230,14 +242,7 @@ base branch.
 
 		// For a trunk sync, we need to rebase the stack root against the HEAD
 		// of the trunk branch. After that, it's just a normal sync.
-		branches, err := meta.ReadAllBranches(repo)
-
-		// Construct the list of branches we need to sync
-		if err != nil {
-			return err
-		}
 		var branchesToSync []string
-
 		if len(state.Branches) != 0 {
 			// This is a --continue, so we need to sync the current branch and
 			// everything after it.
@@ -263,12 +268,12 @@ base branch.
 			if err != nil {
 				return err
 			}
-			branchesToSync, err = meta.PreviousBranches(branches, currentBranch)
+			branchesToSync, err = meta.PreviousBranches(tx, currentBranch)
 			if err != nil {
 				return err
 			}
 			branchesToSync = append(branchesToSync, currentBranch)
-			nextBranches, err := meta.SubsequentBranches(branches, branchesToSync[len(branchesToSync)-1])
+			nextBranches, err := meta.SubsequentBranches(tx, branchesToSync[len(branchesToSync)-1])
 			if err != nil {
 				return err
 			}
@@ -289,12 +294,13 @@ base branch.
 				_, _ = fmt.Fprint(os.Stderr, "\n\n")
 			}
 			state.CurrentBranch = currentBranch
-			res, err := actions.SyncBranch(ctx, repo, client, repoMeta, actions.SyncBranchOpts{
+			res, err := actions.SyncBranch(ctx, repo, client, tx, actions.SyncBranchOpts{
 				Branch:       currentBranch,
 				Fetch:        !state.Config.NoFetch,
 				Push:         !state.Config.NoPush,
 				Continuation: state.Continuation,
 				ToTrunk:      state.Config.Trunk,
+				Skip:         stackSyncFlags.Skip,
 			})
 			if err != nil {
 				return err
@@ -303,6 +309,9 @@ base branch.
 				state.Continuation = res.Continuation
 				if err := writeStackSyncState(repo, &state); err != nil {
 					return errors.Wrap(err, "failed to write stack sync state")
+				}
+				if err := tx.Commit(); err != nil {
+					return err
 				}
 				return errExitSilently{1}
 			}
@@ -317,6 +326,9 @@ base branch.
 		if err := writeStackSyncState(repo, nil); err != nil {
 			return errors.Wrap(err, "failed to write stack sync state")
 		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 		return nil
 	},
 }
@@ -325,7 +337,7 @@ const stackSyncStateFile = "stack-sync.state.json"
 
 func readStackSyncState(repo *git.Repo) (stackSyncState, error) {
 	var state stackSyncState
-	data, err := ioutil.ReadFile(path.Join(repo.GitDir(), "av", stackSyncStateFile))
+	data, err := os.ReadFile(path.Join(repo.GitDir(), "av", stackSyncStateFile))
 	if err != nil {
 		return state, err
 	}
@@ -360,7 +372,7 @@ func writeStackSyncState(repo *git.Repo, state *stackSyncState) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(path.Join(avDir, stackSyncStateFile), data, 0644)
+	return os.WriteFile(path.Join(avDir, stackSyncStateFile), data, 0644)
 }
 
 func init() {
@@ -389,8 +401,22 @@ func init() {
 		&stackSyncFlags.Abort, "abort", false,
 		"abort an in-progress sync",
 	)
+	stackSyncCmd.Flags().BoolVar(
+		&stackSyncFlags.Skip, "skip", false,
+		"skip the current commit and continue an in-progress sync",
+	)
 	stackSyncCmd.Flags().StringVar(
 		&stackSyncFlags.Parent, "parent", "",
 		"parent branch to rebase onto",
 	)
+}
+
+func countBools(bs ...bool) int {
+	var ret int
+	for _, b := range bs {
+		if b {
+			ret += 1
+		}
+	}
+	return ret
 }

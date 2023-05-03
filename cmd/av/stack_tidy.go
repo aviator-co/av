@@ -1,6 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/textutils"
+	"os"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -9,8 +13,8 @@ import (
 )
 
 var stackTidyCmd = &cobra.Command{
-	Use:          "tidy",
-	Short:        "tidy up the branch metadata",
+	Use:   "tidy",
+	Short: "tidy up the branch metadata",
 	Long: strings.TrimSpace(`
 Tidy up the branch metadata by removing the deleted / merged branches.
 
@@ -23,10 +27,14 @@ operates on only av's internal metadata, and it won't delete the actual Git bran
 		if err != nil {
 			return err
 		}
-		origBranches, err := meta.ReadAllBranches(repo)
+
+		db, err := getDB(repo)
 		if err != nil {
 			return err
 		}
+		tx := db.WriteTx()
+		defer tx.Abort()
+		origBranches := tx.AllBranches()
 		branches := make(map[string]*meta.Branch)
 		for name, br := range origBranches {
 			// origBranches has values, not references. Convert to references so that we
@@ -47,16 +55,28 @@ operates on only av's internal metadata, and it won't delete the actual Git bran
 		}
 		rebuildChildren(branches)
 
+		nDeleted := 0
 		for name, br := range branches {
 			if _, deleted := newParents[name]; deleted {
-				if err := meta.DeleteBranch(repo, name); err != nil {
-					return err
-				}
+				tx.DeleteBranch(name)
+				nDeleted += 1
 				continue
 			}
-			if err := meta.WriteBranch(repo, *br); err != nil {
-				return err
-			}
+			tx.SetBranch(*br)
+		}
+
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+
+		if nDeleted > 0 {
+			_, _ = fmt.Fprint(os.Stderr,
+				"Tidied ", colors.UserInput(nDeleted), " ",
+				textutils.Pluralize(nDeleted, "branch", "branches"),
+				".\n",
+			)
+		} else {
+			_, _ = fmt.Fprintln(os.Stderr, "No branches to tidy.")
 		}
 		return nil
 	},
