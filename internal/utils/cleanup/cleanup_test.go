@@ -1,8 +1,9 @@
 package cleanup_test
 
 import (
-	"github.com/aviator-co/av/internal/utils/cleanup"
 	"testing"
+
+	"github.com/aviator-co/av/internal/utils/cleanup"
 )
 
 func TestCleanup(t *testing.T) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/aviator-co/av/internal/config"
 	"github.com/spf13/cobra"
 )

@@ -1,10 +1,11 @@
 package e2e_tests
 
 import (
-	"github.com/aviator-co/av/internal/git/gittest"
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+
+	"github.com/aviator-co/av/internal/git/gittest"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSyncAfterAmendingCommit(t *testing.T) {

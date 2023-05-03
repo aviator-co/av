@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/exp/slices"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -20,6 +18,7 @@ import (
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 )
 
 // stackSyncConfig contains the configuration for a sync operation.
@@ -332,7 +331,7 @@ const stackSyncStateFile = "stack-sync.state.json"
 
 func readStackSyncState(repo *git.Repo) (stackSyncState, error) {
 	var state stackSyncState
-	data, err := ioutil.ReadFile(path.Join(repo.GitDir(), "av", stackSyncStateFile))
+	data, err := os.ReadFile(path.Join(repo.GitDir(), "av", stackSyncStateFile))
 	if err != nil {
 		return state, err
 	}
@@ -367,7 +366,7 @@ func writeStackSyncState(repo *git.Repo, state *stackSyncState) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(path.Join(avDir, stackSyncStateFile), data, 0644)
+	return os.WriteFile(path.Join(avDir, stackSyncStateFile), data, 0644)
 }
 
 func init() {

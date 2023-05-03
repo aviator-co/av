@@ -1,10 +1,11 @@
 package stacks
 
 import (
-	"emperror.dev/errors"
 	"fmt"
-	"github.com/aviator-co/av/internal/git"
 	"strings"
+
+	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/git"
 )
 
 type SyncStatus int

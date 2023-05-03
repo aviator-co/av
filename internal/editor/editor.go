@@ -3,13 +3,14 @@ package editor
 import (
 	"bufio"
 	"bytes"
+	"os"
+	"os/exec"
+	"strings"
+
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/kballard/go-shellquote"
 	"github.com/sirupsen/logrus"
-	"os"
-	"os/exec"
-	"strings"
 )
 
 type Config struct {

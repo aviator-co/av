@@ -2,15 +2,16 @@ package e2e_tests
 
 import (
 	"bytes"
-	"emperror.dev/errors"
 	"fmt"
-	"github.com/kr/text"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"emperror.dev/errors"
+	"github.com/kr/text"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
 var avCmdPath string

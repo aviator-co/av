@@ -1,9 +1,10 @@
 package git
 
 import (
-	"github.com/sirupsen/logrus"
 	"regexp"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 type RebaseOpts struct {
