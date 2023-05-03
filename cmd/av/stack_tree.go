@@ -69,7 +69,11 @@ func printStackTree(repo *git.Repo, branches map[string]meta.Branch, currentBran
 		return
 	}
 
-	branchInfo := getBranchInfo(repo, branch)
+	branchInfo, err := getBranchInfo(repo, branch)
+	if err != nil {
+		fmt.Printf("<ERROR: cannot get branch info: %v>\n", err)
+		return
+	}
 
 	if currentBranch == branch.Name {
 		_, _ = fmt.Print(
@@ -83,19 +87,19 @@ func printStackTree(repo *git.Repo, branches map[string]meta.Branch, currentBran
 	}
 }
 
-func getBranchInfo(repo *git.Repo, branch meta.Branch) string {
+func getBranchInfo(repo *git.Repo, branch meta.Branch) (string, error) {
 	var branchInfo string
 
 	parentStatus, err := getParentStatus(repo, branch)
 	if err != nil {
 		fmt.Printf("<ERROR: could not get status of parent branch: %v>\n", err)
-		return ""
+		return "", err
 	}
 
 	upstreamStatus, err := getUpstreamStatus(repo, branch)
 	if err != nil {
 		fmt.Printf("<ERROR: could not get status of upstream branch: %v>\n", err)
-		return ""
+		return "", err
 	}
 
 	branchStatus := strings.Trim(fmt.Sprintf("%s, %s", parentStatus, upstreamStatus), ", ")
@@ -107,7 +111,7 @@ func getBranchInfo(repo *git.Repo, branch meta.Branch) string {
 		branchInfo = branch.PullRequest.Permalink + " " + branchInfo
 	}
 
-	return branchInfo
+	return branchInfo, nil
 }
 
 // Check if branch is up to date with the parent branch.
