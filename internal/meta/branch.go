@@ -81,7 +81,7 @@ type PullRequest struct {
 	// The web URL for the pull request.
 	Permalink string `json:"permalink"`
 	// The state of the pull request (open, closed, or merged).
-	State githubv4.PullRequestState
+	State githubv4.PullRequestState `json:"state"`
 }
 
 // GetNumber returns the number of the pull request or zero if the PullRequest is nil.
