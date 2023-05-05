@@ -139,13 +139,48 @@ func syncBranchRebase(
 		return nil, errors.WrapIff(err, "failed to get head of branch %q", branch.Name)
 	}
 
-	if branch.IsStackRoot() {
-		trunk := branch.Parent.Name
-		if !opts.ToTrunk {
+	parentState := branch.Parent
+	parentBranch, _ := tx.Branch(parentState.Name)
+	origParent := branch.Parent
+	origParentBranch := parentBranch
+	for parentBranch.MergeCommit != "" {
+		parentState = parentBranch.Parent
+		parentBranch, _ = tx.Branch(parentState.Name)
+	}
+
+	if parentState.Trunk {
+		var newUpstreamCommitHash string
+		if opts.ToTrunk {
+			// First, try to fetch latest commit from the trunk...
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - fetching latest commit from ", colors.UserInput("origin/", parentState.Name), "\n",
+			)
+			if _, err := repo.Run(&git.RunOpts{
+				Args: []string{"fetch", "origin", parentState.Name},
+			}); err != nil {
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - ",
+					colors.Failure("error: failed to fetch HEAD of "), colors.UserInput(parentState.Name),
+					colors.Failure(" from origin: ", err.Error()), "\n",
+				)
+				return nil, errors.WrapIff(err, "failed to fetch trunk branch %q from origin", parentState.Name)
+			}
+
+			// NOTE: Strictly speaking, if a user doesn't use the default refspec (e.g. fetch is
+			// not +refs/heads/*:refs/remotes/origin/*, the remote tracking branch is not
+			// origin/$TRUNK. As we just fetched from a remote, it'd be safe to use FETCH_HEAD.
+			trunkHead, err := repo.RevParse(&git.RevParse{Rev: "origin/" + parentState.Name})
+			if err != nil {
+				return nil, errors.WrapIff(err, "failed to get HEAD of %q", parentState.Name)
+			}
+			newUpstreamCommitHash = trunkHead
+		} else if origParentBranch.MergeCommit != "" {
+			newUpstreamCommitHash = origParentBranch.MergeCommit
+		} else {
 			_, _ = fmt.Fprint(os.Stderr,
 				"  - branch is a stack root, nothing to do",
 				" (run ", colors.CliCmd("av stack sync --trunk"),
-				" to sync against the latest commit in ", colors.UserInput(trunk), ")\n",
+				" to sync against the latest commit in ", colors.UserInput(parentState.Name), ")\n",
 			)
 			return &SyncBranchResult{
 				git.RebaseResult{Status: git.RebaseAlreadyUpToDate},
@@ -153,38 +188,22 @@ func syncBranchRebase(
 				branch,
 			}, nil
 		}
-
-		// First, try to fetch latest commit from the trunk...
-		_, _ = fmt.Fprint(os.Stderr,
-			"  - fetching latest commit from ", colors.UserInput("origin/", trunk), "\n",
-		)
-		if _, err := repo.Run(&git.RunOpts{
-			Args: []string{"fetch", "origin", trunk},
-		}); err != nil {
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - ",
-				colors.Failure("error: failed to fetch HEAD of "), colors.UserInput(trunk),
-				colors.Failure(" from origin: ", err.Error()), "\n",
-			)
-			return nil, errors.WrapIff(err, "failed to fetch trunk branch %q from origin", trunk)
-		}
-
-		// NOTE: Strictly speaking, if a user doesn't use the default refspec (e.g. fetch is
-		// not +refs/heads/*:refs/remotes/origin/*, the remote tracking branch is not
-		// origin/$TRUNK. As we just fetched from a remote, it'd be safe to use FETCH_HEAD.
-		trunkHead, err := repo.RevParse(&git.RevParse{Rev: "origin/" + trunk})
-		if err != nil {
-			return nil, errors.WrapIff(err, "failed to get HEAD of %q", trunk)
-		}
-
 		rebase, err := repo.RebaseParse(git.RebaseOpts{
 			Branch:   opts.Branch,
-			Upstream: trunkHead,
+			Upstream: origParent.Head,
+			Onto:     newUpstreamCommitHash,
 		})
 		if err != nil {
 			return nil, err
 		}
 		msgRebaseResult(rebase)
+
+		if !origParent.Trunk {
+			_, err = syncBranchUpdateNewTrunk(tx, branch, parentState.Name)
+			if err != nil {
+				return nil, err
+			}
+		}
 		//nolint:exhaustive
 		switch rebase.Status {
 		case git.RebaseConflict:
@@ -210,12 +229,11 @@ func syncBranchRebase(
 	//      happen if the parent branch was rebased itself).
 
 	// Scenario 1: the parent branch has been merged.
-	parent, _ := tx.Branch(branch.Parent.Name)
-	if parent.MergeCommit != "" {
-		short := git.ShortSha(parent.MergeCommit)
+	if parentBranch.MergeCommit != "" {
+		short := git.ShortSha(parentBranch.MergeCommit)
 		_, _ = fmt.Fprint(os.Stderr,
 			"  - parent ", colors.UserInput(branch.Parent.Name),
-			" (pull ", colors.UserInput("#", parent.PullRequest.GetNumber()), ")",
+			" (pull ", colors.UserInput("#", parentBranch.PullRequest.GetNumber()), ")",
 			" was merged\n",
 		)
 		_, _ = fmt.Fprint(os.Stderr,
@@ -253,7 +271,7 @@ func syncBranchRebase(
 			//                  X'--Y'  stacked-2
 			// Note that we've introduced B into the history of stacked-2, but
 			// not C or D since those commits come after M.
-			Onto: parent.MergeCommit,
+			Onto: parentBranch.MergeCommit,
 		})
 		if err != nil {
 			return nil, err
@@ -263,14 +281,14 @@ func syncBranchRebase(
 				*rebase,
 				&SyncBranchContinuation{
 					OldHead:      branchHead,
-					ParentCommit: parent.MergeCommit,
-					NewTrunk:     parent.Parent.Name,
+					ParentCommit: parentBranch.MergeCommit,
+					NewTrunk:     parentBranch.Parent.Name,
 				},
 				branch,
 			}, nil
 		}
 
-		branch, err = syncBranchUpdateNewTrunk(tx, branch, parent.Parent.Name)
+		branch, err = syncBranchUpdateNewTrunk(tx, branch, parentState.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -278,19 +296,19 @@ func syncBranchRebase(
 	}
 
 	// Scenario 2: the branch is up-to-date with its parent.
-	parentHead, err := repo.RevParse(&git.RevParse{Rev: parent.Name})
+	parentHead, err := repo.RevParse(&git.RevParse{Rev: parentState.Name})
 	if err != nil {
-		return nil, errors.WrapIff(err, "failed to resolve HEAD of parent branch %q", parent.Name)
+		return nil, errors.WrapIff(err, "failed to resolve HEAD of parent branch %q", parentState.Name)
 	}
 	mergeBase, err := repo.MergeBase(&git.MergeBase{
 		Revs: []string{parentHead, branch.Name},
 	})
 	if err != nil {
-		return nil, errors.WrapIff(err, "failed to compute merge base of %q and %q", parent.Name, branch.Name)
+		return nil, errors.WrapIff(err, "failed to compute merge base of %q and %q", parentState.Name, branch.Name)
 	}
 	if mergeBase == parentHead {
 		_, _ = fmt.Fprint(os.Stderr,
-			"  - already up-to-date with parent ", colors.UserInput(parent.Name),
+			"  - already up-to-date with parent ", colors.UserInput(parentState.Name),
 			"\n",
 		)
 		return &SyncBranchResult{git.RebaseResult{Status: git.RebaseAlreadyUpToDate}, nil, branch}, nil
@@ -300,7 +318,7 @@ func syncBranchRebase(
 	_, _ = fmt.Fprint(os.Stderr,
 		"  - synching branch ", colors.UserInput(branch.Name),
 		" on latest commit ", git.ShortSha(parentHead),
-		" of parent branch ", colors.UserInput(parent.Name),
+		" of parent branch ", colors.UserInput(parentState.Name),
 		"\n",
 	)
 	// We need to use `rebase --onto` here and be very careful about how we
