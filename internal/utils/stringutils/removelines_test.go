@@ -1,9 +1,10 @@
 package stringutils_test
 
 import (
+	"testing"
+
 	"github.com/aviator-co/av/internal/utils/stringutils"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestRemoveLines(t *testing.T) {

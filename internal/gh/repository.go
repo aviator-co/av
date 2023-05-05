@@ -2,9 +2,10 @@ package gh
 
 import (
 	"context"
+	"strings"
+
 	"emperror.dev/errors"
 	"github.com/shurcooL/githubv4"
-	"strings"
 )
 
 type Repository struct {

@@ -103,20 +103,20 @@ func Reparent(
 	return handleReparentRebaseOutput(repo, tx, opts, output)
 }
 
-func ReparentContinue(
-	repo *git.Repo,
-	tx meta.WriteTx,
-	opts ReparentOpts,
-) (*ReparentResult, error) {
-	output, err := repo.Rebase(git.RebaseOpts{
-		Continue: true,
-	})
+func ReparentSkipContinue(repo *git.Repo, tx meta.WriteTx, opts ReparentOpts, skip bool) (*ReparentResult, error) {
+	var rebaseOpts git.RebaseOpts
+	if skip {
+		rebaseOpts.Skip = true
+	} else {
+		rebaseOpts.Continue = true
+	}
+	output, err := repo.Rebase(rebaseOpts)
 	if err != nil {
 		return nil, err
 	}
 
 	if output.ExitCode != 0 && strings.Contains(string(output.Stderr), "no rebase in progress") {
-		// If there's no rebase, assume the user did `git rebase --continue` manually.
+		// If there's no rebase, assume the user did `git rebase --continue/--skip` manually.
 		// TODO: we could try to detect if the user `git rebase --abort`-ed here
 		_, _ = fmt.Fprint(os.Stderr,
 			"    - ", colors.Failure("WARNING: "),

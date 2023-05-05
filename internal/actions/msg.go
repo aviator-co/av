@@ -2,11 +2,12 @@ package actions
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/kr/text"
-	"os"
-	"strings"
 )
 
 func msgRebaseResult(rebase *git.RebaseResult) {

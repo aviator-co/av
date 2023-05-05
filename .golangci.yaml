@@ -3,8 +3,9 @@ linters:
     - exhaustive
     - importas
     - gofmt
+    - goimports
     - gosec
-    - structcheck
+    - unused
     - tagliatelle
     - wastedassign
 

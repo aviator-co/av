@@ -1,9 +1,10 @@
 package ghutils
 
 import (
-	"github.com/aviator-co/av/internal/git"
 	"os"
 	"path"
+
+	"github.com/aviator-co/av/internal/git"
 )
 
 func HasCodeowners(repo *git.Repo) bool {

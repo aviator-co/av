@@ -1,11 +1,12 @@
 package git_test
 
 import (
+	"testing"
+
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestRepo_ListRefs(t *testing.T) {

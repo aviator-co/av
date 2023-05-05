@@ -19,12 +19,13 @@ import (
 )
 
 type SyncBranchOpts struct {
-	Branch  string
-	Fetch bool
-	Push  bool
+	Branch string
+	Fetch  bool
+	Push   bool
 	// If specified, synchronize the branch against the latest version of the
 	// trunk branch. This value is ignored if the branch is not a stack root.
 	ToTrunk bool
+	Skip    bool
 
 	Continuation *SyncBranchContinuation
 }
@@ -80,7 +81,6 @@ func SyncBranch(
 				_, _ = fmt.Fprint(os.Stderr, colors.Failure("      - error: ", err.Error()), "\n")
 				return nil, errors.Wrap(err, "failed to fetch latest PR info")
 			}
-			branch = update.Branch
 			pull = update.Pull
 			if update.Changed {
 				_, _ = fmt.Fprint(os.Stderr, "      - found updated pull request: ", colors.UserInput(update.Pull.Permalink), "\n")
@@ -369,9 +369,13 @@ func syncBranchContinue(
 	opts SyncBranchOpts,
 	branch meta.Branch,
 ) (*SyncBranchResult, error) {
-	rebase, err := repo.RebaseParse(git.RebaseOpts{
-		Continue: true,
-	})
+	var rebaseOpts git.RebaseOpts
+	if opts.Skip {
+		rebaseOpts.Skip = true
+	} else {
+		rebaseOpts.Continue = true
+	}
+	rebase, err := repo.RebaseParse(rebaseOpts)
 	if err != nil {
 		return nil, err
 	}

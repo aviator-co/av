@@ -1,8 +1,9 @@
 package git
 
 import (
-	"emperror.dev/errors"
 	"os/exec"
+
+	"emperror.dev/errors"
 )
 
 type DiffOpts struct {
