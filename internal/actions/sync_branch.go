@@ -359,6 +359,10 @@ func syncBranchRebase(
 	}
 	msgRebaseResult(rebase)
 
+	branch.Parent = parentState
+	branch.Parent.Head = parentHead
+	tx.SetBranch(branch)
+
 	//nolint:exhaustive
 	switch rebase.Status {
 	case git.RebaseConflict:
