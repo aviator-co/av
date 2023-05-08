@@ -95,13 +95,11 @@ func getBranchInfo(repo *git.Repo, branch meta.Branch) (string, error) {
 
 	parentStatus, err := getParentStatus(repo, branch)
 	if err != nil {
-		fmt.Printf("<ERROR: could not get status of parent branch: %v>\n", err)
 		return "", err
 	}
 
 	upstreamStatus, err := getUpstreamStatus(repo, branch)
 	if err != nil {
-		fmt.Printf("<ERROR: could not get status of upstream branch: %v>\n", err)
 		return "", err
 	}
 
