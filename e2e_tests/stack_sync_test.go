@@ -9,6 +9,7 @@ import (
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
+	"github.com/aviator-co/av/internal/meta"
 	"github.com/stretchr/testify/require"
 )
 
@@ -126,6 +127,25 @@ func TestStackSync(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, 4, len(revs))
+
+	stack1Commit, err := repo.RevParse(&git.RevParse{Rev: "stack-1"})
+	require.NoError(t, err)
+
+	stack2Commit, err := repo.RevParse(&git.RevParse{Rev: "stack-2"})
+	require.NoError(t, err)
+
+	require.Equal(t, meta.BranchState{
+		Name:  "main",
+		Trunk: true,
+	}, GetStoredParentBranchState(t, repo, "stack-1"))
+	require.Equal(t, meta.BranchState{
+		Name: "stack-1",
+		Head: stack1Commit,
+	}, GetStoredParentBranchState(t, repo, "stack-2"))
+	require.Equal(t, meta.BranchState{
+		Name: "stack-2",
+		Head: stack2Commit,
+	}, GetStoredParentBranchState(t, repo, "stack-3"))
 }
 
 func TestStackSyncAbort(t *testing.T) {
