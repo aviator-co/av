@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -190,6 +191,21 @@ func (r *Repo) HasChangesToBeCommitted() (bool, error) {
 		return false, errors.Errorf("failed to check if there are changes to be committed: exit code %d", out.ExitCode)
 	}
 	return out.ExitCode == 1, nil
+}
+
+func (r *Repo) DoesRemoteBranchExist(branch string) (bool, error) {
+	remoteBranch := fmt.Sprintf("refs/remotes/origin/%s", branch)
+	out, err := r.Run(&RunOpts{
+		Args: []string{"show-ref", remoteBranch},
+	})
+	if err != nil {
+		return false, errors.Errorf("remote branch does not exist: %v", err)
+	}
+
+	if len(out.Stdout) > 0 {
+		return true, nil
+	}
+	return false, nil
 }
 
 type CheckoutBranch struct {
