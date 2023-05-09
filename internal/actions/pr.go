@@ -176,6 +176,7 @@ func CreatePullRequest(
 			Name:  defaultBranch,
 			Trunk: true,
 		}
+		branchMeta.Parent = parentState
 	}
 	prCompareRef := parentState.Name
 	var parentMeta meta.Branch
