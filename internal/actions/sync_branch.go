@@ -229,11 +229,11 @@ func syncBranchRebase(
 	//      happen if the parent branch was rebased itself).
 
 	// Scenario 1: the parent branch has been merged.
-	if parentBranch.MergeCommit != "" {
-		short := git.ShortSha(parentBranch.MergeCommit)
+	if origParentBranch.MergeCommit != "" {
+		short := git.ShortSha(origParentBranch.MergeCommit)
 		_, _ = fmt.Fprint(os.Stderr,
 			"  - parent ", colors.UserInput(branch.Parent.Name),
-			" (pull ", colors.UserInput("#", parentBranch.PullRequest.GetNumber()), ")",
+			" (pull ", colors.UserInput("#", origParentBranch.PullRequest.GetNumber()), ")",
 			" was merged\n",
 		)
 		_, _ = fmt.Fprint(os.Stderr,
@@ -241,14 +241,14 @@ func syncBranchRebase(
 			" on top of merge commit ", colors.UserInput(short), "\n",
 		)
 		if opts.Fetch {
-			if _, err := repo.Git("fetch", "origin", branch.MergeCommit); err != nil {
+			if _, err := repo.Git("fetch", "origin", origParentBranch.MergeCommit); err != nil {
 				return nil, errors.WrapIff(err, "failed to fetch merge commit %q from origin", short)
 			}
 		}
 
 		rebase, err := repo.RebaseParse(git.RebaseOpts{
 			Branch:   branch.Name,
-			Upstream: branch.Parent.Name,
+			Upstream: branch.Parent.Head,
 			// Replay the commits from this branch directly onto the merge commit.
 			// The HEAD of trunk might have moved forward since this, but this is
 			// probably the best thing to do here (we bias towards introducing as
@@ -271,7 +271,7 @@ func syncBranchRebase(
 			//                  X'--Y'  stacked-2
 			// Note that we've introduced B into the history of stacked-2, but
 			// not C or D since those commits come after M.
-			Onto: parentBranch.MergeCommit,
+			Onto: origParentBranch.MergeCommit,
 		})
 		if err != nil {
 			return nil, err
@@ -288,7 +288,33 @@ func syncBranchRebase(
 			}, nil
 		}
 
-		branch, err = syncBranchUpdateNewTrunk(tx, branch, parentState.Name)
+		/*
+			TODO:
+				This assumes that the parent was always merged into trunk. We
+				might want to support the case where a parent branch was actually
+				merged into it's parent (possibly on accident).
+				For example, if we have
+					main -- A -- B -- C
+				and B is merged into A, then we'd want to have a history like
+					main -- A -- C
+				(currently we would consider A the trunk branch for C).
+		*/
+		trunk, ok := meta.Trunk(tx, branch.Parent.Name)
+		if !ok {
+			defaultBranch, err := repo.DefaultBranch()
+			if err != nil {
+				return nil, err
+			}
+			_, _ = fmt.Fprint(os.Stderr,
+				colors.Warning("  - Unable to determine trunk branch of "),
+				colors.UserInput(branch.Parent.Name),
+				colors.Warning(". Assuming "),
+				colors.UserInput(defaultBranch),
+				colors.Warning(" for the new trunk.\n"),
+			)
+			trunk = branch.Parent.Name
+		}
+		branch, err = syncBranchUpdateNewTrunk(tx, branch, trunk)
 		if err != nil {
 			return nil, err
 		}
