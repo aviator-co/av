@@ -58,19 +58,26 @@ func Reparent(
 	}
 
 	// Check that the parent branch actually exists
-	parentSha, err := repo.RevParse(&git.RevParse{Rev: opts.NewParent})
+	parentBranch := opts.NewParent
+	if opts.NewParentTrunk {
+		parentBranch = "remotes/origin/" + opts.NewParent
+	}
+	parentSha, err := repo.RevParse(&git.RevParse{Rev: parentBranch})
 	if err != nil {
 		_, _ = fmt.Fprint(os.Stderr,
 			colors.Failure("      - ERROR:"),
 			"cannot re-parent branch ", colors.UserInput(opts.Branch),
-			": new parent branch ", colors.UserInput(opts.NewParent),
+			": new parent branch ", colors.UserInput(parentBranch),
 			" does not exist\n",
 		)
-		return nil, errors.Errorf("parent branch %q does not exist", opts.NewParent)
+		return nil, errors.Errorf("parent branch %q does not exist", parentBranch)
 	}
 
 	branchMeta, _ := tx.Branch(opts.Branch)
 	upstream := branchMeta.Parent.Name
+	if branchMeta.Parent.Trunk {
+		upstream = "remotes/origin/" + branchMeta.Parent.Name
+	}
 
 	// We might need to rebase the branch on top of the new parent. This
 	// requires a special rebase command because the "normal" rebase command
@@ -87,12 +94,12 @@ func Reparent(
 	// the commits that are reachable from B3 but not B2 on top of B1.
 	logrus.WithFields(logrus.Fields{
 		"branch":      opts.Branch,
-		"onto_branch": opts.NewParent,
+		"onto_branch": parentBranch,
 		"onto_head":   parentSha,
 		"upstream":    upstream,
 	}).Debug("rebasing branch")
 	output, err := repo.Rebase(git.RebaseOpts{
-		Onto:     opts.NewParent,
+		Onto:     parentSha,
 		Upstream: upstream,
 		Branch:   opts.Branch,
 	})
