@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"github.com/aviator-co/av/internal/utils/cleanup"
+	"github.com/aviator-co/av/internal/utils/colors"
+	"os"
 	"regexp"
 	"strings"
 
@@ -43,8 +46,9 @@ var stackBranchCommitFlags struct {
 
 var stackBranchCommitCmd = &cobra.Command{
 	Use:          "branch-commit [flags]",
-	Short:        "create a new stacked branch and a commit",
-	Long:         "Create a new branch that is stacked on the current branch, and call git-commit with the specified arguments.",
+	Aliases:      []string{"bc"},
+	Short:        "create a new stacked branch and commit staged changes to it",
+	Long:         "Create a new branch that is stacked on the current branch and commit all staged changes with the specified arguments.",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
 		branchName := stackBranchCommitFlags.BranchName
@@ -116,6 +120,25 @@ var stackBranchCommitCmd = &cobra.Command{
 			return errors.WrapIff(err, "checkout error")
 		}
 
+		// On failure, we want to delete the branch we created so that the user
+		// can try again (e.g., to fix issues surfaced by a pre-commit hook).
+		cu.Add(func() {
+			_, _ = fmt.Fprint(os.Stderr,
+				colors.Faint("  - Cleaning up branch "),
+				colors.UserInput(branchName),
+				colors.Faint(" because commit was not successful."),
+				"\n",
+			)
+			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+				Name: parentBranchName,
+			}); err != nil {
+				logrus.WithError(err).Error("failed to return to original branch during cleanup")
+			}
+			if err := repo.BranchDelete(branchName); err != nil {
+				logrus.WithError(err).Error("failed to delete branch during cleanup")
+			}
+		})
+
 		tx.SetBranch(meta.Branch{
 			Name: branchName,
 			Parent: meta.BranchState{
@@ -134,18 +157,6 @@ var stackBranchCommitCmd = &cobra.Command{
 			tx.SetBranch(parentMeta)
 		}
 
-		// TODO[UX]
-		// Here, we commit the db changes before actually creating a git commit
-		// since the git commit might fail. It's a little unclear what should
-		// actually happen if that occurs -- at this point we've already checked
-		// out the branch. Should we delete the branch? That would allow the
-		// user to fix any issues (e.g., those surfaced by pre-commit hooks) and
-		// re-run the `av stack branch-commit` command verbatim again.
-		cu.Cancel()
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-
 		commitArgs := []string{"commit"}
 		if stackBranchCommitFlags.All {
 			commitArgs = append(commitArgs, "--all")
@@ -159,7 +170,17 @@ var stackBranchCommitCmd = &cobra.Command{
 			ExitError:   true,
 			Interactive: true,
 		}); err != nil {
-			return errors.WrapIff(err, "failed to create a commit")
+			_, _ = fmt.Fprint(os.Stderr,
+				"\n", colors.Failure("Failed to create commit."), "\n",
+			)
+			return errExitSilently{1}
+		}
+
+		// Cancel the cleanup **after** the commit is successful (so that we
+		// delete the created branch).
+		cu.Cancel()
+		if err := tx.Commit(); err != nil {
+			return err
 		}
 
 		return nil
@@ -167,9 +188,9 @@ var stackBranchCommitCmd = &cobra.Command{
 }
 
 func init() {
-	stackBranchCommitCmd.Flags().StringVarP(&stackBranchCommitFlags.Message, "message", "m", "", "commit message")
-	stackBranchCommitCmd.Flags().StringVarP(&stackBranchCommitFlags.BranchName, "branch-name", "b", "", "branch name. If empty, auto-generated from the commit message")
-	stackBranchCommitCmd.Flags().BoolVarP(&stackBranchCommitFlags.All, "all", "a", false, "same as git commit --all")
+	stackBranchCommitCmd.Flags().StringVarP(&stackBranchCommitFlags.Message, "message", "m", "", "the commit message")
+	stackBranchCommitCmd.Flags().StringVarP(&stackBranchCommitFlags.BranchName, "branch-name", "b", "", "the branch name to create (if empty, automatically generated from the message)")
+	stackBranchCommitCmd.Flags().BoolVarP(&stackBranchCommitFlags.All, "all", "a", false, "automatically stage modified files (same as git commit --all)")
 }
 
 func branchNameFromMessage(message string) string {
@@ -179,5 +200,6 @@ func branchNameFromMessage(message string) string {
 	if len(name) > branchNameLength {
 		name = name[:branchNameLength]
 	}
+	name = strings.ToLower(name)
 	return name
 }
