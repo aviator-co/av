@@ -1,9 +1,10 @@
 package e2e_tests
 
 import (
+	"testing"
+
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/stretchr/testify/assert"
-	"testing"
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
@@ -11,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStackSyncMergeCommit(t *testing.T) {
+func TestStackSyncMergedParent(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
 	Chdir(t, repo.Dir())
 
@@ -19,7 +20,7 @@ func TestStackSyncMergeCommit(t *testing.T) {
 	// Our stack looks like:
 	//     stack-1: main -> 1a -> 2b
 	//     stack-2:                \ -> 2a -> 2b
-	//     stack-3:			                   \ -> 3a -> 3b
+	//     stack-3:                             \ -> 3a -> 3b
 	require.Equal(t, 0, Cmd(t, "git", "checkout", "-b", "stack-1").ExitCode)
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n"), gittest.WithMessage("Commit 1a"))
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"), gittest.WithMessage("Commit 1b"))
@@ -34,13 +35,13 @@ func TestStackSyncMergeCommit(t *testing.T) {
 	require.Equal(t, 0, Av(t, "stack", "sync", "--no-fetch", "--no-push").ExitCode)
 
 	// We simulate a merge here so that our history looks like:
-	//     main:    X                         / -> 1S
-	//     stack-1:  \ -> 1a -> 2b           /
+	//     main:    X
+	//     stack-1:  \ -> 1a -> 2b           / -> 1S
 	//     stack-2:              \ -> 2a -> 2b
-	// where 2S is the squash-merge commit of 2b onto main. Note that since it's
+	// where 2S is the squash-merge commit of 2b onto stack-1. Note that since it's
 	// a squash commit, 2S is not a *merge commit* in the Git definition.
 	var squashCommit string
-	gittest.WithCheckoutBranch(t, repo, "main", func() {
+	gittest.WithCheckoutBranch(t, repo, "stack-1", func() {
 		oldHead, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
 		require.NoError(t, err, "failed to get HEAD")
 
@@ -60,16 +61,9 @@ func TestStackSyncMergeCommit(t *testing.T) {
 	db, err := jsonfiledb.OpenRepo(repo)
 	require.NoError(t, err, "failed to open repo db")
 	tx := db.WriteTx()
-
-	// Both stack-1 and stack-2 were merged into main together.
-	stack1Meta, _ := tx.Branch("stack-1")
-	stack1Meta.MergeCommit = squashCommit
-	tx.SetBranch(stack1Meta)
-
 	stack2Meta, _ := tx.Branch("stack-2")
 	stack2Meta.MergeCommit = squashCommit
 	tx.SetBranch(stack2Meta)
-
 	require.NoError(t, tx.Commit())
 
 	require.Equal(t, 0,
@@ -89,10 +83,10 @@ func TestStackSyncMergeCommit(t *testing.T) {
 	)
 	assert.Equal(t,
 		meta.BranchState{
-			Name:  "main",
-			Trunk: true,
+			Name: "stack-1",
+			Head: squashCommit,
 		},
 		GetStoredParentBranchState(t, repo, "stack-3"),
-		"stack-3 should be re-rooted onto main",
+		"stack-3 should be re-rooted onto stack-1",
 	)
 }
