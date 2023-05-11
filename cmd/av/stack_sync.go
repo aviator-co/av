@@ -280,10 +280,20 @@ base branch.
 			branchesToSync = append(branchesToSync, nextBranches...)
 			state.Branches = branchesToSync
 		}
-		// Either way (--continue or not), we sync all subsequent branches
 
+		if !stackSyncFlags.NoFetch {
+			// Fetch the latest Git information from the origin.
+			// This is important to make sure that we can tell whether or not
+			// the remote branches are up-to-date.
+			// Since `git fetch` doesn't actually update any local refs (it
+			// only updates the origin/** refs), it should be safe to do.
+			if _, err := repo.Git("fetch", "origin"); err != nil {
+				return errors.WrapIff(err, "failed to fetch latest git refs from origin")
+			}
+		}
+
+		// Either way (--continue or not), we sync all subsequent branches
 		logrus.WithField("branches", branchesToSync).Debug("determined branches to sync")
-		//var resErr error
 		client, err := getClient(config.Av.GitHub.Token)
 		if err != nil {
 			return err
