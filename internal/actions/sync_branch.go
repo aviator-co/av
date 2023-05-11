@@ -288,35 +288,19 @@ func syncBranchRebase(
 			}, nil
 		}
 
-		/*
-			TODO:
-				This assumes that the parent was always merged into trunk. We
-				might want to support the case where a parent branch was actually
-				merged into it's parent (possibly on accident).
-				For example, if we have
-					main -- A -- B -- C
-				and B is merged into A, then we'd want to have a history like
-					main -- A -- C
-				(currently we would consider A the trunk branch for C).
-		*/
-		trunk, ok := meta.Trunk(tx, branch.Parent.Name)
-		if !ok {
-			defaultBranch, err := repo.DefaultBranch()
+		if parentState.Trunk {
+			branch, err = syncBranchUpdateNewTrunk(tx, branch, parentState.Name)
 			if err != nil {
 				return nil, err
 			}
+		} else {
 			_, _ = fmt.Fprint(os.Stderr,
-				colors.Warning("  - Unable to determine trunk branch of "),
-				colors.UserInput(branch.Parent.Name),
-				colors.Warning(". Assuming "),
-				colors.UserInput(defaultBranch),
-				colors.Warning(" for the new trunk.\n"),
+				"  - Parent branch ", colors.UserInput(origParent.Name), " was merged into non-trunk branch ", colors.UserInput(parentState.Name), ", reparenting ", colors.UserInput(branch.Name), " onto ", colors.UserInput(parentState.Name),
+				"\n",
 			)
-			trunk = branch.Parent.Name
-		}
-		branch, err = syncBranchUpdateNewTrunk(tx, branch, trunk)
-		if err != nil {
-			return nil, err
+			branch.Parent = parentState
+			branch.Parent.Head = origParentBranch.MergeCommit
+			tx.SetBranch(branch)
 		}
 		return &SyncBranchResult{*rebase, nil, branch}, nil
 	}
@@ -350,7 +334,7 @@ func syncBranchRebase(
 	// We need to use `rebase --onto` here and be very careful about how we
 	// determine the commits that are being rebased on top of parentHead.
 	// Suppose we have a history like
-	// 	   A---B---C---D  main
+	//     A---B---C---D  main
 	//      \
 	//       Q---R  stacked-1
 	//        \
@@ -359,7 +343,7 @@ func syncBranchRebase(
 	//           W  stacked-3
 	// where R is a commit that was added to stacked-1 after stacked-2 was
 	// created. After syncing stacked-2 against stacked-1, we have
-	// 	   A---B---C---D  main
+	//     A---B---C---D  main
 	//      \
 	//       Q---R  stacked-1
 	//        \    \
