@@ -287,6 +287,7 @@ base branch.
 			// the remote branches are up-to-date.
 			// Since `git fetch` doesn't actually update any local refs (it
 			// only updates the origin/** refs), it should be safe to do.
+			_, _ = fmt.Fprint(os.Stderr, "Fetching latest git refs from origin...\n")
 			if _, err := repo.Git("fetch", "origin"); err != nil {
 				return errors.WrapIff(err, "failed to fetch latest git refs from origin")
 			}
