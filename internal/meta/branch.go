@@ -67,7 +67,6 @@ func (b *Branch) UnmarshalJSON(bytes []byte) error {
 		return err
 	}
 
-	logrus.Debugf("parsed branch metadata: %s => %#+v %#+v", bytes, d, b)
 	return nil
 }
 
