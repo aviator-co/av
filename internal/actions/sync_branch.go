@@ -321,6 +321,9 @@ func syncBranchRebase(
 			"  - already up-to-date with parent ", colors.UserInput(parentState.Name),
 			"\n",
 		)
+		branch.Parent = parentState
+		branch.Parent.Head = parentHead
+		tx.SetBranch(branch)
 		return &SyncBranchResult{git.RebaseResult{Status: git.RebaseAlreadyUpToDate}, nil, branch}, nil
 	}
 
