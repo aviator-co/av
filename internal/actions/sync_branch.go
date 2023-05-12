@@ -29,17 +29,6 @@ type SyncBranchOpts struct {
 	Continuation *SyncBranchContinuation
 }
 
-type SyncBranchResult struct {
-	git.RebaseResult
-
-	// If set, the sync needs to be continued.
-	// This is set if and only if RebaseResult.Status is RebaseConflict
-	Continuation *SyncBranchContinuation
-
-	// The updated branch metadata (if the rebase was successful)
-	Branch meta.Branch
-}
-
 type (
 	SyncBranchContinuation struct {
 		// The new parent name.
@@ -56,16 +45,16 @@ func SyncBranch(
 	client *gh.Client,
 	tx meta.WriteTx,
 	opts SyncBranchOpts,
-) (*SyncBranchResult, error) {
+) (*SyncBranchContinuation, error) {
 	branch, _ := tx.Branch(opts.Branch)
 	_, _ = fmt.Fprint(os.Stderr, "Synchronizing branch ", colors.UserInput(branch.Name), "...\n")
 
-	var res *SyncBranchResult
+	var cont *SyncBranchContinuation
 	var pull *gh.PullRequest
 
 	if opts.Continuation != nil {
 		var err error
-		res, err = syncBranchContinue(ctx, repo, tx, opts, branch)
+		cont, err = syncBranchContinue(ctx, repo, tx, opts, branch)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +69,7 @@ func SyncBranch(
 			if update.Changed {
 				_, _ = fmt.Fprint(os.Stderr, "      - found updated pull request: ", colors.UserInput(update.Pull.Permalink), "\n")
 			}
-			branch = update.Branch
+			branch, _ = tx.Branch(opts.Branch)
 			if branch.PullRequest == nil {
 				_, _ = fmt.Fprint(os.Stderr,
 					"      - this branch does not have an open pull request"+
@@ -96,30 +85,28 @@ func SyncBranch(
 					"(merged in commit ", colors.UserInput(git.ShortSha(branch.MergeCommit)), ")"+
 					"\n",
 			)
-			return &SyncBranchResult{
-				RebaseResult: git.RebaseResult{Status: git.RebaseAlreadyUpToDate},
-			}, nil
+			return nil, nil
 		}
 
 		var err error
-		res, err = syncBranchRebase(ctx, repo, tx, opts, branch)
+		cont, err = syncBranchRebase(ctx, repo, tx, opts)
 		if err != nil {
 			return nil, err
 		}
+		branch, _ = tx.Branch(opts.Branch)
 	}
 
-	branch = res.Branch
-	if res.Status == git.RebaseConflict {
-		return res, nil
+	if cont != nil {
+		return cont, nil
 	}
 
 	if opts.Push {
-		if err := syncBranchPushAndUpdatePullRequest(ctx, repo, client, tx, branch, pull); err != nil {
+		if err := syncBranchPushAndUpdatePullRequest(ctx, repo, client, tx, opts.Branch, pull); err != nil {
 			return nil, err
 		}
 	}
 
-	return res, nil
+	return nil, nil
 }
 
 // syncBranchRebase does the actual rebase part of SyncBranch
@@ -127,11 +114,12 @@ func syncBranchRebase(
 	ctx context.Context,
 	repo *git.Repo,
 	tx meta.WriteTx,
-	opts SyncBranchOpts, branch meta.Branch,
-) (*SyncBranchResult, error) {
+	opts SyncBranchOpts,
+) (*SyncBranchContinuation, error) {
+	branch, _ := tx.Branch(opts.Branch)
 	parentState := branch.Parent
 	parentBranch, _ := tx.Branch(parentState.Name)
-	origParent := branch.Parent
+	origParentState := branch.Parent
 	origParentBranch := parentBranch
 	for parentBranch.MergeCommit != "" {
 		parentState = parentBranch.Parent
@@ -172,20 +160,16 @@ func syncBranchRebase(
 				" (run ", colors.CliCmd("av stack sync --trunk"),
 				" to sync against the latest commit in ", colors.UserInput(parentState.Name), ")\n",
 			)
-			return &SyncBranchResult{
-				git.RebaseResult{Status: git.RebaseAlreadyUpToDate},
-				nil,
-				branch,
-			}, nil
+			return nil, nil
 		}
 
 		var origUpstream string
-		if origParent.Trunk {
+		if origParentState.Trunk {
 			// We do not know the original trunk commit hashes. Use the current one as
 			// an approximation.
 			origUpstream = newUpstreamCommitHash
 		} else {
-			origUpstream = origParent.Head
+			origUpstream = origParentState.Head
 		}
 
 		continuation := SyncBranchContinuation{
@@ -201,10 +185,10 @@ func syncBranchRebase(
 		}
 		msgRebaseResult(rebase)
 		if rebase.Status == git.RebaseConflict {
-			return &SyncBranchResult{*rebase, &continuation, branch}, nil
+			return &continuation, nil
 		}
-		branch = syncBranchUpdateParent(tx, branch, &continuation)
-		return &SyncBranchResult{*rebase, nil, branch}, nil
+		syncBranchUpdateParent(tx, branch, &continuation)
+		return nil, nil
 	}
 
 	// We have three possibilities here:
@@ -220,7 +204,7 @@ func syncBranchRebase(
 	if origParentBranch.MergeCommit != "" {
 		short := git.ShortSha(origParentBranch.MergeCommit)
 		_, _ = fmt.Fprint(os.Stderr,
-			"  - parent ", colors.UserInput(origParent.Name),
+			"  - parent ", colors.UserInput(origParentState.Name),
 			" (pull ", colors.UserInput("#", origParentBranch.PullRequest.GetNumber()), ")",
 			" was merged\n",
 		)
@@ -258,21 +242,21 @@ func syncBranchRebase(
 		// not C or D since those commits come after M.
 		newUpstreamCommitHash := origParentBranch.MergeCommit
 		var origUpstream string
-		if origParent.Trunk {
+		if origParentState.Trunk {
 			var err error
-			origUpstream, err = repo.RevParse(&git.RevParse{Rev: "origin/" + origParent.Name})
+			origUpstream, err = repo.RevParse(&git.RevParse{Rev: "origin/" + origParentState.Name})
 			if err != nil {
-				return nil, errors.WrapIff(err, "failed to get HEAD of %q", origParent.Name)
+				return nil, errors.WrapIff(err, "failed to get HEAD of %q", origParentState.Name)
 			}
 		} else {
-			origUpstream = origParent.Head
+			origUpstream = origParentState.Head
 		}
 		continuation := SyncBranchContinuation{
 			NewParentName: parentState.Name,
 		}
 		if !parentState.Trunk {
 			_, _ = fmt.Fprint(os.Stderr,
-				"  - Parent branch ", colors.UserInput(origParent.Name), " was merged into non-trunk branch ", colors.UserInput(parentState.Name), ", reparenting ", colors.UserInput(branch.Name), " onto ", colors.UserInput(parentState.Name),
+				"  - Parent branch ", colors.UserInput(origParentState.Name), " was merged into non-trunk branch ", colors.UserInput(parentState.Name), ", reparenting ", colors.UserInput(branch.Name), " onto ", colors.UserInput(parentState.Name),
 				"\n",
 			)
 			continuation.NewParentCommit = newUpstreamCommitHash
@@ -287,10 +271,10 @@ func syncBranchRebase(
 		}
 		msgRebaseResult(rebase)
 		if rebase.Status == git.RebaseConflict {
-			return &SyncBranchResult{*rebase, &continuation, branch}, nil
+			return &continuation, nil
 		}
-		branch = syncBranchUpdateParent(tx, branch, &continuation)
-		return &SyncBranchResult{*rebase, nil, branch}, nil
+		syncBranchUpdateParent(tx, branch, &continuation)
+		return nil, nil
 	}
 
 	// Scenario 2: the branch is up-to-date with its parent.
@@ -313,8 +297,8 @@ func syncBranchRebase(
 			NewParentName:   parentState.Name,
 			NewParentCommit: parentHead,
 		}
-		branch = syncBranchUpdateParent(tx, branch, &continuation)
-		return &SyncBranchResult{git.RebaseResult{Status: git.RebaseAlreadyUpToDate}, nil, branch}, nil
+		syncBranchUpdateParent(tx, branch, &continuation)
+		return nil, nil
 	}
 
 	// Scenario 3: the branch is not up-to-date with its parent.
@@ -325,16 +309,16 @@ func syncBranchRebase(
 		"\n",
 	)
 	var origUpstream string
-	if origParent.Trunk {
+	if origParentState.Trunk {
 		// This can happen if the branch is originally a stack root and reparented to
 		// another branch (and became non-stack-root).
 		var err error
-		origUpstream, err = repo.RevParse(&git.RevParse{Rev: "origin/" + origParent.Name})
+		origUpstream, err = repo.RevParse(&git.RevParse{Rev: "origin/" + origParentState.Name})
 		if err != nil {
-			return nil, errors.WrapIff(err, "failed to get HEAD of %q", origParent.Name)
+			return nil, errors.WrapIff(err, "failed to get HEAD of %q", origParentState.Name)
 		}
 	} else {
-		origUpstream = origParent.Head
+		origUpstream = origParentState.Head
 	}
 	// We need to use `rebase --onto` here and be very careful about how we
 	// determine the commits that are being rebased on top of parentHead.
@@ -378,10 +362,10 @@ func syncBranchRebase(
 	}
 	msgRebaseResult(rebase)
 	if rebase.Status == git.RebaseConflict {
-		return &SyncBranchResult{*rebase, &continuation, branch}, nil
+		return &continuation, nil
 	}
-	branch = syncBranchUpdateParent(tx, branch, &continuation)
-	return &SyncBranchResult{*rebase, nil, branch}, nil
+	syncBranchUpdateParent(tx, branch, &continuation)
+	return nil, nil
 }
 
 func syncBranchContinue(
@@ -390,7 +374,7 @@ func syncBranchContinue(
 	tx meta.WriteTx,
 	opts SyncBranchOpts,
 	branch meta.Branch,
-) (*SyncBranchResult, error) {
+) (*SyncBranchContinuation, error) {
 	var rebaseOpts git.RebaseOpts
 	if opts.Skip {
 		rebaseOpts.Skip = true
@@ -417,21 +401,17 @@ func syncBranchContinue(
 		)
 	case git.RebaseConflict:
 		msgRebaseResult(rebase)
-		return &SyncBranchResult{*rebase, opts.Continuation, branch}, nil
+		return opts.Continuation, nil
 	default:
 		msgRebaseResult(rebase)
 	}
 
 	// Finish setting the parent for the branch
-	branch = syncBranchUpdateParent(tx, branch, opts.Continuation)
-	return &SyncBranchResult{*rebase, nil, branch}, nil
+	syncBranchUpdateParent(tx, branch, opts.Continuation)
+	return nil, nil
 }
 
-func syncBranchUpdateParent(
-	tx meta.WriteTx,
-	branch meta.Branch,
-	continuation *SyncBranchContinuation,
-) meta.Branch {
+func syncBranchUpdateParent(tx meta.WriteTx, branch meta.Branch, continuation *SyncBranchContinuation) {
 	oldParentState := branch.Parent
 	oldParent, _ := tx.Branch(branch.Parent.Name)
 	branch.Parent = meta.BranchState{
@@ -465,7 +445,6 @@ func syncBranchUpdateParent(
 			tx.SetBranch(newParent)
 		}
 	}
-	return branch
 }
 
 func syncBranchPushAndUpdatePullRequest(
@@ -473,10 +452,11 @@ func syncBranchPushAndUpdatePullRequest(
 	repo *git.Repo,
 	client *gh.Client,
 	tx meta.WriteTx,
-	branch meta.Branch,
+	branchName string,
 	// pr can be nil, in which case the PR info is fetched from GitHub
 	pr *gh.PullRequest,
 ) error {
+	branch, _ := tx.Branch(branchName)
 	if branch.PullRequest == nil || branch.PullRequest.ID == "" {
 		return nil
 	}
