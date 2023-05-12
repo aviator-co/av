@@ -158,6 +158,10 @@ func TestStackSyncAbort(t *testing.T) {
 	RequireAv(t, "stack", "branch", "stack-2")
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n2a\n"), gittest.WithMessage("Commit 2a"))
 
+	// Save the original parent HEAD for stack-2, which is the stack-1's commit.
+	origStack1Commit, err := repo.RevParse(&git.RevParse{Rev: "stack-1"})
+	require.NoError(t, err)
+
 	// ... and introduce a commit onto stack-1 that will conflict with stack-2...
 	gittest.CheckoutBranch(t, repo, "stack-1")
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"), gittest.WithMessage("Commit 1b"))
@@ -177,6 +181,13 @@ func TestStackSyncAbort(t *testing.T) {
 	currentBranch, err := repo.RevParse(&git.RevParse{Rev: "HEAD", SymbolicFullName: true})
 	require.NoError(t, err, "failed to get current branch")
 	require.Equal(t, "refs/heads/stack-1", currentBranch, "current branch should be reset to starting branch (stack-1) after abort")
+
+	// Because we aborted the sync, the stack-2 parent HEAD must stay at the original stack-1
+	// HEAD.
+	require.Equal(t, meta.BranchState{
+		Name: "stack-1",
+		Head: origStack1Commit,
+	}, GetStoredParentBranchState(t, repo, "stack-2"))
 }
 
 func TestStackSyncWithLotsOfConflicts(t *testing.T) {
