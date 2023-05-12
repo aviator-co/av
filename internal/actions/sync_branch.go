@@ -15,7 +15,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/ghutils"
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/shurcooL/githubv4"
-	"github.com/sirupsen/logrus"
 )
 
 type SyncBranchOpts struct {
@@ -43,14 +42,10 @@ type SyncBranchResult struct {
 
 type (
 	SyncBranchContinuation struct {
-		// The original HEAD commit of the branch.
-		OldHead string `json:"oldHead"`
-		// The commit that we were rebasing the branch on top of.
-		ParentCommit string `json:"parentCommit"`
-
-		// If set, we need to re-assign the branch to be a stack root that is
-		// based on this trunk branch.
-		NewTrunk string `json:"newTrunk,omitempty"`
+		// The new parent name.
+		NewParentName string `json:"parentName"`
+		// If set, set this as the parent HEAD. If unset, the parent is treated as trunk.
+		NewParentCommit string `json:"parentCommit"`
 	}
 )
 
@@ -134,11 +129,6 @@ func syncBranchRebase(
 	tx meta.WriteTx,
 	opts SyncBranchOpts, branch meta.Branch,
 ) (*SyncBranchResult, error) {
-	branchHead, err := repo.RevParse(&git.RevParse{Rev: branch.Name})
-	if err != nil {
-		return nil, errors.WrapIff(err, "failed to get head of branch %q", branch.Name)
-	}
-
 	parentState := branch.Parent
 	parentBranch, _ := tx.Branch(parentState.Name)
 	origParent := branch.Parent
@@ -188,8 +178,12 @@ func syncBranchRebase(
 				branch,
 			}, nil
 		}
+
+		continuation := SyncBranchContinuation{
+			NewParentName: parentState.Name,
+		}
 		rebase, err := repo.RebaseParse(git.RebaseOpts{
-			Branch:   opts.Branch,
+			Branch:   branch.Name,
 			Upstream: origParent.Head,
 			Onto:     newUpstreamCommitHash,
 		})
@@ -197,26 +191,11 @@ func syncBranchRebase(
 			return nil, err
 		}
 		msgRebaseResult(rebase)
-
-		if !origParent.Trunk {
-			_, err = syncBranchUpdateNewTrunk(tx, branch, parentState.Name)
-			if err != nil {
-				return nil, err
-			}
+		if rebase.Status == git.RebaseConflict {
+			return &SyncBranchResult{*rebase, &continuation, branch}, nil
 		}
-		//nolint:exhaustive
-		switch rebase.Status {
-		case git.RebaseConflict:
-			return &SyncBranchResult{
-				*rebase,
-				&SyncBranchContinuation{
-					OldHead: branchHead,
-				},
-				branch,
-			}, nil
-		default:
-			return &SyncBranchResult{*rebase, nil, branch}, nil
-		}
+		branch = syncBranchUpdateParent(tx, branch, &continuation)
+		return &SyncBranchResult{*rebase, nil, branch}, nil
 	}
 
 	// We have three possibilities here:
@@ -232,7 +211,7 @@ func syncBranchRebase(
 	if origParentBranch.MergeCommit != "" {
 		short := git.ShortSha(origParentBranch.MergeCommit)
 		_, _ = fmt.Fprint(os.Stderr,
-			"  - parent ", colors.UserInput(branch.Parent.Name),
+			"  - parent ", colors.UserInput(origParent.Name),
 			" (pull ", colors.UserInput("#", origParentBranch.PullRequest.GetNumber()), ")",
 			" was merged\n",
 		)
@@ -246,62 +225,52 @@ func syncBranchRebase(
 			}
 		}
 
-		rebase, err := repo.RebaseParse(git.RebaseOpts{
-			Branch:   branch.Name,
-			Upstream: branch.Parent.Head,
-			// Replay the commits from this branch directly onto the merge commit.
-			// The HEAD of trunk might have moved forward since this, but this is
-			// probably the best thing to do here (we bias towards introducing as
-			// few unrelated commits into the history as possible -- we have to
-			// introduce everything that landed in trunk before the merge commit,
-			// but we hold off on introducing anything that landed after).
-			// The user can always run `av stack sync --trunk` to sync against the
-			// tip of master.
-			// For example if we have
-			//        A---B---M---C---D  main
-			//         \     /
-			//          Q---R  stacked-1
-			//               \
-			//                X---Y  stacked-2
-			// (where M is the commit that merged stacked-1 into main, **even
-			// if it's actually a squash merge and not a real merge commit),
-			// then after the sync we'll have
-			//        A---B---M---C---D  main
-			//                 \
-			//                  X'--Y'  stacked-2
-			// Note that we've introduced B into the history of stacked-2, but
-			// not C or D since those commits come after M.
-			Onto: origParentBranch.MergeCommit,
-		})
-		if err != nil {
-			return nil, err
+		// Replay the commits from this branch directly onto the merge commit.
+		// The HEAD of trunk might have moved forward since this, but this is
+		// probably the best thing to do here (we bias towards introducing as
+		// few unrelated commits into the history as possible -- we have to
+		// introduce everything that landed in trunk before the merge commit,
+		// but we hold off on introducing anything that landed after).
+		// The user can always run `av stack sync --trunk` to sync against the
+		// tip of master.
+		// For example if we have
+		//        A---B---M---C---D  main
+		//         \     /
+		//          Q---R  stacked-1
+		//               \
+		//                X---Y  stacked-2
+		// (where M is the commit that merged stacked-1 into main, **even
+		// if it's actually a squash merge and not a real merge commit),
+		// then after the sync we'll have
+		//        A---B---M---C---D  main
+		//                 \
+		//                  X'--Y'  stacked-2
+		// Note that we've introduced B into the history of stacked-2, but
+		// not C or D since those commits come after M.
+		newUpstreamCommitHash := origParentBranch.MergeCommit
+		continuation := SyncBranchContinuation{
+			NewParentName: parentState.Name,
 		}
-		if rebase.Status == git.RebaseConflict {
-			return &SyncBranchResult{
-				*rebase,
-				&SyncBranchContinuation{
-					OldHead:      branchHead,
-					ParentCommit: parentBranch.MergeCommit,
-					NewTrunk:     parentBranch.Parent.Name,
-				},
-				branch,
-			}, nil
-		}
-
-		if parentState.Trunk {
-			branch, err = syncBranchUpdateNewTrunk(tx, branch, parentState.Name)
-			if err != nil {
-				return nil, err
-			}
-		} else {
+		if !parentState.Trunk {
 			_, _ = fmt.Fprint(os.Stderr,
 				"  - Parent branch ", colors.UserInput(origParent.Name), " was merged into non-trunk branch ", colors.UserInput(parentState.Name), ", reparenting ", colors.UserInput(branch.Name), " onto ", colors.UserInput(parentState.Name),
 				"\n",
 			)
-			branch.Parent = parentState
-			branch.Parent.Head = origParentBranch.MergeCommit
-			tx.SetBranch(branch)
+			continuation.NewParentCommit = newUpstreamCommitHash
 		}
+		rebase, err := repo.RebaseParse(git.RebaseOpts{
+			Branch:   branch.Name,
+			Upstream: origParent.Head,
+			Onto:     newUpstreamCommitHash,
+		})
+		if err != nil {
+			return nil, err
+		}
+		msgRebaseResult(rebase)
+		if rebase.Status == git.RebaseConflict {
+			return &SyncBranchResult{*rebase, &continuation, branch}, nil
+		}
+		branch = syncBranchUpdateParent(tx, branch, &continuation)
 		return &SyncBranchResult{*rebase, nil, branch}, nil
 	}
 
@@ -321,9 +290,11 @@ func syncBranchRebase(
 			"  - already up-to-date with parent ", colors.UserInput(parentState.Name),
 			"\n",
 		)
-		branch.Parent = parentState
-		branch.Parent.Head = parentHead
-		tx.SetBranch(branch)
+		continuation := SyncBranchContinuation{
+			NewParentName:   parentState.Name,
+			NewParentCommit: parentHead,
+		}
+		branch = syncBranchUpdateParent(tx, branch, &continuation)
 		return &SyncBranchResult{git.RebaseResult{Status: git.RebaseAlreadyUpToDate}, nil, branch}, nil
 	}
 
@@ -362,39 +333,24 @@ func syncBranchRebase(
 	// With `git rebase --onto stacked-2 T stacked-3`, Git looks at the
 	// difference between T and stacked-3, determines that it's only the
 	// commit W, and then plays the commit W **onto** stacked-2 (aka T').
+	continuation := SyncBranchContinuation{
+		NewParentName:   parentState.Name,
+		NewParentCommit: parentHead,
+	}
 	rebase, err := repo.RebaseParse(git.RebaseOpts{
 		Branch:   branch.Name,
+		Upstream: origParent.Head,
 		Onto:     parentHead,
-		Upstream: branch.Parent.Head,
 	})
 	if err != nil {
 		return nil, err
 	}
 	msgRebaseResult(rebase)
-
-	branch.Parent = parentState
-	branch.Parent.Head = parentHead
-	tx.SetBranch(branch)
-
-	//nolint:exhaustive
-	switch rebase.Status {
-	case git.RebaseConflict:
-		return &SyncBranchResult{
-			*rebase,
-			&SyncBranchContinuation{
-				OldHead:      branchHead,
-				ParentCommit: parentHead,
-			},
-			branch,
-		}, nil
-	case git.RebaseUpdated:
-		return &SyncBranchResult{*rebase, nil, branch}, nil
-	default:
-		// We shouldn't even get an already-up-to-date or not-in-progress
-		// here...
-		logrus.Warn("unexpected rebase status: ", rebase.Status)
-		return &SyncBranchResult{*rebase, nil, branch}, nil
+	if rebase.Status == git.RebaseConflict {
+		return &SyncBranchResult{*rebase, &continuation, branch}, nil
 	}
+	branch = syncBranchUpdateParent(tx, branch, &continuation)
+	return &SyncBranchResult{*rebase, nil, branch}, nil
 }
 
 func syncBranchContinue(
@@ -435,46 +391,50 @@ func syncBranchContinue(
 		msgRebaseResult(rebase)
 	}
 
-	// Finish setting the new trunk for the branch
-	if opts.Continuation.NewTrunk != "" {
-		var err error
-		branch, err = syncBranchUpdateNewTrunk(tx, branch, opts.Continuation.NewTrunk)
-		if err != nil {
-			return nil, err
-		}
-	}
-
+	// Finish setting the parent for the branch
+	branch = syncBranchUpdateParent(tx, branch, opts.Continuation)
 	return &SyncBranchResult{*rebase, nil, branch}, nil
 }
 
-func syncBranchUpdateNewTrunk(
+func syncBranchUpdateParent(
 	tx meta.WriteTx,
 	branch meta.Branch,
-	newTrunk string,
-) (meta.Branch, error) {
+	continuation *SyncBranchContinuation,
+) meta.Branch {
+	oldParentState := branch.Parent
 	oldParent, _ := tx.Branch(branch.Parent.Name)
-	var err error
-
 	branch.Parent = meta.BranchState{
-		Name:  newTrunk,
-		Trunk: true,
+		Name: continuation.NewParentName,
 	}
-	if err != nil {
-		return branch, err
+	if continuation.NewParentCommit == "" {
+		branch.Parent.Trunk = true
+	} else {
+		branch.Parent.Head = continuation.NewParentCommit
 	}
-	_, _ = fmt.Fprint(os.Stderr,
-		"  - this branch is now a stack root based on trunk branch ",
-		colors.UserInput(branch.Parent.Name), "\n",
-	)
 	tx.SetBranch(branch)
 
-	// Remove from the old parent branches metadata
-	if len(oldParent.Children) > 0 {
-		oldParent.Children = sliceutils.DeleteElement(oldParent.Children, branch.Name)
-		tx.SetBranch(oldParent)
+	if !oldParentState.Trunk && branch.Parent.Trunk {
+		_, _ = fmt.Fprint(os.Stderr,
+			"  - this branch is now a stack root based on trunk branch ",
+			colors.UserInput(branch.Parent.Name), "\n",
+		)
 	}
 
-	return branch, nil
+	if oldParent.Name != branch.Parent.Name {
+		// Remove from the old parent branches metadata
+		oldParent.Children = sliceutils.DeleteElement(oldParent.Children, branch.Name)
+		tx.SetBranch(oldParent)
+
+		if !branch.Parent.Trunk {
+			// We don't store children of the trunk branches.
+			newParent, _ := tx.Branch(branch.Parent.Name)
+			// To avoid duplicates, delete it first and append.
+			newParent.Children = sliceutils.DeleteElement(newParent.Children, branch.Name)
+			newParent.Children = append(newParent.Children, branch.Name)
+			tx.SetBranch(newParent)
+		}
+	}
+	return branch
 }
 
 func syncBranchPushAndUpdatePullRequest(
