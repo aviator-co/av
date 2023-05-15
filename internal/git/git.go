@@ -38,6 +38,18 @@ func (r *Repo) GitDir() string {
 	return path.Join(r.repoDir, ".git")
 }
 
+func (r *Repo) AvDir() string {
+	return path.Join(r.GitDir(), "av")
+}
+
+func (r *Repo) AvTmpDir() string {
+	dir := path.Join(r.AvDir(), "tmp")
+	// Try to create the directory, but swallow the error since it will
+	// ultimately be surfaced when trying to create a file in the directory.
+	_ = os.MkdirAll(dir, 0755)
+	return dir
+}
+
 func (r *Repo) DefaultBranch() (string, error) {
 	ref, err := r.Git("symbolic-ref", "refs/remotes/origin/HEAD")
 	if err != nil {

@@ -34,7 +34,7 @@ func getRepo() (*git.Repo, error) {
 }
 
 func getDB(repo *git.Repo) (meta.DB, error) {
-	dbPath := path.Join(repo.GitDir(), "av", "av.db")
+	dbPath := path.Join(repo.AvDir(), "av.db")
 	existingStat, _ := os.Stat(dbPath)
 	db, err := jsonfiledb.OpenPath(dbPath)
 	if err != nil {
