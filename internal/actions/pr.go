@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/aviator-co/av/internal/utils/cleanup"
+	"github.com/aviator-co/av/internal/utils/sanitize"
 	"os"
 	"path/filepath"
 	"strings"
@@ -129,6 +131,9 @@ func CreatePullRequest(
 		return nil, ErrRepoNotInitialized
 	}
 
+	var cu cleanup.Cleanup
+	defer cu.Cleanup()
+
 	_, _ = fmt.Fprint(os.Stderr,
 		"Creating pull request for branch ", colors.UserInput(opts.BranchName), ":",
 		"\n",
@@ -234,8 +239,25 @@ func CreatePullRequest(
 			commits = append(commits, *commit)
 		}
 
-		// We need to open an editor to ask the user. Try to populate with
-		// reasonable defaults here.
+		// If a saved pull request description exists, use that.
+		saveFile := filepath.Join(os.TempDir(), fmt.Sprintf("av-pr-%s.md", sanitize.FileName(opts.BranchName)))
+		if _, err := os.Stat(saveFile); err == nil {
+			contents, err := os.ReadFile(saveFile)
+			if err != nil {
+				logrus.WithError(err).Warn("failed to read saved pull request description")
+			} else {
+				title, body := stringutils.ParseSubjectBody(string(contents))
+				if opts.Title == "" {
+					opts.Title = title
+				}
+				if opts.Body == "" {
+					opts.Body = body
+				}
+			}
+		}
+
+		// Try to populate the editor text using contextual information from the
+		// repository and commits included in this pull request.
 		if opts.Title == "" {
 			opts.Title = commits[0].Subject
 		}
@@ -255,6 +277,7 @@ func CreatePullRequest(
 			Body:    opts.Body,
 			Commits: commits,
 		})
+
 		res, err := editor.Launch(repo, editor.Config{
 			Text:           editorText,
 			TmpFilePattern: "pr-*.md",
@@ -267,6 +290,26 @@ func CreatePullRequest(
 		if opts.Title == "" {
 			return nil, errors.New("aborting pull request due to empty message")
 		}
+
+		defer func() {
+			// If we created the PR successfully, just make sure to clean up any
+			// lingering files.
+			if reterr == nil {
+				_ = os.Remove(saveFile)
+				return
+			}
+
+			// Otherwise, save what the user entered to a file so that it's not
+			// lost forever (and we can re-use it if they try again).
+			if err := os.WriteFile(saveFile, []byte(res), 0644); err != nil {
+				logrus.WithError(err).Error("failed to write pull request description to temporary file")
+				return
+			}
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - saved pull request description to ", colors.UserInput(saveFile),
+				" (it will be automatically re-used if you try again)\n",
+			)
+		}()
 	}
 
 	prMeta, err := getPRMetadata(tx, branchMeta, &parentMeta)
@@ -284,6 +327,9 @@ func CreatePullRequest(
 		existingPR:  existingPR,
 	})
 	if err != nil {
+		_, _ = fmt.Fprint(os.Stderr,
+			colors.Failure("  - failed to create pull request: "), err, "\n",
+		)
 		return nil, errors.WrapIf(err, "failed to create PR")
 	}
 
@@ -382,7 +428,7 @@ func ensurePR(ctx context.Context, client *gh.Client, repoMeta meta.Repository, 
 			Body:          gh.Ptr(githubv4.String(newBody)),
 		})
 		if err != nil {
-			return nil, false, errors.WrapIf(err, "updating PR")
+			return nil, false, errors.WithStack(err)
 		}
 		return updatedPR, false, nil
 	}
@@ -395,7 +441,7 @@ func ensurePR(ctx context.Context, client *gh.Client, repoMeta meta.Repository, 
 		Draft:        gh.Ptr(githubv4.Boolean(opts.draft)),
 	})
 	if err != nil {
-		return nil, false, errors.WrapIf(err, "opening pull request")
+		return nil, false, errors.WithStack(err)
 	}
 	return pull, true, nil
 }
