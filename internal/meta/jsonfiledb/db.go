@@ -16,7 +16,7 @@ type DB struct {
 }
 
 func RepoPath(repo *git.Repo) string {
-	return path.Join(repo.GitDir(), "av", "av.db")
+	return path.Join(repo.AvDir(), "av.db")
 }
 
 func OpenRepo(repo *git.Repo) (*DB, error) {

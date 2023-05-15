@@ -236,7 +236,7 @@ func CreatePullRequest(
 		}
 
 		// If a saved pull request description exists, use that.
-		saveFile := filepath.Join(os.TempDir(), fmt.Sprintf("av-pr-%s.md", sanitize.FileName(opts.BranchName)))
+		saveFile := filepath.Join(repo.AvTmpDir(), fmt.Sprintf("av-pr-%s.md", sanitize.FileName(opts.BranchName)))
 		if _, err := os.Stat(saveFile); err == nil {
 			contents, err := os.ReadFile(saveFile)
 			if err != nil {

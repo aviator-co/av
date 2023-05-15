@@ -337,7 +337,7 @@ const stackSyncStateFile = "stack-sync.state.json"
 
 func readStackSyncState(repo *git.Repo) (stackSyncState, error) {
 	var state stackSyncState
-	data, err := os.ReadFile(path.Join(repo.GitDir(), "av", stackSyncStateFile))
+	data, err := os.ReadFile(path.Join(repo.AvDir(), stackSyncStateFile))
 	if err != nil {
 		return state, err
 	}
@@ -348,7 +348,7 @@ func readStackSyncState(repo *git.Repo) (stackSyncState, error) {
 }
 
 func writeStackSyncState(repo *git.Repo, state *stackSyncState) error {
-	avDir := path.Join(repo.GitDir(), "av")
+	avDir := repo.AvDir()
 	if _, err := os.Stat(avDir); err != nil {
 		if !os.IsNotExist(err) {
 			return err
