@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/aviator-co/av/internal/utils/cleanup"
 	"github.com/aviator-co/av/internal/utils/sanitize"
 	"os"
 	"path/filepath"
@@ -130,9 +129,6 @@ func CreatePullRequest(
 	if !ok {
 		return nil, ErrRepoNotInitialized
 	}
-
-	var cu cleanup.Cleanup
-	defer cu.Cleanup()
 
 	_, _ = fmt.Fprint(os.Stderr,
 		"Creating pull request for branch ", colors.UserInput(opts.BranchName), ":",
