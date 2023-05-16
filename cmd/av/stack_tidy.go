@@ -53,7 +53,6 @@ operates on only av's internal metadata, and it won't delete the actual Git bran
 				br.Parent = newParent
 			}
 		}
-		rebuildChildren(branches)
 
 		nDeleted := 0
 		for name, br := range branches {
@@ -64,6 +63,7 @@ operates on only av's internal metadata, and it won't delete the actual Git bran
 			}
 			tx.SetBranch(*br)
 		}
+		rebuildChildren(branches)
 
 		if err := tx.Commit(); err != nil {
 			return err
