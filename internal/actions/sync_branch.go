@@ -179,12 +179,21 @@ func syncBranchRebase(
 			}, nil
 		}
 
+		var origUpstream string
+		if origParent.Trunk {
+			// We do not know the original trunk commit hashes. Use the current one as
+			// an approximation.
+			origUpstream = newUpstreamCommitHash
+		} else {
+			origUpstream = origParent.Head
+		}
+
 		continuation := SyncBranchContinuation{
 			NewParentName: parentState.Name,
 		}
 		rebase, err := repo.RebaseParse(git.RebaseOpts{
 			Branch:   branch.Name,
-			Upstream: origParent.Head,
+			Upstream: origUpstream,
 			Onto:     newUpstreamCommitHash,
 		})
 		if err != nil {
@@ -248,6 +257,16 @@ func syncBranchRebase(
 		// Note that we've introduced B into the history of stacked-2, but
 		// not C or D since those commits come after M.
 		newUpstreamCommitHash := origParentBranch.MergeCommit
+		var origUpstream string
+		if origParent.Trunk {
+			var err error
+			origUpstream, err = repo.RevParse(&git.RevParse{Rev: "origin/" + origParent.Name})
+			if err != nil {
+				return nil, errors.WrapIff(err, "failed to get HEAD of %q", origParent.Name)
+			}
+		} else {
+			origUpstream = origParent.Head
+		}
 		continuation := SyncBranchContinuation{
 			NewParentName: parentState.Name,
 		}
@@ -260,7 +279,7 @@ func syncBranchRebase(
 		}
 		rebase, err := repo.RebaseParse(git.RebaseOpts{
 			Branch:   branch.Name,
-			Upstream: origParent.Head,
+			Upstream: origUpstream,
 			Onto:     newUpstreamCommitHash,
 		})
 		if err != nil {
@@ -305,6 +324,18 @@ func syncBranchRebase(
 		" of parent branch ", colors.UserInput(parentState.Name),
 		"\n",
 	)
+	var origUpstream string
+	if origParent.Trunk {
+		// This can happen if the branch is originally a stack root and reparented to
+		// another branch (and became non-stack-root).
+		var err error
+		origUpstream, err = repo.RevParse(&git.RevParse{Rev: "origin/" + origParent.Name})
+		if err != nil {
+			return nil, errors.WrapIff(err, "failed to get HEAD of %q", origParent.Name)
+		}
+	} else {
+		origUpstream = origParent.Head
+	}
 	// We need to use `rebase --onto` here and be very careful about how we
 	// determine the commits that are being rebased on top of parentHead.
 	// Suppose we have a history like
@@ -339,7 +370,7 @@ func syncBranchRebase(
 	}
 	rebase, err := repo.RebaseParse(git.RebaseOpts{
 		Branch:   branch.Name,
-		Upstream: origParent.Head,
+		Upstream: origUpstream,
 		Onto:     parentHead,
 	})
 	if err != nil {
