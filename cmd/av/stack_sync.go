@@ -294,7 +294,7 @@ base branch.
 				_, _ = fmt.Fprint(os.Stderr, "\n\n")
 			}
 			state.CurrentBranch = currentBranch
-			res, err := actions.SyncBranch(ctx, repo, client, tx, actions.SyncBranchOpts{
+			cont, err := actions.SyncBranch(ctx, repo, client, tx, actions.SyncBranchOpts{
 				Branch:       currentBranch,
 				Fetch:        !state.Config.NoFetch,
 				Push:         !state.Config.NoPush,
@@ -305,8 +305,8 @@ base branch.
 			if err != nil {
 				return err
 			}
-			if res.Status == git.RebaseConflict {
-				state.Continuation = res.Continuation
+			if cont != nil {
+				state.Continuation = cont
 				if err := writeStackSyncState(repo, &state); err != nil {
 					return errors.Wrap(err, "failed to write stack sync state")
 				}

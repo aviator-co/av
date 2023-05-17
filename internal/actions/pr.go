@@ -446,8 +446,6 @@ type UpdatePullRequestResult struct {
 	// True if the pull request information changed (e.g., a new pull request
 	// was found or if the pull request changed state)
 	Changed bool
-	// The (updated) branch metadata.
-	Branch meta.Branch
 	// The pull request object that was returned from GitHub
 	Pull *gh.PullRequest
 }
@@ -490,7 +488,7 @@ func UpdatePullRequestState(
 			return nil, errors.New("GitHub reported no pull requests for branch but local metadata has pull request")
 		}
 
-		return &UpdatePullRequestResult{false, branch, nil}, nil
+		return &UpdatePullRequestResult{false, nil}, nil
 	}
 
 	// The latest info for the pull request that we have stored in local metadata
@@ -572,7 +570,7 @@ func UpdatePullRequestState(
 	}
 
 	tx.SetBranch(branch)
-	return &UpdatePullRequestResult{changed, branch, newPull}, nil
+	return &UpdatePullRequestResult{changed, newPull}, nil
 }
 
 type PRMetadata struct {
