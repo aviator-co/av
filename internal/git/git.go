@@ -16,6 +16,8 @@ import (
 	giturls "github.com/whilp/git-urls"
 )
 
+var ErrRemoteNotFound = errors.Sentinel("this repository doesn't have a remote origin")
+
 type Repo struct {
 	repoDir string
 	log     logrus.FieldLogger
@@ -331,10 +333,19 @@ func (r *Repo) Origin() (*Origin, error) {
 	// Note: `git remote get-url` gets the "real" URL of the remote (taking
 	// `insteadOf` from git config into account) whereas `git config --get ...`
 	// does *not*. Not sure if it matters here.
-	origin, err := r.Git("remote", "get-url", "origin")
+	output, err := r.Run(&RunOpts{
+		Args: []string{"remote", "get-url", "origin"},
+	})
 	if err != nil {
 		return nil, err
 	}
+	if output.ExitCode != 0 {
+		if strings.Contains(string(output.Stderr), "No such remote") {
+			return nil, ErrRemoteNotFound
+		}
+		return nil, errors.New("cannot get the remote of the repository")
+	}
+	origin := strings.TrimSpace(string(output.Stdout))
 	if origin == "" {
 		return nil, errors.New("origin URL is empty")
 	}
