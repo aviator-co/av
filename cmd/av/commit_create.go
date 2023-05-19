@@ -33,12 +33,11 @@ var commitCreateCmd = &cobra.Command{
 		}
 
 		currentBranchName, _ := repo.CurrentBranchName()
-		currentCommitOID, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
 		if err != nil {
 			return errors.Errorf("cannot get the current commit object: %v", err)
 		}
 
-		if err := commitCreate(repo, currentBranchName, currentCommitOID, commitCreateFlags); err != nil {
+		if err := commitCreate(repo, currentBranchName, commitCreateFlags); err != nil {
 			return err
 		}
 
@@ -51,7 +50,7 @@ func init() {
 	commitCreateCmd.Flags().BoolVarP(&commitCreateFlags.All, "all", "a", false, "automatically stage modified files (same as git commit --all)")
 }
 
- func commitCreate(repo *git.Repo, currentBranchName, currentCommitOID string, flags struct{Message string; All bool}) error {
+ func commitCreate(repo *git.Repo, currentBranchName string, flags struct{Message string; All bool}) error {
 	commitArgs := []string{"commit"}
 	if commitCreateFlags.All {
 		commitArgs = append(commitArgs, "--all")
