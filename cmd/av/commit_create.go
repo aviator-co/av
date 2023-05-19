@@ -83,10 +83,7 @@ func init() {
 	tx := db.WriteTx()
 	defer tx.Abort()
 
-	branchesToSync, err := meta.SubsequentBranches(tx, currentBranchName)
-	if err != nil {
-		return err
-	}
+	branchesToSync, _ := meta.SubsequentBranches(tx, currentBranchName)
 	state.Branches = branchesToSync
 
 	client, err := getClient(config.Av.GitHub.Token)
