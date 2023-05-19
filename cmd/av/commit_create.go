@@ -71,13 +71,11 @@ func init() {
 		return errExitSilently{1}
 	}
 
-	var branchesToSync []string
 	state, err := readStackSyncState(repo)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	ctx := context.Background()
-
 	db, err := getDB(repo)
 	if err != nil {
 		return err
@@ -85,11 +83,10 @@ func init() {
 	tx := db.WriteTx()
 	defer tx.Abort()
 
-	nextBranches, err := meta.SubsequentBranches(tx, currentBranchName)
+	branchesToSync, err := meta.SubsequentBranches(tx, currentBranchName)
 	if err != nil {
 		return err
 	}
-	branchesToSync = append(branchesToSync, nextBranches...)
 	state.Branches = branchesToSync
 
 	client, err := getClient(config.Av.GitHub.Token)
