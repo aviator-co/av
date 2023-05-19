@@ -85,7 +85,7 @@ func init() {
 	tx := db.WriteTx()
 	defer tx.Abort()
 
-	nextBranches, err := meta.SubsequentBranches(tx, branchesToSync[len(branchesToSync)-1])
+	nextBranches, err := meta.SubsequentBranches(tx, currentBranchName)
 	if err != nil {
 		return err
 	}
