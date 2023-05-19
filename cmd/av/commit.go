@@ -11,6 +11,6 @@ var commitCmd = &cobra.Command{
 
 func init() {
 	commitCmd.AddCommand(
-		commitSplitCmd,
+		commitSplitCmd, commitCreateCmd,
 	)
 }
