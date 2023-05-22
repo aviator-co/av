@@ -134,11 +134,11 @@ base branch.
 
 			state.OriginalBranch = state.CurrentBranch
 			state.Config = actions.StackSyncConfig{
-				syncFlags.Current,
-				syncFlags.Trunk,
-				syncFlags.NoPush,
-				syncFlags.NoFetch,
-				syncFlags.Parent,
+				Current: syncFlags.Current,
+				Trunk: syncFlags.Trunk,
+				NoPush: syncFlags.NoPush,
+				NoFetch: syncFlags.NoFetch,
+				Parent: syncFlags.Parent,
 			}
 		}
 
