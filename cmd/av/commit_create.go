@@ -70,7 +70,7 @@ func init() {
 		return errExitSilently{1}
 	}
 
-	state, err := readStackSyncState(repo)
+	state, err := actions.ReadStackSyncState(repo)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -82,45 +82,20 @@ func init() {
 	tx := db.WriteTx()
 	defer tx.Abort()
 
-	branchesToSync, _ := meta.SubsequentBranches(tx, currentBranchName)
-	state.Branches = branchesToSync
-
 	client, err := getClient(config.Av.GitHub.Token)
-		if err != nil {
-			return err
-		}
-
-	for i, currentBranch := range branchesToSync {
-		if i > 0 {
-			// Add spacing in the output between each branch sync
-			_, _ = fmt.Fprint(os.Stderr, "\n\n")
-		}
-		state.CurrentBranch = currentBranch
-		cont, err := actions.SyncBranch(ctx, repo, client, tx, actions.SyncBranchOpts{
-			Branch:       currentBranch,
-			Fetch:        !state.Config.NoFetch,
-			Push:         !state.Config.NoPush,
-			Continuation: state.Continuation,
-			ToTrunk:      state.Config.Trunk,
-			Skip:         stackSyncFlags.Skip,
-		})
-		if err != nil {
-			return err
-		}
-		if cont != nil {
-			state.Continuation = cont
-			if err := writeStackSyncState(repo, &state); err != nil {
-				return errors.Wrap(err, "failed to write stack sync state")
-			}
-			if err := tx.Commit(); err != nil {
-				return err
-			}
-			return errExitSilently{1}
-		}
-
-		state.Continuation = nil
+	if err != nil {
+		return err
 	}
 
+	branchesToSync, err := meta.SubsequentBranches(tx, currentBranchName)
+	if err != nil {
+		return err
+	}
+
+	err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, SyncFlags)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -21,55 +20,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-// stackSyncConfig contains the configuration for a sync operation.
-// It is serializable to JSON to handle the case where the sync is interrupted
-// by a merge conflict (so it can be resumed with the --continue flag).
-type stackSyncConfig struct {
-	// If set, only sync up to the current branch (do not sync descendants).
-	// This is useful for syncing changes from a parent branch in case the
-	// current branch needs to be updated before continuing the sync.
-	Current bool `json:"current"`
-	// If set, incorporate changes from the trunk (repo base branch) into the stack.
-	// Only valid if synchronizing the root of a stack.
-	// This effectively re-roots the stack on the latest commit from the trunk.
-	Trunk bool `json:"trunk"`
-	// If set, do not push to GitHub.
-	NoPush bool `json:"noPush"`
-	// If set, do not fetch updated PR information from GitHub.
-	NoFetch bool `json:"noFetch"`
-	// The new parent branch to sync the current branch to.
-	Parent string `json:"parent"`
-}
-
-// stackSyncState is the state of an in-progress sync operation.
-// It is written to a file if the sync is interrupted (so it can be resumed with
-// the --continue flag).
-type stackSyncState struct {
-	// The branch to return to when the sync is complete.
-	OriginalBranch string `json:"originalBranch"`
-	// The branch that's currently being synced.
-	CurrentBranch string `json:"currentBranch"`
-	// All of the branches that are being synced (including branches that have
-	// already been synced).
-	// TODO: We should probably store the original HEAD commit for each branch
-	//       and revert each branch individually if we --abort.
-	Branches []string `json:"branches"`
-	// The continuation state for the current branch.
-	Continuation *actions.SyncBranchContinuation `json:"continuation,omitempty"`
-	// The config of the sync.
-	Config stackSyncConfig `json:"config"`
-}
-
-var stackSyncFlags struct {
-	// Include all the options from stackSyncConfig
-	stackSyncConfig
-	// If set, we're continuing a previous sync.
-	Continue bool
-	// If set, abort an in-progress sync operation.
-	Abort bool
-	// If set, skip a commit and continue a previous sync.
-	Skip bool
-}
+var SyncFlags actions.StackSyncFlags
 
 var stackSyncCmd = &cobra.Command{
 	Use:   "sync",
@@ -92,13 +43,13 @@ base branch.
 `),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Argument validation
-		if countBools(stackSyncFlags.Continue, stackSyncFlags.Abort, stackSyncFlags.Skip) > 1 {
+		if countBools(SyncFlags.Continue, SyncFlags.Abort, SyncFlags.Skip) > 1 {
 			return errors.New("cannot use --continue, --abort, and --skip together")
 		}
-		if stackSyncFlags.Current && stackSyncFlags.Trunk {
+		if SyncFlags.Current && SyncFlags.Trunk {
 			return errors.New("cannot use --current and --trunk together")
 		}
-		if stackSyncFlags.Parent != "" && stackSyncFlags.Trunk {
+		if SyncFlags.Parent != "" && SyncFlags.Trunk {
 			return errors.New("cannot use --parent and --trunk together")
 		}
 
@@ -117,15 +68,15 @@ base branch.
 
 		// Read any preexisting state.
 		// This is required to allow us to handle --continue/--abort/--skip
-		state, err := readStackSyncState(repo)
+		state, err := actions.ReadStackSyncState(repo)
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
 
-		if stackSyncFlags.Abort {
+		if SyncFlags.Abort {
 			if state.CurrentBranch == "" || state.Continuation == nil {
 				// Try to clear the state file if it exists just to be safe.
-				_ = writeStackSyncState(repo, nil)
+				_ = actions.WriteStackSyncState(repo, nil)
 				return errors.New("no sync in progress")
 			}
 
@@ -136,7 +87,7 @@ base branch.
 				}
 			}
 
-			err := writeStackSyncState(repo, nil)
+			err := actions.WriteStackSyncState(repo, nil)
 			if err != nil {
 				return errors.Wrap(err, "failed to reset stack sync state")
 			}
@@ -147,7 +98,7 @@ base branch.
 			return nil
 		}
 
-		if !stackSyncFlags.Skip {
+		if !SyncFlags.Skip {
 			// Make sure all changes are staged unless --skip. git rebase --skip will
 			// clean up the changes.
 			diff, err := repo.Diff(&git.DiffOpts{Quiet: true})
@@ -159,7 +110,7 @@ base branch.
 			}
 		}
 
-		if stackSyncFlags.Continue || stackSyncFlags.Skip {
+		if SyncFlags.Continue || SyncFlags.Skip {
 			if state.CurrentBranch == "" {
 				return errors.New("no sync in progress")
 			}
@@ -182,12 +133,12 @@ base branch.
 			}
 
 			state.OriginalBranch = state.CurrentBranch
-			state.Config = stackSyncConfig{
-				stackSyncFlags.Current,
-				stackSyncFlags.Trunk,
-				stackSyncFlags.NoPush,
-				stackSyncFlags.NoFetch,
-				stackSyncFlags.Parent,
+			state.Config = actions.StackSyncConfig{
+				SyncFlags.Current,
+				SyncFlags.Trunk,
+				SyncFlags.NoPush,
+				SyncFlags.NoFetch,
+				SyncFlags.Parent,
 			}
 		}
 
@@ -206,8 +157,8 @@ base branch.
 				NewParent:      state.Config.Parent,
 				NewParentTrunk: state.Config.Parent == defaultBranch,
 			}
-			if stackSyncFlags.Continue || stackSyncFlags.Skip {
-				res, err = actions.ReparentSkipContinue(repo, tx, opts, stackSyncFlags.Skip)
+			if SyncFlags.Continue || SyncFlags.Skip {
+				res, err = actions.ReparentSkipContinue(repo, tx, opts, SyncFlags.Skip)
 			} else {
 				res, err = actions.Reparent(repo, tx, opts)
 			}
@@ -215,7 +166,7 @@ base branch.
 				return err
 			}
 			if !res.Success {
-				if err := writeStackSyncState(repo, &state); err != nil {
+				if err := actions.WriteStackSyncState(repo, &state); err != nil {
 					return errors.Wrap(err, "failed to write stack sync state")
 				}
 				_, _ = fmt.Fprint(os.Stderr,
@@ -288,125 +239,49 @@ base branch.
 		if err != nil {
 			return err
 		}
-		for i, currentBranch := range branchesToSync {
-			if i > 0 {
-				// Add spacing in the output between each branch sync
-				_, _ = fmt.Fprint(os.Stderr, "\n\n")
-			}
-			state.CurrentBranch = currentBranch
-			cont, err := actions.SyncBranch(ctx, repo, client, tx, actions.SyncBranchOpts{
-				Branch:       currentBranch,
-				Fetch:        !state.Config.NoFetch,
-				Push:         !state.Config.NoPush,
-				Continuation: state.Continuation,
-				ToTrunk:      state.Config.Trunk,
-				Skip:         stackSyncFlags.Skip,
-			})
-			if err != nil {
-				return err
-			}
-			if cont != nil {
-				state.Continuation = cont
-				if err := writeStackSyncState(repo, &state); err != nil {
-					return errors.Wrap(err, "failed to write stack sync state")
-				}
-				if err := tx.Commit(); err != nil {
-					return err
-				}
-				return errExitSilently{1}
-			}
 
-			state.Continuation = nil
-		}
-
-		// Return to the original branch
-		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: state.OriginalBranch}); err != nil {
-			return err
-		}
-		if err := writeStackSyncState(repo, nil); err != nil {
-			return errors.Wrap(err, "failed to write stack sync state")
-		}
-		if err := tx.Commit(); err != nil {
+		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, SyncFlags)
+		if err != nil {
 			return err
 		}
 		return nil
 	},
 }
 
-const stackSyncStateFile = "stack-sync.state.json"
 
-func readStackSyncState(repo *git.Repo) (stackSyncState, error) {
-	var state stackSyncState
-	data, err := os.ReadFile(path.Join(repo.AvDir(), stackSyncStateFile))
-	if err != nil {
-		return state, err
-	}
-	if err := json.Unmarshal(data, &state); err != nil {
-		return state, err
-	}
-	return state, nil
-}
-
-func writeStackSyncState(repo *git.Repo, state *stackSyncState) error {
-	avDir := repo.AvDir()
-	if _, err := os.Stat(avDir); err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
-		if err := os.Mkdir(avDir, 0755); err != nil {
-			return err
-		}
-	}
-
-	// delete the file if state is nil (i.e., --abort)
-	if state == nil {
-		err := os.Remove(path.Join(avDir, stackSyncStateFile))
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		return nil
-	}
-
-	// otherwise, create/write the file
-	data, err := json.Marshal(state)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path.Join(avDir, stackSyncStateFile), data, 0644)
-}
 
 func init() {
 	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.Current, "current", false,
+		&SyncFlags.Current, "current", false,
 		"only sync changes to the current branch\n(don't recurse into descendant branches)",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.NoPush, "no-push", false,
+		&SyncFlags.NoPush, "no-push", false,
 		"do not force-push updated branches to GitHub",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.NoFetch, "no-fetch", false,
+		&SyncFlags.NoFetch, "no-fetch", false,
 		"do not fetch latest PR information from GitHub",
 	)
 	// TODO[mvp]: better name (--to-trunk?)
 	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.Trunk, "trunk", false,
+		&SyncFlags.Trunk, "trunk", false,
 		"synchronize the trunk into the stack",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.Continue, "continue", false,
+		&SyncFlags.Continue, "continue", false,
 		"continue an in-progress sync",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.Abort, "abort", false,
+		&SyncFlags.Abort, "abort", false,
 		"abort an in-progress sync",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.Skip, "skip", false,
+		&SyncFlags.Skip, "skip", false,
 		"skip the current commit and continue an in-progress sync",
 	)
 	stackSyncCmd.Flags().StringVar(
-		&stackSyncFlags.Parent, "parent", "",
+		&SyncFlags.Parent, "parent", "",
 		"parent branch to rebase onto",
 	)
 }
