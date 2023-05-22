@@ -7,7 +7,7 @@ import (
 
 // StackBranchCmd is a command to create a new branch in a stack.
 //
-//	branch <branch-name> [--parent <parent-branch-name>] [--trunk <trunk-branch-name>]
+//	stack-branch <branch-name> [--parent <parent-branch-name>] [--trunk <trunk-branch-name>]
 type StackBranchCmd struct {
 	// The name of the branch to create.
 	Name string
@@ -42,7 +42,7 @@ func (b StackBranchCmd) String() string {
 
 var _ Cmd = &StackBranchCmd{}
 
-func parseBranchCmd(args []string) (Cmd, error) {
+func parseStackBranchCmd(args []string) (Cmd, error) {
 	cmd := StackBranchCmd{}
 	fs := pflag.NewFlagSet("stack-branch", pflag.ContinueOnError)
 	fs.StringVar(&cmd.Parent, "parent", "", "parent branch")
@@ -51,10 +51,10 @@ func parseBranchCmd(args []string) (Cmd, error) {
 		return nil, err
 	}
 	if fs.NArg() != 1 {
-		return nil, ErrInvalidCmd{"branch", "exactly one argument is required (the name of the branch to create)"}
+		return nil, ErrInvalidCmd{"stack-branch", "exactly one argument is required (the name of the branch to create)"}
 	}
 	if cmd.Trunk != "" && cmd.Parent != "" {
-		return nil, ErrInvalidCmd{"branch", "cannot specify both --parent and --trunk"}
+		return nil, ErrInvalidCmd{"stack-branch", "cannot specify both --parent and --trunk"}
 	}
 	cmd.Name = fs.Arg(0)
 	return cmd, nil

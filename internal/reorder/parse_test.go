@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestParseBranchCmd(t *testing.T) {
+func TestParseCmd(t *testing.T) {
 	for _, tt := range []struct {
 		Input string
 		Cmd   Cmd

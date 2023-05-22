@@ -19,7 +19,7 @@ func ParseCmd(line string) (Cmd, error) {
 	args = args[1:]
 	switch cmdName {
 	case "stack-branch", "sb":
-		return parseBranchCmd(args)
+		return parseStackBranchCmd(args)
 	case "pick", "p":
 		return parsePickCmd(args)
 	default:
