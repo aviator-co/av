@@ -20,7 +20,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-var SyncFlags actions.StackSyncFlags
+var syncFlags actions.StackSyncFlags
 
 var stackSyncCmd = &cobra.Command{
 	Use:   "sync",
@@ -43,13 +43,13 @@ base branch.
 `),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Argument validation
-		if countBools(SyncFlags.Continue, SyncFlags.Abort, SyncFlags.Skip) > 1 {
+		if countBools(syncFlags.Continue, syncFlags.Abort, syncFlags.Skip) > 1 {
 			return errors.New("cannot use --continue, --abort, and --skip together")
 		}
-		if SyncFlags.Current && SyncFlags.Trunk {
+		if syncFlags.Current && syncFlags.Trunk {
 			return errors.New("cannot use --current and --trunk together")
 		}
-		if SyncFlags.Parent != "" && SyncFlags.Trunk {
+		if syncFlags.Parent != "" && syncFlags.Trunk {
 			return errors.New("cannot use --parent and --trunk together")
 		}
 
@@ -73,7 +73,7 @@ base branch.
 			return err
 		}
 
-		if SyncFlags.Abort {
+		if syncFlags.Abort {
 			if state.CurrentBranch == "" || state.Continuation == nil {
 				// Try to clear the state file if it exists just to be safe.
 				_ = actions.WriteStackSyncState(repo, nil)
@@ -98,7 +98,7 @@ base branch.
 			return nil
 		}
 
-		if !SyncFlags.Skip {
+		if !syncFlags.Skip {
 			// Make sure all changes are staged unless --skip. git rebase --skip will
 			// clean up the changes.
 			diff, err := repo.Diff(&git.DiffOpts{Quiet: true})
@@ -110,7 +110,7 @@ base branch.
 			}
 		}
 
-		if SyncFlags.Continue || SyncFlags.Skip {
+		if syncFlags.Continue || syncFlags.Skip {
 			if state.CurrentBranch == "" {
 				return errors.New("no sync in progress")
 			}
@@ -134,11 +134,11 @@ base branch.
 
 			state.OriginalBranch = state.CurrentBranch
 			state.Config = actions.StackSyncConfig{
-				SyncFlags.Current,
-				SyncFlags.Trunk,
-				SyncFlags.NoPush,
-				SyncFlags.NoFetch,
-				SyncFlags.Parent,
+				syncFlags.Current,
+				syncFlags.Trunk,
+				syncFlags.NoPush,
+				syncFlags.NoFetch,
+				syncFlags.Parent,
 			}
 		}
 
@@ -157,8 +157,8 @@ base branch.
 				NewParent:      state.Config.Parent,
 				NewParentTrunk: state.Config.Parent == defaultBranch,
 			}
-			if SyncFlags.Continue || SyncFlags.Skip {
-				res, err = actions.ReparentSkipContinue(repo, tx, opts, SyncFlags.Skip)
+			if syncFlags.Continue || syncFlags.Skip {
+				res, err = actions.ReparentSkipContinue(repo, tx, opts, syncFlags.Skip)
 			} else {
 				res, err = actions.Reparent(repo, tx, opts)
 			}
@@ -240,7 +240,7 @@ base branch.
 			return err
 		}
 
-		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, SyncFlags)
+		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, syncFlags)
 		if err != nil {
 			return err
 		}
@@ -252,36 +252,36 @@ base branch.
 
 func init() {
 	stackSyncCmd.Flags().BoolVar(
-		&SyncFlags.Current, "current", false,
+		&syncFlags.Current, "current", false,
 		"only sync changes to the current branch\n(don't recurse into descendant branches)",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&SyncFlags.NoPush, "no-push", false,
+		&syncFlags.NoPush, "no-push", false,
 		"do not force-push updated branches to GitHub",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&SyncFlags.NoFetch, "no-fetch", false,
+		&syncFlags.NoFetch, "no-fetch", false,
 		"do not fetch latest PR information from GitHub",
 	)
 	// TODO[mvp]: better name (--to-trunk?)
 	stackSyncCmd.Flags().BoolVar(
-		&SyncFlags.Trunk, "trunk", false,
+		&syncFlags.Trunk, "trunk", false,
 		"synchronize the trunk into the stack",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&SyncFlags.Continue, "continue", false,
+		&syncFlags.Continue, "continue", false,
 		"continue an in-progress sync",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&SyncFlags.Abort, "abort", false,
+		&syncFlags.Abort, "abort", false,
 		"abort an in-progress sync",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&SyncFlags.Skip, "skip", false,
+		&syncFlags.Skip, "skip", false,
 		"skip the current commit and continue an in-progress sync",
 	)
 	stackSyncCmd.Flags().StringVar(
-		&SyncFlags.Parent, "parent", "",
+		&syncFlags.Parent, "parent", "",
 		"parent branch to rebase onto",
 	)
 }

@@ -92,7 +92,7 @@ func init() {
 		return err
 	}
 
-	err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, SyncFlags)
+	err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, syncFlags)
 	if err != nil {
 		return err
 	}
