@@ -101,7 +101,7 @@ func SyncStack(	ctx context.Context,
 			if err := tx.Commit(); err != nil {
 				return err
 			}
-			// TODO: Exit silently here.
+			return ErrExitSilently{ExitCode: 1}
 		}
 		state.Continuation = nil
 	}

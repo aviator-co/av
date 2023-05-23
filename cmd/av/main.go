@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/fatih/color"
@@ -94,18 +95,7 @@ func init() {
 	)
 }
 
-// errExitSilently is an error type that indicates that program should exit
-// without printing any additional information with the given exit code.
-// This is meant for cases where the running commands wants to manage its own
-// error output but still needs to return a non-zero exit code (since returning
-// nil from RunE would cause a exit with a zero code).
-type errExitSilently struct {
-	exitCode int
-}
 
-func (e errExitSilently) Error() string {
-	return "<exit silently>"
-}
 
 func main() {
 	// Note: this doesn't include whatever time is spent in initializing the
@@ -114,9 +104,9 @@ func main() {
 	err := rootCmd.Execute()
 	logrus.WithField("duration", time.Since(startTime)).Debug("command exited")
 	checkCliVersion()
-	var exitSilently errExitSilently
+	var exitSilently actions.ErrExitSilently
 	if errors.As(err, &exitSilently) {
-		os.Exit(exitSilently.exitCode)
+		os.Exit(exitSilently.ExitCode)
 	}
 	if err != nil {
 		// In debug mode, show more detailed information about the error

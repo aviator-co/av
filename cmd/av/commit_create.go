@@ -67,7 +67,7 @@ func init() {
 		_, _ = fmt.Fprint(os.Stderr,
 			"\n", colors.Failure("Failed to create commit."), "\n",
 		)
-		return errExitSilently{1}
+		return actions.ErrExitSilently{ExitCode: 1}
 	}
 
 	state, err := actions.ReadStackSyncState(repo)

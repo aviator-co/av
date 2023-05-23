@@ -239,47 +239,12 @@ base branch.
 		if err != nil {
 			return err
 		}
-		for i, currentBranch := range branchesToSync {
-			if i > 0 {
-				// Add spacing in the output between each branch sync
-				_, _ = fmt.Fprint(os.Stderr, "\n\n")
-			}
-			state.CurrentBranch = currentBranch
-			cont, err := actions.SyncBranch(ctx, repo, client, tx, actions.SyncBranchOpts{
-				Branch:       currentBranch,
-				Fetch:        !state.Config.NoFetch,
-				Push:         !state.Config.NoPush,
-				Continuation: state.Continuation,
-				ToTrunk:      state.Config.Trunk,
-				Skip:         syncFlags.Skip,
-			})
-			if err != nil {
-				return err
-			}
-			if cont != nil {
-				state.Continuation = cont
-				if err := actions.WriteStackSyncState(repo, &state); err != nil {
-					return errors.Wrap(err, "failed to write stack sync state")
-				}
-				if err := tx.Commit(); err != nil {
-					return err
-				}
-				return errExitSilently{1}
-			}
 
-			state.Continuation = nil
-		}
-
-		// Return to the original branch
-		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: state.OriginalBranch}); err != nil {
+		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, syncFlags)
+		if err != nil {
 			return err
 		}
-		if err := actions.WriteStackSyncState(repo, nil); err != nil {
-			return errors.Wrap(err, "failed to write stack sync state")
-		}
-		if err := tx.Commit(); err != nil {
-			return err
-		}
+
 		return nil
 	},
 }

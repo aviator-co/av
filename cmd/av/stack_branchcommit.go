@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/aviator-co/av/internal/utils/cleanup"
-	"github.com/aviator-co/av/internal/utils/colors"
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/utils/cleanup"
+	"github.com/aviator-co/av/internal/utils/colors"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
@@ -173,7 +175,7 @@ var stackBranchCommitCmd = &cobra.Command{
 			_, _ = fmt.Fprint(os.Stderr,
 				"\n", colors.Failure("Failed to create commit."), "\n",
 			)
-			return errExitSilently{1}
+			return actions.ErrExitSilently{ExitCode: 1}
 		}
 
 		// Cancel the cleanup **after** the commit is successful (so that we
