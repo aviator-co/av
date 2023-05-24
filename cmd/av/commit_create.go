@@ -32,9 +32,9 @@ var commitCreateCmd = &cobra.Command{
 			return err
 		}
 
-		currentBranchName, _ := repo.CurrentBranchName()
+		currentBranchName, err := repo.CurrentBranchName()
 		if err != nil {
-			return errors.Errorf("cannot get the current commit object: %v", err)
+			return errors.WrapIf(err, "failed to determine current branch")
 		}
 
 		if err := commitCreate(repo, currentBranchName, commitCreateFlags); err != nil {
