@@ -135,10 +135,11 @@ base branch.
 			state.OriginalBranch = state.CurrentBranch
 			state.Config = actions.StackSyncConfig{
 				Current: syncFlags.Current,
-				Trunk: syncFlags.Trunk,
-				NoPush: syncFlags.NoPush,
+				Trunk:   syncFlags.Trunk,
+				NoPush:  syncFlags.NoPush,
 				NoFetch: syncFlags.NoFetch,
-				Parent: syncFlags.Parent,
+				Parent:  syncFlags.Parent,
+				Prune:   syncFlags.Prune,
 			}
 		}
 
@@ -249,8 +250,6 @@ base branch.
 	},
 }
 
-
-
 func init() {
 	stackSyncCmd.Flags().BoolVar(
 		&syncFlags.Current, "current", false,
@@ -263,6 +262,10 @@ func init() {
 	stackSyncCmd.Flags().BoolVar(
 		&syncFlags.NoFetch, "no-fetch", false,
 		"do not fetch latest PR information from GitHub",
+	)
+	stackSyncCmd.Flags().BoolVar(
+		&syncFlags.Prune, "prune", false,
+		"delete the merged branches",
 	)
 	// TODO[mvp]: better name (--to-trunk?)
 	stackSyncCmd.Flags().BoolVar(
