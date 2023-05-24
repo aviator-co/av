@@ -6,7 +6,7 @@ av - Aviator CLI
 
 # DESCRIPTION
 
-**av** allows you to manage pull-requests with Aviator MergeQueue.
+**av** allows you to manage stacked pull requests with Aviator.
 
 # SUBCOMMANDS
 
