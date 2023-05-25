@@ -46,6 +46,8 @@ type StackSyncFlags struct {
 	Abort bool
 	// If set, skip a commit and continue a previous sync.
 	Skip bool
+	// If set, synchronize all branches.
+	All bool
 }
 
 // stackSyncState is the state of an in-progress sync operation.

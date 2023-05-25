@@ -215,6 +215,19 @@ base branch.
 			// we try to do something in the repo before we finish that)
 			branchesToSync = []string{state.CurrentBranch}
 			state.Branches = branchesToSync
+		} else if syncFlags.All {
+			for _, br := range tx.AllBranches() {
+				if !br.IsStackRoot() {
+					continue
+				}
+				branchesToSync = append(branchesToSync, br.Name)
+				nextBranches, err := meta.SubsequentBranches(tx, branchesToSync[len(branchesToSync)-1])
+				if err != nil {
+					return err
+				}
+				branchesToSync = append(branchesToSync, nextBranches...)
+			}
+			state.Branches = branchesToSync
 		} else {
 			currentBranch, err := repo.CurrentBranchName()
 			if err != nil {
@@ -252,6 +265,10 @@ base branch.
 
 func init() {
 	stackSyncCmd.Flags().BoolVar(
+		&syncFlags.All, "all", false,
+		"synchronize all branches",
+	)
+	stackSyncCmd.Flags().BoolVar(
 		&syncFlags.Current, "current", false,
 		"only sync changes to the current branch\n(don't recurse into descendant branches)",
 	)
@@ -288,6 +305,7 @@ func init() {
 		&syncFlags.Parent, "parent", "",
 		"parent branch to rebase onto",
 	)
+	stackSyncCmd.MarkFlagsMutuallyExclusive("current", "all")
 }
 
 func countBools(bs ...bool) int {
