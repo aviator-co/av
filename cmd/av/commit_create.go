@@ -71,6 +71,8 @@ func init() {
 	}
 
 	state, err := actions.ReadStackSyncState(repo)
+	state.OriginalBranch = currentBranchName
+
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}

@@ -11,6 +11,8 @@ import (
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/sliceutils"
 )
 
 // stackSyncConfig contains the configuration for a sync operation.
@@ -31,8 +33,9 @@ type StackSyncConfig struct {
 	NoFetch bool `json:"noFetch"`
 	// The new parent branch to sync the current branch to.
 	Parent string `json:"parent"`
+	// If set, delete the merged branches.
+	Prune bool `json:"prune"`
 }
-
 
 type StackSyncFlags struct {
 	// Include all the options from stackSyncConfig
@@ -64,16 +67,15 @@ type StackSyncState struct {
 	Config StackSyncConfig `json:"config"`
 }
 
-
 // Performs stack sync on all branches in branchesToSync.
-func SyncStack(	ctx context.Context,
+func SyncStack(ctx context.Context,
 	repo *git.Repo,
 	client *gh.Client,
 	tx meta.WriteTx,
 	branchesToSync []string,
 	state StackSyncState,
 	flags StackSyncFlags,
-) (error) {
+) error {
 	state.Branches = branchesToSync
 
 	for i, currentBranch := range branchesToSync {
@@ -106,9 +108,79 @@ func SyncStack(	ctx context.Context,
 		state.Continuation = nil
 	}
 
+	if state.Config.Prune {
+		remoteBranches, err := repo.LsRemote("origin")
+		if err != nil {
+			return err
+		}
+		for _, currentBranch := range branchesToSync {
+			br, _ := tx.Branch(currentBranch)
+			if br.MergeCommit == "" {
+				continue
+			}
+			if len(br.Children) > 0 {
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - not deleting merged branch ", colors.UserInput(currentBranch), " because it still has children",
+					"\n",
+				)
+				continue
+			}
+			if br.PullRequest == nil {
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - not deleting merged branch ", colors.UserInput(currentBranch), " because we cannot find the associated pull-request",
+					"\n",
+				)
+				continue
+			}
+			ref := fmt.Sprintf("refs/pull/%d/head", br.PullRequest.Number)
+			remoteHash, ok := remoteBranches[ref]
+			if !ok {
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - not deleting merged branch ", colors.UserInput(currentBranch), " because we cannot find the HEAD of the pull-request",
+					"\n",
+				)
+				continue
+			}
+			currentHash, err := repo.RevParse(&git.RevParse{Rev: currentBranch})
+			if err != nil {
+				return errors.Errorf("cannot get the current commit hash of %q: %v", currentBranch, err)
+			}
+			if remoteHash != currentHash {
+				_, _ = fmt.Fprint(os.Stderr,
+					"  - not deleting merged branch ", colors.UserInput(currentBranch), " because the local branch points to a different commit than the merged pull-request",
+					"\n",
+				)
+				continue
+			}
+			_, _ = fmt.Fprint(os.Stderr,
+				"  - deleting merged branch ", colors.UserInput(currentBranch),
+				"\n",
+			)
+			if _, err := repo.Git("switch", "--detach"); err != nil {
+				return errors.Errorf("cannot switch to detached HEAD: %v", err)
+			}
+			if _, err := repo.Git("branch", "-D", currentBranch); err != nil {
+				return errors.Errorf("cannot delete merged branch %q: %v", currentBranch, err)
+			}
+			// There's no children, but this can have a non-trunk parent.
+			tx.DeleteBranch(currentBranch)
+			if !br.Parent.Trunk {
+				parentBranch, _ := tx.Branch(br.Parent.Name)
+				parentBranch.Children = sliceutils.DeleteElement(parentBranch.Children, currentBranch)
+				tx.SetBranch(parentBranch)
+			}
+			if currentBranch == state.OriginalBranch {
+				// The original branch is deleted.
+				state.OriginalBranch = ""
+			}
+		}
+	}
+
 	// Return to the original branch
-	if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: state.OriginalBranch}); err != nil {
-		return err
+	if state.OriginalBranch != "" {
+		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: state.OriginalBranch}); err != nil {
+			return err
+		}
 	}
 	if err := WriteStackSyncState(repo, nil); err != nil {
 		return errors.Wrap(err, "failed to write stack sync state")
@@ -119,7 +191,6 @@ func SyncStack(	ctx context.Context,
 
 	return nil
 }
-
 
 const stackSyncStateFile = "stack-sync.state.json"
 

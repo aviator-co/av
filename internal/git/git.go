@@ -222,6 +222,25 @@ func (r *Repo) DoesRemoteBranchExist(branch string) (bool, error) {
 	return false, nil
 }
 
+func (r *Repo) LsRemote(remote string) (map[string]string, error) {
+	out, err := r.Run(&RunOpts{
+		Args: []string{"ls-remote", remote},
+		ExitError: true,
+	})
+	if err != nil {
+		return nil, errors.Errorf("failed to get remote branches: %v", err)
+	}
+	ret := make(map[string]string)
+	for _, line := range out.Lines() {
+		ss := strings.Split(line, "\t")
+		if len(ss) != 2 {
+			return nil, errors.Errorf("failed to parse the ls-remote output: %q", line)
+		}
+		ret[ss[1]] = ss[0]
+	}
+	return ret, nil
+}
+
 type CheckoutBranch struct {
 	// The name of the branch to checkout.
 	Name string
