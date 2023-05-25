@@ -64,7 +64,13 @@ var stackTreeCmd = &cobra.Command{
 	},
 }
 
-func printStackTree(repo *git.Repo, branches map[string]meta.Branch, currentBranch string, root string, depth int) {
+func printStackTree(
+	repo *git.Repo,
+	branches map[string]meta.Branch,
+	currentBranch string,
+	root string,
+	depth int,
+) {
 	indent := strings.Repeat("    ", depth)
 	branch, ok := branches[root]
 	if !ok {
@@ -80,7 +86,12 @@ func printStackTree(repo *git.Repo, branches map[string]meta.Branch, currentBran
 
 	if currentBranch == branch.Name {
 		_, _ = fmt.Print(
-			indent, colors.Success("* "), colors.Success(branch.Name), " ", colors.Faint(branchInfo), "\n",
+			indent,
+			colors.Success("* "),
+			colors.Success(branch.Name),
+			" ",
+			colors.Faint(branchInfo),
+			"\n",
 		)
 	} else {
 		_, _ = fmt.Print(indent, branch.Name, " ", colors.Faint(branchInfo), "\n")
@@ -131,7 +142,7 @@ func getParentStatus(repo *git.Repo, branch meta.Branch) (string, error) {
 	if mergeBase == parentHead {
 		return "", nil
 	}
-	
+
 	return "needs sync", nil
 }
 
@@ -144,14 +155,16 @@ func getUpstreamStatus(repo *git.Repo, branch meta.Branch) (string, error) {
 	}
 
 	upstreamBranch := fmt.Sprintf("remotes/origin/%s", branch.Name)
-	upstreamDiff, err := repo.Diff(&git.DiffOpts{Quiet: true, Branch1: branch.Name, Branch2: upstreamBranch})
+	upstreamDiff, err := repo.Diff(
+		&git.DiffOpts{Quiet: true, Branch1: branch.Name, Branch2: upstreamBranch},
+	)
 	if err != nil {
 		return "", err
-	} 
-	
+	}
+
 	if upstreamDiff.Empty {
 		return "", nil
 	}
-		
+
 	return "not pushed", nil
 }

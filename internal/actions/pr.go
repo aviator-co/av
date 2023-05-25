@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/aviator-co/av/internal/utils/sanitize"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/aviator-co/av/internal/utils/sanitize"
 
 	"github.com/aviator-co/av/internal/editor"
 	"github.com/aviator-co/av/internal/utils/stringutils"
@@ -82,7 +83,13 @@ func getPRMetadata(
 	return prMeta, nil
 }
 
-func getExistingOpenPR(ctx context.Context, client *gh.Client, repoMeta meta.Repository, branchMeta meta.Branch, baseRefName string) (*gh.PullRequest, error) {
+func getExistingOpenPR(
+	ctx context.Context,
+	client *gh.Client,
+	repoMeta meta.Repository,
+	branchMeta meta.Branch,
+	baseRefName string,
+) (*gh.PullRequest, error) {
 	if branchMeta.PullRequest != nil {
 		pr, err := client.PullRequest(ctx, branchMeta.PullRequest.ID)
 		if err != nil {
@@ -236,7 +243,10 @@ func CreatePullRequest(
 		}
 
 		// If a saved pull request description exists, use that.
-		saveFile := filepath.Join(repo.AvTmpDir(), fmt.Sprintf("av-pr-%s.md", sanitize.FileName(opts.BranchName)))
+		saveFile := filepath.Join(
+			repo.AvTmpDir(),
+			fmt.Sprintf("av-pr-%s.md", sanitize.FileName(opts.BranchName)),
+		)
 		if _, err := os.Stat(saveFile); err == nil {
 			contents, err := os.ReadFile(saveFile)
 			if err != nil {
@@ -298,7 +308,8 @@ func CreatePullRequest(
 			// Otherwise, save what the user entered to a file so that it's not
 			// lost forever (and we can re-use it if they try again).
 			if err := os.WriteFile(saveFile, []byte(res), 0644); err != nil {
-				logrus.WithError(err).Error("failed to write pull request description to temporary file")
+				logrus.WithError(err).
+					Error("failed to write pull request description to temporary file")
 				return
 			}
 			_, _ = fmt.Fprint(os.Stderr,
@@ -371,7 +382,10 @@ type prBodyTemplateData struct {
 
 var templateFuncs = template.FuncMap{"trimSpace": strings.TrimSpace}
 
-var prBodyTemplate = template.Must(template.New("prBody").Funcs(templateFuncs).Parse(`%% Creating pull request for branch '{{ .Branch }}'
+var prBodyTemplate = template.Must(
+	template.New("prBody").
+		Funcs(templateFuncs).
+		Parse(`%% Creating pull request for branch '{{ .Branch }}'
 %% Lines starting with '%%' will be ignored and an empty message aborts the
 %% creation of the pull request.
 
@@ -390,7 +404,8 @@ var prBodyTemplate = template.Must(template.New("prBody").Funcs(templateFuncs).P
 {{- end }}
 {{- end }}
 {{- end }}
-`))
+`),
+)
 
 func readDefaultPullRequestTemplate(repo *git.Repo) string {
 	tpl := filepath.Join(repo.Dir(), ".github", "PULL_REQUEST_TEMPLATE.md")
@@ -415,7 +430,12 @@ type ensurePROpts struct {
 // pull request if one doesn't exist. It returns the pull request, a boolean
 // indicating whether or not the pull request was created, and an error if one
 // occurred.
-func ensurePR(ctx context.Context, client *gh.Client, repoMeta meta.Repository, opts ensurePROpts) (*gh.PullRequest, bool, error) {
+func ensurePR(
+	ctx context.Context,
+	client *gh.Client,
+	repoMeta meta.Repository,
+	opts ensurePROpts,
+) (*gh.PullRequest, bool, error) {
 	if opts.existingPR != nil {
 		newBody := AddPRMetadata(opts.body, opts.meta)
 		updatedPR, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
@@ -485,7 +505,9 @@ func UpdatePullRequestState(
 				"branch": branch.Name,
 				"pull":   branch.PullRequest.Permalink,
 			}).Error("GitHub reported no pull requests for branch but local metadata has pull request")
-			return nil, errors.New("GitHub reported no pull requests for branch but local metadata has pull request")
+			return nil, errors.New(
+				"GitHub reported no pull requests for branch but local metadata has pull request",
+			)
 		}
 
 		return &UpdatePullRequestResult{false, nil}, nil
@@ -581,10 +603,13 @@ type PRMetadata struct {
 }
 
 const PRMetadataCommentStart = "<!-- av pr metadata\n"
+
 const PRMetadataCommentHelpText = "This information is embedded by the av CLI when creating PRs to track the status of stacks when using Aviator. Please do not delete or edit this section of the PR.\n"
 const PRMetadataCommentEnd = "-->\n"
 
-func ParsePRMetadata(input string) (commentStart int, commentEnd int, prMeta PRMetadata, reterr error) {
+func ParsePRMetadata(
+	input string,
+) (commentStart int, commentEnd int, prMeta PRMetadata, reterr error) {
 	buf := bytes.NewBufferString(input)
 
 	// Read until we find the "<!-- av pr metadata" line

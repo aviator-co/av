@@ -1,9 +1,10 @@
 package main
 
 import (
+	"strings"
+
 	"emperror.dev/errors"
 	"github.com/spf13/cobra"
-	"strings"
 )
 
 var stackReorderFlags struct {
@@ -32,6 +33,8 @@ var stackReorderCmd = &cobra.Command{
 }
 
 func init() {
-	stackReorderCmd.Flags().BoolVar(&stackReorderFlags.Continue, "continue", false, "continue a previous reorder")
-	stackReorderCmd.Flags().BoolVar(&stackReorderFlags.Abort, "abort", false, "abort a previous reorder")
+	stackReorderCmd.Flags().
+		BoolVar(&stackReorderFlags.Continue, "continue", false, "continue a previous reorder")
+	stackReorderCmd.Flags().
+		BoolVar(&stackReorderFlags.Abort, "abort", false, "abort a previous reorder")
 }

@@ -1,9 +1,10 @@
 package meta
 
 import (
-	"emperror.dev/errors"
 	"encoding/json"
 	"fmt"
+
+	"emperror.dev/errors"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 )
@@ -104,7 +105,10 @@ func PreviousBranches(tx ReadTx, name string) ([]string, error) {
 		return nil, nil
 	}
 	if parent.Name == name {
-		logrus.Fatalf("invariant error: branch %q is its own parent (this is probably a bug with av)", name)
+		logrus.Fatalf(
+			"invariant error: branch %q is its own parent (this is probably a bug with av)",
+			name,
+		)
 	}
 	previous, err := PreviousBranches(tx, parent.Name)
 	if err != nil {

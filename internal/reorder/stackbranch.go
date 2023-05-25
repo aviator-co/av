@@ -1,8 +1,9 @@
 package reorder
 
 import (
-	"github.com/spf13/pflag"
 	"strings"
+
+	"github.com/spf13/pflag"
 )
 
 // StackBranchCmd is a command to create a new branch in a stack.
@@ -51,7 +52,10 @@ func parseStackBranchCmd(args []string) (Cmd, error) {
 		return nil, err
 	}
 	if fs.NArg() != 1 {
-		return nil, ErrInvalidCmd{"stack-branch", "exactly one argument is required (the name of the branch to create)"}
+		return nil, ErrInvalidCmd{
+			"stack-branch",
+			"exactly one argument is required (the name of the branch to create)",
+		}
 	}
 	if cmd.Trunk != "" && cmd.Parent != "" {
 		return nil, ErrInvalidCmd{"stack-branch", "cannot specify both --parent and --trunk"}

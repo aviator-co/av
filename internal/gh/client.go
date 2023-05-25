@@ -53,7 +53,12 @@ func (c *Client) query(ctx context.Context, query any, variables map[string]any)
 	return c.gh.Query(ctx, query, variables)
 }
 
-func (c *Client) mutate(ctx context.Context, mutation any, input githubv4.Input, variables map[string]any) (reterr error) {
+func (c *Client) mutate(
+	ctx context.Context,
+	mutation any,
+	input githubv4.Input,
+	variables map[string]any,
+) (reterr error) {
 	log := logrus.WithFields(logrus.Fields{
 		"input": logutils.Format("%#+v", input),
 	})
@@ -75,7 +80,12 @@ func (c *Client) mutate(ctx context.Context, mutation any, input githubv4.Input,
 
 // restPost executes a POST request to the endpoint (e.g., /repos/:owner/:repo/pulls).
 // It unmarshals the response into the given result type (unless it's nil).
-func (c *Client) restPost(ctx context.Context, endpoint string, body interface{}, result interface{}) error {
+func (c *Client) restPost(
+	ctx context.Context,
+	endpoint string,
+	body interface{},
+	result interface{},
+) error {
 	if endpoint[0] != '/' {
 		logrus.WithField("endpoint", endpoint).Panicf("malformed REST endpoint")
 	}

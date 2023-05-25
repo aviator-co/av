@@ -61,7 +61,11 @@ func main() {
 			log.Fatalf("Cannot read a file %q: %v", ent.Name(), err)
 		}
 		roff := convertMarkdown(bs)
-		outFilePath := filepath.Join(*outputDir, "man"+matches[1], strings.TrimSuffix(ent.Name(), ".md"))
+		outFilePath := filepath.Join(
+			*outputDir,
+			"man"+matches[1],
+			strings.TrimSuffix(ent.Name(), ".md"),
+		)
 		if err := os.MkdirAll(filepath.Dir(outFilePath), 0755); err != nil {
 			log.Fatalf("Cannot create the output directory: %v", err)
 		}

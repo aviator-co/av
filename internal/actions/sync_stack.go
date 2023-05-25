@@ -121,15 +121,21 @@ func SyncStack(ctx context.Context,
 				continue
 			}
 			if len(br.Children) > 0 {
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - not deleting merged branch ", colors.UserInput(currentBranch), " because it still has children",
+				_, _ = fmt.Fprint(
+					os.Stderr,
+					"  - not deleting merged branch ",
+					colors.UserInput(currentBranch),
+					" because it still has children",
 					"\n",
 				)
 				continue
 			}
 			if br.PullRequest == nil {
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - not deleting merged branch ", colors.UserInput(currentBranch), " because we cannot find the associated pull-request",
+				_, _ = fmt.Fprint(
+					os.Stderr,
+					"  - not deleting merged branch ",
+					colors.UserInput(currentBranch),
+					" because we cannot find the associated pull-request",
 					"\n",
 				)
 				continue
@@ -137,19 +143,29 @@ func SyncStack(ctx context.Context,
 			ref := fmt.Sprintf("refs/pull/%d/head", br.PullRequest.Number)
 			remoteHash, ok := remoteBranches[ref]
 			if !ok {
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - not deleting merged branch ", colors.UserInput(currentBranch), " because we cannot find the HEAD of the pull-request",
+				_, _ = fmt.Fprint(
+					os.Stderr,
+					"  - not deleting merged branch ",
+					colors.UserInput(currentBranch),
+					" because we cannot find the HEAD of the pull-request",
 					"\n",
 				)
 				continue
 			}
 			currentHash, err := repo.RevParse(&git.RevParse{Rev: currentBranch})
 			if err != nil {
-				return errors.Errorf("cannot get the current commit hash of %q: %v", currentBranch, err)
+				return errors.Errorf(
+					"cannot get the current commit hash of %q: %v",
+					currentBranch,
+					err,
+				)
 			}
 			if remoteHash != currentHash {
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - not deleting merged branch ", colors.UserInput(currentBranch), " because the local branch points to a different commit than the merged pull-request",
+				_, _ = fmt.Fprint(
+					os.Stderr,
+					"  - not deleting merged branch ",
+					colors.UserInput(currentBranch),
+					" because the local branch points to a different commit than the merged pull-request",
 					"\n",
 				)
 				continue
@@ -168,7 +184,10 @@ func SyncStack(ctx context.Context,
 			tx.DeleteBranch(currentBranch)
 			if !br.Parent.Trunk {
 				parentBranch, _ := tx.Branch(br.Parent.Name)
-				parentBranch.Children = sliceutils.DeleteElement(parentBranch.Children, currentBranch)
+				parentBranch.Children = sliceutils.DeleteElement(
+					parentBranch.Children,
+					currentBranch,
+				)
 				tx.SetBranch(parentBranch)
 			}
 			if currentBranch == state.OriginalBranch {

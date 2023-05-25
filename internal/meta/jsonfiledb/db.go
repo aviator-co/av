@@ -1,11 +1,12 @@
 package jsonfiledb
 
 import (
-	"github.com/aviator-co/av/internal/git"
-	"github.com/aviator-co/av/internal/meta"
 	"os"
 	"path"
 	"sync"
+
+	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/meta"
 )
 
 type DB struct {

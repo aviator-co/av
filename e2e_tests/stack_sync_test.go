@@ -34,7 +34,13 @@ func TestStackSync(t *testing.T) {
 	require.Equal(t, 0, Av(t, "stack", "branch", "stack-2").ExitCode)
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n2a\n"), gittest.WithMessage("Commit 2a"))
 	require.Equal(t, 0, Av(t, "stack", "branch", "stack-3").ExitCode)
-	gittest.CommitFile(t, repo, "different-file", []byte("1a\n2a\n3a\n"), gittest.WithMessage("Commit 3a"))
+	gittest.CommitFile(
+		t,
+		repo,
+		"different-file",
+		[]byte("1a\n2a\n3a\n"),
+		gittest.WithMessage("Commit 3a"),
+	)
 
 	// Everything up to date now, so this should be a no-op.
 	require.Equal(t, 0, Av(t, "stack", "sync", "--no-fetch", "--no-push").ExitCode)
@@ -90,7 +96,9 @@ func TestStackSync(t *testing.T) {
 	)
 	syncContinueWithoutResolving := Av(t, "stack", "sync", "--continue")
 	require.NotEqual(
-		t, 0, syncContinueWithoutResolving.ExitCode,
+		t,
+		0,
+		syncContinueWithoutResolving.ExitCode,
 		"stack sync --continue should return non-zero exit code if conflicts have not been resolved",
 	)
 	// resolve the conflict
@@ -99,7 +107,12 @@ func TestStackSync(t *testing.T) {
 	_, err = repo.Git("add", "my-file")
 	require.NoError(t, err, "failed to stage file")
 	syncContinue := Av(t, "stack", "sync", "--continue")
-	require.Equal(t, 0, syncContinue.ExitCode, "stack sync --continue should return zero exit code after resolving conflicts")
+	require.Equal(
+		t,
+		0,
+		syncContinue.ExitCode,
+		"stack sync --continue should return zero exit code after resolving conflicts",
+	)
 
 	// Make sure we've handled the rebase of stack-3 correctly (see the long
 	// comment above).
@@ -168,19 +181,37 @@ func TestStackSyncAbort(t *testing.T) {
 
 	// ... and make sure we get a conflict on sync...
 	syncConflict := Av(t, "stack", "sync", "--no-fetch", "--no-push")
-	require.NotEqual(t, 0, syncConflict.ExitCode, "stack sync should return non-zero exit code if conflicts")
-	require.FileExists(t, path.Join(repo.GitDir(), "REBASE_HEAD"), "REBASE_HEAD should be created for conflict")
+	require.NotEqual(
+		t,
+		0,
+		syncConflict.ExitCode,
+		"stack sync should return non-zero exit code if conflicts",
+	)
+	require.FileExists(
+		t,
+		path.Join(repo.GitDir(), "REBASE_HEAD"),
+		"REBASE_HEAD should be created for conflict",
+	)
 
 	// ... and then abort the sync...
 	RequireAv(t, "stack", "sync", "--abort")
-	require.NoFileExists(t, path.Join(repo.GitDir(), "REBASE_HEAD"), "REBASE_HEAD should be removed after abort")
+	require.NoFileExists(
+		t,
+		path.Join(repo.GitDir(), "REBASE_HEAD"),
+		"REBASE_HEAD should be removed after abort",
+	)
 
 	// ... and make sure that we return to stack-1 (where we started).
 	// (this also makes sure that we've actually aborted the rebase and are not
 	// in a detached HEAD state).
 	currentBranch, err := repo.RevParse(&git.RevParse{Rev: "HEAD", SymbolicFullName: true})
 	require.NoError(t, err, "failed to get current branch")
-	require.Equal(t, "refs/heads/stack-1", currentBranch, "current branch should be reset to starting branch (stack-1) after abort")
+	require.Equal(
+		t,
+		"refs/heads/stack-1",
+		currentBranch,
+		"current branch should be reset to starting branch (stack-1) after abort",
+	)
 
 	// Because we aborted the sync, the stack-2 parent HEAD must stay at the original stack-1
 	// HEAD.
@@ -211,14 +242,31 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 		gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"), gittest.WithMessage("Commit 1b"))
 	})
 	gittest.WithCheckoutBranch(t, repo, "stack-2", func() {
-		gittest.CommitFile(t, repo, "my-file", []byte("1a\n2a\n2b\n"), gittest.WithMessage("Commit 2b"))
+		gittest.CommitFile(
+			t,
+			repo,
+			"my-file",
+			[]byte("1a\n2a\n2b\n"),
+			gittest.WithMessage("Commit 2b"),
+		)
 	})
 	gittest.WithCheckoutBranch(t, repo, "stack-3", func() {
-		gittest.CommitFile(t, repo, "my-file", []byte("1a\n2a\n3a\n3b\n"), gittest.WithMessage("Commit 3b"))
+		gittest.CommitFile(
+			t,
+			repo,
+			"my-file",
+			[]byte("1a\n2a\n3a\n3b\n"),
+			gittest.WithMessage("Commit 3b"),
+		)
 	})
 
 	sync := Av(t, "stack", "sync", "--no-fetch", "--no-push")
-	require.NotEqual(t, 0, sync.ExitCode, "stack sync should return non-zero exit code if conflicts")
+	require.NotEqual(
+		t,
+		0,
+		sync.ExitCode,
+		"stack sync should return non-zero exit code if conflicts",
+	)
 	require.Regexp(t, regexp.MustCompile("could not apply .+ Commit 2a"), sync.Stderr)
 	require.NoError(t, os.WriteFile("my-file", []byte("1a\n1b\n2a\n"), 0644))
 	RequireCmd(t, "git", "add", "my-file")
@@ -226,7 +274,12 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 	// Commit 2b should be able to be applied normally, then we should have a
 	// conflict with 3a
 	sync = Av(t, "stack", "sync", "--continue")
-	require.NotEqual(t, 0, sync.ExitCode, "stack sync should return non-zero exit code if conflicts")
+	require.NotEqual(
+		t,
+		0,
+		sync.ExitCode,
+		"stack sync should return non-zero exit code if conflicts",
+	)
 	require.Regexp(t, regexp.MustCompile("could not apply .+ Commit 3a"), sync.Stderr)
 	require.NoError(t, os.WriteFile("my-file", []byte("1a\n1b\n2a\n2b\n3a\n"), 0644))
 	RequireCmd(t, "git", "add", "my-file")

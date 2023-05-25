@@ -22,8 +22,10 @@ func msgRebaseResult(rebase *git.RebaseResult) {
 			colors.Faint(text.Indent(strings.TrimSpace(rebase.Hint), "        ")),
 			"\n",
 		)
-		_, _ = fmt.Fprint(os.Stderr,
-			"  - resolve the conflicts and continue the sync with ", colors.CliCmd("av stack sync --continue"),
+		_, _ = fmt.Fprint(
+			os.Stderr,
+			"  - resolve the conflicts and continue the sync with ",
+			colors.CliCmd("av stack sync --continue"),
 			"\n",
 		)
 		_, _ = fmt.Fprint(os.Stderr,

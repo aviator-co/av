@@ -44,9 +44,19 @@ func TestStackBranchMove(t *testing.T) {
 	require.NoError(t, err, "failed to open repo db")
 	branches := db.ReadTx().AllBranches()
 	require.Equal(t, true, branches["un"].Parent.Trunk, "expected parent(un) to be a trunk")
-	require.Equal(t, []string{"deux"}, branches["un"].Children, "expected un to have children [deux]")
+	require.Equal(
+		t,
+		[]string{"deux"},
+		branches["un"].Children,
+		"expected un to have children [deux]",
+	)
 	require.Equal(t, "un", branches["deux"].Parent.Name, "expected parent(deux) to be un")
-	require.Equal(t, []string{"trois"}, branches["deux"].Children, "expected deux to have children [trois]")
+	require.Equal(
+		t,
+		[]string{"trois"},
+		branches["deux"].Children,
+		"expected deux to have children [trois]",
+	)
 	require.Equal(t, "deux", branches["trois"].Parent.Name, "expected parent(trois) to be deux")
 	require.Len(t, branches["trois"].Children, 0, "expected trois to have no children")
 }

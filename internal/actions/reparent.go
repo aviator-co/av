@@ -36,8 +36,12 @@ func Reparent(
 ) (*ReparentResult, error) {
 	branchMeta, exist := tx.Branch(opts.Branch)
 	if !exist {
-		_, _ = fmt.Fprint(os.Stderr,
-			"  - Adopting a branch ", colors.UserInput(opts.Branch), " to Av", colors.UserInput(opts.NewParent),
+		_, _ = fmt.Fprint(
+			os.Stderr,
+			"  - Adopting a branch ",
+			colors.UserInput(opts.Branch),
+			" to Av",
+			colors.UserInput(opts.NewParent),
 			"\n",
 		)
 		branchMeta.Parent.Name = opts.NewParent
@@ -127,7 +131,12 @@ func Reparent(
 	return handleReparentRebaseOutput(repo, tx, opts, output)
 }
 
-func ReparentSkipContinue(repo *git.Repo, tx meta.WriteTx, opts ReparentOpts, skip bool) (*ReparentResult, error) {
+func ReparentSkipContinue(
+	repo *git.Repo,
+	tx meta.WriteTx,
+	opts ReparentOpts,
+	skip bool,
+) (*ReparentResult, error) {
 	var rebaseOpts git.RebaseOpts
 	if skip {
 		rebaseOpts.Skip = true

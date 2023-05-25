@@ -37,7 +37,8 @@ func (r *Repo) CommitInfo(opts CommitInfoOpts) (*CommitInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	logrus.WithFields(logrus.Fields{"output": string(res.Stdout), "rev": opts.Rev}).Debug("got commit info")
+	logrus.WithFields(logrus.Fields{"output": string(res.Stdout), "rev": opts.Rev}).
+		Debug("got commit info")
 	var info CommitInfo
 	buf := bytes.NewBuffer(res.Stdout)
 	info.Hash, err = readLine(buf)

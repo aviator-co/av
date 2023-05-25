@@ -1,11 +1,12 @@
 package e2e_tests
 
 import (
+	"os"
+	"testing"
+
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/stretchr/testify/require"
-	"os"
-	"testing"
 )
 
 func TestStackBranchCommit(t *testing.T) {
@@ -27,7 +28,11 @@ func TestStackBranchCommit(t *testing.T) {
 
 		clean, err := repo.CheckCleanWorkdir()
 		require.NoError(t, err)
-		require.False(t, clean, "workdir should not be clean since yourfile.txt should not be committed")
+		require.False(
+			t,
+			clean,
+			"workdir should not be clean since yourfile.txt should not be committed",
+		)
 
 		diff, err := repo.Diff(&git.DiffOpts{
 			Quiet: true,

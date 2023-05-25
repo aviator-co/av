@@ -1,0 +1,20 @@
+repos:
+  - repo: local
+    hooks:
+      - id: golines
+        name: golines
+        files: ".+$"
+        language: system
+        entry: |
+          sh -c 'go run github.com/segmentio/golines -w .'
+      - id: goimports
+        name: goimports
+        files: ".+$"
+        language: system
+        entry: |
+          sh -c 'go run golang.org/x/tools/cmd/goimports@latest .'
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: end-of-file-fixer

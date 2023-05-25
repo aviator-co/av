@@ -104,7 +104,10 @@ type GetPullRequestsPage struct {
 	PullRequests []PullRequest
 }
 
-func (c *Client) GetPullRequests(ctx context.Context, input GetPullRequestsInput) (*GetPullRequestsPage, error) {
+func (c *Client) GetPullRequests(
+	ctx context.Context,
+	input GetPullRequestsInput,
+) (*GetPullRequestsPage, error) {
 	if input.First == 0 {
 		input.First = 50
 	}
@@ -133,7 +136,10 @@ func (c *Client) GetPullRequests(ctx context.Context, input GetPullRequestsInput
 	}, nil
 }
 
-func (c *Client) CreatePullRequest(ctx context.Context, input githubv4.CreatePullRequestInput) (*PullRequest, error) {
+func (c *Client) CreatePullRequest(
+	ctx context.Context,
+	input githubv4.CreatePullRequestInput,
+) (*PullRequest, error) {
 	var mutation struct {
 		CreatePullRequest struct {
 			PullRequest PullRequest
@@ -145,7 +151,10 @@ func (c *Client) CreatePullRequest(ctx context.Context, input githubv4.CreatePul
 	return &mutation.CreatePullRequest.PullRequest, nil
 }
 
-func (c *Client) UpdatePullRequest(ctx context.Context, input githubv4.UpdatePullRequestInput) (*PullRequest, error) {
+func (c *Client) UpdatePullRequest(
+	ctx context.Context,
+	input githubv4.UpdatePullRequestInput,
+) (*PullRequest, error) {
 	var mutation struct {
 		UpdatePullRequest struct {
 			PullRequest PullRequest
@@ -169,7 +178,10 @@ func (c *Client) ConvertPullRequestToDraft(ctx context.Context, id string) (*Pul
 	return &mutation.ConvertPullRequestToDraft.PullRequest, nil
 }
 
-func (c *Client) MarkPullRequestReadyForReview(ctx context.Context, id string) (*PullRequest, error) {
+func (c *Client) MarkPullRequestReadyForReview(
+	ctx context.Context,
+	id string,
+) (*PullRequest, error) {
 	var mutation struct {
 		MarkPullRequestReadyForReview struct {
 			PullRequest PullRequest
@@ -226,7 +238,10 @@ type RepoPullRequestsResponse struct {
 	PullRequests []PullRequest
 }
 
-func (c *Client) RepoPullRequests(ctx context.Context, opts RepoPullRequestOpts) (RepoPullRequestsResponse, error) {
+func (c *Client) RepoPullRequests(
+	ctx context.Context,
+	opts RepoPullRequestOpts,
+) (RepoPullRequestsResponse, error) {
 	var query struct {
 		Repository struct {
 			PullRequests struct {

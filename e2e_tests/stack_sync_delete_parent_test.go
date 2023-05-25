@@ -25,10 +25,28 @@ func TestStackSyncDeleteParent(t *testing.T) {
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"), gittest.WithMessage("Commit 1b"))
 	RequireAv(t, "stack", "branch", "stack-2")
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n2a\n"), gittest.WithMessage("Commit 2a"))
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n2a\n2b\n"), gittest.WithMessage("Commit 2b"))
+	gittest.CommitFile(
+		t,
+		repo,
+		"my-file",
+		[]byte("1a\n1b\n2a\n2b\n"),
+		gittest.WithMessage("Commit 2b"),
+	)
 	RequireAv(t, "stack", "branch", "stack-3")
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n2a\n2b\n3a\n"), gittest.WithMessage("Commit 3a"))
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n2a\n2b\n3a\n3b\n"), gittest.WithMessage("Commit 3b"))
+	gittest.CommitFile(
+		t,
+		repo,
+		"my-file",
+		[]byte("1a\n1b\n2a\n2b\n3a\n"),
+		gittest.WithMessage("Commit 3a"),
+	)
+	gittest.CommitFile(
+		t,
+		repo,
+		"my-file",
+		[]byte("1a\n1b\n2a\n2b\n3a\n3b\n"),
+		gittest.WithMessage("Commit 3b"),
+	)
 
 	// Everything up to date now, so this should be a no-op.
 	require.Equal(t, 0, Av(t, "stack", "sync", "--no-fetch", "--no-push").ExitCode)

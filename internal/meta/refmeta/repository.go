@@ -1,13 +1,14 @@
 package refmeta
 
 import (
-	"emperror.dev/errors"
 	"encoding/json"
+	"os"
+	"path"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/sirupsen/logrus"
-	"os"
-	"path"
 )
 
 var ErrRepoNotInitialized = errors.Sentinel("this repository not initialized: please run `av init`")
