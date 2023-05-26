@@ -24,7 +24,9 @@ type SyncBranchOpts struct {
 	// If specified, synchronize the branch against the latest version of the
 	// trunk branch. This value is ignored if the branch is not a stack root.
 	ToTrunk bool
-	Skip    bool
+	// If true, skipNextCommit the current commit.
+	// This must only be set after a rebase conflict in a sync.
+	Skip bool
 
 	Continuation *SyncBranchContinuation
 }

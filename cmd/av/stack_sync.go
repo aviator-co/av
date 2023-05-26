@@ -20,7 +20,14 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-var syncFlags actions.StackSyncFlags
+var stackSyncFlags struct {
+	actions.StackSyncConfig
+
+	All      bool
+	Abort    bool
+	Continue bool
+	Skip     bool
+}
 
 var stackSyncCmd = &cobra.Command{
 	Use:   "sync",
@@ -42,17 +49,6 @@ stack. This is useful for rebasing a whole stack on the latest changes from the
 base branch.
 `),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Argument validation
-		if countBools(syncFlags.Continue, syncFlags.Abort, syncFlags.Skip) > 1 {
-			return errors.New("cannot use --continue, --abort, and --skip together")
-		}
-		if syncFlags.Current && syncFlags.Trunk {
-			return errors.New("cannot use --current and --trunk together")
-		}
-		if syncFlags.Parent != "" && syncFlags.Trunk {
-			return errors.New("cannot use --parent and --trunk together")
-		}
-
 		ctx := context.Background()
 
 		repo, err := getRepo()
@@ -73,7 +69,7 @@ base branch.
 			return err
 		}
 
-		if syncFlags.Abort {
+		if stackSyncFlags.Abort {
 			if state.CurrentBranch == "" || state.Continuation == nil {
 				// Try to clear the state file if it exists just to be safe.
 				_ = actions.WriteStackSyncState(repo, nil)
@@ -98,7 +94,7 @@ base branch.
 			return nil
 		}
 
-		if !syncFlags.Skip {
+		if !stackSyncFlags.Skip {
 			// Make sure all changes are staged unless --skip. git rebase --skip will
 			// clean up the changes.
 			diff, err := repo.Diff(&git.DiffOpts{Quiet: true})
@@ -112,7 +108,7 @@ base branch.
 			}
 		}
 
-		if syncFlags.Continue || syncFlags.Skip {
+		if stackSyncFlags.Continue || stackSyncFlags.Skip {
 			if state.CurrentBranch == "" {
 				return errors.New("no sync in progress")
 			}
@@ -136,12 +132,12 @@ base branch.
 
 			state.OriginalBranch = state.CurrentBranch
 			state.Config = actions.StackSyncConfig{
-				Current: syncFlags.Current,
-				Trunk:   syncFlags.Trunk,
-				NoPush:  syncFlags.NoPush,
-				NoFetch: syncFlags.NoFetch,
-				Parent:  syncFlags.Parent,
-				Prune:   syncFlags.Prune,
+				Current: stackSyncFlags.Current,
+				Trunk:   stackSyncFlags.Trunk,
+				NoPush:  stackSyncFlags.NoPush,
+				NoFetch: stackSyncFlags.NoFetch,
+				Parent:  stackSyncFlags.Parent,
+				Prune:   stackSyncFlags.Prune,
 			}
 		}
 
@@ -160,8 +156,8 @@ base branch.
 				NewParent:      state.Config.Parent,
 				NewParentTrunk: state.Config.Parent == defaultBranch,
 			}
-			if syncFlags.Continue || syncFlags.Skip {
-				res, err = actions.ReparentSkipContinue(repo, tx, opts, syncFlags.Skip)
+			if stackSyncFlags.Continue || stackSyncFlags.Skip {
+				res, err = actions.ReparentSkipContinue(repo, tx, opts, stackSyncFlags.Skip)
 			} else {
 				res, err = actions.Reparent(repo, tx, opts)
 			}
@@ -217,7 +213,7 @@ base branch.
 			// we try to do something in the repo before we finish that)
 			branchesToSync = []string{state.CurrentBranch}
 			state.Branches = branchesToSync
-		} else if syncFlags.All {
+		} else if stackSyncFlags.All {
 			for _, br := range tx.AllBranches() {
 				if !br.IsStackRoot() {
 					continue
@@ -256,7 +252,11 @@ base branch.
 			return err
 		}
 
-		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, syncFlags)
+		var syncOpts []actions.SyncStackOpt
+		if stackSyncFlags.Skip {
+			syncOpts = append(syncOpts, actions.WithSkipNextCommit())
+		}
+		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, syncOpts...)
 		if err != nil {
 			return err
 		}
@@ -267,47 +267,51 @@ base branch.
 
 func init() {
 	stackSyncCmd.Flags().BoolVar(
-		&syncFlags.All, "all", false,
+		&stackSyncFlags.All, "all", false,
 		"synchronize all branches",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&syncFlags.Current, "current", false,
+		&stackSyncFlags.Current, "current", false,
 		"only sync changes to the current branch\n(don't recurse into descendant branches)",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&syncFlags.NoPush, "no-push", false,
+		&stackSyncFlags.NoPush, "no-push", false,
 		"do not force-push updated branches to GitHub",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&syncFlags.NoFetch, "no-fetch", false,
+		&stackSyncFlags.NoFetch, "no-fetch", false,
 		"do not fetch latest PR information from GitHub",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&syncFlags.Prune, "prune", false,
+		&stackSyncFlags.Prune, "prune", false,
 		"delete the merged branches",
 	)
 	// TODO[mvp]: better name (--to-trunk?)
 	stackSyncCmd.Flags().BoolVar(
-		&syncFlags.Trunk, "trunk", false,
+		&stackSyncFlags.Trunk, "trunk", false,
 		"synchronize the trunk into the stack",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&syncFlags.Continue, "continue", false,
+		&stackSyncFlags.Continue, "continue", false,
 		"continue an in-progress sync",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&syncFlags.Abort, "abort", false,
+		&stackSyncFlags.Abort, "abort", false,
 		"abort an in-progress sync",
 	)
 	stackSyncCmd.Flags().BoolVar(
-		&syncFlags.Skip, "skip", false,
+		&stackSyncFlags.Skip, "skip", false,
 		"skip the current commit and continue an in-progress sync",
 	)
 	stackSyncCmd.Flags().StringVar(
-		&syncFlags.Parent, "parent", "",
+		&stackSyncFlags.Parent, "parent", "",
 		"parent branch to rebase onto",
 	)
+
 	stackSyncCmd.MarkFlagsMutuallyExclusive("current", "all")
+	stackSyncCmd.MarkFlagsMutuallyExclusive("current", "trunk")
+	stackSyncCmd.MarkFlagsMutuallyExclusive("trunk", "parent")
+	stackSyncCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
 }
 
 func countBools(bs ...bool) int {

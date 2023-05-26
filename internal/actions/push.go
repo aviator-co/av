@@ -27,7 +27,7 @@ type PushOpts struct {
 	Force ForceOpt
 	// If true, require the corresponding branch exist on the remote (otherwise, don't push).
 	SkipIfRemoteBranchNotExist bool
-	// If true, skip pushing the branch if the corresponding branch on the remote points to the
+	// If true, skipNextCommit pushing the branch if the corresponding branch on the remote points to the
 	// same commit as the local HEAD commit. The caller should probably call `git fetch` before
 	// running this to make sure remote tracking information is up-to-date.
 	SkipIfRemoteBranchIsUpToDate bool

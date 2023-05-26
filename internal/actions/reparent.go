@@ -149,7 +149,7 @@ func ReparentSkipContinue(
 	}
 
 	if output.ExitCode != 0 && strings.Contains(string(output.Stderr), "no rebase in progress") {
-		// If there's no rebase, assume the user did `git rebase --continue/--skip` manually.
+		// If there's no rebase, assume the user did `git rebase --continue/--skipNextCommit` manually.
 		// TODO: we could try to detect if the user `git rebase --abort`-ed here
 		_, _ = fmt.Fprint(os.Stderr,
 			"    - ", colors.Failure("WARNING: "),

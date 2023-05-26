@@ -22,7 +22,6 @@ var commitAmendFlags struct {
 	NoEdit bool
 }
 
-
 var commitAmendCmd = &cobra.Command{
 	Use:   "amend",
 	Short: "amend a commit",
@@ -80,7 +79,7 @@ var commitAmendCmd = &cobra.Command{
 			return err
 		}
 
-		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, syncFlags)
+		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state)
 		if err != nil {
 			return err
 		}
@@ -90,7 +89,9 @@ var commitAmendCmd = &cobra.Command{
 }
 
 func init() {
-	commitAmendCmd.Flags().StringVarP(&commitAmendFlags.Message, "message", "m", "", "the commit message")
-	commitAmendCmd.Flags().BoolVar(&commitAmendFlags.NoEdit, "no-edit", false, "amend a commit without changing its commit message")
+	commitAmendCmd.Flags().
+		StringVarP(&commitAmendFlags.Message, "message", "m", "", "the commit message")
+	commitAmendCmd.Flags().
+		BoolVar(&commitAmendFlags.NoEdit, "no-edit", false, "amend a commit without changing its commit message")
 	commitAmendCmd.MarkFlagsMutuallyExclusive("message", "no-edit")
 }
