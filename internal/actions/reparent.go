@@ -34,6 +34,24 @@ func Reparent(
 	tx meta.WriteTx,
 	opts ReparentOpts,
 ) (*ReparentResult, error) {
+	branchMeta, exist := tx.Branch(opts.Branch)
+	if !exist {
+		_, _ = fmt.Fprint(os.Stderr,
+			"  - Adopting a branch ", colors.UserInput(opts.Branch), " to Av", colors.UserInput(opts.NewParent),
+			"\n",
+		)
+		branchMeta.Parent.Name = opts.NewParent
+		branchMeta.Parent.Trunk = opts.NewParentTrunk
+		if !branchMeta.Parent.Trunk {
+			head, err := repo.RevParse(&git.RevParse{Rev: opts.NewParent})
+			if err != nil {
+				return nil, errors.WrapIff(err, "failed to get HEAD of %q", opts.NewParent)
+			}
+			branchMeta.Parent.Head = head
+		}
+		tx.SetBranch(branchMeta)
+	}
+
 	_, _ = fmt.Fprint(os.Stderr,
 		"  - Re-parenting branch ", colors.UserInput(opts.Branch),
 		" onto ", colors.UserInput(opts.NewParent),
@@ -73,7 +91,6 @@ func Reparent(
 		return nil, errors.Errorf("parent branch %q does not exist", parentBranch)
 	}
 
-	branchMeta, _ := tx.Branch(opts.Branch)
 	upstream := branchMeta.Parent.Name
 	if branchMeta.Parent.Trunk {
 		upstream = "remotes/origin/" + branchMeta.Parent.Name
