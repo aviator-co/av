@@ -20,6 +20,8 @@ type DiffOpts struct {
 	// If a Commit is specified, the branches will not be used.
 	Branch1 string
 	Branch2 string
+	// If specified, compare only the specified paths.
+	Paths []string
 }
 
 type Diff struct {
@@ -42,6 +44,13 @@ func (r *Repo) Diff(d *DiffOpts) (*Diff, error) {
 
 	if d.Color {
 		args = append(args, "--color=always")
+	}
+
+	// This needs to be last because everything after the `--` is interpreted
+	// as a path, not a flag.
+	if len(d.Paths) > 0 {
+		args = append(args, "--")
+		args = append(args, d.Paths...)
 	}
 	contents, err := r.Git(args...)
 	var exitError *exec.ExitError

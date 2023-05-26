@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/aviator-co/av/internal/utils/cleanup"
-	"github.com/aviator-co/av/internal/utils/colors"
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/utils/cleanup"
+	"github.com/aviator-co/av/internal/utils/colors"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
@@ -40,8 +42,13 @@ var stackBranchCommitFlags struct {
 	// Name of the new branch.
 	BranchName string
 
-	// Same as `git commit --all`.
+	// Same as `git add --all`.
+	// Stages all changes, including untracked files.
 	All bool
+
+	// Same as `git commit --all`.
+	// Stage all files that have been modified and deleted, but ignore untracked files.
+	AllModified bool
 }
 
 var stackBranchCommitCmd = &cobra.Command{
@@ -157,10 +164,29 @@ var stackBranchCommitCmd = &cobra.Command{
 			tx.SetBranch(parentMeta)
 		}
 
-		commitArgs := []string{"commit"}
+		// For "--all" and "--all-modified",
+		var addArgs []string
 		if stackBranchCommitFlags.All {
-			commitArgs = append(commitArgs, "--all")
+			addArgs = append(addArgs, "--all")
+		} else if stackBranchCommitFlags.AllModified {
+			// This is meant to mirror `git commit --all` which does not add
+			// unstaged files to the index (which is different from `git add --all`).
+			addArgs = append(addArgs, "--update")
 		}
+		if len(addArgs) > 0 {
+			_, err := repo.Run(&git.RunOpts{
+				Args:      append([]string{"add"}, addArgs...),
+				ExitError: true,
+			})
+			if err != nil {
+				_, _ = fmt.Fprint(os.Stderr,
+					"\n", colors.Failure("Failed to stage files: ", err.Error()), "\n",
+				)
+				return actions.ErrExitSilently{ExitCode: 1}
+			}
+		}
+
+		commitArgs := []string{"commit"}
 		if stackBranchCommitFlags.Message != "" {
 			commitArgs = append(commitArgs, "--message", stackBranchCommitFlags.Message)
 		}
@@ -173,7 +199,7 @@ var stackBranchCommitCmd = &cobra.Command{
 			_, _ = fmt.Fprint(os.Stderr,
 				"\n", colors.Failure("Failed to create commit."), "\n",
 			)
-			return errExitSilently{1}
+			return actions.ErrExitSilently{ExitCode: 1}
 		}
 
 		// Cancel the cleanup **after** the commit is successful (so that we
@@ -190,7 +216,10 @@ var stackBranchCommitCmd = &cobra.Command{
 func init() {
 	stackBranchCommitCmd.Flags().StringVarP(&stackBranchCommitFlags.Message, "message", "m", "", "the commit message")
 	stackBranchCommitCmd.Flags().StringVarP(&stackBranchCommitFlags.BranchName, "branch-name", "b", "", "the branch name to create (if empty, automatically generated from the message)")
-	stackBranchCommitCmd.Flags().BoolVarP(&stackBranchCommitFlags.All, "all", "a", false, "automatically stage modified files (same as git commit --all)")
+	stackBranchCommitCmd.Flags().BoolVarP(&stackBranchCommitFlags.All, "all", "A", false, "automatically stage all files")
+	stackBranchCommitCmd.Flags().BoolVarP(&stackBranchCommitFlags.AllModified, "all-modified", "a", false, "automatically stage modified and deleted files (ignore untracked files)")
+
+	stackBranchCommitCmd.MarkFlagsMutuallyExclusive("all", "all-modified")
 }
 
 func branchNameFromMessage(message string) string {
