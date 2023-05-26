@@ -12,7 +12,12 @@ func TestParseSubjectBody(t *testing.T) {
 		{"empty", "", "", ""},
 		{"subject only", "subject", "subject", ""},
 		{"subject and body", "subject\n\n\nbody\n\n", "subject", "body"},
-		{"subject and body with newlines", "subject\n\n\nbody\nmore body\n", "subject", "body\nmore body"},
+		{
+			"subject and body with newlines",
+			"subject\n\n\nbody\nmore body\n",
+			"subject",
+			"body\nmore body",
+		},
 	}
 
 	for _, tt := range tests {

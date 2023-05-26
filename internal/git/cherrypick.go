@@ -1,9 +1,10 @@
 package git
 
 import (
-	"emperror.dev/errors"
 	"fmt"
 	"strings"
+
+	"emperror.dev/errors"
 )
 
 type CherryPickResume string
@@ -72,7 +73,10 @@ func (r *Repo) CherryPick(opts CherryPick) error {
 	if run.ExitCode != 0 {
 		cherryPickHead, err := r.readGitFile("CHERRY_PICK_HEAD")
 		if err != nil {
-			return errors.WrapIff(err, "expected CHERRY_PICK_HEAD to exist after cherry-pick failure")
+			return errors.WrapIff(
+				err,
+				"expected CHERRY_PICK_HEAD to exist after cherry-pick failure",
+			)
 		}
 		return ErrCherryPickConflict{
 			ConflictingCommit: strings.TrimSpace(cherryPickHead),

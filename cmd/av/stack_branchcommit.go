@@ -214,10 +214,14 @@ var stackBranchCommitCmd = &cobra.Command{
 }
 
 func init() {
-	stackBranchCommitCmd.Flags().StringVarP(&stackBranchCommitFlags.Message, "message", "m", "", "the commit message")
-	stackBranchCommitCmd.Flags().StringVarP(&stackBranchCommitFlags.BranchName, "branch-name", "b", "", "the branch name to create (if empty, automatically generated from the message)")
-	stackBranchCommitCmd.Flags().BoolVarP(&stackBranchCommitFlags.All, "all", "A", false, "automatically stage all files")
-	stackBranchCommitCmd.Flags().BoolVarP(&stackBranchCommitFlags.AllModified, "all-modified", "a", false, "automatically stage modified and deleted files (ignore untracked files)")
+	stackBranchCommitCmd.Flags().
+		StringVarP(&stackBranchCommitFlags.Message, "message", "m", "", "the commit message")
+	stackBranchCommitCmd.Flags().
+		StringVarP(&stackBranchCommitFlags.BranchName, "branch-name", "b", "", "the branch name to create (if empty, automatically generated from the message)")
+	stackBranchCommitCmd.Flags().
+		BoolVarP(&stackBranchCommitFlags.All, "all", "A", false, "automatically stage all files")
+	stackBranchCommitCmd.Flags().
+		BoolVarP(&stackBranchCommitFlags.AllModified, "all-modified", "a", false, "automatically stage modified and deleted files (ignore untracked files)")
 
 	stackBranchCommitCmd.MarkFlagsMutuallyExclusive("all", "all-modified")
 }

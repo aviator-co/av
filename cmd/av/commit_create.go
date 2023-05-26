@@ -22,7 +22,6 @@ var commitCreateFlags struct {
 	All bool
 }
 
-
 var commitCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "create a commit",
@@ -46,11 +45,16 @@ var commitCreateCmd = &cobra.Command{
 }
 
 func init() {
-	commitCreateCmd.Flags().StringVarP(&commitCreateFlags.Message, "message", "m", "", "the commit message")
-	commitCreateCmd.Flags().BoolVarP(&commitCreateFlags.All, "all", "a", false, "automatically stage modified files (same as git commit --all)")
+	commitCreateCmd.Flags().
+		StringVarP(&commitCreateFlags.Message, "message", "m", "", "the commit message")
+	commitCreateCmd.Flags().
+		BoolVarP(&commitCreateFlags.All, "all", "a", false, "automatically stage modified files (same as git commit --all)")
 }
 
- func commitCreate(repo *git.Repo, currentBranchName string, flags struct{Message string; All bool}) error {
+func commitCreate(repo *git.Repo, currentBranchName string, flags struct {
+	Message string
+	All     bool
+}) error {
 	commitArgs := []string{"commit"}
 	if commitCreateFlags.All {
 		commitArgs = append(commitArgs, "--all")

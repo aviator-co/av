@@ -2,11 +2,12 @@ package reorder
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/errutils"
 	"github.com/kr/text"
-	"strings"
 )
 
 // PickCmd is a command that picks a commit from the history and applies it on

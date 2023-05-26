@@ -1,12 +1,13 @@
 package refmeta
 
 import (
-	"emperror.dev/errors"
 	"encoding/json"
+	"strings"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/sirupsen/logrus"
-	"strings"
 )
 
 // ReadBranch loads information about the branch from the git repository.

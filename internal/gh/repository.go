@@ -19,7 +19,10 @@ type Repository struct {
 func (c *Client) GetRepositoryBySlug(ctx context.Context, slug string) (*Repository, error) {
 	owner, name, ok := strings.Cut(slug, "/")
 	if !ok {
-		return nil, errors.Errorf("unable to parse repository slug (expected <owner>/<repo>): %q", slug)
+		return nil, errors.Errorf(
+			"unable to parse repository slug (expected <owner>/<repo>): %q",
+			slug,
+		)
 	}
 
 	var query struct {

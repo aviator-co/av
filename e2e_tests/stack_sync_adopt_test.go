@@ -16,7 +16,11 @@ func TestStackSyncAdopt(t *testing.T) {
 	require.Equal(t, 0, Cmd(t, "git", "checkout", "-b", "stack-1").ExitCode)
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n"), gittest.WithMessage("Commit 1a"))
 
-	require.Equal(t, 0, Av(t, "stack", "sync", "--no-fetch", "--no-push", "--parent", "main").ExitCode)
+	require.Equal(
+		t,
+		0,
+		Av(t, "stack", "sync", "--no-fetch", "--no-push", "--parent", "main").ExitCode,
+	)
 
 	assert.Equal(t,
 		meta.BranchState{

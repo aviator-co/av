@@ -53,7 +53,11 @@ func Push(repo *git.Repo, opts PushOpts) error {
 
 		head, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
 		if err != nil {
-			return errors.WrapIff(err, "failed to determine branch HEAD for branch %q", currentBranch)
+			return errors.WrapIff(
+				err,
+				"failed to determine branch HEAD for branch %q",
+				currentBranch,
+			)
 		}
 		if opts.SkipIfRemoteBranchIsUpToDate && remoteBranchCommit == head {
 			_, _ = fmt.Fprint(os.Stderr,

@@ -1,14 +1,15 @@
 package git_test
 
 import (
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/aviator-co/av/internal/utils/errutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"os"
-	"path/filepath"
-	"testing"
 )
 
 func TestRepo_CherryPick(t *testing.T) {

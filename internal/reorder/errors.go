@@ -1,8 +1,9 @@
 package reorder
 
 import (
-	"emperror.dev/errors"
 	"fmt"
+
+	"emperror.dev/errors"
 )
 
 type ErrInvalidCmd struct {

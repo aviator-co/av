@@ -29,7 +29,13 @@ func WithAmend() CommitFileOpt {
 	}
 }
 
-func CommitFile(t *testing.T, repo *git.Repo, filename string, body []byte, cfOpts ...CommitFileOpt) string {
+func CommitFile(
+	t *testing.T,
+	repo *git.Repo,
+	filename string,
+	body []byte,
+	cfOpts ...CommitFileOpt,
+) string {
 	opts := commitFileOpts{
 		msg: fmt.Sprintf("Write %s", filename),
 	}

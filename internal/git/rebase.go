@@ -142,7 +142,8 @@ func parseRebaseResult(opts RebaseOpts, out *Output) (*RebaseResult, error) {
 	case strings.Contains(stderr, "Could not apply"):
 		status = RebaseConflict
 	default:
-		logrus.WithField("exit_code", out.ExitCode).Warn("unexpected output from git rebase with non-zero exit code (assuming rebase had conflicts): ", stderr)
+		logrus.WithField("exit_code", out.ExitCode).
+			Warn("unexpected output from git rebase with non-zero exit code (assuming rebase had conflicts): ", stderr)
 		return &RebaseResult{
 			Status: RebaseConflict,
 			Hint:   stderr,

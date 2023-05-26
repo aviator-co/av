@@ -101,7 +101,12 @@ func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) err
 			// original state.
 			CreateReflog: true,
 		}); err != nil {
-			return errors.Errorf("cannot update the branch %s to the new commit %s: %v", currentBranchName, newCommitOID, err)
+			return errors.Errorf(
+				"cannot update the branch %s to the new commit %s: %v",
+				currentBranchName,
+				newCommitOID,
+				err,
+			)
 		}
 		// At this point, the HEAD is still a detached HEAD. Check out the branch.
 		// repo.CheckoutBranch errors out if the repository is at the detached head.
@@ -126,16 +131,25 @@ func commitSplitAbortMessage(branchName, commitOID string) {
 		// We started from a detached HEAD.
 		_, _ = fmt.Fprint(
 			os.Stderr,
-			colors.Failure("===================================================="), "\n",
-			colors.Failure("DETACHED HEAD"), "\n",
+			colors.Failure("===================================================="),
+			"\n",
+			colors.Failure("DETACHED HEAD"),
+			"\n",
 			"\n",
 			"The commit split command aborted.\n",
-			"The HEAD is moved to a different commit than the original commit ", colors.UserInput(commitOID), "\n",
+			"The HEAD is moved to a different commit than the original commit ",
+			colors.UserInput(commitOID),
 			"\n",
-			"To revert your changes and switch to the original commit ", colors.UserInput(commitOID), ", run:\n",
 			"\n",
-			"    ", colors.CliCmd("git switch --discard-changes ", branchName), "\n",
-			colors.Failure("===================================================="), "\n",
+			"To revert your changes and switch to the original commit ",
+			colors.UserInput(commitOID),
+			", run:\n",
+			"\n",
+			"    ",
+			colors.CliCmd("git switch --discard-changes ", branchName),
+			"\n",
+			colors.Failure("===================================================="),
+			"\n",
 		)
 		return
 	}

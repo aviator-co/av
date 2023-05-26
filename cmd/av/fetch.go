@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/utils/cleanup"
-	"os"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
@@ -77,10 +78,12 @@ var fetchCmd = &cobra.Command{
 				// TODO: maybe warn if local branch is not up-to-date with remote?
 				branchMeta, ok := branches[pr.HeadBranchName()]
 				if !ok {
-					logrus.WithField("branch", pr.HeadBranchName()).Debug("skipping PR for unknown local branch")
+					logrus.WithField("branch", pr.HeadBranchName()).
+						Debug("skipping PR for unknown local branch")
 					continue
 				}
-				logrus.WithField("branch", pr.HeadBranchName()).Debug("found PR for known local branch")
+				logrus.WithField("branch", pr.HeadBranchName()).
+					Debug("found PR for known local branch")
 				if branchMeta.PullRequest == nil {
 					_, _ = fmt.Fprint(
 						os.Stderr,

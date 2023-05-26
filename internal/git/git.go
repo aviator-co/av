@@ -179,7 +179,10 @@ func (r *Repo) DetachedHead() (bool, error) {
 func (r *Repo) CurrentBranchName() (string, error) {
 	branch, err := r.Git("symbolic-ref", "--short", "HEAD")
 	if err != nil {
-		return "", errors.Wrap(err, "failed to determine current branch (are you in detached HEAD or is a rebase in progress?)")
+		return "", errors.Wrap(
+			err,
+			"failed to determine current branch (are you in detached HEAD or is a rebase in progress?)",
+		)
 	}
 	return branch, nil
 }
@@ -202,7 +205,10 @@ func (r *Repo) HasChangesToBeCommitted() (bool, error) {
 		return false, errors.Errorf("failed to check if there are changes to be committed: %v", err)
 	}
 	if out.ExitCode != 0 && out.ExitCode != 1 {
-		return false, errors.Errorf("failed to check if there are changes to be committed: exit code %d", out.ExitCode)
+		return false, errors.Errorf(
+			"failed to check if there are changes to be committed: exit code %d",
+			out.ExitCode,
+		)
 	}
 	return out.ExitCode == 1, nil
 }
@@ -224,7 +230,7 @@ func (r *Repo) DoesRemoteBranchExist(branch string) (bool, error) {
 
 func (r *Repo) LsRemote(remote string) (map[string]string, error) {
 	out, err := r.Run(&RunOpts{
-		Args: []string{"ls-remote", remote},
+		Args:      []string{"ls-remote", remote},
 		ExitError: true,
 	})
 	if err != nil {

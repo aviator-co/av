@@ -1,11 +1,12 @@
 package jsonfiledb_test
 
 import (
+	"testing"
+
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestJSONFileDB(t *testing.T) {

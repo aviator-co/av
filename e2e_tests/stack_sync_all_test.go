@@ -27,7 +27,11 @@ func TestStackSyncAll(t *testing.T) {
 	//     stack-1:  \ -> 1a
 	//     stack-2:  \ -> 2a
 
-	require.Equal(t, 0, Av(t, "stack", "sync", "--no-fetch", "--no-push", "--trunk", "--all").ExitCode)
+	require.Equal(
+		t,
+		0,
+		Av(t, "stack", "sync", "--no-fetch", "--no-push", "--trunk", "--all").ExitCode,
+	)
 
 	//     main:    X  -> X2
 	//     stack-1:        \ -> 1a

@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/aviator-co/av/internal/utils/textutils"
 	"os"
 	"strings"
+
+	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/textutils"
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
@@ -83,7 +84,10 @@ operates on only av's internal metadata, and it won't delete the actual Git bran
 }
 
 // findNonDeletedParents finds the non-deleted/merged branch for each deleted/merged branches.
-func findNonDeletedParents(repo *git.Repo, branches map[string]*meta.Branch) map[string]meta.BranchState {
+func findNonDeletedParents(
+	repo *git.Repo,
+	branches map[string]*meta.Branch,
+) map[string]meta.BranchState {
 	deleted := make(map[string]bool)
 	for name, br := range branches {
 		if br.MergeCommit != "" {

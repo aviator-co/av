@@ -130,18 +130,30 @@ func syncBranchRebase(
 		var newUpstreamCommitHash string
 		if opts.ToTrunk {
 			// First, try to fetch latest commit from the trunk...
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - fetching latest commit from ", colors.UserInput("origin/", parentState.Name), "\n",
+			_, _ = fmt.Fprint(
+				os.Stderr,
+				"  - fetching latest commit from ",
+				colors.UserInput("origin/", parentState.Name),
+				"\n",
 			)
 			if _, err := repo.Run(&git.RunOpts{
 				Args: []string{"fetch", "origin", parentState.Name},
 			}); err != nil {
-				_, _ = fmt.Fprint(os.Stderr,
+				_, _ = fmt.Fprint(
+					os.Stderr,
 					"  - ",
-					colors.Failure("error: failed to fetch HEAD of "), colors.UserInput(parentState.Name),
-					colors.Failure(" from origin: ", err.Error()), "\n",
+					colors.Failure(
+						"error: failed to fetch HEAD of ",
+					),
+					colors.UserInput(parentState.Name),
+					colors.Failure(" from origin: ", err.Error()),
+					"\n",
 				)
-				return nil, errors.WrapIff(err, "failed to fetch trunk branch %q from origin", parentState.Name)
+				return nil, errors.WrapIff(
+					err,
+					"failed to fetch trunk branch %q from origin",
+					parentState.Name,
+				)
 			}
 
 			// NOTE: Strictly speaking, if a user doesn't use the default refspec (e.g. fetch is
@@ -214,7 +226,11 @@ func syncBranchRebase(
 		)
 		if opts.Fetch {
 			if _, err := repo.Git("fetch", "origin", origParentBranch.MergeCommit); err != nil {
-				return nil, errors.WrapIff(err, "failed to fetch merge commit %q from origin", short)
+				return nil, errors.WrapIff(
+					err,
+					"failed to fetch merge commit %q from origin",
+					short,
+				)
 			}
 		}
 
@@ -255,8 +271,16 @@ func syncBranchRebase(
 			NewParentName: parentState.Name,
 		}
 		if !parentState.Trunk {
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - Parent branch ", colors.UserInput(origParentState.Name), " was merged into non-trunk branch ", colors.UserInput(parentState.Name), ", reparenting ", colors.UserInput(branch.Name), " onto ", colors.UserInput(parentState.Name),
+			_, _ = fmt.Fprint(
+				os.Stderr,
+				"  - Parent branch ",
+				colors.UserInput(origParentState.Name),
+				" was merged into non-trunk branch ",
+				colors.UserInput(parentState.Name),
+				", reparenting ",
+				colors.UserInput(branch.Name),
+				" onto ",
+				colors.UserInput(parentState.Name),
 				"\n",
 			)
 			continuation.NewParentCommit = newUpstreamCommitHash
@@ -280,13 +304,22 @@ func syncBranchRebase(
 	// Scenario 2: the branch is up-to-date with its parent.
 	parentHead, err := repo.RevParse(&git.RevParse{Rev: parentState.Name})
 	if err != nil {
-		return nil, errors.WrapIff(err, "failed to resolve HEAD of parent branch %q", parentState.Name)
+		return nil, errors.WrapIff(
+			err,
+			"failed to resolve HEAD of parent branch %q",
+			parentState.Name,
+		)
 	}
 	mergeBase, err := repo.MergeBase(&git.MergeBase{
 		Revs: []string{parentHead, branch.Name},
 	})
 	if err != nil {
-		return nil, errors.WrapIff(err, "failed to compute merge base of %q and %q", parentState.Name, branch.Name)
+		return nil, errors.WrapIff(
+			err,
+			"failed to compute merge base of %q and %q",
+			parentState.Name,
+			branch.Name,
+		)
 	}
 	if mergeBase == parentHead {
 		_, _ = fmt.Fprint(os.Stderr,
@@ -411,7 +444,11 @@ func syncBranchContinue(
 	return nil, nil
 }
 
-func syncBranchUpdateParent(tx meta.WriteTx, branch meta.Branch, continuation *SyncBranchContinuation) {
+func syncBranchUpdateParent(
+	tx meta.WriteTx,
+	branch meta.Branch,
+	continuation *SyncBranchContinuation,
+) {
 	oldParentState := branch.Parent
 	oldParent, _ := tx.Branch(branch.Parent.Name)
 	branch.Parent = meta.BranchState{
@@ -531,9 +568,12 @@ func shouldRebaseWithDraft(repo *git.Repo, pr *gh.PullRequest) bool {
 
 	if config.Av.PullRequest.RebaseWithDraft == nil {
 		if ghutils.HasCodeowners(repo) {
-			_, _ = fmt.Fprint(os.Stderr,
+			_, _ = fmt.Fprint(
+				os.Stderr,
 				"  - converting pull request to draft for rebase to avoid adding unnecessary CODEOWNERS\n",
-				"      - set ", colors.CliCmd("pullRequest.rebaseWithDraft"), " in your configuration file to explicitly control this behavior and to suppress this message\n",
+				"      - set ",
+				colors.CliCmd("pullRequest.rebaseWithDraft"),
+				" in your configuration file to explicitly control this behavior and to suppress this message\n",
 				"      - see https://docs.aviator.co/reference/aviator-cli/configuration#config-option-reference for more information\n",
 			)
 			return true

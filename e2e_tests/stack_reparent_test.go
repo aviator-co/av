@@ -28,15 +28,30 @@ func TestStackSyncReparent(t *testing.T) {
 	// Now, re-parent spam on top of bar (should be relatively a no-op)
 	RequireAv(t, "stack", "sync", "--parent", "bar", "--no-fetch", "--no-push")
 	requireFileContent(t, "spam.txt", "spam")
-	requireFileContent(t, "bar.txt", "bar", "bar.txt should still be set after reparenting onto same branch")
+	requireFileContent(
+		t,
+		"bar.txt",
+		"bar",
+		"bar.txt should still be set after reparenting onto same branch",
+	)
 
 	// Now, re-parent spam on top of foo
 	RequireAv(t, "stack", "sync", "--parent", "foo", "--no-fetch", "--no-push")
 	currentBranch, err := repo.CurrentBranchName()
 	require.NoError(t, err)
-	require.Equal(t, "spam", currentBranch, "branch should be set to original branch (spam) after reparenting onto foo")
+	require.Equal(
+		t,
+		"spam",
+		currentBranch,
+		"branch should be set to original branch (spam) after reparenting onto foo",
+	)
 	requireFileContent(t, "spam.txt", "spam")
-	requireFileContent(t, "foo.txt", "foo", "foo.txt should be set after reparenting onto foo branch")
+	requireFileContent(
+		t,
+		"foo.txt",
+		"foo",
+		"foo.txt should be set after reparenting onto foo branch",
+	)
 	require.NoFileExists(t, "bar.txt", "bar.txt should not exist after reparenting onto foo branch")
 
 	Cmd(t, "git", "log")

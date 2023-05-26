@@ -2,8 +2,9 @@ package reorder
 
 import (
 	"fmt"
-	"github.com/aviator-co/av/internal/git"
 	"io"
+
+	"github.com/aviator-co/av/internal/git"
 )
 
 // Context is the context of a reorder operation.

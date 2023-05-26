@@ -95,8 +95,6 @@ func init() {
 	)
 }
 
-
-
 func main() {
 	// Note: this doesn't include whatever time is spent in initializing the
 	// runtime and various packages (e.g., package init functions).

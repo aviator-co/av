@@ -106,7 +106,9 @@ base branch.
 				return err
 			}
 			if !diff.Empty {
-				return errors.New("refusing to sync: there are unstaged changes in the working tree (use `git add` to stage changes)")
+				return errors.New(
+					"refusing to sync: there are unstaged changes in the working tree (use `git add` to stage changes)",
+				)
 			}
 		}
 

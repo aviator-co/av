@@ -37,7 +37,12 @@ func FetchLatestVersion() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/repos/aviator-co/av/releases/latest", nil)
+	req, err := http.NewRequestWithContext(
+		ctx,
+		"GET",
+		"https://api.github.com/repos/aviator-co/av/releases/latest",
+		nil,
+	)
 	if err != nil {
 		return "", err
 	}
