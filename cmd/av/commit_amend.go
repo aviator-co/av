@@ -37,7 +37,51 @@ var commitAmendCmd = &cobra.Command{
 			return errors.WrapIf(err, "failed to determine current branch")
 		}
 
-		if err := commitAmend(repo, currentBranchName, commitAmendFlags); err != nil {
+		commitArgs := []string{"commit", "--amend"}
+		if commitAmendFlags.NoEdit {
+			commitArgs = append(commitArgs, "--no-edit")
+		}
+		if commitAmendFlags.Message != "" {
+			commitArgs = append(commitArgs, "--message", commitAmendFlags.Message)
+		}
+
+		if _, err := repo.Run(&git.RunOpts{
+			Args:        commitArgs,
+			ExitError:   true,
+			Interactive: true,
+		}); err != nil {
+			_, _ = fmt.Fprint(os.Stderr,
+				"\n", colors.Failure("Failed to create commit."), "\n",
+			)
+			return actions.ErrExitSilently{ExitCode: 1}
+		}
+
+		state, err := actions.ReadStackSyncState(repo)
+		state.OriginalBranch = currentBranchName
+
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		ctx := context.Background()
+		db, err := getDB(repo)
+		if err != nil {
+			return err
+		}
+		tx := db.WriteTx()
+		defer tx.Abort()
+
+		client, err := getClient(config.Av.GitHub.Token)
+		if err != nil {
+			return err
+		}
+
+		branchesToSync, err := meta.SubsequentBranches(tx, currentBranchName)
+		if err != nil {
+			return err
+		}
+
+		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, syncFlags)
+		if err != nil {
 			return err
 		}
 
@@ -47,65 +91,6 @@ var commitAmendCmd = &cobra.Command{
 
 func init() {
 	commitAmendCmd.Flags().StringVarP(&commitAmendFlags.Message, "message", "m", "", "the commit message")
-	commitAmendCmd.Flags().BoolVarP(&commitAmendFlags.NoEdit, "no-edit", "a", false, "amend a commit without changing its commit message")
-}
-
- func commitAmend(repo *git.Repo, currentBranchName string, flags struct{Message string; NoEdit bool}) error {
-	// Argument validation
-	if flags.NoEdit && flags.Message != "" {
-		return errors.New("cannot use --no-edit & amend the commit message.")
-	}
-
-	
-	commitArgs := []string{"commit"}
-	commitArgs = append(commitArgs, "--amend")
-
-	if commitAmendFlags.NoEdit {
-		commitArgs = append(commitArgs, "--no-edit")
-	}
-	if commitAmendFlags.Message != "" {
-		commitArgs = append(commitArgs, "--message", flags.Message)
-	}
-
-	if _, err := repo.Run(&git.RunOpts{
-		Args:        commitArgs,
-		ExitError:   true,
-		Interactive: true,
-	}); err != nil {
-		_, _ = fmt.Fprint(os.Stderr,
-			"\n", colors.Failure("Failed to create commit."), "\n",
-		)
-		return actions.ErrExitSilently{ExitCode: 1}
-	}
-
-	state, err := actions.ReadStackSyncState(repo)
-	state.OriginalBranch = currentBranchName
-
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	ctx := context.Background()
-	db, err := getDB(repo)
-	if err != nil {
-		return err
-	}
-	tx := db.WriteTx()
-	defer tx.Abort()
-
-	client, err := getClient(config.Av.GitHub.Token)
-	if err != nil {
-		return err
-	}
-
-	branchesToSync, err := meta.SubsequentBranches(tx, currentBranchName)
-	if err != nil {
-		return err
-	}
-
-	err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, syncFlags)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	commitAmendCmd.Flags().BoolVar(&commitAmendFlags.NoEdit, "no-edit", false, "amend a commit without changing its commit message")
+	commitAmendCmd.MarkFlagsMutuallyExclusive("message", "no-edit")
 }
