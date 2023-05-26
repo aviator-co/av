@@ -6,12 +6,6 @@ merge_rules:
     merge_failed: blocked
   publish_status_check: true
   preconditions:
-    validations:
-    - name: Require conventional commit format
-      match:
-        type: title
-        regex:
-        - '^(fix|feat|chore|docs|style|test|ci|refactor)(\(.+\))?: .+$'
     use_github_mergeability: true
     conversation_resolution_required: true
   merge_mode:

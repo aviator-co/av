@@ -15,7 +15,7 @@ import (
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 )
 
-// stackSyncConfig contains the configuration for a sync operation.
+// StackSyncConfig contains the configuration for a sync operation.
 // It is serializable to JSON to handle the case where the sync is interrupted
 // by a merge conflict (so it can be resumed with the --continue flag).
 type StackSyncConfig struct {
@@ -50,7 +50,7 @@ type StackSyncFlags struct {
 	All bool
 }
 
-// stackSyncState is the state of an in-progress sync operation.
+// StackSyncState is the state of an in-progress sync operation.
 // It is written to a file if the sync is interrupted (so it can be resumed with
 // the --continue flag).
 type StackSyncState struct {
@@ -69,7 +69,7 @@ type StackSyncState struct {
 	Config StackSyncConfig `json:"config"`
 }
 
-// Performs stack sync on all branches in branchesToSync.
+// SyncStack performs stack sync on all branches in branchesToSync.
 func SyncStack(ctx context.Context,
 	repo *git.Repo,
 	client *gh.Client,
@@ -78,8 +78,19 @@ func SyncStack(ctx context.Context,
 	state StackSyncState,
 	flags StackSyncFlags,
 ) error {
-	state.Branches = branchesToSync
+	if !flags.NoFetch {
+		// Fetch latest commits from the remote.
+		// This is necessary to make sure that if a branch is merged, and we're
+		// syncing subsequent branches, we have the merge commit locally
+		// (without this, Git will complain that we're trying to rebase onto a
+		// commit that doesn't exist).
+		_, err := repo.Git("fetch", "origin")
+		if err != nil {
+			return err
+		}
+	}
 
+	state.Branches = branchesToSync
 	for i, currentBranch := range branchesToSync {
 		if i > 0 {
 			// Add spacing in the output between each branch sync
