@@ -633,7 +633,7 @@ func ParsePRMetadata(
 		return
 	}
 
-	// This will skipNextCommit over any data lines (since those weren't consumed by buf,
+	// This will skip over any data lines (since those weren't consumed by buf,
 	// only by the copy of buf).
 	if err := readLineUntil(buf, "```\n"); err != nil {
 		reterr = errors.WrapIff(err, "expecting closing \"```\"")
