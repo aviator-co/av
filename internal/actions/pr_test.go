@@ -47,7 +47,10 @@ func TestPRMetadataPreservesBody(t *testing.T) {
 		ParentPull: 123,
 		Trunk:      "baz",
 	}
-	body1 := actions.AddPRMetadata("Hello! This is a cool PR that does some neat things.", sampleMeta)
+	body1 := actions.AddPRMetadata(
+		"Hello! This is a cool PR that does some neat things.",
+		sampleMeta,
+	)
 	// Add some text to the end of the body (as if someone had edited manually)
 	body1 += "\n\nIt's very neat, actually."
 

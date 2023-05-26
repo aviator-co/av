@@ -1,11 +1,12 @@
 package jsonfiledb
 
 import (
-	"emperror.dev/errors"
 	"encoding/json"
+	"os"
+
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/maputils"
-	"os"
 )
 
 func readState(filepath string) (*state, error) {

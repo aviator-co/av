@@ -77,7 +77,12 @@ var stackPrevCmd = &cobra.Command{
 			return err
 		}
 
-		_, _ = fmt.Fprint(os.Stderr, "Checked out branch ", colors.UserInput(branchToCheckout), "\n")
+		_, _ = fmt.Fprint(
+			os.Stderr,
+			"Checked out branch ",
+			colors.UserInput(branchToCheckout),
+			"\n",
+		)
 
 		return nil
 	},

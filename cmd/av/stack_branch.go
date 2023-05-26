@@ -94,7 +94,11 @@ internal tracking metadata that defines the order of branches within a stack.`,
 			var err error
 			parentHead, err = repo.RevParse(&git.RevParse{Rev: parentBranchName})
 			if err != nil {
-				return errors.WrapIff(err, "failed to determine head commit of branch %q", parentHead)
+				return errors.WrapIff(
+					err,
+					"failed to determine head commit of branch %q",
+					parentHead,
+				)
 			}
 		}
 
@@ -151,10 +155,12 @@ internal tracking metadata that defines the order of branches within a stack.`,
 }
 
 func init() {
-	stackBranchCmd.Flags().StringVar(&stackBranchFlags.Parent, "parent", "", "the parent branch to base the new branch off of")
+	stackBranchCmd.Flags().
+		StringVar(&stackBranchFlags.Parent, "parent", "", "the parent branch to base the new branch off of")
 	// NOTE: We use -m as the shorthand here to match `git branch -m ...`.
 	// See the comment on stackBranchFlags.Rename.
-	stackBranchCmd.Flags().BoolVarP(&stackBranchFlags.Rename, "rename", "m", false, "rename the current branch")
+	stackBranchCmd.Flags().
+		BoolVarP(&stackBranchFlags.Rename, "rename", "m", false, "rename the current branch")
 }
 
 func stackBranchMove(

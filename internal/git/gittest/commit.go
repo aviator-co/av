@@ -29,7 +29,13 @@ func WithAmend() CommitFileOpt {
 	}
 }
 
-func CommitFile(t *testing.T, repo *git.Repo, filename string, body []byte, cfOpts ...CommitFileOpt) {
+func CommitFile(
+	t *testing.T,
+	repo *git.Repo,
+	filename string,
+	body []byte,
+	cfOpts ...CommitFileOpt,
+) string {
 	opts := commitFileOpts{
 		msg: fmt.Sprintf("Write %s", filename),
 	}
@@ -50,4 +56,8 @@ func CommitFile(t *testing.T, repo *git.Repo, filename string, body []byte, cfOp
 	}
 	_, err = repo.Git(args...)
 	require.NoError(t, err, "failed to commit file: %s", filename)
+
+	head, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
+	require.NoError(t, err, "failed to get HEAD")
+	return head
 }

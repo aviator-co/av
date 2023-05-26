@@ -16,7 +16,11 @@ func ReadBranchState(repo *git.Repo, branch string, trunk bool) (meta.BranchStat
 
 	head, err := repo.RevParse(&git.RevParse{Rev: "refs/heads/" + branch})
 	if err != nil {
-		return meta.BranchState{}, errors.WrapIff(err, "failed to determine HEAD for branch %q", branch)
+		return meta.BranchState{}, errors.WrapIff(
+			err,
+			"failed to determine HEAD for branch %q",
+			branch,
+		)
 	}
 	return meta.BranchState{
 		Name: branch,

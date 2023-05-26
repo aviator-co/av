@@ -1,9 +1,10 @@
 package e2e_tests
 
 import (
+	"testing"
+
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/stretchr/testify/assert"
-	"testing"
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
@@ -25,10 +26,28 @@ func TestStackSyncMergeCommit(t *testing.T) {
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"), gittest.WithMessage("Commit 1b"))
 	RequireAv(t, "stack", "branch", "stack-2")
 	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n2a\n"), gittest.WithMessage("Commit 2a"))
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n2a\n2b\n"), gittest.WithMessage("Commit 2b"))
+	gittest.CommitFile(
+		t,
+		repo,
+		"my-file",
+		[]byte("1a\n1b\n2a\n2b\n"),
+		gittest.WithMessage("Commit 2b"),
+	)
 	RequireAv(t, "stack", "branch", "stack-3")
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n2a\n2b\n3a\n"), gittest.WithMessage("Commit 3a"))
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n2a\n2b\n3a\n3b\n"), gittest.WithMessage("Commit 3b"))
+	gittest.CommitFile(
+		t,
+		repo,
+		"my-file",
+		[]byte("1a\n1b\n2a\n2b\n3a\n"),
+		gittest.WithMessage("Commit 3a"),
+	)
+	gittest.CommitFile(
+		t,
+		repo,
+		"my-file",
+		[]byte("1a\n1b\n2a\n2b\n3a\n3b\n"),
+		gittest.WithMessage("Commit 3b"),
+	)
 
 	// Everything up to date now, so this should be a no-op.
 	require.Equal(t, 0, Av(t, "stack", "sync", "--no-fetch", "--no-push").ExitCode)
@@ -50,7 +69,12 @@ func TestStackSyncMergeCommit(t *testing.T) {
 		RequireCmd(t, "git", "commit", "--no-edit")
 		squashCommit, err = repo.RevParse(&git.RevParse{Rev: "HEAD"})
 		require.NoError(t, err, "failed to get squash commit")
-		require.NotEqual(t, oldHead, squashCommit, "squash commit should be different from old HEAD")
+		require.NotEqual(
+			t,
+			oldHead,
+			squashCommit,
+			"squash commit should be different from old HEAD",
+		)
 	})
 
 	// We shouldn't do this as part of an E2E test since it depends on internal

@@ -1,16 +1,17 @@
 package main
 
 import (
+	"os"
+	"os/exec"
+	"path"
+	"strings"
+
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/aviator-co/av/internal/meta/refmeta"
 	"github.com/sirupsen/logrus"
-	"os"
-	"os/exec"
-	"path"
-	"strings"
 )
 
 var cachedRepo *git.Repo
@@ -23,7 +24,10 @@ func getRepo() (*git.Repo, error) {
 		}
 		toplevel, err := cmd.Output()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to determine repo toplevel (are you running inside a Git repo?)")
+			return nil, errors.Wrap(
+				err,
+				"failed to determine repo toplevel (are you running inside a Git repo?)",
+			)
 		}
 		cachedRepo, err = git.OpenRepo(strings.TrimSpace(string(toplevel)))
 		if err != nil {
