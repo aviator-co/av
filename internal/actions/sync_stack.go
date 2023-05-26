@@ -82,17 +82,6 @@ func SyncStack(ctx context.Context,
 	for _, optFn := range optFns {
 		optFn(opts)
 	}
-	if !state.Config.NoFetch {
-		// Fetch latest commits from the remote.
-		// This is necessary to make sure that if a branch is merged, and we're
-		// syncing subsequent branches, we have the merge commit locally
-		// (without this, Git will complain that we're trying to rebase onto a
-		// commit that doesn't exist).
-		_, err := repo.Git("fetch", "origin")
-		if err != nil {
-			return err
-		}
-	}
 
 	state.Branches = branchesToSync
 	skip := opts.skipNextCommit
