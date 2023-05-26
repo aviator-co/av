@@ -51,7 +51,7 @@ var commitAmendCmd = &cobra.Command{
 			Interactive: true,
 		}); err != nil {
 			_, _ = fmt.Fprint(os.Stderr,
-				"\n", colors.Failure("Failed to create commit."), "\n",
+				"\n", colors.Failure("Failed to amend."), "\n",
 			)
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
