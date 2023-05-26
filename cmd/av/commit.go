@@ -13,5 +13,6 @@ func init() {
 	commitCmd.AddCommand(
 		commitSplitCmd, 
 		commitCreateCmd,
+		commitAmendCmd,
 	)
 }
