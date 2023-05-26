@@ -1,6 +1,9 @@
 package reorder
 
-import "fmt"
+import (
+	"emperror.dev/errors"
+	"fmt"
+)
 
 type ErrInvalidCmd struct {
 	Cmd    string
@@ -10,3 +13,8 @@ type ErrInvalidCmd struct {
 func (e ErrInvalidCmd) Error() string {
 	return fmt.Sprintf("invalid %s command: %s", e.Cmd, e.Reason)
 }
+
+// ErrInterruptReorder is an error that is returned by Cmd implementations when
+// the reorder operation should be suspended (and later resumed with --continue,
+// --skip, or --reorder).
+var ErrInterruptReorder = errors.Sentinel("interrupt reorder")
