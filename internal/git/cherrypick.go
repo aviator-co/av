@@ -36,18 +36,6 @@ type CherryPick struct {
 	Resume CherryPickResume
 }
 
-type CherryPickResult struct {
-	// Head is the last commit that was successfully cherry-picked.
-	Head string
-
-	// Conflict is true if the cherry-pick operation resulted in a conflict.
-	Conflict bool
-
-	// CherryPickHead is the commit that was unable to be applied.
-	// Set only if Conflict is true.
-	CherryPickHead string
-}
-
 type ErrCherryPickConflict struct {
 	ConflictingCommit string
 	Output            string
