@@ -15,7 +15,7 @@ import (
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 )
 
-// stackSyncConfig contains the configuration for a sync operation.
+// StackSyncConfig contains the configuration for a sync operation.
 // It is serializable to JSON to handle the case where the sync is interrupted
 // by a merge conflict (so it can be resumed with the --continue flag).
 type StackSyncConfig struct {
@@ -37,20 +37,7 @@ type StackSyncConfig struct {
 	Prune bool `json:"prune"`
 }
 
-type StackSyncFlags struct {
-	// Include all the options from stackSyncConfig
-	StackSyncConfig
-	// If set, we're continuing a previous sync.
-	Continue bool
-	// If set, abort an in-progress sync operation.
-	Abort bool
-	// If set, skip a commit and continue a previous sync.
-	Skip bool
-	// If set, synchronize all branches.
-	All bool
-}
-
-// stackSyncState is the state of an in-progress sync operation.
+// StackSyncState is the state of an in-progress sync operation.
 // It is written to a file if the sync is interrupted (so it can be resumed with
 // the --continue flag).
 type StackSyncState struct {
@@ -69,17 +56,35 @@ type StackSyncState struct {
 	Config StackSyncConfig `json:"config"`
 }
 
-// Performs stack sync on all branches in branchesToSync.
+type (
+	SyncStackOpt  func(*syncStackOpts)
+	syncStackOpts struct {
+		skipNextCommit bool
+	}
+)
+
+func WithSkipNextCommit() SyncStackOpt {
+	return func(opts *syncStackOpts) {
+		opts.skipNextCommit = true
+	}
+}
+
+// SyncStack performs stack sync on all branches in branchesToSync.
 func SyncStack(ctx context.Context,
 	repo *git.Repo,
 	client *gh.Client,
 	tx meta.WriteTx,
 	branchesToSync []string,
 	state StackSyncState,
-	flags StackSyncFlags,
+	optFns ...SyncStackOpt,
 ) error {
-	state.Branches = branchesToSync
+	opts := &syncStackOpts{}
+	for _, optFn := range optFns {
+		optFn(opts)
+	}
 
+	state.Branches = branchesToSync
+	skip := opts.skipNextCommit
 	for i, currentBranch := range branchesToSync {
 		if i > 0 {
 			// Add spacing in the output between each branch sync
@@ -92,7 +97,7 @@ func SyncStack(ctx context.Context,
 			Push:         !state.Config.NoPush,
 			Continuation: state.Continuation,
 			ToTrunk:      state.Config.Trunk,
-			Skip:         flags.Skip,
+			Skip:         skip,
 		})
 		if err != nil {
 			return err
@@ -108,6 +113,11 @@ func SyncStack(ctx context.Context,
 			return ErrExitSilently{ExitCode: 1}
 		}
 		state.Continuation = nil
+		// If skip was specified, it was because the sync was interrupted by a
+		// conflict. The user wanted to skip a commit and continue the sync. If
+		// we get here, the rebase succeeded, and it doesn't make sense to start
+		// subsequent rebases with `git rebase --skip`.
+		skip = false
 	}
 
 	if state.Config.Prune {
