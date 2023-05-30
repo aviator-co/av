@@ -20,8 +20,8 @@ git-add(1) to incrementally "add" changes to the index.
 # OPTIONS
 
 `-m <msg>, --message=<msg>`
-    Use the given `<msg>` as the commit message.
+: Use the given `<msg>` as the commit message.
 
 `-a, --all`
-    Automatically stage modified/deleted files, but new files you have not told
-    Git about are not affected. (Same as git commit --all)
+: Automatically stage modified/deleted files, but new files you have not told
+  Git about are not affected. (Same as git commit --all)
