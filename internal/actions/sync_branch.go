@@ -168,6 +168,24 @@ func syncBranchRebase(
 			newUpstreamCommitHash = trunkHead
 		} else if origParentBranch.MergeCommit != "" {
 			newUpstreamCommitHash = origParentBranch.MergeCommit
+			// Fetch the merge commit from the remote.
+			// This is important to support the sequence where a parent branch
+			// in the stack is merged using MergeQueue or GitHub then the user
+			// runs `av sync` on a child branch. Assuming they haven't done a
+			// git fetch/git pull between, the merge commit will not be in their
+			// local repo, and we'll fail to rebase with an error along the
+			// lines of "commit abcd1234 does not exist".
+			if _, err := repo.Run(&git.RunOpts{
+				Args: []string{"fetch", "origin", newUpstreamCommitHash},
+			}); err != nil {
+				_, _ = fmt.Fprint(
+					os.Stderr,
+					colors.Failure("  - error: failed to fetch commit "),
+					colors.UserInput(git.ShortSha(newUpstreamCommitHash)),
+					colors.Failure(" from origin: ", err.Error()),
+				)
+				return nil, errors.WrapIff(err, "failed to fetch merge commit from origin")
+			}
 		} else {
 			_, _ = fmt.Fprint(os.Stderr,
 				"  - branch is a stack root, nothing to do",
