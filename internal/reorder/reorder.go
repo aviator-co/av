@@ -22,6 +22,7 @@ func Reorder(ctx Context) (*Continuation, error) {
 		} else if err != nil {
 			return nil, err
 		}
+		ctx.State.Commands = ctx.State.Commands[1:]
 	}
 
 	_, _ = fmt.Fprint(ctx.Output, colors.Success("Reorder complete!\n"))
