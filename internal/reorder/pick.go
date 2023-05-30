@@ -32,15 +32,17 @@ func (p PickCmd) Execute(ctx *Context) error {
 		return err
 	}
 
-	ctx.Print(
-		colors.Success("  - applied commit "),
-		colors.UserInput(git.ShortSha(p.Commit)),
-		colors.Success(" without conflict\n"),
-	)
 	head, err := ctx.Repo.RevParse(&git.RevParse{Rev: "HEAD"})
 	if err != nil {
 		return err
 	}
+	ctx.Print(
+		colors.Success("  - applied commit "),
+		colors.UserInput(git.ShortSha(p.Commit)),
+		colors.Success(" without conflict (HEAD is now at "),
+		colors.UserInput(git.ShortSha(head)),
+		colors.Success(")\n"),
+	)
 	ctx.State.Head = head
 	return nil
 }
