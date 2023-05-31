@@ -2,7 +2,6 @@ package reorder
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -21,7 +20,6 @@ func TestState(t *testing.T) {
 
 	serialized, err := json.Marshal(state)
 	require.NoError(t, err, "failed to serialize state")
-	fmt.Println(string(serialized))
 
 	var deserialized State
 	err = json.Unmarshal(serialized, &deserialized)

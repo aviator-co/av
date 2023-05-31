@@ -41,7 +41,6 @@ type State struct {
 }
 
 func (s *State) MarshalJSON() ([]byte, error) {
-	fmt.Println("marshalling state")
 	// Create Alias type to avoid copying MarshalJSON method (and avoid infinite recursion).
 	type Alias State
 	var cmdStrings []string
@@ -65,7 +64,6 @@ func (s *State) UnmarshalJSON(data []byte) error {
 		Alias
 	}
 	if err := json.Unmarshal(data, &aux); err != nil {
-		fmt.Printf("failed to unmarshal state: %v\n", err)
 		return err
 	}
 	var cmds []Cmd
