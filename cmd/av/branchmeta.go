@@ -25,7 +25,6 @@ func init() {
 	branchMetaCmd.AddCommand(
 		branchMetaDeleteCmd,
 		branchMetaListCmd,
-		branchMetaRebuildChildrenCmd,
 		branchMetaSetCmd,
 	)
 }
@@ -70,26 +69,6 @@ var branchMetaListCmd = &cobra.Command{
 			return err
 		}
 		fmt.Println(string(bs))
-		return nil
-	},
-}
-
-var branchMetaRebuildChildrenCmd = &cobra.Command{
-	Use:   "rebuild-children",
-	Short: "rebuild the children based on the parent",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		repo, err := getRepo()
-		if err != nil {
-			return err
-		}
-		db, err := getDB(repo)
-		if err != nil {
-			return err
-		}
-		tx := db.WriteTx()
-		if err := tx.Commit(); err != nil {
-			return err
-		}
 		return nil
 	},
 }
