@@ -3,8 +3,9 @@ package reorder
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/aviator-co/av/internal/meta"
 	"io"
+
+	"github.com/aviator-co/av/internal/meta"
 
 	"github.com/aviator-co/av/internal/git"
 )

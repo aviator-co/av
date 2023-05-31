@@ -17,7 +17,6 @@ var prCmd = &cobra.Command{
 }
 
 var prCreateFlags struct {
-	Base   string
 	Draft  bool
 	Force  bool
 	NoPush bool
@@ -101,10 +100,6 @@ func init() {
 	prCmd.AddCommand(prCreateCmd)
 
 	// av pr create
-	prCreateCmd.Flags().StringVar(
-		&prCreateFlags.Base, "base", "",
-		"base branch to create the pull request against",
-	)
 	prCreateCmd.Flags().BoolVar(
 		&prCreateFlags.Draft, "draft", false,
 		"create the pull request in draft mode",

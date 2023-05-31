@@ -1,10 +1,11 @@
 package reorder
 
 import (
-	"emperror.dev/errors"
 	"fmt"
-	"github.com/aviator-co/av/internal/utils/colors"
 	"os"
+
+	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/utils/colors"
 )
 
 // Reorder executes a reorder.
