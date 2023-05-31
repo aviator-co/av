@@ -30,8 +30,6 @@ var stackTreeCmd = &cobra.Command{
 			return err
 		}
 
-		branches := tx.AllBranches()
-
 		var currentBranch string
 		if dh, err := repo.DetachedHead(); err != nil {
 			return err
@@ -53,11 +51,11 @@ var stackTreeCmd = &cobra.Command{
 		} else {
 			fmt.Println(defaultBranch)
 		}
-		for branch, branchMeta := range branches {
-			if !branchMeta.IsStackRoot() {
+		for _, branch := range tx.AllBranches() {
+			if !branch.IsStackRoot() {
 				continue
 			}
-			printStackTree(repo, branches, currentBranch, branch, 1)
+			printStackTree(repo, tx, currentBranch, branch, 1)
 		}
 
 		return nil
@@ -66,18 +64,14 @@ var stackTreeCmd = &cobra.Command{
 
 func printStackTree(
 	repo *git.Repo,
-	branches map[string]meta.Branch,
+	tx meta.ReadTx,
+	// The currently checked out git branch.
 	currentBranch string,
-	root string,
+	// The root of the (sub-)tree to print.
+	branch meta.Branch,
 	depth int,
 ) {
 	indent := strings.Repeat("    ", depth)
-	branch, ok := branches[root]
-	if !ok {
-		fmt.Printf("%s<ERROR: unknown branch: %s>\n", indent, root)
-		return
-	}
-
 	branchInfo, err := getBranchInfo(repo, branch)
 	if err != nil {
 		fmt.Printf("<ERROR: cannot get branch info: %v>\n", err)
@@ -96,8 +90,8 @@ func printStackTree(
 	} else {
 		_, _ = fmt.Print(indent, branch.Name, " ", colors.Faint(branchInfo), "\n")
 	}
-	for _, next := range branch.Children {
-		printStackTree(repo, branches, currentBranch, next, depth+1)
+	for _, next := range meta.Children(tx, branch.Name) {
+		printStackTree(repo, tx, currentBranch, next, depth+1)
 	}
 }
 
@@ -126,7 +120,7 @@ func getBranchInfo(repo *git.Repo, branch meta.Branch) (string, error) {
 	return branchInfo, nil
 }
 
-// Check if branch is up to date with the parent branch.
+// Check if branch is up-to-date with the parent branch.
 func getParentStatus(repo *git.Repo, branch meta.Branch) (string, error) {
 	parentHead, err := repo.RevParse(&git.RevParse{Rev: branch.Parent.Name})
 	if err != nil {
@@ -146,7 +140,7 @@ func getParentStatus(repo *git.Repo, branch meta.Branch) (string, error) {
 	return "needs sync", nil
 }
 
-// Check if branch is up to date with the upstream branch.
+// Check if branch is up-to-date with the upstream branch.
 // This is doing `git diff <givenBranch> remotes/origin/<givenBranch>`
 func getUpstreamStatus(repo *git.Repo, branch meta.Branch) (string, error) {
 	upstreamExists, err := repo.DoesRemoteBranchExist(branch.Name)
