@@ -1,9 +1,10 @@
 package reorder
 
 import (
+	"strings"
+
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
-	"strings"
 
 	"github.com/spf13/pflag"
 )
