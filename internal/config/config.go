@@ -25,9 +25,14 @@ type PullRequest struct {
 	RebaseWithDraft *bool
 }
 
+type Aviator struct {
+	APIToken string
+}
+
 var Av = struct {
 	PullRequest PullRequest
 	GitHub      GitHub
+	Aviator		Aviator
 }{
 	PullRequest: PullRequest{
 		OpenBrowser: true,
@@ -87,5 +92,9 @@ func loadFromEnv() {
 		Av.GitHub.Token = githubToken
 	} else if githubToken := os.Getenv("GITHUB_TOKEN"); githubToken != "" {
 		Av.GitHub.Token = githubToken
+	}
+
+	if apiToken := os.Getenv("AVIATOR_APITOKEN"); apiToken != "" {
+		Av.Aviator.APIToken = apiToken
 	}
 }
