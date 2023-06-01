@@ -16,3 +16,7 @@ in the pull request description.
 
 If a branch has an existing pull request, it will be modified with the correct
 base branch and metadata (if necessary).
+
+# SEE ALSO
+
+`av-pr-create`(1)
