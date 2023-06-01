@@ -15,12 +15,15 @@ func (tx *readTx) Repository() (meta.Repository, bool) {
 	return tx.state.RepositoryState, tx.state.RepositoryState.ID != ""
 }
 
-func (tx *readTx) Branch(name string) (branch meta.Branch, ok bool) {
-	branch, ok = tx.state.BranchState[name]
-	if !ok {
+func (tx *readTx) Branch(name string) (meta.Branch, bool) {
+	if name == "" {
+		panic("invariant error: cannot read branch state for empty branch name")
+	}
+	branch, ok := tx.state.BranchState[name]
+	if branch.Name == "" {
 		branch.Name = name
 	}
-	return
+	return branch, ok
 }
 
 func (tx *readTx) AllBranches() map[string]meta.Branch {

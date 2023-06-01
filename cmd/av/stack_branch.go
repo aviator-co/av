@@ -182,7 +182,17 @@ func stackBranchMove(
 		return errors.Errorf("cannot rename branch to itself")
 	}
 
-	currentMeta, _ := tx.Branch(oldBranch)
+	currentMeta, ok := tx.Branch(oldBranch)
+	if !ok {
+		defaultBranch, err := repo.DefaultBranch()
+		if err != nil {
+			return errors.WrapIf(err, "failed to determine repository default branch")
+		}
+		currentMeta.Parent = meta.BranchState{
+			Name:  defaultBranch,
+			Trunk: true,
+		}
+	}
 	currentMeta.Name = newBranch
 	tx.SetBranch(currentMeta)
 
