@@ -1,9 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"context"
 
 	"github.com/aviator-co/av/internal/gql"
 	"github.com/shurcooL/graphql"
@@ -11,8 +11,8 @@ import (
 )
 
 var authStatusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "check auth status",
+	Use:          "status",
+	Short:        "check auth status",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := gql.GraphQLClient()
@@ -31,12 +31,14 @@ var authStatusCmd = &cobra.Command{
 		}
 
 		if query.Viewer.Email == "" {
-			fmt.Fprintln(os.Stderr, "Error: Could not find auth info, please verify that your API Token is correct.")
+			fmt.Fprintln(
+				os.Stderr,
+				"Error: Could not find auth info, please verify that your API Token is correct.",
+			)
 			return nil
 		}
 
-		_, _ = fmt.Fprintln(os.Stderr, "Logged in as: " + query.Viewer.Email)
+		_, _ = fmt.Fprintln(os.Stderr, "Logged in as: "+query.Viewer.Email)
 		return nil
 	},
 }
-

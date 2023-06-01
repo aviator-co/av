@@ -32,7 +32,7 @@ type Aviator struct {
 var Av = struct {
 	PullRequest PullRequest
 	GitHub      GitHub
-	Aviator		Aviator
+	Aviator     Aviator
 }{
 	PullRequest: PullRequest{
 		OpenBrowser: true,
