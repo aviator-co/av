@@ -94,7 +94,7 @@ func loadFromEnv() {
 		Av.GitHub.Token = githubToken
 	}
 
-	if apiToken := os.Getenv("AVIATOR_APITOKEN"); apiToken != "" {
+	if apiToken := os.Getenv("AV_API_TOKEN"); apiToken != "" {
 		Av.Aviator.APIToken = apiToken
 	}
 }
