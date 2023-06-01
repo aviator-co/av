@@ -1,4 +1,4 @@
-# av-commit-create 1 "" av-cli "Aviator CLI User Manual"
+# av-stack-tidy 1 "" av-cli "Aviator CLI User Manual"
 
 # NAME
 
