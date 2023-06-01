@@ -2,7 +2,6 @@ package avgql
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/aviator-co/av/internal/config"
 	"github.com/shurcooL/graphql"
@@ -10,7 +9,6 @@ import (
 )
 
 func NewClient() *graphql.Client {
-	fmt.Println("token: ", config.Av.Aviator.APIToken)
 	src := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: config.Av.Aviator.APIToken},
 	)
