@@ -15,15 +15,17 @@ import (
 
 var stackTidyCmd = &cobra.Command{
 	Use:   "tidy",
-	Short: "tidy up the branch metadata",
+	Short: "Tidy stacked branches",
 	Long: strings.TrimSpace(`
-Tidy up the branch metadata by removing the deleted / merged branches.
+Tidy stacked branches by removing deleted or merged branches.
 
-This command detects which branch is deleted or merged, and re-parent the child branches. This
-operates on only av's internal metadata, and it won't delete the actual Git branches.
-	`),
+This command detects which branches are deleted or merged and re-parents
+children of merged branches. This operates on only av's internal metadata and
+does not delete Git branches.
+`),
 	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Args:         cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		repo, err := getRepo()
 		if err != nil {
 			return err
