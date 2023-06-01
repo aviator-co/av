@@ -2,7 +2,7 @@ package meta
 
 import (
 	"encoding/json"
-	"fmt"
+	"golang.org/x/exp/slices"
 
 	"emperror.dev/errors"
 	"github.com/shurcooL/githubv4"
@@ -17,9 +17,6 @@ type Branch struct {
 
 	// Information about the parent branch.
 	Parent BranchState `json:"parent,omitempty"`
-
-	// The child branches of this branch within the stack (if any).
-	Children []string `json:"children,omitempty"`
 
 	// The associated pull request information, if any.
 	PullRequest *PullRequest `json:"pullRequest,omitempty"`
@@ -122,16 +119,10 @@ func PreviousBranches(tx ReadTx, name string) ([]string, error) {
 func SubsequentBranches(tx ReadTx, name string) ([]string, error) {
 	logrus.Debugf("finding subsequent branches for %q", name)
 	var res []string
-	branchMeta, ok := tx.Branch(name)
-	if !ok {
-		return nil, fmt.Errorf("branch metadata not found for %q", name)
-	}
-	if len(branchMeta.Children) == 0 {
-		return res, nil
-	}
-	for _, child := range branchMeta.Children {
-		res = append(res, child)
-		desc, err := SubsequentBranches(tx, child)
+	children := Children(tx, name)
+	for _, child := range children {
+		res = append(res, child.Name)
+		desc, err := SubsequentBranches(tx, child.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -152,23 +143,27 @@ func Trunk(tx ReadTx, name string) (string, bool) {
 	return "", false
 }
 
-func RebuildChildren(tx WriteTx) {
+// Children returns all the immediate children of the given branch.
+func Children(tx ReadTx, name string) []Branch {
 	branches := tx.AllBranches()
-	for name, branch := range branches {
-		branch.Children = nil
-		// We have to assign the branch back to the map because we're modifying
-		// the value in-place (go has weird map semantics).
-		// `branches[name].Children` = nil will **not** work because
-		// `branches[name]` is a copy of the value in the map.
-		branches[name] = branch
-	}
-	for name, branch := range branches {
-		if parent, ok := branches[branch.Parent.Name]; ok {
-			parent.Children = append(parent.Children, name)
-			branches[branch.Parent.Name] = parent
+	var children []Branch
+	for _, branch := range branches {
+		if branch.Parent.Name == name {
+			children = append(children, branch)
 		}
 	}
+	// Sort for determinism.
+	slices.SortFunc(children, func(a, b Branch) bool {
+		return a.Name < b.Name
+	})
+	return children
+}
+
+func ChildrenNames(tx ReadTx, name string) []string {
+	branches := Children(tx, name)
+	children := make([]string, 0, len(branches))
 	for _, branch := range branches {
-		tx.SetBranch(branch)
+		children = append(children, branch.Name)
 	}
+	return children
 }

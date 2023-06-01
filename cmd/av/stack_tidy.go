@@ -64,7 +64,6 @@ operates on only av's internal metadata, and it won't delete the actual Git bran
 			}
 			tx.SetBranch(*br)
 		}
-		rebuildChildren(branches)
 
 		if err := tx.Commit(); err != nil {
 			return err
@@ -107,16 +106,4 @@ func findNonDeletedParents(
 		liveParents[name] = state
 	}
 	return liveParents
-}
-
-// rebuildChildren removes Children for all branches and recreates them from Parent.
-func rebuildChildren(branches map[string]*meta.Branch) {
-	for _, br := range branches {
-		br.Children = nil
-	}
-	for name, br := range branches {
-		if parent, ok := branches[br.Parent.Name]; ok {
-			parent.Children = append(parent.Children, name)
-		}
-	}
 }

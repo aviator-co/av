@@ -5,7 +5,6 @@ import (
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
-	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -141,7 +140,6 @@ internal tracking metadata that defines the order of branches within a stack.`,
 					},
 				}
 			}
-			parentMeta.Children = append(parentMeta.Children, branchName)
 			logrus.WithField("meta", parentMeta).Debug("writing parent branch metadata")
 			tx.SetBranch(parentMeta)
 		}
@@ -196,23 +194,15 @@ func stackBranchMove(
 		}
 	}
 	currentMeta.Name = newBranch
-	tx.DeleteBranch(oldBranch)
 	tx.SetBranch(currentMeta)
 
-	// Update the parent's reference to the child (unless the parent is a trunk
-	// which doesn't maintain references to children).
-	if !currentMeta.Parent.Trunk {
-		parentMeta, _ := tx.Branch(currentMeta.Parent.Name)
-		sliceutils.Replace(parentMeta.Children, oldBranch, newBranch)
-		tx.SetBranch(parentMeta)
-	}
-
 	// Update all child branches to refer to the correct (renamed) parent.
-	for _, child := range currentMeta.Children {
-		childMeta, _ := tx.Branch(child)
-		childMeta.Parent.Name = newBranch
-		tx.SetBranch(childMeta)
+	children := meta.Children(tx, oldBranch)
+	for _, child := range children {
+		child.Parent.Name = newBranch
+		tx.SetBranch(child)
 	}
+	tx.DeleteBranch(oldBranch)
 
 	// Finally, actually rename the branch in Git
 	if _, err := repo.Run(&git.RunOpts{

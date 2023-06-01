@@ -11,9 +11,8 @@ import (
 )
 
 var branchMetaFlags struct {
-	rebuildChildren bool
-	trunk           bool
-	parent          string
+	trunk  bool
+	parent string
 }
 
 var branchMetaCmd = &cobra.Command{
@@ -26,7 +25,6 @@ func init() {
 	branchMetaCmd.AddCommand(
 		branchMetaDeleteCmd,
 		branchMetaListCmd,
-		branchMetaRebuildChildrenCmd,
 		branchMetaSetCmd,
 	)
 }
@@ -48,18 +46,8 @@ var branchMetaDeleteCmd = &cobra.Command{
 		for _, branch := range args {
 			tx.DeleteBranch(branch)
 		}
-		if branchMetaFlags.rebuildChildren {
-			meta.RebuildChildren(tx)
-		}
 		return tx.Commit()
 	},
-}
-
-func init() {
-	branchMetaDeleteCmd.Flags().BoolVar(
-		&branchMetaFlags.rebuildChildren, "rebuild-children", true,
-		"rebuild children fields based on parent after modifying the branch metadata",
-	)
 }
 
 var branchMetaListCmd = &cobra.Command{
@@ -81,27 +69,6 @@ var branchMetaListCmd = &cobra.Command{
 			return err
 		}
 		fmt.Println(string(bs))
-		return nil
-	},
-}
-
-var branchMetaRebuildChildrenCmd = &cobra.Command{
-	Use:   "rebuild-children",
-	Short: "rebuild the children based on the parent",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		repo, err := getRepo()
-		if err != nil {
-			return err
-		}
-		db, err := getDB(repo)
-		if err != nil {
-			return err
-		}
-		tx := db.WriteTx()
-		meta.RebuildChildren(tx)
-		if err := tx.Commit(); err != nil {
-			return err
-		}
 		return nil
 	},
 }
@@ -144,18 +111,11 @@ var branchMetaSetCmd = &cobra.Command{
 			}
 		}
 		tx.SetBranch(br)
-		if branchMetaFlags.rebuildChildren {
-			meta.RebuildChildren(tx)
-		}
 		return tx.Commit()
 	},
 }
 
 func init() {
-	branchMetaSetCmd.Flags().BoolVar(
-		&branchMetaFlags.rebuildChildren, "rebuild-children", true,
-		"rebuild children fields based on parent after modifying the branch metadata",
-	)
 	branchMetaSetCmd.Flags().BoolVar(
 		&branchMetaFlags.trunk, "trunk", false,
 		"mark the parent branch as trunk",
