@@ -155,15 +155,6 @@ var stackBranchCommitCmd = &cobra.Command{
 			},
 		})
 
-		// If this isn't a new stack root, update the parent metadata to include
-		// the new branch as a child.
-		if !isBranchFromTrunk {
-			parentMeta, _ := tx.Branch(parentBranchName)
-			parentMeta.Children = append(parentMeta.Children, branchName)
-			logrus.WithField("meta", parentMeta).Debug("writing parent branch metadata")
-			tx.SetBranch(parentMeta)
-		}
-
 		// For "--all" and "--all-modified",
 		var addArgs []string
 		if stackBranchCommitFlags.All {

@@ -9,7 +9,6 @@ import (
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -170,7 +169,6 @@ func reparentWriteMetadata(
 	opts ReparentOpts,
 ) error {
 	branch, _ := tx.Branch(opts.Branch)
-	oldParent := branch.Parent
 
 	var parentHead string
 	if !opts.NewParentTrunk {
@@ -187,22 +185,6 @@ func reparentWriteMetadata(
 		Head:  parentHead,
 	}
 	tx.SetBranch(branch)
-
-	// Make sure to delete the reference to this branch from the old parent if
-	// necessary.
-	if !oldParent.Trunk {
-		if oldParentMeta, ok := tx.Branch(oldParent.Name); ok {
-			oldParentMeta.Children = sliceutils.DeleteElement(oldParentMeta.Children, opts.Branch)
-			tx.SetBranch(oldParentMeta)
-		}
-	}
-
-	// Add this branch as a child of the new parent (unless it's a trunk branch)
-	if !opts.NewParentTrunk {
-		newParentMeta, _ := tx.Branch(opts.NewParent)
-		newParentMeta.Children = append(newParentMeta.Children, opts.Branch)
-		tx.SetBranch(newParentMeta)
-	}
 
 	return nil
 }
