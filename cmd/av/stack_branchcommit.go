@@ -6,13 +6,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/aviator-co/av/internal/actions"
-	"github.com/aviator-co/av/internal/utils/cleanup"
-	"github.com/aviator-co/av/internal/utils/colors"
-
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/cleanup"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

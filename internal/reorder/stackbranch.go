@@ -5,7 +5,6 @@ import (
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
-
 	"github.com/spf13/pflag"
 )
 

@@ -1,10 +1,10 @@
 package e2e_tests
 
 import (
-	"github.com/aviator-co/av/internal/meta"
 	"testing"
 
 	"github.com/aviator-co/av/internal/git/gittest"
+	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/stretchr/testify/require"
 )

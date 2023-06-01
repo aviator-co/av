@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aviator-co/av/internal/meta"
-
 	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/meta"
 )
 
 // Context is the context of a reorder operation.
