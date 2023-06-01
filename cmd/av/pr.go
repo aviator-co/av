@@ -40,6 +40,7 @@ Examples:
     > Can you please review it?
     > EOF
 `),
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
 		repo, err := getRepo()
 		if err != nil {
