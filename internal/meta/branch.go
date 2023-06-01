@@ -2,11 +2,11 @@ package meta
 
 import (
 	"encoding/json"
-	"golang.org/x/exp/slices"
 
 	"emperror.dev/errors"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 )
 
 type Branch struct {

@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aviator-co/av/internal/actions"
-	"github.com/aviator-co/av/internal/utils/cleanup"
-
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/cleanup"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/fatih/color"
 	"github.com/shurcooL/githubv4"

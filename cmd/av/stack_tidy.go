@@ -5,11 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/aviator-co/av/internal/utils/textutils"
-
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/textutils"
 	"github.com/spf13/cobra"
 )
 
