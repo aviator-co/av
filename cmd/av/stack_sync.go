@@ -48,6 +48,7 @@ latest commit to the repository base branch (e.g., main or master) into the
 stack. This is useful for rebasing a whole stack on the latest changes from the
 base branch.
 `),
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
