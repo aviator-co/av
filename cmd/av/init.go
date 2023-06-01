@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aviator-co/av/internal/utils/cleanup"
-	"github.com/sirupsen/logrus"
-
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/cleanup"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 

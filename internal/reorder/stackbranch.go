@@ -3,6 +3,8 @@ package reorder
 import (
 	"strings"
 
+	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/meta"
 	"github.com/spf13/pflag"
 )
 
@@ -19,11 +21,60 @@ type StackBranchCmd struct {
 	Parent string
 	// The name of the trunk branch.
 	// Mutually exclusive with --parent.
+	// The branch can be rooted at a given commit by appending "@<commit>" to the
+	// branch name.
 	Trunk string
 }
 
 func (b StackBranchCmd) Execute(ctx *Context) error {
-	panic("not implemented")
+	tx := ctx.DB.WriteTx()
+	defer tx.Abort()
+
+	branch, _ := tx.Branch(b.Name)
+	var parentState meta.BranchState
+
+	// Figure out which commit we need to start this branch at.
+	var headCommit string
+
+	if b.Trunk != "" {
+		parentState.Name, headCommit, _ = strings.Cut(b.Trunk, "@")
+		parentState.Trunk = true
+	} else {
+		// We assume the parent branch (if not set manually) is the previous branch
+		// in the reorder operation.
+		if b.Parent == "" {
+			b.Parent = ctx.State.Branch
+		}
+		if b.Parent == "" {
+			return ErrInvalidCmd{
+				"stack-branch",
+				"--parent=<branch> or --trunk=<branch> must be specified when creating the first branch",
+			}
+		}
+		parentState.Name = b.Parent
+		var err error
+
+		// We always start child branches at the HEAD of their parents.
+		headCommit, err = ctx.Repo.RevParse(&git.RevParse{Rev: b.Parent})
+		if err != nil {
+			return err
+		}
+		parentState.Head = headCommit
+	}
+	branch.Parent = parentState
+	tx.SetBranch(branch)
+
+	if headCommit == "" {
+		headCommit = branch.Parent.Name
+	}
+	if _, err := ctx.Repo.Git("switch", "--force-create", b.Name); err != nil {
+		return err
+	}
+	if _, err := ctx.Repo.Git("reset", "--hard", headCommit); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (b StackBranchCmd) String() string {

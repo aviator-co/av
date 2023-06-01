@@ -6,6 +6,7 @@ import (
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
+	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,8 +17,10 @@ func TestPickCmd_String(t *testing.T) {
 
 func TestPickCmd_Execute(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
+	db, err := jsonfiledb.OpenRepo(repo)
+	require.NoError(t, err)
 	out := &bytes.Buffer{}
-	ctx := &Context{repo, State{Branch: "main"}, out}
+	ctx := &Context{repo, db, &State{Branch: "main"}, out}
 
 	start, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
 	require.NoError(t, err)

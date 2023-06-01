@@ -3,26 +3,21 @@ package main
 import (
 	"context"
 
-	"github.com/aviator-co/av/internal/utils/cleanup"
-
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/cleanup"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
 
 var stackSubmitCmd = &cobra.Command{
 	Use:   "submit",
-	Short: "create/synchronize pull requests for the current stack",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) > 0 {
-			_ = cmd.Usage()
-			return errors.New("this command takes no arguments")
-		}
-
+	Short: "Create pull requests for every branch in the stack",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		// Get the all branches in the stack
 		repo, err := getRepo()
 		if err != nil {
