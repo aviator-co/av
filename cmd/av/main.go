@@ -92,6 +92,7 @@ func init() {
 		prCmd,
 		stackCmd,
 		versionCmd,
+		authCmd,
 	)
 }
 
