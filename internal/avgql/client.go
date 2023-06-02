@@ -2,6 +2,7 @@ package avgql
 
 import (
 	"context"
+	"os"
 
 	"github.com/aviator-co/av/internal/config"
 	"github.com/shurcooL/graphql"
@@ -13,5 +14,9 @@ func NewClient() *graphql.Client {
 		&oauth2.Token{AccessToken: config.Av.Aviator.APIToken},
 	)
 	httpClient := oauth2.NewClient(context.Background(), src)
-	return graphql.NewClient("https://api.aviator.co/graphql", httpClient)
+	apiURL := os.Getenv("AV_GRAPHQL_URL")
+	if apiURL == "" {
+		apiURL = "https://api.aviator.co/graphql"
+	}
+	return graphql.NewClient(apiURL, httpClient)
 }
