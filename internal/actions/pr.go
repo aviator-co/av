@@ -10,19 +10,17 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/aviator-co/av/internal/utils/sanitize"
-
-	"github.com/aviator-co/av/internal/editor"
-	"github.com/aviator-co/av/internal/utils/stringutils"
-	"github.com/aviator-co/av/internal/utils/templateutils"
-
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
+	"github.com/aviator-co/av/internal/editor"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/browser"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/sanitize"
+	"github.com/aviator-co/av/internal/utils/stringutils"
+	"github.com/aviator-co/av/internal/utils/templateutils"
 	"github.com/fatih/color"
 	"github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"

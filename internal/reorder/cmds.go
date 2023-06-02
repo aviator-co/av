@@ -3,10 +3,10 @@ package reorder
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/aviator-co/av/internal/meta"
 	"io"
 
 	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/meta"
 )
 
 // Context is the context of a reorder operation.

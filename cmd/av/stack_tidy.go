@@ -5,25 +5,26 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/aviator-co/av/internal/utils/textutils"
-
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/textutils"
 	"github.com/spf13/cobra"
 )
 
 var stackTidyCmd = &cobra.Command{
 	Use:   "tidy",
-	Short: "tidy up the branch metadata",
+	Short: "Tidy stacked branches",
 	Long: strings.TrimSpace(`
-Tidy up the branch metadata by removing the deleted / merged branches.
+Tidy stacked branches by removing deleted or merged branches.
 
-This command detects which branch is deleted or merged, and re-parent the child branches. This
-operates on only av's internal metadata, and it won't delete the actual Git branches.
-	`),
+This command detects which branches are deleted or merged and re-parents
+children of merged branches. This operates on only av's internal metadata and
+does not delete Git branches.
+`),
 	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Args:         cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		repo, err := getRepo()
 		if err != nil {
 			return err
@@ -64,7 +65,6 @@ operates on only av's internal metadata, and it won't delete the actual Git bran
 			}
 			tx.SetBranch(*br)
 		}
-		rebuildChildren(branches)
 
 		if err := tx.Commit(); err != nil {
 			return err
@@ -107,16 +107,4 @@ func findNonDeletedParents(
 		liveParents[name] = state
 	}
 	return liveParents
-}
-
-// rebuildChildren removes Children for all branches and recreates them from Parent.
-func rebuildChildren(branches map[string]*meta.Branch) {
-	for _, br := range branches {
-		br.Children = nil
-	}
-	for name, br := range branches {
-		if parent, ok := branches[br.Parent.Name]; ok {
-			parent.Children = append(parent.Children, name)
-		}
-	}
 }

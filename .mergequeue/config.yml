@@ -7,7 +7,7 @@ merge_rules:
   publish_status_check: true
   preconditions:
     use_github_mergeability: true
-    conversation_resolution_required: true
+    conversation_resolution_required: false
   merge_mode:
     type: default
   merge_strategy:

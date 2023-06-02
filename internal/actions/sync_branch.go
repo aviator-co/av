@@ -13,7 +13,6 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/ghutils"
-	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -470,7 +469,6 @@ func syncBranchUpdateParent(
 	continuation *SyncBranchContinuation,
 ) {
 	oldParentState := branch.Parent
-	oldParent, _ := tx.Branch(branch.Parent.Name)
 	branch.Parent = meta.BranchState{
 		Name: continuation.NewParentName,
 	}
@@ -486,21 +484,6 @@ func syncBranchUpdateParent(
 			"  - this branch is now a stack root based on trunk branch ",
 			colors.UserInput(branch.Parent.Name), "\n",
 		)
-	}
-
-	if oldParent.Name != branch.Parent.Name {
-		// Remove from the old parent branches metadata
-		oldParent.Children = sliceutils.DeleteElement(oldParent.Children, branch.Name)
-		tx.SetBranch(oldParent)
-
-		if !branch.Parent.Trunk {
-			// We don't store children of the trunk branches.
-			newParent, _ := tx.Branch(branch.Parent.Name)
-			// To avoid duplicates, delete it first and append.
-			newParent.Children = sliceutils.DeleteElement(newParent.Children, branch.Name)
-			newParent.Children = append(newParent.Children, branch.Name)
-			tx.SetBranch(newParent)
-		}
 	}
 }
 

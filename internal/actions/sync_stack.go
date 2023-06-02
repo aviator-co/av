@@ -12,7 +12,6 @@ import (
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/aviator-co/av/internal/utils/sliceutils"
 )
 
 // StackSyncConfig contains the configuration for a sync operation.
@@ -130,7 +129,7 @@ func SyncStack(ctx context.Context,
 			if br.MergeCommit == "" {
 				continue
 			}
-			if len(br.Children) > 0 {
+			if len(meta.Children(tx, currentBranch)) > 0 {
 				_, _ = fmt.Fprint(
 					os.Stderr,
 					"  - not deleting merged branch ",
@@ -192,14 +191,6 @@ func SyncStack(ctx context.Context,
 			}
 			// There's no children, but this can have a non-trunk parent.
 			tx.DeleteBranch(currentBranch)
-			if !br.Parent.Trunk {
-				parentBranch, _ := tx.Branch(br.Parent.Name)
-				parentBranch.Children = sliceutils.DeleteElement(
-					parentBranch.Children,
-					currentBranch,
-				)
-				tx.SetBranch(parentBranch)
-			}
 			if currentBranch == state.OriginalBranch {
 				// The original branch is deleted.
 				state.OriginalBranch = ""

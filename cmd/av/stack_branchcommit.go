@@ -6,13 +6,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/aviator-co/av/internal/actions"
-	"github.com/aviator-co/av/internal/utils/cleanup"
-	"github.com/aviator-co/av/internal/utils/colors"
-
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/cleanup"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -154,15 +153,6 @@ var stackBranchCommitCmd = &cobra.Command{
 				Head:  parentHead,
 			},
 		})
-
-		// If this isn't a new stack root, update the parent metadata to include
-		// the new branch as a child.
-		if !isBranchFromTrunk {
-			parentMeta, _ := tx.Branch(parentBranchName)
-			parentMeta.Children = append(parentMeta.Children, branchName)
-			logrus.WithField("meta", parentMeta).Debug("writing parent branch metadata")
-			tx.SetBranch(parentMeta)
-		}
 
 		// For "--all" and "--all-modified",
 		var addArgs []string
