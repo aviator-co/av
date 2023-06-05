@@ -4,7 +4,6 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
-	"github.com/sirupsen/logrus"
 )
 
 // CreatePlan creates a reorder plan for the stack rooted at rootBranch.
@@ -55,11 +54,6 @@ func CreatePlan(repo *git.Repo, tx meta.ReadTx, rootBranch string) ([]Cmd, error
 		if err != nil {
 			return nil, err
 		}
-
-		logrus.WithFields(logrus.Fields{
-			"commitIDs":     commitIDs,
-			"commitObjects": commitObjects,
-		}).Info("got commit objects")
 
 		for _, object := range commitObjects {
 			commit, err := git.ParseCommitContents(object.Contents)
