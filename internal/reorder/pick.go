@@ -1,7 +1,6 @@
 package reorder
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -13,7 +12,8 @@ import (
 // PickCmd is a command that picks a commit from the history and applies it on
 // top of the current HEAD.
 type PickCmd struct {
-	Commit string
+	Commit  string
+	Comment string
 }
 
 func (p PickCmd) Execute(ctx *Context) error {
@@ -48,7 +48,14 @@ func (p PickCmd) Execute(ctx *Context) error {
 }
 
 func (p PickCmd) String() string {
-	return fmt.Sprintf("pick %s", p.Commit)
+	sb := strings.Builder{}
+	sb.WriteString("pick ")
+	sb.WriteString(p.Commit)
+	if p.Comment != "" {
+		sb.WriteString("  # ")
+		sb.WriteString(p.Comment)
+	}
+	return sb.String()
 }
 
 var _ Cmd = &PickCmd{}

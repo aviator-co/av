@@ -13,9 +13,9 @@ func TestState(t *testing.T) {
 		Head:   "owouwu",
 		Commands: []Cmd{
 			StackBranchCmd{Name: "one", Trunk: "main"},
-			PickCmd{"abcd"},
+			PickCmd{"abcd", ""},
 			StackBranchCmd{Name: "two", Parent: "one"},
-			PickCmd{"efgh"},
+			PickCmd{"efgh", ""},
 		},
 	}
 

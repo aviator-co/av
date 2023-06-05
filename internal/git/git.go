@@ -97,6 +97,8 @@ type RunOpts struct {
 	// If true, the standard I/Os are connected to the console, allowing the git command to
 	// interact with the user. Stdout and Stderr will be empty.
 	Interactive bool
+	// The standard input to the command (if any). Mutually exclusive with Interactive.
+	Stdin io.Reader
 }
 
 type Output struct {
@@ -123,6 +125,9 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 	}
+	if opts.Stdin != nil {
+		cmd.Stdin = opts.Stdin
+	}
 	cmd.Env = append(os.Environ(), opts.Env...)
 	err := cmd.Run()
 	var exitError *exec.ExitError
@@ -137,26 +142,6 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 		Stdout:   stdout.Bytes(),
 		Stderr:   stderr.Bytes(),
 	}, nil
-}
-
-func (r *Repo) GitStdin(args []string, stdin io.Reader) (string, error) {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = r.repoDir
-	cmd.Stdin = stdin
-	r.log.Debugf("git %s", args)
-	out, err := cmd.Output()
-	if err != nil {
-		stderr := "<no output>"
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			stderr = string(exitError.Stderr)
-		}
-		r.log.Errorf("git %s failed: %s: %s", args, err, stderr)
-		return "", errors.Wrapf(err, "git %s", args[0])
-	}
-
-	// trim trailing newline
-	return strings.TrimSpace(string(out)), nil
 }
 
 // DetachedHead returns true if the repository is in the detached HEAD.
