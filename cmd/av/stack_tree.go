@@ -150,7 +150,7 @@ func getUpstreamStatus(repo *git.Repo, branch meta.Branch) (string, error) {
 
 	upstreamBranch := fmt.Sprintf("remotes/origin/%s", branch.Name)
 	upstreamDiff, err := repo.Diff(
-		&git.DiffOpts{Quiet: true, Branch1: branch.Name, Branch2: upstreamBranch},
+		&git.DiffOpts{Quiet: true, Specifiers: []string{branch.Name, upstreamBranch}},
 	)
 	if err != nil {
 		return "", err
