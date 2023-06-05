@@ -11,7 +11,14 @@ av-pr-create - Create a pull request for the current branch
 
 # DESCRIPTION
 
-Create a pull request for the current branch.
+Push the current branch and create a pull request if not exist. If the branch
+has a parent branch, you need to make a pull-request for the parent first. If
+title and body are not provided, `$EDITOR` pops up and you are asked to provide
+them.
+
+When there's already a pull-request, the command just pushes the branch to
+remote, and you are not asked to provide the title and the body. If you want to
+edit the pull-request description for the existing pull-request, use `--edit`.
 
 # OPTIONS
 
