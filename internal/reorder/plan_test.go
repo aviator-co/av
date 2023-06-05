@@ -18,21 +18,16 @@ func TestCreatePlan(t *testing.T) {
 
 	initialCommit, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
 	require.NoError(t, err)
-	_ = initialCommit
 
 	_, err = repo.CheckoutBranch(&git.CheckoutBranch{Name: "one", NewBranch: true})
 	require.NoError(t, err)
 	c1a := gittest.CommitFile(t, repo, "file", []byte("hello\n"))
 	c1b := gittest.CommitFile(t, repo, "file", []byte("hello\nworld\n"))
-	_ = c1a
-	_ = c1b
 
 	_, err = repo.CheckoutBranch(&git.CheckoutBranch{Name: "two", NewBranch: true})
 	require.NoError(t, err)
 	c2a := gittest.CommitFile(t, repo, "fichier", []byte("bonjour\n"))
 	c2b := gittest.CommitFile(t, repo, "fichier", []byte("bonjour\nle monde\n"))
-	_ = c2a
-	_ = c2b
 
 	tx := db.WriteTx()
 	tx.SetBranch(meta.Branch{
