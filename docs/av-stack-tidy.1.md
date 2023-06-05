@@ -2,7 +2,7 @@
 
 # NAME
 
-av-stack-tidy - Record changes to the repository with commits
+av-stack-tidy - Tidy stacked branches by removing deleted or merged branches
 
 # SYNOPSIS
 
