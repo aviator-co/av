@@ -284,7 +284,7 @@ func CreatePullRequest(
 
 		res, err := editor.Launch(repo, editor.Config{
 			Text:           editorText,
-			TmpFilePattern: "pr-*.md",
+			TmpFilePattern: "pr-*.av.md",
 			CommentPrefix:  "%%",
 		})
 		if err != nil {
