@@ -31,7 +31,7 @@ var stackSyncFlags struct {
 
 var stackSyncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "synchronize stacked branches",
+	Short: "Synchronize stacked branches",
 	Long: strings.TrimSpace(`
 Synchronize stacked branches to be up-to-date with their parent branches.
 
