@@ -37,10 +37,7 @@ var stackNextCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		subsequentBranches, err := meta.SubsequentBranches(tx, currentBranch)
-		if err != nil {
-			return err
-		}
+		subsequentBranches := meta.SubsequentBranches(tx, currentBranch)
 
 		var branchToCheckout string
 		if stackNextFlags.Last {

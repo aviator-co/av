@@ -40,7 +40,6 @@ func Reparent(
 			"  - Adopting a branch ",
 			colors.UserInput(opts.Branch),
 			" to Av",
-			colors.UserInput(opts.NewParent),
 			"\n",
 		)
 		branchMeta.Parent.Name = opts.NewParent
@@ -61,7 +60,7 @@ func Reparent(
 		"\n",
 	)
 
-	diff, err := repo.Diff(&git.DiffOpts{Commit: "HEAD", Quiet: true})
+	diff, err := repo.Diff(&git.DiffOpts{Specifiers: []string{"HEAD"}, Quiet: true})
 	if err != nil {
 		return nil, err
 	}

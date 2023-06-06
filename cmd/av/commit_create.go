@@ -93,10 +93,7 @@ func commitCreate(repo *git.Repo, currentBranchName string, flags struct {
 		return err
 	}
 
-	branchesToSync, err := meta.SubsequentBranches(tx, currentBranchName)
-	if err != nil {
-		return err
-	}
+	branchesToSync := meta.SubsequentBranches(tx, currentBranchName)
 
 	err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state)
 	if err != nil {
