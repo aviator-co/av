@@ -3,6 +3,8 @@ package reorder
 import (
 	"strings"
 
+	"github.com/aviator-co/av/internal/utils/colors"
+
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/spf13/pflag"
@@ -73,6 +75,13 @@ func (b StackBranchCmd) Execute(ctx *Context) error {
 	if _, err := ctx.Repo.Git("reset", "--hard", headCommit); err != nil {
 		return err
 	}
+	ctx.Print(
+		"Starting branch ",
+		colors.UserInput(b.Name),
+		" at ",
+		colors.UserInput(git.ShortSha(headCommit)),
+		"\n",
+	)
 
 	return tx.Commit()
 }

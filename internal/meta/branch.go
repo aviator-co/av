@@ -65,7 +65,6 @@ func (b *Branch) UnmarshalJSON(bytes []byte) error {
 		return err
 	}
 
-	logrus.Debugf("parsed branch metadata: %s => %#+v %#+v", bytes, d, b)
 	return nil
 }
 
@@ -127,6 +126,18 @@ func SubsequentBranches(tx ReadTx, name string) []string {
 		res = append(res, SubsequentBranches(tx, child.Name)...)
 	}
 	return res
+}
+
+// Root determines the stack root of a branch.
+func Root(tx ReadTx, name string) (string, bool) {
+	for name != "" {
+		branch, _ := tx.Branch(name)
+		if branch.Parent.Trunk {
+			return name, true
+		}
+		name = branch.Parent.Name
+	}
+	return "", false
 }
 
 // Trunk determines the trunk of a branch.
