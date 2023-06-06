@@ -40,10 +40,7 @@ var stackSubmitCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		subsequentBranches, err := meta.SubsequentBranches(tx, currentBranch)
-		if err != nil {
-			return err
-		}
+		subsequentBranches := meta.SubsequentBranches(tx, currentBranch)
 		var branchesToSubmit []string
 		branchesToSubmit = append(branchesToSubmit, previousBranches...)
 		branchesToSubmit = append(branchesToSubmit, currentBranch)

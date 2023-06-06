@@ -31,7 +31,7 @@ var stackSyncFlags struct {
 
 var stackSyncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "synchronize stacked branches",
+	Short: "Synchronize stacked branches",
 	Long: strings.TrimSpace(`
 Synchronize stacked branches to be up-to-date with their parent branches.
 
@@ -220,10 +220,7 @@ base branch.
 					continue
 				}
 				branchesToSync = append(branchesToSync, br.Name)
-				nextBranches, err := meta.SubsequentBranches(tx, branchesToSync[len(branchesToSync)-1])
-				if err != nil {
-					return err
-				}
+				nextBranches := meta.SubsequentBranches(tx, branchesToSync[len(branchesToSync)-1])
 				branchesToSync = append(branchesToSync, nextBranches...)
 			}
 			state.Branches = branchesToSync
@@ -237,10 +234,7 @@ base branch.
 				return err
 			}
 			branchesToSync = append(branchesToSync, currentBranch)
-			nextBranches, err := meta.SubsequentBranches(tx, branchesToSync[len(branchesToSync)-1])
-			if err != nil {
-				return err
-			}
+			nextBranches := meta.SubsequentBranches(tx, branchesToSync[len(branchesToSync)-1])
 			branchesToSync = append(branchesToSync, nextBranches...)
 			state.Branches = branchesToSync
 		}

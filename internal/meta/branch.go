@@ -116,19 +116,17 @@ func PreviousBranches(tx ReadTx, name string) ([]string, error) {
 
 // SubsequentBranches finds all the child branches of the given branch name in
 // "dependency order" (i.e., A comes before B if A is an ancestor of B).
-func SubsequentBranches(tx ReadTx, name string) ([]string, error) {
+// If the tree is not a straight line (which isn't explicitly supported!), the
+// branches will be returned in depth-first traversal order.
+func SubsequentBranches(tx ReadTx, name string) []string {
 	logrus.Debugf("finding subsequent branches for %q", name)
 	var res []string
 	children := Children(tx, name)
 	for _, child := range children {
 		res = append(res, child.Name)
-		desc, err := SubsequentBranches(tx, child.Name)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, desc...)
+		res = append(res, SubsequentBranches(tx, child.Name)...)
 	}
-	return res, nil
+	return res
 }
 
 // Trunk determines the trunk of a branch.
