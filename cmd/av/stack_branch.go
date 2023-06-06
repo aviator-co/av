@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
@@ -36,13 +37,8 @@ given as the first argument to the command. Branches should only be renamed
 with this command (not with git branch -m ...) because av needs to update
 internal tracking metadata that defines the order of branches within a stack.`,
 	SilenceUsage: true,
+	Args:         cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
-		if len(args) != 1 {
-			_ = cmd.Usage()
-			return errors.New("exactly one branch name is required")
-		}
-		branchName := args[0]
-
 		repo, err := getRepo()
 		if err != nil {
 			return err
@@ -53,6 +49,7 @@ internal tracking metadata that defines the order of branches within a stack.`,
 			return err
 		}
 
+		branchName := args[0]
 		if stackBranchFlags.Rename {
 			return stackBranchMove(repo, db, branchName, stackBranchFlags.Force)
 		}
@@ -177,9 +174,20 @@ func stackBranchMove(
 	newBranch string,
 	force bool,
 ) (reterr error) {
-	oldBranch, err := repo.CurrentBranchName()
-	if err != nil {
-		return err
+	c := strings.Count(newBranch, ":")
+	if c > 1 {
+		return errors.New("the branch name should be NEW_BRANCH or OLD_BRANCH:NEW_BRANCH")
+	}
+
+	var oldBranch string
+	if strings.ContainsRune(newBranch, ':') {
+		oldBranch, newBranch, _ = strings.Cut(newBranch, ":")
+	} else {
+		var err error
+		oldBranch, err = repo.CurrentBranchName()
+		if err != nil {
+			return err
+		}
 	}
 
 	tx := db.WriteTx()
@@ -236,11 +244,22 @@ func stackBranchMove(
 	tx.DeleteBranch(oldBranch)
 
 	// Finally, actually rename the branch in Git
-	if _, err := repo.Run(&git.RunOpts{
-		Args:      []string{"branch", "-m", newBranch},
-		ExitError: true,
-	}); err != nil {
-		return errors.WrapIff(err, "failed to rename Git branch")
+	if ok, err := repo.DoesBranchExist(oldBranch); err != nil {
+		return err
+	} else if ok {
+		if _, err := repo.Run(&git.RunOpts{
+			Args:      []string{"branch", "-m", newBranch},
+			ExitError: true,
+		}); err != nil {
+			return errors.WrapIff(err, "failed to rename Git branch")
+		}
+	} else {
+		_, _ = fmt.Fprint(
+			os.Stderr,
+			"Branch ",
+			colors.UserInput(oldBranch),
+			" does not exist in Git. Updating av internal metadata only.\n",
+		)
 	}
 
 	cu.Cancel()

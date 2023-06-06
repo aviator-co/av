@@ -204,15 +204,21 @@ func (r *Repo) HasChangesToBeCommitted() (bool, error) {
 	return out.ExitCode == 1, nil
 }
 
+func (r *Repo) DoesBranchExist(branch string) (bool, error) {
+	return r.DoesRefExist(fmt.Sprintf("refs/heads/%s", branch))
+}
+
 func (r *Repo) DoesRemoteBranchExist(branch string) (bool, error) {
-	remoteBranch := fmt.Sprintf("refs/remotes/origin/%s", branch)
+	return r.DoesRefExist(fmt.Sprintf("refs/remotes/origin/%s", branch))
+}
+
+func (r *Repo) DoesRefExist(ref string) (bool, error) {
 	out, err := r.Run(&RunOpts{
-		Args: []string{"show-ref", remoteBranch},
+		Args: []string{"show-ref", ref},
 	})
 	if err != nil {
-		return false, errors.Errorf("remote branch does not exist: %v", err)
+		return false, errors.Errorf("ref %s does not exist: %v", ref, err)
 	}
-
 	if len(out.Stdout) > 0 {
 		return true, nil
 	}
