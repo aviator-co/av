@@ -61,7 +61,7 @@ func Reparent(
 		"\n",
 	)
 
-	diff, err := repo.Diff(&git.DiffOpts{Commit: "HEAD", Quiet: true})
+	diff, err := repo.Diff(&git.DiffOpts{Specifiers: []string{"HEAD"}, Quiet: true})
 	if err != nil {
 		return nil, err
 	}
