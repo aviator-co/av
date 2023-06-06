@@ -40,7 +40,6 @@ func Reparent(
 			"  - Adopting a branch ",
 			colors.UserInput(opts.Branch),
 			" to Av",
-			colors.UserInput(opts.NewParent),
 			"\n",
 		)
 		branchMeta.Parent.Name = opts.NewParent
