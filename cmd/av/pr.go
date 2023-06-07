@@ -5,13 +5,13 @@ import (
 )
 
 var prCmd = &cobra.Command{
-	Use: "pr",
+	Use:   "pr",
 	Short: "manage pull requests",
 }
 
 func init() {
 	prCmd.AddCommand(
 		prCreateCmd,
-
+		prStatusCmd,
 	)
 }
