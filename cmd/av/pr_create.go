@@ -12,10 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var prCmd = &cobra.Command{
-	Use: "pr",
-}
-
 var prCreateFlags struct {
 	Draft  bool
 	Force  bool
@@ -24,6 +20,7 @@ var prCreateFlags struct {
 	Body   string
 	Edit   bool
 }
+
 var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "create a pull request for the current branch",
