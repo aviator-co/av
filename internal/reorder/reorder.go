@@ -1,8 +1,12 @@
 package reorder
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+
+	"github.com/aviator-co/av/internal/git"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/utils/colors"
@@ -32,4 +36,46 @@ func Reorder(ctx Context) (*Continuation, error) {
 
 type Continuation struct {
 	State *State
+}
+
+const stateFileName = "stack-reorder.state.json"
+
+// ReadContinuation reads a continuation from the state file.
+// Returns the raw error returned by os.Open if the file couldn't be opened.
+// Use os.IsNotExist to check if the continuation doesn't exist.
+func ReadContinuation(repo *git.Repo) (*Continuation, error) {
+	file, err := os.Open(filepath.Join(repo.AvDir(), stateFileName))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+
+	decoder := json.NewDecoder(file)
+	var continuation Continuation
+	err = decoder.Decode(&continuation)
+	if err != nil {
+		return nil, err
+	}
+
+	return &continuation, nil
+}
+
+// WriteContinuation writes a continuation to the state file.
+// If a nil continuation is passed, the state file is deleted.
+func WriteContinuation(repo *git.Repo, continuation *Continuation) error {
+	if continuation == nil {
+		return os.Remove(filepath.Join(repo.AvDir(), stateFileName))
+	}
+
+	file, err := os.Create(filepath.Join(repo.AvDir(), stateFileName))
+	if err != nil {
+		return err
+	}
+	enc := json.NewEncoder(file)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(continuation); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
 }

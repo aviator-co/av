@@ -21,6 +21,9 @@ type Config struct {
 	TmpFilePattern string
 	// The prefix used to identify comments in the text.
 	CommentPrefix string
+	// If true, strip comments from the end of lines. If false, only whole lines
+	// that are comments will be stripped.
+	EndOfLineComments bool
 	// The editor command to be used.
 	// If empty, the git default editor will be used.
 	Command string
@@ -106,10 +109,17 @@ func parseResult(path string, config Config) (string, error) {
 	res := bytes.NewBuffer(nil)
 	for scan.Scan() {
 		line := scan.Text()
-		if !strings.HasPrefix(line, config.CommentPrefix) {
-			res.WriteString(line)
-			res.WriteString("\n")
+		if strings.HasPrefix(line, config.CommentPrefix) {
+			// Skip this line altogether (including the newline).
+			continue
 		}
+		// This currently doesn't include any way to escape comments, but that's
+		// probably fine for us for now.
+		if config.EndOfLineComments {
+			line, _, _ = strings.Cut(line, config.CommentPrefix)
+		}
+		res.WriteString(line)
+		res.WriteByte('\n')
 	}
 	return res.String(), nil
 }
