@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/aviator-co/av/internal/avgql"
 	"github.com/aviator-co/av/internal/utils/colors"
@@ -39,6 +40,7 @@ var query struct {
 					Conclusion graphql.String
 				}
 			}
+			// TODO: add BotPR info
 		} `graphql:"pullRequest(number: $prNumber)"`
 	} `graphql:"githubRepository(owner: $repoOwner, name:$repoName)"`
 }
@@ -67,7 +69,9 @@ var prStatusCmd = &cobra.Command{
 		// Print PR info
 		_, _ = fmt.Fprint(
 			os.Stderr,
-			"#162 ",
+			"#",
+			variables["prNumber"],
+			" ",
 			colors.UserInput(query.GithubRepository.PullRequest.Title),
 			"\n",
 		)
@@ -94,7 +98,7 @@ var prStatusCmd = &cobra.Command{
 			os.Stderr,
 			indent,
 			"Created at: ",
-			colors.UserInput(query.GithubRepository.PullRequest.CreatedAt),
+			colors.UserInput(formatTimestamp(string(query.GithubRepository.PullRequest.CreatedAt))),
 			"\n",
 		)
 
@@ -103,7 +107,9 @@ var prStatusCmd = &cobra.Command{
 				os.Stderr,
 				indent,
 				"Queued at: ",
-				colors.UserInput(query.GithubRepository.PullRequest.QueuedAt),
+				colors.UserInput(
+					formatTimestamp(string(query.GithubRepository.PullRequest.QueuedAt)),
+				),
 				"\n",
 			)
 		}
@@ -112,7 +118,9 @@ var prStatusCmd = &cobra.Command{
 				os.Stderr,
 				indent,
 				"Merged at: ",
-				colors.UserInput(query.GithubRepository.PullRequest.MergedAt),
+				colors.UserInput(
+					formatTimestamp(string(query.GithubRepository.PullRequest.MergedAt)),
+				),
 				"\n",
 			)
 		}
@@ -176,12 +184,12 @@ func getQueryVariables() (map[string]interface{}, error) {
 		return nil, errors.New("pull request does not exist")
 	}
 
-	// prNumber := branch.PullRequest.Number
+	prNumber := branch.PullRequest.Number
 	repository, _ := tx.Repository()
 	var variables = map[string]interface{}{
 		"repoOwner": graphql.String(repository.Owner),
 		"repoName":  graphql.String(repository.Name),
-		"prNumber":  graphql.Int(2897),
+		"prNumber":  graphql.Int(prNumber),
 	}
 	return variables, nil
 }
@@ -194,4 +202,17 @@ func emojiForRequiredCheckResult(result string) string {
 	} else {
 		return "\u231B"
 	}
+}
+
+func formatTimestamp(timeString string) string {
+	inputLayout := "2006-01-02T15:04:05.999999Z07:00"
+	outputLayout := "2 January 2006 3:04:05 PM PST"
+
+	timestamp, err := time.Parse(inputLayout, timeString)
+	if err != nil {
+		return timeString
+	}
+
+	timestampDefaultTZ := timestamp.Local()
+	return timestampDefaultTZ.Format(outputLayout)
 }
