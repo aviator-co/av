@@ -151,23 +151,6 @@ func init() {
 }
 
 func stackReorderEditPlan(repo *git.Repo, initialPlan []reorder.Cmd) ([]reorder.Cmd, error) {
-	// TODO:
-	// What should we do if the plan removes branches? Currently,
-	// we just don't edit those branches. So if a user edits
-	//     sb one
-	//     pick 1a
-	//     sb two
-	//     pick 2a
-	// and deletes the line for `sb two`, then the reorder will modify
-	// one to contain 1a/2a, but we don't modify two so it'll still be
-	// considered stacked on top of one.
-	// We can probably delete the branch and also emit a message to the
-	// user to the effect of
-	//     Deleting branch `two` because it was removed from the reorder.
-	//     To restore the branch, run `git switch -C two <OLD HEAD>`.
-	// just to make sure they can recover their work. (They already would
-	// be able to using `git reflog` but generally only advanced Git
-	// users think to do that).
 	plan := initialPlan
 edit:
 	plan, err := reorder.EditPlan(repo, plan)
@@ -191,7 +174,7 @@ edit:
 			_, _ = fmt.Fprint(os.Stderr, "  - ", colors.UserInput(branch), "\n")
 		}
 
-	prompt:
+	promptDeletionBehavior:
 		_, _ = fmt.Fprint(os.Stderr, "\n",
 			`What would you like to do?
     [a] Abort the reorder
@@ -220,7 +203,7 @@ edit:
 			deleteRefs = false
 		default:
 			_, _ = fmt.Fprint(os.Stderr, colors.Failure("\nInvalid choice.\n"))
-			goto prompt
+			goto promptDeletionBehavior
 		}
 
 		for _, branch := range diff.RemovedBranches {
