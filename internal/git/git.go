@@ -102,9 +102,10 @@ type RunOpts struct {
 }
 
 type Output struct {
-	ExitCode int
-	Stdout   []byte
-	Stderr   []byte
+	ExitCode  int
+	ExitError *exec.ExitError
+	Stdout    []byte
+	Stderr    []byte
 }
 
 func (o Output) Lines() []string {
@@ -138,9 +139,10 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 		return nil, errors.Errorf("git %s: %s: %s", opts.Args, err, stderr.String())
 	}
 	return &Output{
-		ExitCode: cmd.ProcessState.ExitCode(),
-		Stdout:   stdout.Bytes(),
-		Stderr:   stderr.Bytes(),
+		ExitCode:  cmd.ProcessState.ExitCode(),
+		ExitError: exitError,
+		Stdout:    stdout.Bytes(),
+		Stderr:    stderr.Bytes(),
 	}, nil
 }
 
