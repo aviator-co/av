@@ -6,7 +6,7 @@ av-stack-branch - Create or rename a branch in the stack
 
 # SYNOPSIS
 
-`av stack branch [-m | --rename] [--parent <parent_branch>] <branch-name>`
+`av stack branch [-m | --rename] [--force] [--parent <parent_branch>] <branch-name>`
 
 # DESCRIPTION
 
@@ -25,4 +25,7 @@ internal tracking metadata that defines the order of branches within a stack.
 
 `-m, --rename`
 : Rename the current branch to the provided `<branch_name>` instead of
-  creating a new one.
+  creating a new one, only if a pull request does not exist.
+
+`--force`
+: Force rename the branch, even if a pull request exists.

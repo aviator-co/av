@@ -15,8 +15,11 @@ var stackBranchFlags struct {
 	Parent string
 	// If true, rename the current branch ("move" in Git parlance, though we
 	// avoid that language here since we're not changing the branch's position
-	// within the stack).
+	// within the stack). The branch can only be renamed if a pull request does
+	// not exist.
 	Rename bool
+	// If true, rename the current branch even if a pull request exists.
+	Force bool
 }
 var stackBranchCmd = &cobra.Command{
 	Use:   "branch [flags] <branch-name>",
@@ -46,7 +49,7 @@ internal tracking metadata that defines the order of branches within a stack.`,
 		}
 
 		if stackBranchFlags.Rename {
-			return stackBranchMove(repo, db, branchName)
+			return stackBranchMove(repo, db, branchName, stackBranchFlags.Force)
 		}
 
 		tx := db.WriteTx()
@@ -159,12 +162,15 @@ func init() {
 	// See the comment on stackBranchFlags.Rename.
 	stackBranchCmd.Flags().
 		BoolVarP(&stackBranchFlags.Rename, "rename", "m", false, "rename the current branch")
+	stackBranchCmd.Flags().
+		BoolVar(&stackBranchFlags.Force, "force", false, "force rename the current branch")
 }
 
 func stackBranchMove(
 	repo *git.Repo,
 	db meta.DB,
 	newBranch string,
+	force bool,
 ) (reterr error) {
 	oldBranch, err := repo.CurrentBranchName()
 	if err != nil {
@@ -195,6 +201,14 @@ func stackBranchMove(
 	}
 	currentMeta.Name = newBranch
 	tx.SetBranch(currentMeta)
+
+	if !force {
+		if currentMeta.PullRequest != nil {
+			return errors.New(
+				"cannot rename branch because a pull request already exists (bypass with the `--force` flag, but this renames your local branch and not its remote counterpart)",
+			)
+		}
+	}
 
 	// Update all child branches to refer to the correct (renamed) parent.
 	children := meta.Children(tx, oldBranch)
