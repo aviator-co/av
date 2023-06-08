@@ -18,10 +18,12 @@ func ParseCmd(line string) (Cmd, error) {
 	cmdName := args[0]
 	args = args[1:]
 	switch cmdName {
-	case "stack-branch", "sb":
-		return parseStackBranchCmd(args)
+	case "delete-branch", "db":
+		return parseDeleteBranchCmd(args)
 	case "pick", "p":
 		return parsePickCmd(args)
+	case "stack-branch", "sb":
+		return parseStackBranchCmd(args)
 	default:
 		return nil, errors.Errorf("unknown reorder command %q", cmdName)
 	}

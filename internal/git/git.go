@@ -136,7 +136,11 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 		return nil, errors.Wrapf(err, "git %s", opts.Args)
 	}
 	if err != nil && opts.ExitError && exitError.ExitCode() != 0 {
-		return nil, errors.Errorf("git %s: %s: %s", opts.Args, err, stderr.String())
+		// ExitError.Stderr is only populated if the command was started without
+		// a Stderr pipe, which is not the case here. Just populate it ourselves
+		// to make it easier for callers to access.
+		exitError.Stderr = stderr.Bytes()
+		return nil, errors.WrapIff(err, "git %s (%s)", opts.Args, stderr.String())
 	}
 	return &Output{
 		ExitCode:  cmd.ProcessState.ExitCode(),

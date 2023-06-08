@@ -19,6 +19,11 @@ func TestParseCmd(t *testing.T) {
 		{"pick", PickCmd{}, true},
 		{"pick foo", PickCmd{Commit: "foo"}, false},
 		{"pick foo bar", PickCmd{}, true},
+		{"delete-branch", DeleteBranchCmd{}, true},
+		{"delete-branch foo", DeleteBranchCmd{Name: "foo"}, false},
+		{"delete-branch foo bar", DeleteBranchCmd{}, true},
+		{"db foo --delete-ref", DeleteBranchCmd{Name: "foo", DeleteRef: true}, false},
+		{"blarn", nil, true},
 	} {
 		t.Run(tt.Input, func(t *testing.T) {
 			cmd, err := ParseCmd(tt.Input)

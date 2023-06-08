@@ -6,12 +6,12 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/spf13/pflag"
+
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/errutils"
 )
-
-type DeleteBranchMode string
 
 // DeleteBranchCmd is a command that deletes a branch.
 type DeleteBranchCmd struct {
@@ -69,3 +69,25 @@ func (d DeleteBranchCmd) String() string {
 }
 
 var _ Cmd = DeleteBranchCmd{}
+
+func parseDeleteBranchCmd(args []string) (Cmd, error) {
+	cmd := DeleteBranchCmd{}
+	flags := pflag.NewFlagSet("delete-branch", pflag.ContinueOnError)
+	flags.BoolVar(
+		&cmd.DeleteRef,
+		"delete-ref",
+		false,
+		"delete the branch from Git as well as from the internal database",
+	)
+	if err := flags.Parse(args); err != nil {
+		return nil, err
+	}
+	if flags.NArg() != 1 {
+		return nil, ErrInvalidCmd{
+			"delete-branch",
+			"exactly one argument is required (the name of the branch to delete)",
+		}
+	}
+	cmd.Name = flags.Arg(0)
+	return cmd, nil
+}
