@@ -5,45 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
+	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/avgql"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/timeutils"
 	"github.com/shurcooL/graphql"
 	"github.com/spf13/cobra"
 )
-
-var query struct {
-	GithubRepository struct {
-		PullRequest struct {
-			Title        graphql.String
-			Status       graphql.String
-			StatusReason graphql.String
-			Author       struct {
-				Login graphql.String
-			}
-			CreatedAt             graphql.String
-			QueuedAt              graphql.String
-			MergedAt              graphql.String
-			BaseBranchName        graphql.String
-			HeadBranchName        graphql.String
-			RequiredCheckStatuses []struct {
-				RequiredCheck struct {
-					Pattern graphql.String
-				}
-				Result    graphql.String
-				CheckRuns []struct {
-					Check struct {
-						Name graphql.String
-					}
-					Status     graphql.String
-					Conclusion graphql.String
-				}
-			}
-			// TODO: add BotPR info
-		} `graphql:"pullRequest(number: $prNumber)"`
-	} `graphql:"githubRepository(owner: $repoOwner, name:$repoName)"`
-}
 
 var prStatusCmd = &cobra.Command{
 	Use:          "status",
@@ -57,6 +26,38 @@ var prStatusCmd = &cobra.Command{
 		}
 
 		client := avgql.NewClient()
+
+		var query struct {
+			GithubRepository struct {
+				PullRequest struct {
+					Title        graphql.String
+					Status       graphql.String
+					StatusReason graphql.String
+					Author       struct {
+						Login graphql.String
+					}
+					CreatedAt             graphql.String
+					QueuedAt              graphql.String
+					MergedAt              graphql.String
+					BaseBranchName        graphql.String
+					HeadBranchName        graphql.String
+					RequiredCheckStatuses []struct {
+						RequiredCheck struct {
+							Pattern graphql.String
+						}
+						Result    graphql.String
+						CheckRuns []struct {
+							Check struct {
+								Name graphql.String
+							}
+							Status     graphql.String
+							Conclusion graphql.String
+						}
+					}
+					// TODO: add BotPR info
+				} `graphql:"pullRequest(number: $prNumber)"`
+			} `graphql:"githubRepository(owner: $repoOwner, name:$repoName)"`
+		}
 
 		err = client.Query(context.Background(), &query, variables)
 		if err != nil {
@@ -75,17 +76,18 @@ var prStatusCmd = &cobra.Command{
 			colors.UserInput(query.GithubRepository.PullRequest.Title),
 			"\n",
 		)
-		_, _ = fmt.Fprint(os.Stderr, indent, "Status: ", colors.UserInput(prStatus), "\n")
+		_, _ = fmt.Fprint(os.Stderr, indent, "Status: ", colors.UserInput(prStatus))
 
 		if prStatus == "PENDING" || prStatus == "BLOCKED" {
 			_, _ = fmt.Fprint(
 				os.Stderr,
 				indent,
-				"Status reason: ",
+				" (",
 				colors.UserInput(query.GithubRepository.PullRequest.StatusReason),
-				"\n",
+				")",
 			)
 		}
+		_, _ = fmt.Fprint(os.Stderr, "\n")
 
 		_, _ = fmt.Fprint(
 			os.Stderr,
@@ -98,7 +100,9 @@ var prStatusCmd = &cobra.Command{
 			os.Stderr,
 			indent,
 			"Created at: ",
-			colors.UserInput(formatTimestamp(string(query.GithubRepository.PullRequest.CreatedAt))),
+			colors.UserInput(
+				timeutils.FormatLocal(string(query.GithubRepository.PullRequest.CreatedAt)),
+			),
 			"\n",
 		)
 
@@ -108,7 +112,7 @@ var prStatusCmd = &cobra.Command{
 				indent,
 				"Queued at: ",
 				colors.UserInput(
-					formatTimestamp(string(query.GithubRepository.PullRequest.QueuedAt)),
+					timeutils.FormatLocal(string(query.GithubRepository.PullRequest.QueuedAt)),
 				),
 				"\n",
 			)
@@ -119,7 +123,7 @@ var prStatusCmd = &cobra.Command{
 				indent,
 				"Merged at: ",
 				colors.UserInput(
-					formatTimestamp(string(query.GithubRepository.PullRequest.MergedAt)),
+					timeutils.FormatLocal(string(query.GithubRepository.PullRequest.MergedAt)),
 				),
 				"\n",
 			)
@@ -175,17 +179,20 @@ func getQueryVariables() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	branch, exists := tx.Branch(currentBranchName)
-	if !exists {
-		return nil, errors.New("could not find current branch")
-	}
+	branch, _ := tx.Branch(currentBranchName)
 
 	if branch.PullRequest == nil {
-		return nil, errors.New("pull request does not exist")
+		return nil, errors.New(
+			"this branch has no associated pull request (run `av pr create` to create one)",
+		)
 	}
 
 	prNumber := branch.PullRequest.Number
-	repository, _ := tx.Repository()
+	repository, exists := tx.Repository()
+	if !exists {
+		return nil, actions.ErrRepoNotInitialized
+	}
+
 	var variables = map[string]interface{}{
 		"repoOwner": graphql.String(repository.Owner),
 		"repoName":  graphql.String(repository.Name),
@@ -195,24 +202,12 @@ func getQueryVariables() (map[string]interface{}, error) {
 }
 
 func emojiForRequiredCheckResult(result string) string {
-	if result == "SUCCESS" {
+	switch result {
+	case "SUCCESS":
 		return "\u2705"
-	} else if result == "FAILURE" {
+	case "FAILURE":
 		return "\u274C"
-	} else {
+	default:
 		return "\u231B"
 	}
-}
-
-func formatTimestamp(timeString string) string {
-	inputLayout := "2006-01-02T15:04:05.999999Z07:00"
-	outputLayout := "2 January 2006 3:04:05 PM PST"
-
-	timestamp, err := time.Parse(inputLayout, timeString)
-	if err != nil {
-		return timeString
-	}
-
-	timestampDefaultTZ := timestamp.Local()
-	return timestampDefaultTZ.Format(outputLayout)
 }
