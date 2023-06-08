@@ -48,7 +48,16 @@ var prStatusCmd = &cobra.Command{
 						}
 						Result graphql.String
 					}
-					// TODO: add BotPR info
+
+					BotPullRequest struct {
+						Number                graphql.Int
+						RequiredCheckStatuses []struct {
+							RequiredCheck struct {
+								Pattern graphql.String
+							}
+							Result graphql.String
+						}
+					}
 				} `graphql:"pullRequest(number: $prNumber)"`
 			} `graphql:"githubRepository(owner: $repoOwner, name:$repoName)"`
 		}
@@ -151,6 +160,28 @@ var prStatusCmd = &cobra.Command{
 			)
 		}
 
+		// Get Associated BotPR info
+		botPullRequest := query.GithubRepository.PullRequest.BotPullRequest
+		if botPullRequest.Number == 0 {
+			// no associated botPR
+			return nil
+		}
+
+		_, _ = fmt.Fprint(os.Stderr, "Associated PR #", botPullRequest.Number, " Required Checks\n")
+
+		botRequiredCheckStatuses := query.GithubRepository.PullRequest.BotPullRequest.RequiredCheckStatuses
+		for index := range botRequiredCheckStatuses {
+			result := botRequiredCheckStatuses[index].Result
+			botRequiredCheckName := botRequiredCheckStatuses[index].RequiredCheck.Pattern
+			_, _ = fmt.Fprint(
+				os.Stderr,
+				indent,
+				emojiForRequiredCheckResult(string(result)),
+				" ",
+				colors.UserInput(botRequiredCheckName),
+				"\n",
+			)
+		}
 		return nil
 	},
 }
