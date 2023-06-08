@@ -45,14 +45,7 @@ var prStatusCmd = &cobra.Command{
 						RequiredCheck struct {
 							Pattern graphql.String
 						}
-						Result    graphql.String
-						CheckRuns []struct {
-							Check struct {
-								Name graphql.String
-							}
-							Status     graphql.String
-							Conclusion graphql.String
-						}
+						Result graphql.String
 					}
 					// TODO: add BotPR info
 				} `graphql:"pullRequest(number: $prNumber)"`
