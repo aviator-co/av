@@ -27,6 +27,16 @@ func (d DeleteBranchCmd) Execute(ctx *Context) error {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+
+	if !d.DeleteRef {
+		_, _ = fmt.Fprint(os.Stderr,
+			"Orphaned branch ", colors.UserInput(d.Name), ".\n",
+			"  - Run ", colors.CliCmd("git branch --delete ", d.Name),
+			" to delete the branch from your repository.\n",
+		)
+		return nil
+	}
+
 	_, err := ctx.Repo.Run(&git.RunOpts{
 		Args:      []string{"branch", "--delete", "--force", d.Name},
 		ExitError: true,

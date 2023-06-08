@@ -168,8 +168,9 @@ func stackReorderEditPlan(repo *git.Repo, initialPlan []reorder.Cmd) ([]reorder.
 	// just to make sure they can recover their work. (They already would
 	// be able to using `git reflog` but generally only advanced Git
 	// users think to do that).
+	plan := initialPlan
 edit:
-	plan, err := reorder.EditPlan(repo, initialPlan)
+	plan, err := reorder.EditPlan(repo, plan)
 	if err != nil {
 		return nil, err
 	}
