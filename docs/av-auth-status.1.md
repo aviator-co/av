@@ -1,13 +1,15 @@
-# av-auth-status 1 "" av-cli "Aviator CLI User Manual"
+# av-auth-status
 
-# NAME
+## NAME
 
-av-auth-status - Show info about the logged in user.
+av-auth-status - Show info about the logged in user
 
-# SYNOPSIS
+## SYNOPSIS
 
-`av auth status`
+```synopsis
+av auth status
+```
 
-# DESCRIPTION
+## DESCRIPTION
 
 Shows information about the logged in user using their access token.
