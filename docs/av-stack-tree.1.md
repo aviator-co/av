@@ -1,13 +1,15 @@
-# av-stack-tree 1 "" av-cli "Aviator CLI User Manual"
+# av-stack-tree
 
-# NAME
+## NAME
 
-av-stack-tree - Shows the tree of stacked branches.
+av-stack-tree - Shows the tree of stacked branches
 
-# SYNOPSIS
+## SYNOPSIS
 
-`av stack tree`
+```synopsis
+av stack tree
+```
 
-# DESCRIPTION
+## DESCRIPTION
 
 Show the tree of stacked branches.
