@@ -3,13 +3,13 @@ repos:
     hooks:
       - id: golines
         name: golines
-        files: ".+$"
+        files: ".+.go$"
         language: system
         entry: |
           sh -c 'go run github.com/segmentio/golines -w .'
       - id: goimports
         name: goimports
-        files: ".+$"
+        files: ".+.go$"
         language: system
         entry: |
           sh -c 'go run golang.org/x/tools/cmd/goimports@latest -w .'
