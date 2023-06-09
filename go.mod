@@ -4,12 +4,12 @@ go 1.20
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/cpuguy83/go-md2man/v2 v2.0.2
 	github.com/fatih/color v1.15.0
 	github.com/golangci/golangci-lint v1.52.2
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kr/text v0.2.0
+	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/segmentio/golines v0.11.0
 	github.com/shurcooL/githubv4 v0.0.0-20220115235240-a14260e6f8a2
 	github.com/shurcooL/graphql v0.0.0-20220606043923-3cf50f8a0a29
@@ -144,7 +144,6 @@ require (
 	github.com/quasilyte/regex/syntax v0.0.0-20210819130434-b3f0c404a727 // indirect
 	github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
-	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ryancurrah/gomodguard v1.3.0 // indirect
 	github.com/ryanrolds/sqlclosecheck v0.4.0 // indirect
 	github.com/sanposhiho/wastedassign/v2 v2.0.7 // indirect

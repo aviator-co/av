@@ -1,10 +1,10 @@
-# av-commit-split 1 "" av-cli "Aviator CLI User Manual"
+# av-commit-split
 
-# NAME
+## NAME
 
-av-commit-split - Split a commit into multiple commits.
+av-commit-split - Split a commit into multiple commits
 
-# DESCRIPTION
+## DESCRIPTION
 
 Split the currently checked out commit into multiple commits. When invoked, it
 prompts you which diff chunks should be included in the first commit and asks

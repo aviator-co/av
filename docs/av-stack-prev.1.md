@@ -1,25 +1,29 @@
-# av-stack-prev 1 "" av-cli "Aviator CLI User Manual"
+# av-stack-prev
 
-# NAME
+## NAME
 
-av-stack-prev - Checkout a previous branch in the stack.
+av-stack-prev - Checkout a previous branch in the stack
 
-# SYNOPSIS
+## SYNOPSIS
 
-`av stack prev [<n> | --first]`
+```synopsis
+av stack prev [<n> | --first]
+```
 
-# DESCRIPTION
+## DESCRIPTION
 
-Checkout a previous branch in the stack. Without any options, this will default to checking out the previous branch in the stack.
+Checkout a previous branch in the stack. Without any options, this will default
+to checking out the previous branch in the stack.
 
-# OPTIONS
+## OPTIONS
 
 `<n>`
-: Checkout to the branch that is `<n>` branches before the current branch in the stack.
+: Checkout to the branch that is `<n>` branches before the current branch in the
+  stack.
 
 `--first`
 : Checkout to the first branch in the stack.
 
-# SEE ALSO
+## SEE ALSO
 
 `av-pr-next`(1)

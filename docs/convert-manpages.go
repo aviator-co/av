@@ -10,15 +10,22 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 
-	"github.com/cpuguy83/go-md2man/v2/md2man"
+	"github.com/aviator-co/av/docs/internal/md2man"
 	"github.com/spf13/pflag"
 )
 
 var (
-	preview   = pflag.Bool("preview", false, "Preview the converted man page")
+	preview    = pflag.Bool("preview", false, "Preview the converted man page")
+	previewRaw = pflag.Bool(
+		"preview-raw",
+		false,
+		"Preview the converted man page in a raw roff format",
+	)
 	outputDir = pflag.String("output-dir", "", "Output directory")
+	version   = pflag.String("version", "", "The manual version")
 
 	manpageMarkdownPattern = regexp.MustCompile(`[.](\d)[.]md`)
 )
@@ -31,7 +38,7 @@ func main() {
 		*preview = true
 	}
 
-	if *preview {
+	if *preview || *previewRaw {
 		args := pflag.Args()
 		if len(args) != 1 {
 			pflag.Usage()
@@ -60,7 +67,11 @@ func main() {
 		if err != nil {
 			log.Fatalf("Cannot read a file %q: %v", ent.Name(), err)
 		}
-		roff := convertMarkdown(bs)
+		section, err := parseSection(ent.Name())
+		if err != nil {
+			log.Fatalf("Cannot parse a section %q: %v", ent.Name(), err)
+		}
+		roff := convertMarkdown(bs, section)
 		outFilePath := filepath.Join(
 			*outputDir,
 			"man"+matches[1],
@@ -81,8 +92,16 @@ func previewMarkdown(fp string) error {
 		return err
 	}
 
-	roff := convertMarkdown(bs)
-	_ = roff
+	section, err := parseSection(fp)
+	if err != nil {
+		return err
+	}
+
+	roff := convertMarkdown(bs, section)
+	if *previewRaw {
+		os.Stdout.Write(roff)
+		return nil
+	}
 
 	if runtime.GOOS == "darwin" || runtime.GOOS == "freebsd" {
 		cmd := exec.Command("mandoc", "-a")
@@ -100,6 +119,14 @@ func previewMarkdown(fp string) error {
 	return errors.New("operating system not supported for preview")
 }
 
-func convertMarkdown(bs []byte) []byte {
-	return md2man.Render(bs)
+func convertMarkdown(bs []byte, section int) []byte {
+	return md2man.RenderToRoff(bs, section, *version, "av-cli", "Aviator CLI User Manual")
+}
+
+func parseSection(fp string) (int, error) {
+	matches := manpageMarkdownPattern.FindStringSubmatch(fp)
+	if len(matches) == 0 {
+		return 0, errors.New("cannot find a section number")
+	}
+	return strconv.Atoi(matches[1])
 }
