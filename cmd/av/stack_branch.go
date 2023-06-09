@@ -206,7 +206,7 @@ func stackBranchMove(
 	if !force {
 		if currentMeta.PullRequest != nil {
 			return errors.New(
-				"cannot rename branch because a pull request already exists (bypass with the `--force` flag, but this renames your local branch and not its remote counterpart)",
+				"cannot rename branch because a pull request already exists (bypass with the `--force` flag, but this will require closing this pull request and opening a new one using `av pr create`)",
 			)
 		}
 	}
