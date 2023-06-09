@@ -199,6 +199,7 @@ func stackBranchMove(
 			Trunk: true,
 		}
 	}
+	currentMeta.PullRequest = nil
 	currentMeta.Name = newBranch
 	tx.SetBranch(currentMeta)
 
