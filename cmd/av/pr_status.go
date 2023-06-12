@@ -160,25 +160,28 @@ var prStatusCmd = &cobra.Command{
 			)
 		}
 
-		// Get Associated BotPR info
+		// Get Bot Pull Request info
 		botPullRequest := query.GithubRepository.PullRequest.BotPullRequest
 		if botPullRequest.Number == 0 {
-			// no associated botPR
+			// no bot pull request info
 			return nil
 		}
 
-		_, _ = fmt.Fprint(os.Stderr, "Associated PR #", botPullRequest.Number, " Required Checks\n")
+		_, _ = fmt.Fprint(
+			os.Stderr,
+			"Bot Pull Request #",
+			botPullRequest.Number,
+			" Required Checks\n",
+		)
 
 		botRequiredCheckStatuses := query.GithubRepository.PullRequest.BotPullRequest.RequiredCheckStatuses
-		for index := range botRequiredCheckStatuses {
-			result := botRequiredCheckStatuses[index].Result
-			botRequiredCheckName := botRequiredCheckStatuses[index].RequiredCheck.Pattern
+		for _, status := range botRequiredCheckStatuses {
 			_, _ = fmt.Fprint(
 				os.Stderr,
 				indent,
-				emojiForRequiredCheckResult(string(result)),
+				emojiForRequiredCheckResult(string(status.Result)),
 				" ",
-				colors.UserInput(botRequiredCheckName),
+				colors.UserInput(status.RequiredCheck.Pattern),
 				"\n",
 			)
 		}
