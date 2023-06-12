@@ -10,6 +10,7 @@ import (
 	"github.com/aviator-co/av/internal/avgql"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/timeutils"
+	"github.com/shurcooL/githubv4"
 	"github.com/shurcooL/graphql"
 	"github.com/spf13/cobra"
 )
@@ -36,9 +37,9 @@ var prStatusCmd = &cobra.Command{
 					Author       struct {
 						Login graphql.String
 					}
-					CreatedAt             graphql.String
-					QueuedAt              graphql.String
-					MergedAt              graphql.String
+					CreatedAt             githubv4.DateTime
+					QueuedAt              githubv4.DateTime
+					MergedAt              githubv4.DateTime
 					BaseBranchName        graphql.String
 					HeadBranchName        graphql.String
 					RequiredCheckStatuses []struct {
@@ -94,7 +95,7 @@ var prStatusCmd = &cobra.Command{
 			indent,
 			"Created at: ",
 			colors.UserInput(
-				timeutils.FormatLocal(string(query.GithubRepository.PullRequest.CreatedAt)),
+				timeutils.FormatLocal(query.GithubRepository.PullRequest.CreatedAt.Time),
 			),
 			"\n",
 		)
@@ -105,7 +106,7 @@ var prStatusCmd = &cobra.Command{
 				indent,
 				"Queued at: ",
 				colors.UserInput(
-					timeutils.FormatLocal(string(query.GithubRepository.PullRequest.QueuedAt)),
+					timeutils.FormatLocal(query.GithubRepository.PullRequest.QueuedAt.Time),
 				),
 				"\n",
 			)
@@ -116,7 +117,7 @@ var prStatusCmd = &cobra.Command{
 				indent,
 				"Merged at: ",
 				colors.UserInput(
-					timeutils.FormatLocal(string(query.GithubRepository.PullRequest.MergedAt)),
+					timeutils.FormatLocal(query.GithubRepository.PullRequest.MergedAt.Time),
 				),
 				"\n",
 			)
