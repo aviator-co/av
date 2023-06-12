@@ -1,10 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -199,17 +204,28 @@ func stackBranchMove(
 			Trunk: true,
 		}
 	}
-	currentMeta.PullRequest = nil
-	currentMeta.Name = newBranch
-	tx.SetBranch(currentMeta)
 
 	if !force {
 		if currentMeta.PullRequest != nil {
-			return errors.New(
-				"cannot rename branch because a pull request already exists (bypass with the `--force` flag, but this will require closing this pull request and opening a new one using `av pr create`)",
+			_, _ = fmt.Fprint(
+				os.Stderr,
+				colors.Failure(
+					"Cannot rename branch ",
+					currentMeta.Name,
+					": pull request #",
+					currentMeta.PullRequest.Number,
+					" would be orphaned.\n",
+				),
+				colors.Faint("  - Use --force to override this check.\n"),
 			)
+
+			return actions.ErrExitSilently{ExitCode: 127}
 		}
 	}
+
+	currentMeta.PullRequest = nil
+	currentMeta.Name = newBranch
+	tx.SetBranch(currentMeta)
 
 	// Update all child branches to refer to the correct (renamed) parent.
 	children := meta.Children(tx, oldBranch)
