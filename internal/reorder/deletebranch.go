@@ -14,11 +14,13 @@ import (
 )
 
 // DeleteBranchCmd is a command that deletes a branch.
+// This is for internal use only to clean up branches that were removed from a
+// re-order operation.
 type DeleteBranchCmd struct {
 	Name string
 	// If true, delete the branch from Git as well as from the internal database.
 	// If false, only delete the branch metadata from the internal database.
-	DeleteRef bool
+	DeleteGitRef bool
 }
 
 func (d DeleteBranchCmd) Execute(ctx *Context) error {
@@ -28,7 +30,7 @@ func (d DeleteBranchCmd) Execute(ctx *Context) error {
 		return err
 	}
 
-	if !d.DeleteRef {
+	if !d.DeleteGitRef {
 		_, _ = fmt.Fprint(os.Stderr,
 			"Orphaned branch ", colors.UserInput(d.Name), ".\n",
 			"  - Run ", colors.CliCmd("git branch --delete ", d.Name),
@@ -62,8 +64,8 @@ func (d DeleteBranchCmd) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("delete-branch ")
 	sb.WriteString(d.Name)
-	if d.DeleteRef {
-		sb.WriteString(" --delete-ref")
+	if d.DeleteGitRef {
+		sb.WriteString(" --delete-git-ref")
 	}
 	return sb.String()
 }
@@ -74,8 +76,8 @@ func parseDeleteBranchCmd(args []string) (Cmd, error) {
 	cmd := DeleteBranchCmd{}
 	flags := pflag.NewFlagSet("delete-branch", pflag.ContinueOnError)
 	flags.BoolVar(
-		&cmd.DeleteRef,
-		"delete-ref",
+		&cmd.DeleteGitRef,
+		"delete-git-ref",
 		false,
 		"delete the branch from Git as well as from the internal database",
 	)

@@ -207,7 +207,7 @@ edit:
 		}
 
 		for _, branch := range diff.RemovedBranches {
-			plan = append(plan, reorder.DeleteBranchCmd{Name: branch, DeleteRef: deleteRefs})
+			plan = append(plan, reorder.DeleteBranchCmd{Name: branch, DeleteGitRef: deleteRefs})
 		}
 	}
 

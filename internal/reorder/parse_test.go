@@ -22,7 +22,7 @@ func TestParseCmd(t *testing.T) {
 		{"delete-branch", DeleteBranchCmd{}, true},
 		{"delete-branch foo", DeleteBranchCmd{Name: "foo"}, false},
 		{"delete-branch foo bar", DeleteBranchCmd{}, true},
-		{"db foo --delete-ref", DeleteBranchCmd{Name: "foo", DeleteRef: true}, false},
+		{"db foo --delete-git-ref", DeleteBranchCmd{Name: "foo", DeleteGitRef: true}, false},
 		{"blarn", nil, true},
 	} {
 		t.Run(tt.Input, func(t *testing.T) {

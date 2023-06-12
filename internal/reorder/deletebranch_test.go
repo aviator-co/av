@@ -15,8 +15,8 @@ func TestDeleteBranchCmd_String(t *testing.T) {
 	assert.Equal(t, "delete-branch my-branch", DeleteBranchCmd{Name: "my-branch"}.String())
 	assert.Equal(
 		t,
-		"delete-branch my-branch --delete-ref",
-		DeleteBranchCmd{Name: "my-branch", DeleteRef: true}.String(),
+		"delete-branch my-branch --delete-git-ref",
+		DeleteBranchCmd{Name: "my-branch", DeleteGitRef: true}.String(),
 	)
 }
 
@@ -41,20 +41,20 @@ func TestDeleteBranchCmd_Execute(t *testing.T) {
 	_, err = repo.Git("switch", "main")
 	require.NoError(t, err)
 
-	// delete-branch without --delete-ref should preserve the branch ref in Git
+	// delete-branch without --delete-git-ref should preserve the branch ref in Git
 	err = DeleteBranchCmd{Name: "my-branch"}.Execute(ctx)
 	require.NoError(t, err)
 	_, err = repo.RevParse(&git.RevParse{Rev: "my-branch"})
 	require.NoError(t, err, "DeleteBranchCmd.Execute should preserve the branch ref in Git")
 
-	// delete-branch with --delete-ref should delete the branch ref in Git
-	err = DeleteBranchCmd{Name: "my-branch", DeleteRef: true}.Execute(ctx)
+	// delete-branch with --delete-git-ref should delete the branch ref in Git
+	err = DeleteBranchCmd{Name: "my-branch", DeleteGitRef: true}.Execute(ctx)
 	require.NoError(t, err)
 	_, err = repo.RevParse(&git.RevParse{Rev: "my-branch"})
 	require.Error(t, err, "DeleteBranchCmd.Execute should delete the branch ref in Git")
 
 	// subsequent delete-branch should be a no-op
-	err = DeleteBranchCmd{Name: "my-branch", DeleteRef: true}.Execute(ctx)
+	err = DeleteBranchCmd{Name: "my-branch", DeleteGitRef: true}.Execute(ctx)
 	require.NoError(
 		t,
 		err,
