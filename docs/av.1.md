@@ -1,14 +1,14 @@
-# av 1 "" av-cli "Aviator CLI User Manual"
+# av
 
-# NAME
+## NAME
 
 av - Aviator CLI
 
-# DESCRIPTION
+## DESCRIPTION
 
 **av** allows you to manage stacked pull requests with Aviator.
 
-# SUBCOMMANDS
+## SUBCOMMANDS
 
 - av-commit-create(1): Create a new commit.
 - av-commit-split(1): Split a commit into multiple commits.
@@ -26,7 +26,7 @@ av - Aviator CLI
 - av-stack-tidy(1): Tidy up the branch metadata.
 - av-stack-tree(1): Show the tree of stacked branches.
 
-# FURTHER DOCUMENTATION
+## FURTHER DOCUMENTATION
 
 See [Aviator documentation](https://docs.aviator.co) for the help document
 beyond Aviator CLI.

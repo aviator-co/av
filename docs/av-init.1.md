@@ -1,10 +1,10 @@
-# av-init 1 "" av-cli "Aviator CLI User Manual"
+# av-init
 
-# NAME
+## NAME
 
-av-init - Initialize the repository for Aviator CLI.
+av-init - Initialize the repository for Aviator CLI
 
-# DESCRIPTION
+## DESCRIPTION
 
 Aviator CLI internally stores metadata in the repository. This command
 initializes the metadata storage for the repository.

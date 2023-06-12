@@ -1,14 +1,16 @@
-# av-stack-tidy 1 "" av-cli "Aviator CLI User Manual"
+# av-stack-tidy
 
-# NAME
+## NAME
 
 av-stack-tidy - Tidy stacked branches by removing deleted or merged branches
 
-# SYNOPSIS
+## SYNOPSIS
 
-`av stack tidy`
+```synopsis
+av stack tidy
+```
 
-# DESCRIPTION
+## DESCRIPTION
 
 Tidy stacked branches by removing deleted or merged branches.
 
