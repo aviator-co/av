@@ -1,22 +1,23 @@
-# av-stack-sync 1 "" av-cli "Aviator CLI User Manual"
+# av-stack-sync
 
-# NAME
+## NAME
 
 av-stack-sync - Synchronize stacked branches
 
-# SYNOPSIS
+## SYNOPSIS
 
-`` av stack sync [--all | --current] [--no-push] [--no-fetch] [--prune]
+```synopsis
+av stack sync [--all | --current] [--no-push] [--no-fetch] [--prune]
               [--trunk] [--continue | --abort | --skip] [--parent=<parent>]
-``
+```
 
-# DESCRIPTION
+## DESCRIPTION
 
 Over the time, branches get unsynchronized in many ways. Some branches are
 merged. The upstream branch is moved. A parent branch get their commit amended.
 `av stack sync` synchronizes the branches following the changes.
 
-For each branch, this command does the following:
+For each branch, this command does the following
 
 * Rebase onto the parent branch. By default, if the parent is the trunk branch
   (e.g. `main`), this step is skipped. If `--trunk` is used, it fetches the
@@ -25,9 +26,9 @@ For each branch, this command does the following:
 * Push to the remote branch. With Git's default config, the push updates the
   same name branch on the remote.
 
-  NOTE: Currently, this overwrites the remote with force. This can overwrite any
-  changes happen on GitHub. To avoid this, pull or manually cherry-pick the
-  changes on the remote.
+Note that currently, this overwrites the remote with force. This can overwrite
+any changes happen on GitHub. To avoid this, pull or manually cherry-pick the
+changes on the remote.
 
 By default, this command will sync all branches starting at the root of the
 stack and repeatedly executes the above steps. If the --current flag is given,
@@ -38,27 +39,27 @@ all branches in the repository.
 
 If --prune option is given, it deletes the merged branches at the end of sync.
 
-# REBASE CONFLICT
+## REBASE CONFLICT
 
 Rebasing can cause a conflict. When a conflict happens, it prompts you to
 resolve the conflict, and continue with `av stack sync --continue`. This is
 similar to `git rebase --continue`, but it continues with syncing the rest of
 the branches.
 
-# CHANGE PARENT
+## CHANGE PARENT
 
 If you want to change the parent, use `--parent=<parent>` to specify the new
 parent. This rebases the current branch onto the new parent and runs the sync
 operations on the children.
 
-# ADOPTING BRANCHES
+## ADOPTING BRANCHES
 
 If you want to adopt a Git branch that is created outside of `av`, you can run
 `av stack sync --parent=<parent>` or `av stack sync --parent=<parent> --trunk`
 to adopt a branch to `av`. If the parent is a trunk branch (e.g. main), use
 `--trunk`.
 
-# OPTIONS
+## OPTIONS
 
 `--all`
 : Synchronize all branches.

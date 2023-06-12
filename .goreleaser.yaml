@@ -1,3 +1,8 @@
+before:
+  hooks:
+    - 'rm -rf man'
+    - 'sh -c "cd docs && go run convert-manpages.go --output-dir ../man --version v{{ .Version }}"'
+
 builds:
   - dir: "./cmd/av"
     env:
@@ -16,9 +21,17 @@ builds:
 release: {}
 
 archives:
-  - replacements:
-      amd64: x86_64
-      darwin: macos
+  - name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "darwin" }}macos
+      {{- else }}{{ .Arch }}{{ end }}
+    files:
+      - 'LICENSE'
+      - 'README.md'
+      - 'man'
 
 
 # Push to the homebrew tap
@@ -31,6 +44,9 @@ brews:
       email: "105820887+aviator-bot@users.noreply.github.com"
     homepage: "https://aviator.co"
     license: "MIT"
+    install: |
+      bin.install "av"
+      man.install Dir["man/*"]
 
 checksum:
   name_template: 'checksums.txt'

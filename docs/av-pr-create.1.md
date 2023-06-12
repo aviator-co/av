@@ -1,15 +1,17 @@
-# av-pr-create 1 "" av-cli "Aviator CLI User Manual"
+# av-pr-create
 
-# NAME
+## NAME
 
 av-pr-create - Create a pull request for the current branch
 
-# SYNOPSIS
+## SYNOPSIS
 
-`` av pr create [-t <title>| --title=<title>] [-b <body>| --body=<body>]
-    [--draft] [--edit] [--force] [--no-push] ``
+```synopsis
+av pr create [-t <title>| --title=<title>] [-b <body>| --body=<body>]
+    [--draft] [--edit] [--force] [--no-push]
+```
 
-# DESCRIPTION
+## DESCRIPTION
 
 Push the current branch and create a pull request if not exist. If the branch
 has a parent branch, you need to make a pull-request for the parent first. If
@@ -20,7 +22,7 @@ When there's already a pull-request, the command just pushes the branch to
 remote, and you are not asked to provide the title and the body. If you want to
 edit the pull-request description for the existing pull-request, use `--edit`.
 
-# OPTIONS
+## OPTIONS
 
 `-t <title>, --title=<title>`
 : Use the given `<title>` as the title for the pull request.
@@ -43,15 +45,17 @@ edit the pull-request description for the existing pull-request, use `--edit`.
 : Do not push the branch to the remote repository before creating the pull
   request.
 
-# EXAMPLES
+## EXAMPLES
 
 Create a pull request, specifying the body of the PR from standard input:
 
-    $ av pr create --title "Implement fancy feature" --body - <<EOF
-    > Implement my very fancy feature.
-    > Can you please review it?
-    > EOF
+```bash
+$ av pr create --title "Implement fancy feature" --body - <<EOF
+> Implement my very fancy feature.
+> Can you please review it?
+> EOF
+```
 
-# SEE ALSO
+## SEE ALSO
 
 `av-stack-submit`(1)
