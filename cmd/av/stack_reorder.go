@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/aviator-co/av/internal/git"
 
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
@@ -92,37 +95,14 @@ var stackReorderCmd = &cobra.Command{
 				)
 				return actions.ErrExitSilently{ExitCode: 127}
 			}
-			plan, err := reorder.CreatePlan(repo, db.ReadTx(), root)
+			initialPlan, err := reorder.CreatePlan(repo, db.ReadTx(), root)
 			if err != nil {
 				return err
 			}
 
-			// TODO:
-			// What should we do if the plan removes branches? Currently,
-			// we just don't edit those branches. So if a user edits
-			//     sb one
-			//     pick 1a
-			//     sb two
-			//     pick 2a
-			// and deletes the line for `sb two`, then the reorder will modify
-			// one to contain 1a/2a, but we don't modify two so it'll still be
-			// considered stacked on top of one.
-			// We can probably delete the branch and also emit a message to the
-			// user to the effect of
-			//     Deleting branch `two` because it was removed from the reorder.
-			//     To restore the branch, run `git switch -C two <OLD HEAD>`.
-			// just to make sure they can recover their work. (They already would
-			// be able to using `git reflog` but generally only advanced Git
-			// users think to do that).
-			plan, err = reorder.EditPlan(repo, plan)
+			plan, err := stackReorderEditPlan(repo, initialPlan)
 			if err != nil {
 				return err
-			}
-			if len(plan) == 0 {
-				_, _ = fmt.Fprint(os.Stderr,
-					colors.Failure("ERROR: reorder plan is empty\n"),
-				)
-				return actions.ErrExitSilently{ExitCode: 127}
 			}
 
 			logrus.WithFields(logrus.Fields{
@@ -168,4 +148,68 @@ func init() {
 	stackReorderCmd.Flags().
 		BoolVar(&stackReorderFlags.Abort, "abort", false, "abort a previous reorder")
 	stackReorderCmd.MarkFlagsMutuallyExclusive("continue", "abort")
+}
+
+func stackReorderEditPlan(repo *git.Repo, initialPlan []reorder.Cmd) ([]reorder.Cmd, error) {
+	plan := initialPlan
+edit:
+	plan, err := reorder.EditPlan(repo, plan)
+	if err != nil {
+		return nil, err
+	}
+	if len(plan) == 0 {
+		_, _ = fmt.Fprint(os.Stderr,
+			colors.Failure("ERROR: reorder plan is empty\n"),
+		)
+		return nil, actions.ErrExitSilently{ExitCode: 127}
+	}
+
+	diff := reorder.Diff(initialPlan, plan)
+	if len(diff.RemovedBranches) > 0 {
+		_, _ = fmt.Fprint(
+			os.Stderr,
+			colors.Warning("\nWARNING: the following branches were removed from the reorder:\n"),
+		)
+		for _, branch := range diff.RemovedBranches {
+			_, _ = fmt.Fprint(os.Stderr, "  - ", colors.UserInput(branch), "\n")
+		}
+
+	promptDeletionBehavior:
+		_, _ = fmt.Fprint(os.Stderr, "\n",
+			`What would you like to do?
+    [a] Abort the reorder
+    [d] Delete the branches
+    [e] Edit the reorder plan
+    [o] Orphan the branches (the Git branch will continue to exist but will not
+        be tracked by av).
+
+[a/d/e/o]: `)
+		choice, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+		var deleteRefs bool
+		// ReadString includes the newline in the string, so this should
+		// never panic even if the user just hits enter.
+		switch strings.ToLower(string(choice[0])) {
+		case "a":
+			_, _ = fmt.Fprint(os.Stderr, colors.Failure("\nAborting reorder.\n"))
+			return nil, actions.ErrExitSilently{ExitCode: 127}
+		case "d":
+			deleteRefs = true
+		case "e":
+			goto edit
+		case "o":
+			deleteRefs = false
+		default:
+			_, _ = fmt.Fprint(os.Stderr, colors.Failure("\nInvalid choice.\n"))
+			goto promptDeletionBehavior
+		}
+
+		for _, branch := range diff.RemovedBranches {
+			plan = append(plan, reorder.DeleteBranchCmd{Name: branch, DeleteGitRef: deleteRefs})
+		}
+	}
+
+	return plan, nil
 }
