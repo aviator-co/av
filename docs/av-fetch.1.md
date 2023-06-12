@@ -1,13 +1,15 @@
-# av-pr-fetch 1 "" av-cli "Aviator CLI User Manual"
+# av-fetch
 
-# NAME
+## NAME
 
-av-fetch - Fetch latest repository state from github.
+av-fetch - Fetch latest repository state from GitHub
 
-# SYNOPSIS
+## SYNOPSIS
 
-`` av pr fetch``
+```synopsis
+av fetch
+```
 
-# DESCRIPTION
+## DESCRIPTION
 
-Fetch latest repository state from github.
+Fetch latest repository state from GitHub.
