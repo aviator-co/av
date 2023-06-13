@@ -3,6 +3,8 @@ package reorder
 import (
 	"strings"
 
+	"github.com/aviator-co/av/internal/utils/sliceutils"
+
 	"github.com/aviator-co/av/internal/editor"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/utils/typeutils"
@@ -46,4 +48,31 @@ func EditPlan(repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 	}
 
 	return newPlan, nil
+}
+
+type PlanDiff struct {
+	RemovedBranches []string
+	AddedBranches   []string
+}
+
+func Diff(old []Cmd, new []Cmd) PlanDiff {
+
+	var oldBranches []string
+	for _, cmd := range old {
+		if sb, ok := cmd.(StackBranchCmd); ok {
+			oldBranches = append(oldBranches, sb.Name)
+		}
+	}
+
+	var newBranches []string
+	for _, cmd := range new {
+		if sb, ok := cmd.(StackBranchCmd); ok {
+			newBranches = append(newBranches, sb.Name)
+		}
+	}
+
+	return PlanDiff{
+		RemovedBranches: sliceutils.Subtract(oldBranches, newBranches),
+		AddedBranches:   sliceutils.Subtract(newBranches, oldBranches),
+	}
 }

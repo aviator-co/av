@@ -1,10 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -15,8 +20,11 @@ var stackBranchFlags struct {
 	Parent string
 	// If true, rename the current branch ("move" in Git parlance, though we
 	// avoid that language here since we're not changing the branch's position
-	// within the stack).
+	// within the stack). The branch can only be renamed if a pull request does
+	// not exist.
 	Rename bool
+	// If true, rename the current branch even if a pull request exists.
+	Force bool
 }
 var stackBranchCmd = &cobra.Command{
 	Use:   "branch [flags] <branch-name>",
@@ -46,7 +54,7 @@ internal tracking metadata that defines the order of branches within a stack.`,
 		}
 
 		if stackBranchFlags.Rename {
-			return stackBranchMove(repo, db, branchName)
+			return stackBranchMove(repo, db, branchName, stackBranchFlags.Force)
 		}
 
 		tx := db.WriteTx()
@@ -159,12 +167,15 @@ func init() {
 	// See the comment on stackBranchFlags.Rename.
 	stackBranchCmd.Flags().
 		BoolVarP(&stackBranchFlags.Rename, "rename", "m", false, "rename the current branch")
+	stackBranchCmd.Flags().
+		BoolVar(&stackBranchFlags.Force, "force", false, "force rename the current branch")
 }
 
 func stackBranchMove(
 	repo *git.Repo,
 	db meta.DB,
 	newBranch string,
+	force bool,
 ) (reterr error) {
 	oldBranch, err := repo.CurrentBranchName()
 	if err != nil {
@@ -193,6 +204,26 @@ func stackBranchMove(
 			Trunk: true,
 		}
 	}
+
+	if !force {
+		if currentMeta.PullRequest != nil {
+			_, _ = fmt.Fprint(
+				os.Stderr,
+				colors.Failure(
+					"Cannot rename branch ",
+					currentMeta.Name,
+					": pull request #",
+					currentMeta.PullRequest.Number,
+					" would be orphaned.\n",
+				),
+				colors.Faint("  - Use --force to override this check.\n"),
+			)
+
+			return actions.ErrExitSilently{ExitCode: 127}
+		}
+	}
+
+	currentMeta.PullRequest = nil
 	currentMeta.Name = newBranch
 	tx.SetBranch(currentMeta)
 
