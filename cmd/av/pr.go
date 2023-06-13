@@ -12,5 +12,6 @@ var prCmd = &cobra.Command{
 func init() {
 	prCmd.AddCommand(
 		prCreateCmd,
+		prStatusCmd,
 	)
 }
