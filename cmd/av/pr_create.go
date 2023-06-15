@@ -95,7 +95,6 @@ Examples:
 }
 
 func init() {
-	prCmd.AddCommand(prCreateCmd)
 
 	// av pr create
 	prCreateCmd.Flags().BoolVar(
