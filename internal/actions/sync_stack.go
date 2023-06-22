@@ -120,10 +120,17 @@ func SyncStack(ctx context.Context,
 	}
 
 	if state.Config.Prune {
+		// Add spacing in the output between each branch sync
+		if len(branchesToSync) > 0 {
+			_, _ = fmt.Fprint(os.Stderr, "\n\n")
+		}
+		_, _ = fmt.Fprint(os.Stderr, "Finding merged branches to delete...\n")
+
 		remoteBranches, err := repo.LsRemote("origin")
 		if err != nil {
 			return err
 		}
+		branchDeleted := false
 		for _, currentBranch := range branchesToSync {
 			br, _ := tx.Branch(currentBranch)
 			if br.MergeCommit == "" {
@@ -195,6 +202,10 @@ func SyncStack(ctx context.Context,
 				// The original branch is deleted.
 				state.OriginalBranch = ""
 			}
+			branchDeleted = true
+		}
+		if !branchDeleted {
+			_, _ = fmt.Fprint(os.Stderr, "  - no branch was deleted\n")
 		}
 	}
 
