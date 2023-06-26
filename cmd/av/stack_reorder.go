@@ -4,17 +4,17 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
-	"github.com/aviator-co/av/internal/git"
-
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
+	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/reorder"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/sirupsen/logrus"
-
 	"github.com/spf13/cobra"
 )
 
@@ -66,7 +66,16 @@ var stackReorderCmd = &cobra.Command{
 
 		var state *reorder.State
 		if stackReorderFlags.Abort {
-			// TODO: Handle clearing any cherry-pick state and whatnot.
+			if continuation == nil {
+				_ = reorder.WriteContinuation(repo, nil)
+				return errors.New("no reorder in progress")
+			}
+
+			if stat, _ := os.Stat(filepath.Join(repo.GitDir(), "CHERRY_PICK_HEAD")); stat != nil {
+				if err := repo.CherryPick(git.CherryPick{Resume: git.CherryPickAbort}); err != nil {
+					return errors.WrapIf(err, "failed to abort in-progress cherry-pick")
+				}
+			}
 			// TODO: --abort should probably reset the state of each branch
 			//   associated with the reorder to the original. It might be worth
 			//   storing some history and allow the user to do --undo to restore
