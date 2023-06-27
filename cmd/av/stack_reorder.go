@@ -9,7 +9,6 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
-	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/reorder"
@@ -40,9 +39,6 @@ var stackReorderCmd = &cobra.Command{
 	Long:   strings.TrimSpace(stackReorderDoc),
 	Args:   cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if config.Version != config.VersionDev {
-			logrus.Fatal("av stack reorder is not yet implemented")
-		}
 		repo, err := getRepo()
 		if err != nil {
 			return err
