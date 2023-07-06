@@ -1,6 +1,6 @@
 # Aviator Command Line Tool
 
-See the [Aviator Stacked PRs quickstart](https://docs.aviator.co/getting-started/stacked-prs) for more information.
+See the [Aviator `av` documentation](https://docs.aviator.co/aviator-cli) for more information.
 
 # Development setup
 This project is built using Go 1.18.1.
