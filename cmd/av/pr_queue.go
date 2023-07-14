@@ -6,16 +6,18 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/sirupsen/logrus"
+
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/avgql"
-	"github.com/shurcooL/githubv4"
 	"github.com/shurcooL/graphql"
 	"github.com/spf13/cobra"
 )
 
 var prQueueFlags struct {
-	SkipLine 	bool
-	Targets		string
+	SkipLine bool
+	Targets  string
 }
 
 var prQueueCmd = &cobra.Command{
@@ -60,8 +62,6 @@ var prQueueCmd = &cobra.Command{
 			"prNumber":  graphql.Int(prNumber),
 		}
 
-
-
 		// I have a feeling this would be better written inside of av/internals
 		client := avgql.NewClient()
 
@@ -69,46 +69,27 @@ var prQueueCmd = &cobra.Command{
 			QueuePullRequest struct {
 				QueuePullRequestPayload struct {
 					PullRequest struct {
-						Title        graphql.String
-						Status       graphql.String
-						StatusReason graphql.String
-						Author       struct {
-							Login graphql.String
-						}
-						CreatedAt             githubv4.DateTime
-						QueuedAt              githubv4.DateTime
-						MergedAt              githubv4.DateTime
-						BaseBranchName        graphql.String
-						HeadBranchName        graphql.String
-						RequiredCheckStatuses []struct {
-							RequiredCheck struct {
-								Pattern graphql.String
-							}
-							Result graphql.String
-						}
+						// We don't currently use anything here, but we need to select
+						// at least one field to make the GraphQL query valid.
+						Status graphql.String
 					}
 				} `graphql:"... on QueuePullRequestPayload"`
-					
 			} `graphql:"queuePullRequest(input: {repoOwner: $repoOwner, repoName:$repoName, number:$prNumber})"`
 		}
+
 		err = client.Mutate(context.Background(), &mutation, variables)
 		if err != nil {
-			return fmt.Errorf("Attempt to mutate failed; %#+v", err)
+			logrus.WithError(err).Debug("failed to queue pull request")
+			return fmt.Errorf("failed to queue pull request: %s", err)
 		}
-		// We print to stderr everywhere, why?
-		// Also, should we surface anything else to the user? bar improving what we actually 
-		pr := mutation.QueuePullRequest.QueuePullRequestPayload.PullRequest
-
-		fmt.Fprintf(
-			os.Stderr, 
-			"Pull request was added to the mergequeue.\n", 
-			pr.BaseBranchName,
-			"\n",
+		_, _ = fmt.Fprint(
+			os.Stderr,
+			"Queued pull request ", colors.UserInput(branch.PullRequest.Permalink), ".\n",
 		)
+
 		return nil
 	},
 }
-
 
 func init() {
 	prQueueCmd.Flags().BoolVar(
