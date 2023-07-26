@@ -63,7 +63,10 @@ var prQueueCmd = &cobra.Command{
 		}
 
 		// I have a feeling this would be better written inside of av/internals
-		client := avgql.NewClient()
+		client, err := avgql.NewClient()
+		if err != nil {
+			return err
+		}
 
 		var mutation struct {
 			QueuePullRequest struct {
