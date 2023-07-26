@@ -26,7 +26,10 @@ var prStatusCmd = &cobra.Command{
 			return err
 		}
 
-		client := avgql.NewClient()
+		client, err := avgql.NewClient()
+		if err != nil {
+			return err
+		}
 
 		var query struct {
 			GithubRepository struct {
