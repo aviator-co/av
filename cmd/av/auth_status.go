@@ -18,7 +18,10 @@ var authStatusCmd = &cobra.Command{
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client := avgql.NewClient()
+		client, err := avgql.NewClient()
+		if err != nil {
+			return err
+		}
 
 		var query struct {
 			Viewer struct {
@@ -26,7 +29,7 @@ var authStatusCmd = &cobra.Command{
 			}
 		}
 
-		err := client.Query(context.Background(), &query, nil)
+		err = client.Query(context.Background(), &query, nil)
 		if err != nil {
 			return err
 		}

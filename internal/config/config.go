@@ -26,6 +26,12 @@ type PullRequest struct {
 }
 
 type Aviator struct {
+	// The base URL of the Aviator API to use.
+	// By default, this is https://aviator.co, but for on-prem installations
+	// this can be changed (e.g., https://aviator.mycompany.com).
+	// It should not include a trailing slash or any path components.
+	APIHost string
+	// The API token to use for authenticating to the Aviator API.
 	APIToken string
 }
 
@@ -34,6 +40,9 @@ var Av = struct {
 	GitHub      GitHub
 	Aviator     Aviator
 }{
+	Aviator: Aviator{
+		APIHost: "https://api.aviator.co",
+	},
 	PullRequest: PullRequest{
 		OpenBrowser: true,
 	},
@@ -49,7 +58,12 @@ var Av = struct {
 // error if one occurred.
 func Load(paths []string) (bool, error) {
 	loaded, err := loadFromFile(paths)
-	loadFromEnv()
+	if err != nil {
+		return loaded, err
+	}
+	if err := loadFromEnv(); err != nil {
+		return loaded, err
+	}
 	return loaded, err
 }
 
@@ -86,7 +100,7 @@ func loadFromFile(paths []string) (bool, error) {
 	return false, nil
 }
 
-func loadFromEnv() {
+func loadFromEnv() error {
 	// TODO: integrate this better with cobra/viper/whatever
 	if githubToken := os.Getenv("AV_GITHUB_TOKEN"); githubToken != "" {
 		Av.GitHub.Token = githubToken
@@ -97,4 +111,9 @@ func loadFromEnv() {
 	if apiToken := os.Getenv("AV_API_TOKEN"); apiToken != "" {
 		Av.Aviator.APIToken = apiToken
 	}
+	if apiHost := os.Getenv("AV_API_HOST"); apiHost != "" {
+		Av.Aviator.APIHost = apiHost
+	}
+
+	return nil
 }
