@@ -531,7 +531,7 @@ func syncBranchPushAndUpdatePullRequest(
 		}
 	}
 
-	if err := Push(repo, PushOpts{
+	if err := Push(repo, branchName, PushOpts{
 		Force:                        ForceWithLease,
 		SkipIfRemoteBranchNotExist:   true,
 		SkipIfRemoteBranchIsUpToDate: true,
