@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"emperror.dev/errors"
-	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
 	"github.com/sirupsen/logrus"
@@ -31,10 +29,7 @@ var initCmd = &cobra.Command{
 		})
 		defer cu.Cleanup()
 
-		if config.Av.GitHub.Token == "" {
-			return errors.New("github token must be set")
-		}
-		client, err := getClient(config.Av.GitHub.Token)
+		client, err := getGitHubClient()
 		if err != nil {
 			return err
 		}

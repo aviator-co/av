@@ -47,7 +47,7 @@ Examples:
 		if err != nil {
 			return errors.WrapIf(err, "failed to determine current branch")
 		}
-		client, err := getClient(config.Av.GitHub.Token)
+		client, err := getGitHubClient()
 		if err != nil {
 			return err
 		}
