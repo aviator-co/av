@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -149,7 +152,27 @@ func checkCliVersion() {
 var once sync.Once
 var lazyGithubClient *gh.Client
 
-func getClient(token string) (*gh.Client, error) {
+func discoverGitHubAPIToken() string {
+	if config.Av.GitHub.Token != "" {
+		return config.Av.GitHub.Token
+	}
+	if ghCli, err := exec.LookPath("gh"); err == nil {
+		var stdout bytes.Buffer
+		cmd := exec.Command(ghCli, "auth", "token")
+		cmd.Stdout = &stdout
+		cmd.Stderr = nil
+		if err := cmd.Run(); err == nil {
+			return strings.TrimSpace(stdout.String())
+		}
+	}
+	return ""
+}
+
+func getGitHubClient() (*gh.Client, error) {
+	token := discoverGitHubAPIToken()
+	if token == "" {
+		return nil, errors.New("github token must be set")
+	}
 	var err error
 	once.Do(func() {
 		lazyGithubClient, err = gh.NewClient(token)
