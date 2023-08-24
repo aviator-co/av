@@ -23,6 +23,10 @@ type PullRequest struct {
 	// If not set, the value should be considered true iff there is a CODEOWNERS
 	// file in the repository.
 	RebaseWithDraft *bool
+
+	// By default, when the pull request title contains "WIP", it automatically sets the PR as
+	// a draft PR. Setting this to true suppresses this behavior.
+	NoWIPDetection bool
 }
 
 type Aviator struct {
