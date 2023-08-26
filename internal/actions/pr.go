@@ -322,13 +322,18 @@ func CreatePullRequest(
 		return nil, err
 	}
 
+	draft := opts.Draft
+	if !config.Av.PullRequest.NoWIPDetection && strings.Contains(opts.Title, "WIP") {
+		draft = true
+	}
+
 	pull, didCreatePR, err := ensurePR(ctx, client, repoMeta, ensurePROpts{
 		baseRefName: parentState.Name,
 		headRefName: opts.BranchName,
 		title:       opts.Title,
 		body:        opts.Body,
 		meta:        prMeta,
-		draft:       opts.Draft,
+		draft:       draft,
 		existingPR:  existingPR,
 	})
 	if err != nil {
