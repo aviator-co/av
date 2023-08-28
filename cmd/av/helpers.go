@@ -18,18 +18,25 @@ var cachedRepo *git.Repo
 
 func getRepo() (*git.Repo, error) {
 	if cachedRepo == nil {
-		cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+		cmd := exec.Command("git", "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir")
+
 		if rootFlags.Directory != "" {
 			cmd.Dir = rootFlags.Directory
 		}
-		toplevel, err := cmd.Output()
+		paths, err := cmd.Output()
 		if err != nil {
 			return nil, errors.Wrap(
 				err,
-				"failed to determine repo toplevel (are you running inside a Git repo?)",
+				"failed to find git directory (are you running inside a Git repo?)",
 			)
 		}
-		cachedRepo, err = git.OpenRepo(strings.TrimSpace(string(toplevel)))
+
+        dir, gitDir, found := strings.Cut(strings.TrimSpace(string(paths)), "\n" )
+        if !found {
+            return nil, errors.New("Unexpected format, not able to parse toplevel and common dir.")
+        }
+
+		cachedRepo, err = git.OpenRepo(dir, gitDir)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to open git repo")
 		}
