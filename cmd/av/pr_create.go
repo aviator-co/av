@@ -47,7 +47,7 @@ Examples:
 		if err != nil {
 			return errors.WrapIf(err, "failed to determine current branch")
 		}
-		client, err := getClient(config.Av.GitHub.Token)
+		client, err := getGitHubClient()
 		if err != nil {
 			return err
 		}
@@ -69,6 +69,11 @@ Examples:
 			prCreateFlags.Body = string(bodyBytes)
 		}
 
+		draft := config.Av.PullRequest.Draft
+		if cmd.Flags().Changed("draft") {
+			draft = prCreateFlags.Draft
+		}
+
 		if _, err := actions.CreatePullRequest(
 			context.Background(), repo, client, tx,
 			actions.CreatePullRequestOpts{
@@ -77,12 +82,8 @@ Examples:
 				Body:       body,
 				NoPush:     prCreateFlags.NoPush,
 				Force:      prCreateFlags.Force,
-				// TODO: this means we can't override with --draft=false if the
-				//       config has draft=true. We need to figure out how to
-				//       unify config and flags (the latter should always
-				//       override the former).
-				Draft: prCreateFlags.Draft || config.Av.PullRequest.Draft,
-				Edit:  prCreateFlags.Edit,
+				Draft:      draft,
+				Edit:       prCreateFlags.Edit,
 			},
 		); err != nil {
 			return err

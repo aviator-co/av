@@ -33,35 +33,34 @@ type PushOpts struct {
 	SkipIfRemoteBranchIsUpToDate bool
 }
 
-// Push pushes the current branch to the Git origin.
-// It does not check out the given branch.
-func Push(repo *git.Repo, opts PushOpts) error {
-	currentBranch, err := repo.CurrentBranchName()
-	if err != nil {
-		return errors.WrapIff(err, "failed to determine current branch")
-	}
-
+// Push pushes the given branch to the Git origin.
+func Push(repo *git.Repo, branchName string, opts PushOpts) error {
 	if opts.SkipIfRemoteBranchNotExist || opts.SkipIfRemoteBranchIsUpToDate {
 		// NOTE: This remote branch pattern is configurable with the fetch spec. This code
 		// assumes that the user won't change the fetch spec from the default. Technically,
 		// this must be generated from the fetch spec.
-		remoteBranch := "refs/remotes/origin/" + currentBranch
+		remoteBranch := "refs/remotes/origin/" + branchName
 		remoteBranchCommit, err := repo.RevParse(&git.RevParse{Rev: remoteBranch})
 		if err != nil {
 			return errors.WrapIff(err, "corresponding remote branch %q doesn't exist", remoteBranch)
 		}
 
-		head, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
+		head, err := repo.RevParse(&git.RevParse{Rev: branchName})
 		if err != nil {
 			return errors.WrapIff(
 				err,
-				"failed to determine branch HEAD for branch %q",
-				currentBranch,
+				"failed to determine HEAD for branch %q",
+				branchName,
 			)
 		}
+		logrus.WithFields(logrus.Fields{
+			"remote_branch": remoteBranch,
+			"remote_head":   remoteBranchCommit,
+			"local_head":    head,
+		}).Debug("checking if remote branch is up-to-date")
 		if opts.SkipIfRemoteBranchIsUpToDate && remoteBranchCommit == head {
 			_, _ = fmt.Fprint(os.Stderr,
-				"  - not pushing branch ", colors.UserInput(currentBranch),
+				"  - not pushing branch ", colors.UserInput(branchName),
 				" (upstream is already up-to-date)\n",
 			)
 			return nil
@@ -69,7 +68,7 @@ func Push(repo *git.Repo, opts PushOpts) error {
 	}
 
 	_, _ = fmt.Fprint(os.Stderr,
-		"  - pushing ", colors.UserInput(currentBranch), "... ",
+		"  - pushing ", colors.UserInput(branchName), "... ",
 	)
 	pushArgs := []string{"push"}
 	switch opts.Force {
@@ -80,7 +79,7 @@ func Push(repo *git.Repo, opts PushOpts) error {
 	case ForcePush:
 		pushArgs = append(pushArgs, "--force")
 	}
-	pushArgs = append(pushArgs, "origin", currentBranch)
+	pushArgs = append(pushArgs, "origin", branchName)
 	res, err := repo.Run(&git.RunOpts{
 		Args: pushArgs,
 	})
@@ -89,7 +88,7 @@ func Push(repo *git.Repo, opts PushOpts) error {
 			colors.Failure("error: ", err.Error()),
 			"\n",
 		)
-		return errors.WrapIff(err, "failed to push branch %q", currentBranch)
+		return errors.WrapIff(err, "failed to push branch %q", branchName)
 	}
 	if res.ExitCode != 0 {
 		_, _ = fmt.Fprint(os.Stderr,
@@ -113,7 +112,7 @@ func Push(repo *git.Repo, opts PushOpts) error {
 				"\n",
 			)
 		}
-		return errors.WrapIff(err, "failed to push branch %q", currentBranch)
+		return errors.WrapIff(err, "failed to push branch %q", branchName)
 	}
 	_, _ = fmt.Fprint(os.Stderr,
 		colors.Success("okay"), "\n",
