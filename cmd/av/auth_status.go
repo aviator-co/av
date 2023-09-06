@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/avgql"
 	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/shurcooL/graphql"
 	"github.com/spf13/cobra"
 )
 
@@ -24,27 +22,20 @@ var authStatusCmd = &cobra.Command{
 		}
 
 		var query struct {
-			Viewer struct {
-				Email graphql.String
-			}
+			avgql.ViewerSubquery
 		}
 
-		err = client.Query(context.Background(), &query, nil)
-		if err != nil {
+		if err := client.Query(context.Background(), &query, nil); err != nil {
+			return err
+		}
+		if err := query.CheckViewer(); err != nil {
 			return err
 		}
 
-		if query.Viewer.Email == "" {
-			_, _ = fmt.Fprint(
-				os.Stderr,
-				colors.Failure(
-					"You are not logged in. Please verify that your API token is correct.\n",
-				),
-			)
-			return actions.ErrExitSilently{ExitCode: 1}
-		}
-
-		_, _ = fmt.Fprint(os.Stderr, "Logged in as ", colors.UserInput(query.Viewer.Email), ".\n")
+		_, _ = fmt.Fprint(os.Stderr,
+			"Logged in as ", colors.UserInput(query.Viewer.FullName),
+			" (", colors.UserInput(query.Viewer.Email), ").\n",
+		)
 		return nil
 	},
 }
