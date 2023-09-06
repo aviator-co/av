@@ -38,12 +38,15 @@ func (r *Repo) Diff(d *DiffOpts) (*Diff, error) {
 	}
 
 	args = append(args, d.Specifiers...)
+
 	// This needs to be last because everything after the `--` is interpreted
 	// as a path, not a flag.
-	if len(d.Paths) > 0 {
-		args = append(args, "--")
-		args = append(args, d.Paths...)
-	}
+	// Note that we still append this `--` even if there are no paths because
+	// otherwise Git might interpret a specifier as ambiguous path and raise an
+	// error.
+	args = append(args, "--")
+	args = append(args, d.Paths...)
+
 	output, err := r.Run(&RunOpts{
 		Args: args,
 	})
