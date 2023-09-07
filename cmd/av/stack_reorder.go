@@ -33,11 +33,10 @@ squashed, dropped, or moved within the stack.
 `
 
 var stackReorderCmd = &cobra.Command{
-	Use:    "reorder",
-	Short:  "reorder the stack",
-	Hidden: true,
-	Long:   strings.TrimSpace(stackReorderDoc),
-	Args:   cobra.NoArgs,
+	Use:   "reorder",
+	Short: "reorder the stack",
+	Long:  strings.TrimSpace(stackReorderDoc),
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
 		if err != nil {

@@ -1,8 +1,24 @@
 # Aviator Command Line Tool
+Aviator CLI is an open-source CLI tool to create, update, review and merge stacked PRs on GitHub.
 
-See the
-[Aviator Stacked PRs quickstart](https://docs.aviator.co/getting-started/stacked-prs)
-for more information.
+## What are Stacked PRs
+Stacked pull requests make smaller, iterative changes and are stacked on top of each other instead of bundling large monolith changes in a single pull request. Each PR in the stack focuses on one logical change only, making the review process more manageable and less time-consuming.
+
+Read more about stacked PRs in our blog: [Rethinking code reviews with stacked PRs](https://www.aviator.co/blog/rethinking-code-reviews-with-stacked-prs/).
+
+# Installing the CLI
+
+### For Mac
+```
+brew install aviator-co/tap/av
+```
+
+### For other platforms
+Download the latest av executable from the GitHub releases page on the av repository. Extract the archive and add the executable to your PATH.
+
+
+See rest of the instructions on
+[Aviator Stacked PRs quickstart](https://docs.aviator.co/aviator-cli).
 
 # Development setup
 

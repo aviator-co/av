@@ -32,8 +32,10 @@ var prStatusCmd = &cobra.Command{
 		}
 
 		var query struct {
+			avgql.ViewerSubquery
 			GithubRepository struct {
 				PullRequest struct {
+					Number       graphql.Int
 					Title        graphql.String
 					Status       graphql.String
 					StatusReason graphql.String
@@ -64,27 +66,31 @@ var prStatusCmd = &cobra.Command{
 				} `graphql:"pullRequest(number: $prNumber)"`
 			} `graphql:"githubRepository(owner: $repoOwner, name:$repoName)"`
 		}
-
-		err = client.Query(context.Background(), &query, variables)
-		if err != nil {
+		if err := client.Query(context.Background(), &query, variables); err != nil {
+			return err
+		}
+		if err := query.CheckViewer(); err != nil {
 			return err
 		}
 
-		indent := "    "
-		prStatus := query.GithubRepository.PullRequest.Status
+		pr := query.GithubRepository.PullRequest
+		if pr.Number == 0 {
+			return errors.New("pull request not found")
+		}
 
 		// Print PR info
+		indent := "    "
 		_, _ = fmt.Fprint(
 			os.Stderr,
 			"#",
 			variables["prNumber"],
 			" ",
-			colors.UserInput(query.GithubRepository.PullRequest.Title),
+			colors.UserInput(pr.Title),
 			"\n",
 		)
-		_, _ = fmt.Fprint(os.Stderr, indent, "Status: ", colors.UserInput(prStatus))
+		_, _ = fmt.Fprint(os.Stderr, indent, "Status: ", colors.UserInput(pr.Status))
 
-		if prStatus == "PENDING" || prStatus == "BLOCKED" {
+		if pr.Status == "PENDING" || pr.Status == "BLOCKED" {
 			_, _ = fmt.Fprint(
 				os.Stderr,
 				indent,
@@ -112,7 +118,7 @@ var prStatusCmd = &cobra.Command{
 			"\n",
 		)
 
-		if prStatus == "QUEUED" {
+		if pr.Status == "QUEUED" {
 			_, _ = fmt.Fprint(
 				os.Stderr,
 				indent,
@@ -123,7 +129,7 @@ var prStatusCmd = &cobra.Command{
 				"\n",
 			)
 		}
-		if prStatus == "MERGED" {
+		if pr.Status == "MERGED" {
 			_, _ = fmt.Fprint(
 				os.Stderr,
 				indent,
