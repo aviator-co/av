@@ -20,12 +20,14 @@ var ErrRemoteNotFound = errors.Sentinel("this repository doesn't have a remote o
 
 type Repo struct {
 	repoDir string
+	gitDir string
 	log     logrus.FieldLogger
 }
 
-func OpenRepo(repoDir string) (*Repo, error) {
+func OpenRepo(repoDir string, gitDir string) (*Repo, error) {
 	r := &Repo{
 		repoDir,
+        gitDir,
 		logrus.WithFields(logrus.Fields{"repo": path.Base(repoDir)}),
 	}
 
@@ -37,7 +39,7 @@ func (r *Repo) Dir() string {
 }
 
 func (r *Repo) GitDir() string {
-	return path.Join(r.repoDir, ".git")
+	return r.gitDir
 }
 
 func (r *Repo) AvDir() string {
