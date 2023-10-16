@@ -18,7 +18,13 @@ var cachedRepo *git.Repo
 
 func getRepo() (*git.Repo, error) {
 	if cachedRepo == nil {
-		cmd := exec.Command("git", "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir")
+		cmd := exec.Command(
+			"git",
+			"rev-parse",
+			"--path-format=absolute",
+			"--show-toplevel",
+			"--git-common-dir",
+		)
 
 		if rootFlags.Directory != "" {
 			cmd.Dir = rootFlags.Directory
@@ -31,10 +37,10 @@ func getRepo() (*git.Repo, error) {
 			)
 		}
 
-        dir, gitDir, found := strings.Cut(strings.TrimSpace(string(paths)), "\n" )
-        if !found {
-            return nil, errors.New("Unexpected format, not able to parse toplevel and common dir.")
-        }
+		dir, gitDir, found := strings.Cut(strings.TrimSpace(string(paths)), "\n")
+		if !found {
+			return nil, errors.New("Unexpected format, not able to parse toplevel and common dir.")
+		}
 
 		cachedRepo, err = git.OpenRepo(dir, gitDir)
 		if err != nil {

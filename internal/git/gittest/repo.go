@@ -3,7 +3,7 @@ package gittest
 import (
 	"os"
 	"os/exec"
-    "path"
+	"path"
 	"path/filepath"
 	"testing"
 
