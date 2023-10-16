@@ -85,16 +85,11 @@ func Launch(repo *git.Repo, config Config) (string, error) {
 	cmd.Stderr = stderr
 	logrus.WithField("cmd", cmd.String()).Debug("launching editor")
 	if err := cmd.Run(); err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"cmd": cmd.String(),
-			"out": stderr.String(),
-		}).Warn("editor exited with error")
-
 		// Try to return the contents of the file even if the editor exited with
 		// an error. We ignore any errors from parsing here since we'll just end
 		// up returning the error from above anyway.
 		res, _ := parseResult(tmp.Name(), config)
-		return res, err
+		return res, errors.WrapIff(err, "command %q failed", config.Command)
 	}
 
 	return parseResult(tmp.Name(), config)
