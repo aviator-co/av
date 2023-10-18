@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
@@ -35,6 +36,10 @@ type Config struct {
 // https://github.com/git/git/blob/5699ec1b0aec51b9e9ba5a2785f65970c5a95d84/editor.c#L57
 const CommandNoOp = ":"
 
+// Launch launches the user's editor and allows them to edit the text.
+// The text is returned after the editor is closed. If an error occurs, the
+// (possibly edited) text is returned in addition to the error. If the file
+// could not be read, an empty string is returned.
 func Launch(repo *git.Repo, config Config) (string, error) {
 	switch {
 	case config.Command == "":
@@ -80,11 +85,11 @@ func Launch(repo *git.Repo, config Config) (string, error) {
 	cmd.Stderr = stderr
 	logrus.WithField("cmd", cmd.String()).Debug("launching editor")
 	if err := cmd.Run(); err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"cmd": cmd.String(),
-			"out": stderr.String(),
-		}).Warn("editor exited with error")
-		return "", err
+		// Try to return the contents of the file even if the editor exited with
+		// an error. We ignore any errors from parsing here since we'll just end
+		// up returning the error from above anyway.
+		res, _ := parseResult(tmp.Name(), config)
+		return res, errors.WrapIff(err, "command %q failed", config.Command)
 	}
 
 	return parseResult(tmp.Name(), config)
@@ -122,4 +127,12 @@ func parseResult(path string, config Config) (string, error) {
 		res.WriteByte('\n')
 	}
 	return res.String(), nil
+}
+
+func mtime(f *os.File) (time.Time, error) {
+	stat, err := f.Stat()
+	if err != nil {
+		return time.Time{}, err
+	}
+	return stat.ModTime(), nil
 }

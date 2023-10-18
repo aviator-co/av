@@ -288,7 +288,11 @@ func CreatePullRequest(
 			CommentPrefix:  "%%",
 		})
 		if err != nil {
-			return nil, errors.WrapIf(err, "failed to launch text editor")
+			if res != "" {
+				savePRDescriptionToTemporaryFile(saveFile, res)
+			}
+			return nil, errors.WrapIf(err, "text editor failed")
+
 		}
 		opts.Title, opts.Body = stringutils.ParseSubjectBody(res)
 		if opts.Title == "" {
@@ -305,15 +309,7 @@ func CreatePullRequest(
 
 			// Otherwise, save what the user entered to a file so that it's not
 			// lost forever (and we can re-use it if they try again).
-			if err := os.WriteFile(saveFile, []byte(res), 0644); err != nil {
-				logrus.WithError(err).
-					Error("failed to write pull request description to temporary file")
-				return
-			}
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - saved pull request description to ", colors.UserInput(saveFile),
-				" (it will be automatically re-used if you try again)\n",
-			)
+			savePRDescriptionToTemporaryFile(saveFile, res)
 		}()
 	}
 
@@ -374,6 +370,18 @@ func CreatePullRequest(
 
 	tx.SetBranch(branchMeta)
 	return &CreatePullRequestResult{didCreatePR, branchMeta, pull}, nil
+}
+
+func savePRDescriptionToTemporaryFile(saveFile string, contents string) {
+	if err := os.WriteFile(saveFile, []byte(contents), 0644); err != nil {
+		logrus.WithError(err).
+			Error("failed to write pull request description to temporary file")
+		return
+	}
+	_, _ = fmt.Fprint(os.Stderr,
+		"  - saved pull request description to ", colors.UserInput(saveFile),
+		" (it will be automatically re-used if you try again)\n",
+	)
 }
 
 type prBodyTemplateData struct {
