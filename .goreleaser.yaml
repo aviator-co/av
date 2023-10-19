@@ -36,7 +36,7 @@ archives:
 
 # Push to the homebrew tap
 brews:
-  - tap:
+  - repository:
       owner: aviator-co
       name: homebrew-tap
     commit_author:
