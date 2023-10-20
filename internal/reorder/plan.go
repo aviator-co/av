@@ -37,15 +37,23 @@ func CreatePlan(repo *git.Repo, tx meta.ReadTx, rootBranch string) ([]Cmd, error
 			branchCmd.Trunk = branch.Parent.Name + "@" + trunkCommit
 			upstreamCommit = trunkCommit
 		}
-		cmds = append(cmds, branchCmd)
 
-		// Add a pick command for every commit associated with this branch
+		// Figure out the commits that belong to this branch.
+		// We'll use this to generate a "pick" command for each commit.
 		commitIDs, err := repo.RevList(git.RevListOpts{
 			Specifiers: []string{branchName, "^" + upstreamCommit},
 			Reverse:    true,
 		})
 		if err != nil {
 			return nil, err
+		}
+
+		// If no commits associated with this branch, bail out early and add a
+		// helpful comment for the user.
+		if len(commitIDs) == 0 {
+			branchCmd.Comment = "this branch has no commits"
+			cmds = append(cmds, branchCmd)
+			continue
 		}
 
 		commitObjects, err := repo.GetRefs(&git.GetRefs{
@@ -55,6 +63,8 @@ func CreatePlan(repo *git.Repo, tx meta.ReadTx, rootBranch string) ([]Cmd, error
 			return nil, err
 		}
 
+		// Append the "stack-branch" command and each "pick" command to the plan
+		cmds = append(cmds, branchCmd)
 		for _, object := range commitObjects {
 			commit, err := git.ParseCommitContents(object.Contents)
 			if err != nil {
