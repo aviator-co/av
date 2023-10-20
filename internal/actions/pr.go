@@ -10,6 +10,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/aviator-co/av/internal/utils/errutils"
+
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/editor"
@@ -81,6 +83,16 @@ func getPRMetadata(
 	return prMeta, nil
 }
 
+type errPullRequestClosed struct {
+	*gh.PullRequest
+}
+
+func (e errPullRequestClosed) Error() string {
+	return fmt.Sprintf("pull request #%d is %s", e.Number, e.State)
+}
+
+// getExistingOpenPR returns an existing pull request for the given branch if
+// any exist and are open.
 func getExistingOpenPR(
 	ctx context.Context,
 	client *gh.Client,
@@ -89,16 +101,18 @@ func getExistingOpenPR(
 	baseRefName string,
 ) (*gh.PullRequest, error) {
 	if branchMeta.PullRequest != nil {
+		logrus.WithField("pr", branchMeta.PullRequest.Number).
+			Debug("querying data for existing PR from GitHub")
 		pr, err := client.PullRequest(ctx, branchMeta.PullRequest.ID)
 		if err != nil {
 			return nil, errors.WrapIf(err, "querying existing pull request")
 		}
 		if pr.State != githubv4.PullRequestStateOpen {
-			// This is already closed. Create a new one.
-			return nil, nil
+			return nil, errPullRequestClosed{pr}
 		}
 		return pr, nil
 	}
+	logrus.WithField("branch", branchMeta.Name).Debug("querying existing open PRs from GitHub")
 	existing, err := client.GetPullRequests(ctx, gh.GetPullRequestsInput{
 		Owner:       repoMeta.Owner,
 		Repo:        repoMeta.Name,
@@ -134,9 +148,41 @@ func CreatePullRequest(
 	if !ok {
 		return nil, ErrRepoNotInitialized
 	}
+	branchMeta, _ := tx.Branch(opts.BranchName)
 
+	var existingPR *gh.PullRequest
+	if !opts.Force {
+		var err error
+		existingPR, err = getExistingOpenPR(ctx, client, repoMeta, branchMeta, opts.BranchName)
+		if closed, ok := errutils.As[errPullRequestClosed](err); ok {
+			_, _ = fmt.Fprint(os.Stderr,
+				colors.Failure("Existing pull request for branch "),
+				colors.UserInput(opts.BranchName),
+				colors.Failure(" is "), colors.UserInput(closed.State),
+				colors.Failure(": "), colors.UserInput(closed.Permalink),
+				"\n",
+			)
+			_, _ = fmt.Fprint(os.Stderr,
+				colors.Faint("  - use "), colors.CliCmd("av pr create --force"),
+				colors.Faint(" to create a new pull request for this branch\n"),
+			)
+			return nil, err
+		} else if err != nil {
+			return nil, errors.WrapIf(err, "failed to get existing pull request")
+		}
+	} else {
+		// If we're forcing creation of a new PR, we always want to force push.
+		// This prevents errors where we try to use `--force-with-lease` but the
+		// remote branch has been deleted.
+		opts.ForcePush = true
+	}
+
+	verb := "Creating"
+	if existingPR != nil {
+		verb = "Updating"
+	}
 	_, _ = fmt.Fprint(os.Stderr,
-		"Creating pull request for branch ", colors.UserInput(opts.BranchName), ":",
+		verb, " pull request for branch ", colors.UserInput(opts.BranchName), ":",
 		"\n",
 	)
 	if !opts.NoPush || opts.ForcePush {
@@ -171,7 +217,6 @@ func CreatePullRequest(
 	}
 
 	// figure this out based on whether or not we're on a stacked branch
-	branchMeta, _ := tx.Branch(opts.BranchName)
 	parentState := branchMeta.Parent
 	if parentState.Name == "" {
 		defaultBranch, err := repo.DefaultBranch()
@@ -215,10 +260,6 @@ func CreatePullRequest(
 		return nil, errors.Errorf("no commits between %q and %q", prCompareRef, opts.BranchName)
 	}
 
-	existingPR, err := getExistingOpenPR(ctx, client, repoMeta, branchMeta, branchMeta.Parent.Name)
-	if err != nil {
-		return nil, err
-	}
 	if existingPR != nil {
 		// If there's an existing PR, use that as the new PR title and body. If --edit is
 		// used, an editor is opened later.
