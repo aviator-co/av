@@ -23,6 +23,7 @@ func EditPlan(repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 		text.WriteString(cmd.String())
 		text.WriteString("\n")
 	}
+	text.WriteString(instructionsText)
 
 	res, err := editor.Launch(repo, editor.Config{
 		Text:              text.String(),
@@ -76,3 +77,18 @@ func Diff(old []Cmd, new []Cmd) PlanDiff {
 		AddedBranches:   sliceutils.Subtract(newBranches, oldBranches),
 	}
 }
+
+const instructionsText = `
+# Instructions:
+#
+# Commands:
+# sb, stack-branch <branch-name> [--parent <parent-branch-name> | --trunk <trunk-branch-name>]
+#         Create a new branch as part of a stack. If parent is not specified,
+#         the previous branch in the stack is used (if any). If trunk is
+#         specified, the branch is rooted from the given branch.
+#         trunk-branch-name can be either a branch name or a branch name with a
+#         commit ID in the format "<branch-name>@<commit-id>".
+# p, pick <commit-id>
+#         Pick a commit to be included in the stack. Only valid after a
+#         stack-branch command.
+`

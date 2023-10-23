@@ -112,6 +112,9 @@ type Output struct {
 
 func (o Output) Lines() []string {
 	s := strings.TrimSpace(string(o.Stdout))
+	if s == "" {
+		return nil
+	}
 	return strings.Split(s, "\n")
 }
 

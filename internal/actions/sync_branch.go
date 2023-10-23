@@ -355,8 +355,8 @@ func syncBranchRebase(
 
 	// Scenario 3: the branch is not up-to-date with its parent.
 	_, _ = fmt.Fprint(os.Stderr,
-		"  - synching branch ", colors.UserInput(branch.Name),
-		" on latest commit ", git.ShortSha(parentHead),
+		"  - syncing branch ", colors.UserInput(branch.Name),
+		" on latest commit ", colors.UserInput(git.ShortSha(parentHead)),
 		" of parent branch ", colors.UserInput(parentState.Name),
 		"\n",
 	)
