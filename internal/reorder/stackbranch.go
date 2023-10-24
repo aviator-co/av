@@ -26,6 +26,8 @@ type StackBranchCmd struct {
 	// The branch can be rooted at a given commit by appending "@<commit>" to the
 	// branch name.
 	Trunk string
+	// An optional comment to include in the reorder plan for this command.
+	Comment string
 }
 
 func (b StackBranchCmd) Execute(ctx *Context) error {
@@ -97,6 +99,10 @@ func (b StackBranchCmd) String() string {
 	if b.Trunk != "" {
 		sb.WriteString(" --trunk ")
 		sb.WriteString(b.Trunk)
+	}
+	if b.Comment != "" {
+		sb.WriteString("  # ")
+		sb.WriteString(b.Comment)
 	}
 	return sb.String()
 }

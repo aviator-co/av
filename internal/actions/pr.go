@@ -494,6 +494,7 @@ func ensurePR(
 			PullRequestID: opts.existingPR.ID,
 			Title:         gh.Ptr(githubv4.String(opts.title)),
 			Body:          gh.Ptr(githubv4.String(newBody)),
+			BaseRefName:   gh.Ptr(githubv4.String(opts.baseRefName)),
 		})
 		if err != nil {
 			return nil, false, errors.WithStack(err)
