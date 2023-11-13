@@ -75,15 +75,13 @@ Examples:
 			"Executing command ", colors.CliCmd(executils.FormatCommandLine(args)),
 			" for ", colors.UserInput(len(branches)), " branches:\n",
 		)
-		for i, branch := range branches {
-			if i > 0 {
-				// Add extra whitespace between branches since the command might
-				// produce its own output.
-				_, _ = fmt.Fprint(os.Stderr, "\n")
-			}
+		for _, branch := range branches {
 			_, _ = fmt.Fprint(os.Stderr,
 				"  - switching to branch ", colors.UserInput(branch), "\n",
 			)
+			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: branch}); err != nil {
+				return errors.Wrapf(err, "failed to switch to branch %q", branch)
+			}
 			cmd := exec.Command(args[0], args[1:]...)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
