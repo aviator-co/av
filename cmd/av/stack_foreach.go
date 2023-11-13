@@ -27,6 +27,8 @@ var stackForEachCmd = &cobra.Command{
 To prevent flags for the command to be executed from being parsed as flags for
 this command, use the "--" separator (see examples below).
 
+Output from the command will be printed to stdout/stderr as it is generated.
+
 Examples:
   Print the current HEAD commit for each branch in the stack:
     $ av stack for-each -- git rev-parse HEAD
