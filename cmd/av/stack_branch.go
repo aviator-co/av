@@ -28,8 +28,9 @@ var stackBranchFlags struct {
 	Force bool
 }
 var stackBranchCmd = &cobra.Command{
-	Use:   "branch [flags] <branch-name>",
-	Short: "create a new stacked branch",
+	Use:     "branch [flags] <branch-name>",
+	Aliases: []string{"b", "br"},
+	Short:   "create a new stacked branch",
 	Long: `Create a new branch that is stacked on the current branch.
 
 If the --rename/-m flag is given, the current branch is renamed to the name

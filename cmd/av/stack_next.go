@@ -18,8 +18,9 @@ var stackNextFlags struct {
 }
 
 var stackNextCmd = &cobra.Command{
-	Use:   "next [<n>|--last]",
-	Short: "checkout the next branch in the stack",
+	Use:     "next [<n>|--last]",
+	Aliases: []string{"n"},
+	Short:   "checkout the next branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get the subsequent branches so we can checkout the nth one
 		repo, err := getRepo()
