@@ -5,8 +5,9 @@ import (
 )
 
 var stackCmd = &cobra.Command{
-	Use:   "stack",
-	Short: "managed stacked pull requests",
+	Use:     "stack",
+	Aliases: []string{"st"},
+	Short:   "managed stacked pull requests",
 }
 
 func init() {
@@ -14,6 +15,7 @@ func init() {
 		stackBranchCmd,
 		stackBranchCommitCmd,
 		stackDiffCmd,
+		stackForEachCmd,
 		stackNextCmd,
 		stackPrevCmd,
 		stackReorderCmd,

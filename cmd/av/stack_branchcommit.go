@@ -52,7 +52,7 @@ var stackBranchCommitFlags struct {
 
 var stackBranchCommitCmd = &cobra.Command{
 	Use:          "branch-commit [flags]",
-	Aliases:      []string{"bc"},
+	Aliases:      []string{"branchcommit", "bc"},
 	Short:        "create a new stacked branch and commit staged changes to it",
 	Long:         "Create a new branch that is stacked on the current branch and commit all staged changes with the specified arguments.",
 	SilenceUsage: true,
