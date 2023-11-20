@@ -15,9 +15,11 @@ type User struct {
 // User returns information about the given user.
 func (c *Client) User(ctx context.Context, login string) (*User, error) {
 	var query struct {
-		User User
+		User User `graphql:"user(login: $login)"`
 	}
-	if err := c.query(ctx, &query, nil); err != nil {
+	if err := c.query(ctx, &query, map[string]any{
+		"login": githubv4.String(login),
+	}); err != nil {
 		return nil, err
 	}
 	if query.User.ID == "" {
