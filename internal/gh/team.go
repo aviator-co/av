@@ -8,8 +8,9 @@ import (
 )
 
 type Team struct {
-	ID    githubv4.ID `graphql:"id"`
-	Login string      `graphql:"login"`
+	ID   githubv4.ID `graphql:"id"`
+	Name string      `graphql:"name"`
+	Slug string      `graphql:"slug"`
 }
 
 // OrganizationTeam returns information about the given team in the given organization.
