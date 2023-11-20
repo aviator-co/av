@@ -29,11 +29,12 @@ import (
 )
 
 type CreatePullRequestOpts struct {
+	// The HEAD branch to create a pull request for.
 	BranchName string
-	Title      string
-	Body       string
-	//LabelNames      []string
-
+	// The pull request title.
+	Title string
+	// The pull request body (description).
+	Body string
 	// If true, create the pull request as a GitHub draft PR.
 	Draft bool
 	// If true, do not push the branch to GitHub
@@ -42,7 +43,6 @@ type CreatePullRequestOpts struct {
 	ForcePush bool
 	// If true, create a PR even if we think one already exists
 	Force bool
-
 	// If true, open an editor for editing the title and body
 	Edit bool
 }
