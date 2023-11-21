@@ -22,7 +22,7 @@ func AddPullRequestReviewers(
 	reviewers []string,
 ) error {
 	_, _ = fmt.Fprint(os.Stderr,
-		"  - adding ", colors.UserInput(len(reviewers)), " reviewers to pull request\n",
+		"  - adding ", colors.UserInput(len(reviewers)), " reviewer(s) to pull request\n",
 	)
 
 	// We need to map the given reviewers to GitHub node IDs.
