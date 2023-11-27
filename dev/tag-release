@@ -1,0 +1,38 @@
+#!/bin/sh
+set -e
+
+# Publish a patch release of the CLI.
+# This script will create a Git tag and push it to the remote repository.
+# A GitHub action is configured to create a release when a new tag is pushed.
+
+# Confirm that the current tree is clean
+if ! git diff-index --quiet HEAD --; then
+  echo "Working tree is not clean. Aborting."
+  exit 1
+fi
+
+# Find the latest tag
+git fetch --tags
+LATEST_TAG=$(git describe --tags --match="v[0-9]*" --abbrev=0 origin/master)
+
+# Get the next version
+HEAD_DESCRIPTION=$(git show --oneline --quiet HEAD)
+NEXT_VERSION=$(echo $LATEST_TAG | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
+
+echo "HEAD is at ${HEAD_DESCRIPTION}"
+echo "Tag and publish ${NEXT_VERSION}? (y/n)"
+read CONFIRM
+case $CONFIRM in
+  y|Y|yes|Yes|YES)
+    echo "Publishing ${NEXT_VERSION}..."
+    ;;
+  *)
+    echo "Aborting."
+    exit 1
+    ;;
+esac
+
+# Tag the release
+set -x
+git tag "${NEXT_VERSION}"
+git push origin "tags/${NEXT_VERSION}"
