@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"strings"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
@@ -13,19 +12,19 @@ import (
 )
 
 var prCreateFlags struct {
-	Draft  bool
-	Force  bool
-	NoPush bool
-	Title  string
-	Body   string
-	Edit   bool
+	Draft     bool
+	Force     bool
+	NoPush    bool
+	Title     string
+	Body      string
+	Edit      bool
+	Reviewers []string
 }
 
 var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "create a pull request for the current branch",
-	Long: strings.TrimSpace(`
-Create a pull request for the current branch.
+	Long: `Create a pull request for the current branch.
 
 Examples:
   Create a PR with an empty body:
@@ -36,7 +35,10 @@ Examples:
     > Implement my very fancy feature.
     > Can you please review it?
     > EOF
-`),
+
+  Create a pull request, assigning reviewers:
+    $ av pr create --reviewers "example,@example-org/example-team"
+`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
 		repo, err := getRepo()
@@ -74,8 +76,9 @@ Examples:
 			draft = prCreateFlags.Draft
 		}
 
-		if _, err := actions.CreatePullRequest(
-			context.Background(), repo, client, tx,
+		ctx := context.Background()
+		res, err := actions.CreatePullRequest(
+			ctx, repo, client, tx,
 			actions.CreatePullRequestOpts{
 				BranchName: branchName,
 				Title:      prCreateFlags.Title,
@@ -85,12 +88,22 @@ Examples:
 				Draft:      draft,
 				Edit:       prCreateFlags.Edit,
 			},
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 		if err := tx.Commit(); err != nil {
 			return err
 		}
+
+		// Do this after creating the PR and committing the transaction so that
+		// our local database is up-to-date even if this fails.
+		if len(prCreateFlags.Reviewers) > 0 {
+			if err := actions.AddPullRequestReviewers(ctx, client, res.Pull.ID, prCreateFlags.Reviewers); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	},
 }
@@ -121,5 +134,9 @@ func init() {
 	prCreateCmd.Flags().BoolVar(
 		&prCreateFlags.Edit, "edit", false,
 		"always open an editor to edit the pull request title and description",
+	)
+	prCreateCmd.Flags().StringSliceVar(
+		&prCreateFlags.Reviewers, "reviewers", nil,
+		"add reviewers to the pull request (can be usernames or team names)",
 	)
 }

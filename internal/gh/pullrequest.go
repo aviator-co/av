@@ -166,6 +166,27 @@ func (c *Client) UpdatePullRequest(
 	return &mutation.UpdatePullRequest.PullRequest, nil
 }
 
+// RequestReviews requests reviews from the given users on the given pull
+// request.
+func (c *Client) RequestReviews(
+	ctx context.Context,
+	input githubv4.RequestReviewsInput,
+) (*PullRequest, error) {
+	if input.Union == nil {
+		// Add reviewers instead of replacing them by default.
+		input.Union = Ptr[githubv4.Boolean](true)
+	}
+	var mutation struct {
+		RequestReviews struct {
+			PullRequest PullRequest
+		} `graphql:"requestReviews(input: $input)"`
+	}
+	if err := c.mutate(ctx, &mutation, input, nil); err != nil {
+		return nil, errors.Wrap(err, "failed to request pull request reviews")
+	}
+	return &mutation.RequestReviews.PullRequest, nil
+}
+
 func (c *Client) ConvertPullRequestToDraft(ctx context.Context, id string) (*PullRequest, error) {
 	var mutation struct {
 		ConvertPullRequestToDraft struct {
