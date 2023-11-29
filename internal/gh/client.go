@@ -38,7 +38,7 @@ func NewClient(token string) (*Client, error) {
 	if config.Av.GitHub.BaseURL == "" {
 		gh = githubv4.NewClient(httpClient)
 	} else {
-		gh = githubv4.NewEnterpriseClient(config.Av.GitHub.BaseURL+"/graphql", httpClient)
+		gh = githubv4.NewEnterpriseClient(config.Av.GitHub.BaseURL+"/api/graphql", httpClient)
 	}
 	return &Client{httpClient, gh}, nil
 }
@@ -109,7 +109,7 @@ func (c *Client) restPost(
 	if config.Av.GitHub.BaseURL == "" {
 		url = githubCloudApiBaseUrl + endpoint
 	} else {
-		url = config.Av.GitHub.BaseURL + "/v3" + endpoint
+		url = config.Av.GitHub.BaseURL + "/api/v3" + endpoint
 	}
 
 	log := logrus.WithFields(logrus.Fields{
