@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/aviator-co/av/internal/config"
+
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/utils/logutils"
 	"github.com/shurcooL/githubv4"
@@ -20,8 +22,10 @@ type Client struct {
 	gh         *githubv4.Client
 }
 
-const githubApiBaseUrl = "https://api.github.com"
+const githubCloudApiBaseUrl = "https://api.github.com"
 
+// NewClient creates a new GitHub client.
+// It takes configuration from the global config.Av.GitHub variable.
 func NewClient(token string) (*Client, error) {
 	if token == "" {
 		return nil, errors.Errorf("no GitHub token provided (do you need to configure one?)")
@@ -30,7 +34,13 @@ func NewClient(token string) (*Client, error) {
 		&oauth2.Token{AccessToken: token},
 	)
 	httpClient := oauth2.NewClient(context.Background(), src)
-	return &Client{httpClient, githubv4.NewClient(httpClient)}, nil
+	var gh *githubv4.Client
+	if config.Av.GitHub.BaseURL == "" {
+		gh = githubv4.NewClient(httpClient)
+	} else {
+		gh = githubv4.NewEnterpriseClient(config.Av.GitHub.BaseURL+"/graphql", httpClient)
+	}
+	return &Client{httpClient, gh}, nil
 }
 
 func (c *Client) query(ctx context.Context, query any, variables map[string]any) (reterr error) {
@@ -91,7 +101,17 @@ func (c *Client) restPost(
 	}
 
 	startTime := time.Now()
-	url := githubApiBaseUrl + endpoint
+
+	// GitHub cloud and GHES have different API URLs.
+	// For cloud, it's `https://api.github.com/repos/...`.
+	// For GHES, it's `https://github.mycompany.com/api/v3/repos/...`.
+	var url string
+	if config.Av.GitHub.BaseURL == "" {
+		url = githubCloudApiBaseUrl + endpoint
+	} else {
+		url = config.Av.GitHub.BaseURL + "/v3" + endpoint
+	}
+
 	log := logrus.WithFields(logrus.Fields{
 		"url":  url,
 		"body": logutils.Format("%#+v", body),
