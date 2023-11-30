@@ -8,8 +8,13 @@ import (
 )
 
 type GitHub struct {
-	Token   string
-	BaseUrl string
+	// The GitHub API token to use for authenticating to the GitHub API.
+	Token string
+	// The base URL of the GitHub instance to use.
+	// This should only be set for GitHub Enterprise Server (GHES) instances.
+	// For example, "https://github.mycompany.com/" (without a "/api/v3" or
+	// "/api/graphql" suffix).
+	BaseURL string
 }
 
 type PullRequest struct {
@@ -50,9 +55,7 @@ var Av = struct {
 	PullRequest: PullRequest{
 		OpenBrowser: true,
 	},
-	GitHub: GitHub{
-		BaseUrl: "https://github.com",
-	},
+	GitHub: GitHub{},
 }
 
 // Load initializes the configuration values.
