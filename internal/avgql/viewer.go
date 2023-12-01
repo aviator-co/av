@@ -16,7 +16,7 @@ type ViewerSubquery struct {
 }
 
 var ErrNotAuthenticated = errors.New(
-	"You are not logged in. Please verify that your API token is correct.",
+	"You are not logged in to Aviator. Please verify that your API token is correct.",
 )
 
 // CheckViewer checks whether or not the viewer is authenticated.
