@@ -61,6 +61,10 @@ func SyncBranch(
 		}
 	} else {
 		if opts.Fetch {
+			fetchHead, err := fetchRemoteTrunkHead(repo, tx, branch)
+			if err != nil {
+				return nil, err
+			}
 			update, err := UpdatePullRequestState(ctx, client, tx, branch.Name)
 			if err != nil {
 				_, _ = fmt.Fprint(os.Stderr, colors.Failure("      - error: ", err.Error()), "\n")
@@ -77,6 +81,14 @@ func SyncBranch(
 						" (create one with ", colors.CliCmd("av pr create"),
 					" or ", colors.CliCmd("av stack submit"), ")\n",
 				)
+			} else if branch.PullRequest.State == githubv4.PullRequestStateClosed && branch.MergeCommit == "" {
+				branch.MergeCommit, err = findMergeCommitWithGitLog(repo, fetchHead, branch)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to find the merge commit from git-log")
+				}
+				if branch.MergeCommit != "" {
+					tx.SetBranch(branch)
+				}
 			}
 		}
 
@@ -243,15 +255,6 @@ func syncBranchRebase(
 			"  - rebasing ", colors.UserInput(branch.Name),
 			" on top of merge commit ", colors.UserInput(short), "\n",
 		)
-		if opts.Fetch {
-			if _, err := repo.Git("fetch", "origin", origParentBranch.MergeCommit); err != nil {
-				return nil, errors.WrapIff(
-					err,
-					"failed to fetch merge commit %q from origin",
-					short,
-				)
-			}
-		}
 
 		// Replay the commits from this branch directly onto the merge commit.
 		// The HEAD of trunk might have moved forward since this, but this is
@@ -418,6 +421,37 @@ func syncBranchRebase(
 	}
 	syncBranchUpdateParent(tx, branch, &continuation)
 	return nil, nil
+}
+
+func fetchRemoteTrunkHead(repo *git.Repo, tx meta.WriteTx, branch meta.Branch) (string, error) {
+	parent, ok := meta.Trunk(tx, branch.Name)
+	if !ok {
+		return "", errors.Errorf("failed to find the trunk branch for %q", branch.Name)
+	}
+
+	if _, err := repo.Git("fetch", "origin", parent); err != nil {
+		return "", errors.WrapIff(err, "failed to fetch %q from origin", parent)
+	}
+	commitHash, err := repo.RevParse(&git.RevParse{Rev: "FETCH_HEAD"})
+	if err != nil {
+		return "", errors.WrapIff(err, "failed to read the commit hash of %q", parent)
+	}
+	return commitHash, nil
+}
+
+// findMergeCommitWithGitLog looks for the merge commit for a specified PR.
+//
+// Usually, GitHub should set which commit closes a pull request. This is known to be not that
+// reliable. When we cannot find a merge commit for a closed PR, we try to find if any commit in the
+// upstream closes the pull request as a fallback.
+func findMergeCommitWithGitLog(repo *git.Repo, upstreamCommit string, branch meta.Branch) (string, error) {
+	// Find all commits that have been merged into the trunk since this branch
+	cis, err := repo.Log(git.LogOpts{RevisionRange: []string{upstreamCommit, "^" + branch.Name}})
+	if err != nil {
+		return "", err
+	}
+	closedPRs := git.FindClosesPullRequestComments(cis)
+	return closedPRs[branch.PullRequest.Number], nil
 }
 
 func syncBranchContinue(
