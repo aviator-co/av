@@ -464,12 +464,14 @@ func readDefaultPullRequestTemplate(repo *git.Repo) string {
 		"PULL_REQUEST_TEMPLATE.md",
 		"pull_request_template.md",
 	} {
-		tpl := filepath.Join(repo.Dir(), ".github", f)
-		data, err := os.ReadFile(tpl)
-		if err != nil {
-			continue
+		for _, dir := range []string{"", ".github", "data"} {
+			tpl := filepath.Join(repo.Dir(), dir, f)
+			data, err := os.ReadFile(tpl)
+			if err != nil {
+				continue
+			}
+			return string(data)
 		}
-		return string(data)
 	}
 	return ""
 }
