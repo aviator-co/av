@@ -460,11 +460,11 @@ var prBodyTemplate = template.Must(
 )
 
 func readDefaultPullRequestTemplate(repo *git.Repo) string {
-	for _, f := range []string{
-		"PULL_REQUEST_TEMPLATE.md",
-		"pull_request_template.md",
-	} {
-		for _, dir := range []string{"", ".github", "data"} {
+	for _, dir := range []string{"", ".github", "data"} {
+		for _, f := range []string{
+			"PULL_REQUEST_TEMPLATE.md",
+			"pull_request_template.md",
+		} {
 			tpl := filepath.Join(repo.Dir(), dir, f)
 			data, err := os.ReadFile(tpl)
 			if err != nil {
