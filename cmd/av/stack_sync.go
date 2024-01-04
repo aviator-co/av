@@ -59,6 +59,10 @@ base branch.
 		if err != nil {
 			return err
 		}
+		if _, err = tidyDB(repo, db); err != nil {
+			return err
+		}
+
 		tx := db.WriteTx()
 		defer tx.Abort()
 
