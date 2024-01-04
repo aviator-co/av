@@ -89,10 +89,8 @@ func findNonDeletedParents(
 	branches map[string]*meta.Branch,
 ) map[string]meta.BranchState {
 	deleted := make(map[string]bool)
-	for name, br := range branches {
-		if br.MergeCommit != "" {
-			deleted[name] = true
-		} else if _, err := repo.Git("show-ref", "refs/heads/"+name); err != nil {
+	for name := range branches {
+		if _, err := repo.Git("show-ref", "refs/heads/"+name); err != nil {
 			// Ref doesn't exist. Should be removed.
 			deleted[name] = true
 		}
