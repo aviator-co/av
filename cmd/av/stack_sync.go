@@ -50,6 +50,12 @@ base branch.
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
+		if stackSyncFlags.Trunk && stackSyncFlags.NoFetch {
+			return errors.New("--trunk requires git-fetch to re-root the stacks")
+		}
+		if !stackSyncFlags.NoPush && stackSyncFlags.NoFetch {
+			return errors.New("--no-fetch requires --no-push as git-push requires git-fetch")
+		}
 
 		repo, err := getRepo()
 		if err != nil {
