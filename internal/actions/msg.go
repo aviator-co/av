@@ -24,7 +24,9 @@ func msgRebaseResult(rebase *git.RebaseResult) {
 		)
 		_, _ = fmt.Fprint(
 			os.Stderr,
-			"  - resolve the conflicts and continue the sync with ",
+			"  - resolve the conflicts, ",
+			colors.CliCmd("git add [<pathspec>...]"),
+			"the resolved files, and continue the sync with ",
 			colors.CliCmd("av stack sync --continue"),
 			"\n",
 		)

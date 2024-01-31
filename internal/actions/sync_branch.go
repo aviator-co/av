@@ -444,7 +444,11 @@ func fetchRemoteTrunkHead(repo *git.Repo, tx meta.WriteTx, branch meta.Branch) (
 // Usually, GitHub should set which commit closes a pull request. This is known to be not that
 // reliable. When we cannot find a merge commit for a closed PR, we try to find if any commit in the
 // upstream closes the pull request as a fallback.
-func findMergeCommitWithGitLog(repo *git.Repo, upstreamCommit string, branch meta.Branch) (string, error) {
+func findMergeCommitWithGitLog(
+	repo *git.Repo,
+	upstreamCommit string,
+	branch meta.Branch,
+) (string, error) {
 	// Find all commits that have been merged into the trunk since this branch
 	cis, err := repo.Log(git.LogOpts{RevisionRange: []string{upstreamCommit, "^" + branch.Name}})
 	if err != nil {

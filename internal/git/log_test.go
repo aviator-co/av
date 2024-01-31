@@ -10,8 +10,20 @@ import (
 
 func TestRepo_Log(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	c1 := gittest.CommitFile(t, repo, "file", []byte("first commit\n"), gittest.WithMessage("commit 1\n\ncommit 1 body"))
-	c2 := gittest.CommitFile(t, repo, "file", []byte("first commit\nsecond commit\n"), gittest.WithMessage("commit 2\n\ncommit 2 body"))
+	c1 := gittest.CommitFile(
+		t,
+		repo,
+		"file",
+		[]byte("first commit\n"),
+		gittest.WithMessage("commit 1\n\ncommit 1 body"),
+	)
+	c2 := gittest.CommitFile(
+		t,
+		repo,
+		"file",
+		[]byte("first commit\nsecond commit\n"),
+		gittest.WithMessage("commit 2\n\ncommit 2 body"),
+	)
 
 	cis, err := repo.Log(git.LogOpts{RevisionRange: []string{c2, "^" + c1 + "^1"}})
 	assert.NoError(t, err)
