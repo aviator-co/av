@@ -467,7 +467,11 @@ func readDefaultPullRequestTemplate(repo *git.Repo) string {
 		tpl := filepath.Join(repo.Dir(), ".github", f)
 		data, err := os.ReadFile(tpl)
 		if err != nil {
-			continue
+			tpl := filepath.Join(repo.Dir(), f)
+			data, err = os.ReadFile(tpl)
+			if err != nil {
+			  continue
+      }
 		}
 		return string(data)
 	}
