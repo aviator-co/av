@@ -162,8 +162,13 @@ func Children(tx ReadTx, name string) []Branch {
 		}
 	}
 	// Sort for determinism.
-	slices.SortFunc(children, func(a, b Branch) bool {
-		return a.Name < b.Name
+	slices.SortFunc(children, func(a, b Branch) int {
+		if a.Name < b.Name {
+			return -1
+		} else if a.Name > b.Name {
+			return 1
+		}
+		return 0
 	})
 	return children
 }

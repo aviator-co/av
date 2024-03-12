@@ -310,13 +310,3 @@ func init() {
 	stackSyncCmd.MarkFlagsMutuallyExclusive("trunk", "parent")
 	stackSyncCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
 }
-
-func countBools(bs ...bool) int {
-	var ret int
-	for _, b := range bs {
-		if b {
-			ret += 1
-		}
-	}
-	return ret
-}

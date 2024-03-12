@@ -104,7 +104,7 @@ func init() {
 		"additional targets affected by this pull request",
 	)
 	// These flags are not yet supported.
-	prQueueCmd.Flags().MarkHidden("targets")
-	prQueueCmd.Flags().MarkHidden("skip-line")
+	_ = prQueueCmd.Flags().MarkHidden("targets")
+	_ = prQueueCmd.Flags().MarkHidden("skip-line")
 
 }

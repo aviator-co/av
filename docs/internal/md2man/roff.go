@@ -211,7 +211,7 @@ func (r *roffRenderer) RenderNode(
 		return blackfriday.GoToNext
 	case blackfriday.TableCell:
 		r.handleTableCell(w, node, entering)
-	case blackfriday.HTMLSpan:
+	case blackfriday.HTMLSpan, blackfriday.Del, blackfriday.HTMLBlock:
 		// ignore other HTML tags
 	default:
 		fmt.Fprintln(os.Stderr, "WARNING: go-md2man does not handle node type "+node.Type.String())
@@ -343,6 +343,7 @@ func countColumns(node *blackfriday.Node) int {
 	var columns int
 
 	node.Walk(func(node *blackfriday.Node, entering bool) blackfriday.WalkStatus {
+		// nolint:exhaustive
 		switch node.Type {
 		case blackfriday.TableRow:
 			if !entering {

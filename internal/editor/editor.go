@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
@@ -127,12 +126,4 @@ func parseResult(path string, config Config) (string, error) {
 		res.WriteByte('\n')
 	}
 	return res.String(), nil
-}
-
-func mtime(f *os.File) (time.Time, error) {
-	stat, err := f.Stat()
-	if err != nil {
-		return time.Time{}, err
-	}
-	return stat.ModTime(), nil
 }

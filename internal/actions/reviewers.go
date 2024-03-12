@@ -67,8 +67,6 @@ func isTeamName(s string) (bool, string, string) {
 	// here, so strip the leading `@` if it exists.
 	// This shouldn't cause any ambiguity since GitHub user login's can't
 	// contain a slash character.
-	if strings.HasPrefix(before, "@") {
-		before = before[1:]
-	}
+	before = strings.TrimPrefix(before, "@")
 	return true, before, after
 }
