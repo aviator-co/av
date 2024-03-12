@@ -32,7 +32,7 @@ func TestRepo_CherryPick(t *testing.T) {
 		t.Fatal(err)
 	}
 	require.NoError(t, repo.CherryPick(git.CherryPick{Commits: []string{c2}, FastForward: true}))
-	contents, err = os.ReadFile(filepath.Join(repo.Dir(), "file"))
+	_, err = os.ReadFile(filepath.Join(repo.Dir(), "file"))
 	require.NoError(t, err)
 
 	// We're back to c2, so trying to cherry-pick c1 should fail.

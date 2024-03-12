@@ -45,7 +45,7 @@ func main() {
 			os.Exit(1)
 			return
 		}
-		previewMarkdown(args[0])
+		_ = previewMarkdown(args[0])
 		return
 	}
 

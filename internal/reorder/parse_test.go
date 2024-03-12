@@ -39,7 +39,7 @@ func TestParseCmd(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(cmd, tt.Cmd) {
-				t.Errorf("got %#v, want %#v", cmd, &tt.Cmd)
+				t.Errorf("got %#v, want %#v", cmd, tt.Cmd)
 			}
 		})
 	}
