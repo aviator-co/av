@@ -252,7 +252,7 @@ func CreatePullRequest(
 		prCompareRef = "origin/" + parentState.Name
 	}
 
-	commitsList, err := repo.Git("rev-list", "--reverse", fmt.Sprintf("%s..HEAD", prCompareRef))
+	commitsList, err := repo.Git("rev-list", "--reverse", fmt.Sprintf("%s..%s", prCompareRef, opts.BranchName))
 	if err != nil {
 		return nil, errors.WrapIf(err, "failed to determine commits to include in PR")
 	}
