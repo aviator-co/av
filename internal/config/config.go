@@ -34,7 +34,7 @@ type PullRequest struct {
 	NoWIPDetection bool
 
 	// Branch prefix to use for creating new branches.
-	BranchNameSuffix string
+	BranchNamePrefix string
 }
 
 type Aviator struct {
