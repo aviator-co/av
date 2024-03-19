@@ -32,6 +32,9 @@ type PullRequest struct {
 	// By default, when the pull request title contains "WIP", it automatically sets the PR as
 	// a draft PR. Setting this to true suppresses this behavior.
 	NoWIPDetection bool
+
+	// Branch prefix to use for creating new branches.
+	BranchNameSuffix string
 }
 
 type Aviator struct {
