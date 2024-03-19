@@ -225,6 +225,7 @@ func branchNameFromMessage(message string) string {
 		name = name[:branchNameLength]
 	}
 	name = strings.ToLower(name)
+
 	if config.Av.PullRequest.BranchNameSuffix != "" {
 		name = fmt.Sprintf("%s%s", config.Av.PullRequest.BranchNameSuffix, name)
 	}
