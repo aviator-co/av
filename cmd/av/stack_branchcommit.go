@@ -226,6 +226,8 @@ func branchNameFromMessage(message string) string {
 	}
 	name = strings.ToLower(name)
 
+	logrus.WithField("branch", config.Av.PullRequest.BranchNameSuffix).
+					Debug("found branch name prefix")
 	if config.Av.PullRequest.BranchNameSuffix != "" {
 		name = fmt.Sprintf("%s%s", config.Av.PullRequest.BranchNameSuffix, name)
 	}
