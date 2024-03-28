@@ -75,6 +75,9 @@ var commitAmendCmd = &cobra.Command{
 
 		branchesToSync := meta.SubsequentBranches(tx, currentBranchName)
 
+		// Even if it's not configured, there's no need to fetch/push
+		state.Config.NoFetch = true
+		state.Config.NoPush = true
 		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state)
 		if err != nil {
 			return err
