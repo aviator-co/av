@@ -114,6 +114,12 @@ func Push(repo *git.Repo, branchName string, opts PushOpts) error {
 		}
 		return errors.WrapIff(err, "failed to push branch %q", branchName)
 	}
+	if err := repo.BranchSetConfig(branchName, "av-pushed-remote", "origin"); err != nil {
+		return err
+	}
+	if err := repo.BranchSetConfig(branchName, "av-pushed-ref", fmt.Sprintf("refs/heads/%s", branchName)); err != nil {
+		return err
+	}
 	_, _ = fmt.Fprint(os.Stderr,
 		colors.Success("okay"), "\n",
 	)
