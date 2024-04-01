@@ -561,7 +561,7 @@ func UpdatePullRequestState(
 		HeadRefName: branchName,
 	})
 	if err != nil {
-		return nil, errors.WrapIf(err, "querying GitHub pull requests")
+		return nil, errors.WrapIf(err, "querying GitHub pull requests. Make sure GitHub token is set or refresh.\nSee: https://docs.aviator.co/aviator-cli#getting-started")
 	}
 
 	if len(page.PullRequests) == 0 {
