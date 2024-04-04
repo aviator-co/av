@@ -345,6 +345,8 @@ func CreatePullRequest(
 		if opts.Title == "" {
 			return nil, errors.New("aborting pull request due to empty message")
 		}
+		// The tailing new line is needed for compare with `PRMetadataCommentEnd` during the metadata parsing.
+		opts.Body += "\n"
 
 		defer func() {
 			// If we created the PR successfully, just make sure to clean up any
