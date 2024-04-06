@@ -2,8 +2,10 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 
 	"emperror.dev/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -62,52 +64,63 @@ var Av = struct {
 }
 
 // Load initializes the configuration values.
-// It may optionally be called with a list of additional paths to check for the
-// config file.
-// Returns a boolean indicating whether or not a config file was loaded and an
-// error if one occurred.
-func Load(paths []string) (bool, error) {
-	loaded, err := loadFromFile(paths)
-	if err != nil {
-		return loaded, err
+//
+// This takes an optional repository config directory, which, when exists, overrides the default
+// config.
+func Load(repoConfigDir string) error {
+	if err := loadFromFile(repoConfigDir); err != nil {
+		return err
 	}
 	if err := loadFromEnv(); err != nil {
-		return loaded, err
+		return err
 	}
-	return loaded, err
+	return nil
 }
 
-func loadFromFile(paths []string) (bool, error) {
+func loadFromFile(repoConfigDir string) error {
 	config := viper.New()
-
-	// Viper has support for various formats, so it supports kson, toml, yaml,
-	// and more (https://github.com/spf13/viper#reading-config-files).
+	// The base filename of the config files.
 	config.SetConfigName("config")
-
-	// Reasonable places to look for config files.
+	// With config.ReadInConfig, Viper looks for a file with `config.$EXT` where $EXT is
+	// viper.SupportedExts. It tries to find the file in the following directories in this
+	// order (e.g. $XDG_CONFIG_HOME/av/config.yaml first).
+	//
+	// Note that Viper will find only one file in these directories, so if there are multiple,
+	// only one is read.
 	config.AddConfigPath("$XDG_CONFIG_HOME/av")
 	config.AddConfigPath("$HOME/.config/av")
 	config.AddConfigPath("$HOME/.av")
 	config.AddConfigPath("$AV_HOME")
-	// Add additional custom paths.
-	// The primary use case for this is adding repository-specific
-	// configuration (e.g., $REPO/.git/av/config.json).
-	for _, path := range paths {
-		config.AddConfigPath(path)
+	if err := config.ReadInConfig(); err != nil {
+		// We can ignore config file not exist case.
+		if !errors.As(err, &viper.ConfigFileNotFoundError{}) {
+			return err
+		}
+	} else {
+		logrus.WithField("config_file", config.ConfigFileUsed()).Debug("loaded config file")
 	}
 
-	if err := config.ReadInConfig(); err != nil {
-		if errors.As(err, &viper.ConfigFileNotFoundError{}) {
-			return false, nil
+	// As stated above, Viper will read only one file from the above paths. However, we want to
+	// support per-repo configuration that overrides the global configuration. Here, we mimic
+	// the behavior of Viper by looking for the per-repo config file and merge it.
+	for _, ext := range viper.SupportedExts {
+		fp := filepath.Join(repoConfigDir, "config."+ext)
+		if stat, err := os.Stat(fp); err == nil {
+			if !stat.IsDir() {
+				config.SetConfigFile(fp)
+				if err := config.MergeInConfig(); err != nil {
+					return errors.Wrapf(err, "failed to read %s", fp)
+				}
+				logrus.WithField("config_file", fp).Debug("loaded config file")
+				break
+			}
 		}
-		return false, err
 	}
 
 	if err := config.Unmarshal(&Av); err != nil {
-		return true, errors.Wrap(err, "failed to read av configs")
+		return errors.Wrap(err, "failed to read av configs")
 	}
-
-	return false, nil
+	return nil
 }
 
 func loadFromEnv() error {
