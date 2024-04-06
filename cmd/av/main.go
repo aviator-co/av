@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -45,7 +46,7 @@ var rootCmd = &cobra.Command{
 			logrus.WithField("av_version", config.Version).Debug("enabled debug logging")
 		}
 
-		var configDirs []string
+		repoConfigDir := ""
 		repo, err := getRepo()
 		// If we weren't able to load the Git repo, that probably just means the
 		// command isn't being run from inside a repo. That's fine, we just
@@ -53,27 +54,25 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			logrus.WithError(err).Debug("unable to load Git repo (probably not inside a repo)")
 		} else {
-			gitDir, err := repo.Git("rev-parse", "--git-dir")
+			gitCommonDir, err := repo.Git("rev-parse", "--git-common-dir")
 			if err != nil {
-				logrus.WithError(err).Warning("failed to determine git root directory")
+				logrus.WithError(err).Warning("failed to determine $GIT_COMMON_DIR")
 			} else {
-				configDirs = append(configDirs, gitDir)
+				gitCommonDir, err = filepath.Abs(gitCommonDir)
+				if err != nil {
+					logrus.WithError(err).Warning("failed to determine $GIT_COMMON_DIR")
+				} else {
+					logrus.WithField("git_common_dir", gitCommonDir).Debug("loaded Git repo")
+					repoConfigDir = filepath.Join(gitCommonDir, "av")
+				}
 			}
-			logrus.WithField("git_dir", gitDir).Debug("loaded Git repo")
 		}
 
 		// Note: this only returns an error if config exists and it can't be
 		// read/parsed. It doesn't return an error if no config file exists.
-		didLoadConfig, err := config.Load(configDirs)
-		if err != nil {
+		if err := config.Load(repoConfigDir); err != nil {
 			return errors.Wrap(err, "failed to load configuration")
 		}
-		if didLoadConfig {
-			logrus.Debug("loaded configuration")
-		} else {
-			logrus.Debug("no configuration found")
-		}
-
 		return nil
 	},
 }
