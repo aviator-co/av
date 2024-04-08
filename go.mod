@@ -22,8 +22,8 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225
-	golang.org/x/mod v0.16.0
-	golang.org/x/oauth2 v0.18.0
+	golang.org/x/mod v0.17.0
+	golang.org/x/oauth2 v0.19.0
 )
 
 require (
@@ -84,7 +84,6 @@ require (
 	github.com/go-xmlfmt/xmlfmt v1.1.2 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
-	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golangci/dupl v0.0.0-20180902072040-3e9179ac440a // indirect
 	github.com/golangci/gofmt v0.0.0-20231019111953-be8c47862aaa // indirect
 	github.com/golangci/misspell v0.4.1 // indirect
@@ -198,7 +197,6 @@ require (
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.19.0 // indirect
-	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
