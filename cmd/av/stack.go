@@ -18,6 +18,7 @@ func init() {
 		stackForEachCmd,
 		stackNextCmd,
 		stackPrevCmd,
+		stackOrphanCmd,
 		stackReorderCmd,
 		stackReparentCmd,
 		stackSyncCmd,
