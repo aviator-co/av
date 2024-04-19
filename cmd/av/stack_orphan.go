@@ -1,6 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"strings"
+
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/spf13/cobra"
@@ -8,7 +12,7 @@ import (
 
 var stackOrphanCmd = &cobra.Command{
 	Use:   "orphan",
-	Short: "Create a pull request not treated av/MergeQueue",
+	Short: "Current branch and the child branches will be orphaned",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		repo, err := getRepo()
@@ -41,6 +45,8 @@ var stackOrphanCmd = &cobra.Command{
 		if err := tx.Commit(); err != nil {
 			return err
 		}
+
+		fmt.Fprintf(os.Stderr, "These branched are orphaned: %s\n", strings.Join(branchesToOrphan, ", "))
 
 		return nil
 	},
