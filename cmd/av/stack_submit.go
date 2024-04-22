@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
@@ -13,10 +14,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var stackSubmitFlags struct {
+	Current bool
+}
+
 var stackSubmitCmd = &cobra.Command{
 	Use:   "submit",
 	Short: "Create pull requests for every branch in the stack",
-	Args:  cobra.NoArgs,
+	Long: strings.TrimSpace(`
+	Create pull requests for every branch in the stack
+
+If the --current flag is given, this command will create pull requests up to the current branch.`),
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		// Get the all branches in the stack
 		repo, err := getRepo()
@@ -40,11 +49,15 @@ var stackSubmitCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		subsequentBranches := meta.SubsequentBranches(tx, currentBranch)
+
 		var branchesToSubmit []string
 		branchesToSubmit = append(branchesToSubmit, previousBranches...)
 		branchesToSubmit = append(branchesToSubmit, currentBranch)
-		branchesToSubmit = append(branchesToSubmit, subsequentBranches...)
+
+		if !stackSubmitFlags.Current {
+			subsequentBranches := meta.SubsequentBranches(tx, currentBranch)
+			branchesToSubmit = append(branchesToSubmit, subsequentBranches...)
+		}
 
 		// ensure pull requests for each branch in the stack
 		ctx := context.Background()
@@ -84,4 +97,11 @@ var stackSubmitCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+func init() {
+	stackSubmitCmd.Flags().BoolVar(
+		&stackSubmitFlags.Current, "current", false,
+		"only create pull requests up to the current branch",
+	)
 }
