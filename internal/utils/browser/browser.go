@@ -50,7 +50,7 @@ func Open(url string) error {
 		case "windows":
 			args = []string{"cmd", "/c", "start"}
 		default:
-			if os.Getenv("DISPLAY") != "" {
+			if os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != "" {
 				// xdg-open is only for use in a desktop environment.
 				args = []string{"xdg-open"}
 			}
