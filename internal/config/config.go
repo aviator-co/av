@@ -37,6 +37,10 @@ type PullRequest struct {
 
 	// Branch prefix to use for creating new branches.
 	BranchNamePrefix string
+
+	// If true, the CLI will automatically add/update a comment to all PRs linking other PRs in the stack.
+	// False by default, since MergeQueue also adds a similar comment.
+	WriteStack bool
 }
 
 type Aviator struct {

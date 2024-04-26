@@ -16,7 +16,7 @@ func TestReadPRMetadata(t *testing.T) {
 		ParentPull: 123,
 		Trunk:      "baz",
 	}
-	prBody := actions.AddPRMetadata("Hello! This is a cool PR that does some neat things.", prMeta)
+	prBody := actions.AddPRMetadataAndStack("Hello! This is a cool PR that does some neat things.", prMeta, "branch", nil)
 	fmt.Println(prBody)
 	prMeta2, err := actions.ReadPRMetadata(prBody)
 	if err != nil {
@@ -27,12 +27,12 @@ func TestReadPRMetadata(t *testing.T) {
 	assert.Equal(t, prMeta.ParentPull, prMeta2.ParentPull)
 	assert.Equal(t, prMeta.Trunk, prMeta2.Trunk)
 
-	prBody = actions.AddPRMetadata(prBody, actions.PRMetadata{
+	prBody = actions.AddPRMetadataAndStack(prBody, actions.PRMetadata{
 		Parent:     "foo2",
 		ParentHead: "bar2",
 		ParentPull: 1234,
 		Trunk:      "baz2",
-	})
+	}, "branch", nil)
 	assert.Contains(t, prBody, "Hello! This is a cool PR that does some neat things.\n\n")
 	prMeta2, err = actions.ReadPRMetadata(prBody)
 	require.NoError(t, err)
@@ -47,14 +47,16 @@ func TestPRMetadataPreservesBody(t *testing.T) {
 		ParentPull: 123,
 		Trunk:      "baz",
 	}
-	body1 := actions.AddPRMetadata(
+	body1 := actions.AddPRMetadataAndStack(
 		"Hello! This is a cool PR that does some neat things.",
 		sampleMeta,
+		"branch",
+		nil,
 	)
 	// Add some text to the end of the body (as if someone had edited manually)
 	body1 += "\n\nIt's very neat, actually."
 
-	body2 := actions.AddPRMetadata(body1, sampleMeta)
+	body2 := actions.AddPRMetadataAndStack(body1, sampleMeta, "branch", nil)
 	assert.Contains(t, body2, "Hello! This is a cool PR that does some neat things.")
 	assert.Contains(t, body2, "It's very neat, actually.")
 	assert.Contains(t, body2, "\n"+actions.PRMetadataCommentStart)
