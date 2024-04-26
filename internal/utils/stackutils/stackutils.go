@@ -244,6 +244,8 @@ func BuildStackTreeForPr(repo *git.Repo, tx meta.WriteTx, branchName string) *St
 	for _, node := range stackTree {
 		for _, child := range node.Children {
 			if containsBranch(child) {
+				// Only include this branch path from the trunk in the stack tree.
+				node.Children = []*StackTreeNode{child}
 				return node
 			}
 		}
