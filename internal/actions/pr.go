@@ -1,7 +1,6 @@
 package actions
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -21,6 +20,7 @@ import (
 	"github.com/aviator-co/av/internal/utils/browser"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/sanitize"
+	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/aviator-co/av/internal/utils/stringutils"
 	"github.com/aviator-co/av/internal/utils/templateutils"
 	"github.com/fatih/color"
@@ -372,6 +372,10 @@ func CreatePullRequest(
 		draft = true
 	}
 
+	var stackToWrite *stackutils.StackTreeNode
+	if config.Av.PullRequest.WriteStack {
+		stackToWrite = stackutils.BuildStackTreeForPr(repo, tx, opts.BranchName)
+	}
 	pull, didCreatePR, err := ensurePR(ctx, client, repoMeta, ensurePROpts{
 		baseRefName: parentState.Name,
 		headRefName: opts.BranchName,
@@ -380,6 +384,7 @@ func CreatePullRequest(
 		meta:        prMeta,
 		draft:       draft,
 		existingPR:  existingPR,
+		stack:       stackToWrite,
 	})
 	if err != nil {
 		_, _ = fmt.Fprint(os.Stderr,
@@ -490,6 +495,7 @@ type ensurePROpts struct {
 	title       string
 	body        string
 	meta        PRMetadata
+	stack       *stackutils.StackTreeNode
 	draft       bool
 	existingPR  *gh.PullRequest
 }
@@ -505,7 +511,7 @@ func ensurePR(
 	opts ensurePROpts,
 ) (*gh.PullRequest, bool, error) {
 	if opts.existingPR != nil {
-		newBody := AddPRMetadata(opts.body, opts.meta)
+		newBody := AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, opts.stack)
 		updatedPR, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
 			PullRequestID: opts.existingPR.ID,
 			Title:         gh.Ptr(githubv4.String(opts.title)),
@@ -522,7 +528,7 @@ func ensurePR(
 		BaseRefName:  githubv4.String(opts.baseRefName),
 		HeadRefName:  githubv4.String(opts.headRefName),
 		Title:        githubv4.String(opts.title),
-		Body:         gh.Ptr(githubv4.String(AddPRMetadata(opts.body, opts.meta))),
+		Body:         gh.Ptr(githubv4.String(AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, opts.stack))),
 		Draft:        gh.Ptr(githubv4.Boolean(opts.draft)),
 	})
 	if err != nil {
@@ -671,97 +677,122 @@ type PRMetadata struct {
 	Trunk      string `json:"trunk"`
 }
 
-const PRMetadataCommentStart = "<!-- av pr metadata\n"
+const PRMetadataCommentStart = "<!-- av pr metadata"
 
 const PRMetadataCommentHelpText = "This information is embedded by the av CLI when creating PRs to track the status of stacks when using Aviator. Please do not delete or edit this section of the PR.\n"
-const PRMetadataCommentEnd = "-->\n"
+const PRMetadataCommentEnd = "-->"
 
-func ParsePRMetadata(
-	input string,
-) (commentStart int, commentEnd int, prMeta PRMetadata, reterr error) {
-	buf := bytes.NewBufferString(input)
+const PRStackCommentStart = "<!-- av pr stack begin -->"
+const PRStackCommentEnd = "<!-- av pr stack end -->"
 
-	// Read until we find the "<!-- av pr metadata" line
-	if err := readLineUntil(buf, PRMetadataCommentStart); err != nil {
-		reterr = errors.WrapIff(err, "expecting %q", PRMetadataCommentStart)
+func extractContent(input string, start string, end string) (pre string, content string, post string) {
+	startIndex := strings.Index(input, start)
+	if startIndex == -1 {
+		return input, "", ""
+	}
+	contentIndex := startIndex + len(start)
+	endIndex := strings.Index(input[contentIndex:], end)
+	if endIndex == -1 {
+		return input, "", ""
+	}
+	return strings.TrimSpace(input[:startIndex]),
+		strings.TrimSpace(input[contentIndex : contentIndex+endIndex]),
+		strings.TrimSpace(input[contentIndex+endIndex+len(end):])
+}
+
+func ParsePRBody(input string) (body string, prMeta PRMetadata, hasStack bool, retErr error) {
+	preMetadata, metadata, postMetadata := extractContent(input, PRMetadataCommentStart, PRMetadataCommentEnd)
+	_, metadataContent, _ := extractContent(metadata, "```", "```")
+	if err := json.Unmarshal([]byte(metadataContent), &prMeta); err != nil {
+		retErr = errors.WrapIff(err, "decoding PR metadata")
 		return
 	}
-	commentStart = len(input) - buf.Len() - len(PRMetadataCommentStart)
 
-	// Read until we find the "```" line (which indicates that json starts
-	// on the following line)
-	if err := readLineUntil(buf, "```\n"); err != nil {
-		reterr = errors.WrapIff(err, "expecting \"```\"")
-		return
-	}
-
-	// We need to create a copy of the buffer here since json.Decoder may read
-	// past the end of the JSON data (and we need to access that data below!)
-	if err := json.NewDecoder(bytes.NewBuffer(buf.Bytes())).Decode(&prMeta); err != nil {
-		reterr = errors.WrapIff(err, "decoding PR metadata")
-		return
-	}
-
-	// This will skip over any data lines (since those weren't consumed by buf,
-	// only by the copy of buf).
-	if err := readLineUntil(buf, "```\n"); err != nil {
-		reterr = errors.WrapIff(err, "expecting closing \"```\"")
-		return
-	}
-	if err := readLineUntil(buf, PRMetadataCommentEnd); err != nil {
-		reterr = errors.WrapIff(err, "expecting %q", PRMetadataCommentEnd)
-		return
-	}
-	commentEnd = len(input) - buf.Len()
+	input = preMetadata + postMetadata
+	preStack, stack, postStack := extractContent(input, PRStackCommentStart, PRStackCommentEnd)
+	hasStack = stack != ""
+	body = preStack + postStack
 	return
 }
 
 func ReadPRMetadata(body string) (PRMetadata, error) {
-	_, _, prMeta, err := ParsePRMetadata(body)
+	_, prMeta, _, err := ParsePRBody(body)
 	return prMeta, err
 }
 
-func AddPRMetadata(body string, prMeta PRMetadata) string {
-	buf := bytes.NewBufferString(body)
-	if commentStart, commentEnd, _, err := ParsePRMetadata(body); err != nil {
+func AddPRMetadataAndStack(input string, prMeta PRMetadata, branchName string, stack *stackutils.StackTreeNode) string {
+	body, _, _, err := ParsePRBody(input)
+	if err != nil {
 		// No existing metadata comment, so add one.
 		logrus.WithError(err).Debug("could not parse PR metadata (assuming it doesn't exist)")
-		buf.WriteString("\n\n")
-	} else {
-		buf.Truncate(commentStart)
-		if commentEnd < len(body) {
-			// The PR body doesn't end with the metadata comment. This probably
-			// means that the PR was edited after it was created with the av CLI
-			// (so we should preserve that text that comes after the comment).
-			buf.WriteString(body[commentEnd:])
-			// We also need newlines here to separate the metadata comment from
-			// the text that comes before it.
-			buf.WriteString("\n\n")
-		}
+		body = input + "\n\n"
 	}
 
-	buf.WriteString(PRMetadataCommentStart)
-	buf.WriteString(PRMetadataCommentHelpText)
-	buf.WriteString("```\n")
+	sb := strings.Builder{}
+	sb.WriteString(body)
+
+	if stack != nil {
+		sb.WriteString("\n\n")
+		sb.WriteString(PRStackCommentStart)
+		sb.WriteString("\n")
+		sb.WriteString("# PR Stack")
+		sb.WriteString("\n")
+
+		ssb := strings.Builder{}
+		var parentPullRequestLink string
+		var visit func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode)
+		visit = func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode) {
+			if depth == 0 {
+				ssb.WriteString("* ")
+				ssb.WriteString("`")
+				ssb.WriteString(node.Branch.BranchName)
+				ssb.WriteString("`")
+			} else if node.Branch.PullRequestLink != "" {
+				ssb.WriteString(strings.Repeat("  ", depth))
+				ssb.WriteString("* ")
+				if node.Branch.BranchName == branchName {
+					ssb.WriteString("➡️ ")
+					parentPullRequestLink = parentNode.Branch.PullRequestLink
+				}
+				ssb.WriteString("**PR ")
+				ssb.WriteString(node.Branch.PullRequestLink)
+				ssb.WriteString("**")
+			} else {
+				return
+			}
+			ssb.WriteString("\n")
+
+			for _, child := range node.Children {
+				visit(child, depth+1, node)
+			}
+		}
+		visit(stack, 0, nil)
+
+		if parentPullRequestLink != "" {
+			sb.WriteString("This PR depends on ")
+			sb.WriteString(parentPullRequestLink)
+			sb.WriteString(". ")
+		}
+		sb.WriteString("This PR is part of a stack:\n")
+		sb.WriteString(ssb.String())
+		sb.WriteString(PRStackCommentEnd)
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("\n\n")
+	sb.WriteString(PRMetadataCommentStart)
+	sb.WriteString("\n")
+	sb.WriteString(PRMetadataCommentHelpText)
+	sb.WriteString("```\n")
 	// Note: Encoder.Encode implicitly adds a newline at the end of the JSON
 	// which is important here so that the ``` below appears on its own line.
-	if err := json.NewEncoder(buf).Encode(prMeta); err != nil {
+	if err := json.NewEncoder(&sb).Encode(prMeta); err != nil {
 		// shouldn't ever happen since we're encoding a simple struct to a buffer
 		panic(errors.WrapIff(err, "encoding PR metadata"))
 	}
-	buf.WriteString("```\n")
-	buf.WriteString(PRMetadataCommentEnd)
-	return buf.String()
-}
+	sb.WriteString("```\n")
+	sb.WriteString(PRMetadataCommentEnd)
+	sb.WriteString("\n")
 
-func readLineUntil(b *bytes.Buffer, line string) error {
-	for {
-		l, err := b.ReadString('\n')
-		if err != nil {
-			return err
-		}
-		if l == line {
-			return nil
-		}
-	}
+	return sb.String()
 }

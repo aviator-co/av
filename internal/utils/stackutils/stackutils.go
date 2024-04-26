@@ -223,3 +223,31 @@ func PrintNode(columns int, currentBranchName string, isTrunk bool, node *StackT
 		fmt.Println()
 	}
 }
+
+func BuildStackTreeForPr(repo *git.Repo, tx meta.WriteTx, branchName string) *StackTreeNode {
+	stackTree := BuildStackTree(repo, tx, branchName)
+
+	// Prune the stack tree to only include the branches that are in the PR body.
+	var containsBranch func(node *StackTreeNode) bool
+	containsBranch = func(node *StackTreeNode) bool {
+		if node.Branch.BranchName == branchName {
+			return true
+		}
+		for _, child := range node.Children {
+			if containsBranch(child) {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, node := range stackTree {
+		for _, child := range node.Children {
+			if containsBranch(child) {
+				return node
+			}
+		}
+	}
+
+	return nil
+}
