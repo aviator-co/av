@@ -731,7 +731,8 @@ func AddPRMetadataAndStack(input string, prMeta PRMetadata, branchName string, s
 	sb := strings.Builder{}
 	sb.WriteString(body)
 
-	if stack != nil {
+	has_multilevel_stack := stack != nil && len(stack.Children) > 0 && len(stack.Children[0].Children) > 0
+	if has_multilevel_stack {
 		sb.WriteString("\n\n")
 		sb.WriteString(PRStackCommentStart)
 		sb.WriteString("\n")
@@ -769,11 +770,11 @@ func AddPRMetadataAndStack(input string, prMeta PRMetadata, branchName string, s
 		visit(stack, 0, nil)
 
 		if parentPullRequestLink != "" {
-			sb.WriteString("This PR depends on ")
+			sb.WriteString("Depends on ")
 			sb.WriteString(parentPullRequestLink)
 			sb.WriteString(". ")
 		}
-		sb.WriteString("This PR is part of a stack:\n")
+		sb.WriteString("This PR is part of a stack created with [Aviator](https://github.com/aviator-co/av):\n")
 		sb.WriteString(ssb.String())
 		sb.WriteString(PRStackCommentEnd)
 		sb.WriteString("\n")
