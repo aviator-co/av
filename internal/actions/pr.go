@@ -45,6 +45,8 @@ type CreatePullRequestOpts struct {
 	Force bool
 	// If true, open an editor for editing the title and body
 	Edit bool
+	// If true, do not open the browser after creating the PR
+	NoOpenBrowser bool
 }
 
 type CreatePullRequestResult struct {
@@ -406,19 +408,23 @@ func CreatePullRequest(
 		colors.UserInput(pull.Permalink), "\n",
 	)
 
-	if didCreatePR && config.Av.PullRequest.OpenBrowser {
-		if err := browser.Open(pull.Permalink); err != nil {
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - couldn't open browser ",
-				colors.UserInput(err),
-				" for pull request link ",
-				colors.UserInput(pull.Permalink),
-			)
-		}
+	if didCreatePR && !opts.NoOpenBrowser && config.Av.PullRequest.OpenBrowser {
+		OpenPullRequestInBrowser(pull.Permalink)
 	}
 
 	tx.SetBranch(branchMeta)
 	return &CreatePullRequestResult{didCreatePR, branchMeta, pull}, nil
+}
+
+func OpenPullRequestInBrowser(pullRequestLink string) {
+	if err := browser.Open(pullRequestLink); err != nil {
+		_, _ = fmt.Fprint(os.Stderr,
+			"  - couldn't open browser ",
+			colors.UserInput(err),
+			" for pull request link ",
+			colors.UserInput(pullRequestLink),
+		)
+	}
 }
 
 func savePRDescriptionToTemporaryFile(saveFile string, contents string) {
@@ -738,8 +744,44 @@ func AddPRMetadataAndStack(input string, prMeta PRMetadata, branchName string, s
 
 		ssb := strings.Builder{}
 		var parentPullRequestLink string
-		var visit func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode)
-		visit = func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode) {
+
+		// For simple stacks (i.e., degenerate trees) print them top-down. For example:
+		// - PR #1
+		// - PR #2
+		// - main
+		var visitSimple func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode)
+		visitSimple = func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode) {
+			if len(node.Children) > 1 {
+				panic("stack tree has more than one child")
+			} else if len(node.Children) == 1 {
+				visitSimple(node.Children[0], depth+1, node)
+			}
+
+			ssb.WriteString("* ")
+
+			if depth == 0 || node.Branch.PullRequestLink == "" {
+				ssb.WriteString("`")
+				ssb.WriteString(node.Branch.BranchName)
+				ssb.WriteString("`")
+			} else {
+				if node.Branch.BranchName == branchName {
+					ssb.WriteString("➡️ ")
+					parentPullRequestLink = parentNode.Branch.PullRequestLink
+				}
+				ssb.WriteString("**PR ")
+				ssb.WriteString(node.Branch.PullRequestLink)
+				ssb.WriteString("**")
+			}
+			ssb.WriteString("\n")
+		}
+
+		// For more complex stacks, print them sideways using a bulleted list. For example:
+		// - main
+		//   - PR #1
+		//     - PR #2
+		//   - PR #3
+		var visitComplex func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode)
+		visitComplex = func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode) {
 			if depth == 0 {
 				ssb.WriteString("* ")
 				ssb.WriteString("`")
@@ -761,10 +803,26 @@ func AddPRMetadataAndStack(input string, prMeta PRMetadata, branchName string, s
 			ssb.WriteString("\n")
 
 			for _, child := range node.Children {
-				visit(child, depth+1, node)
+				visitComplex(child, depth+1, node)
 			}
 		}
-		visit(stack, 0, nil)
+
+		var hasMultipleChildren func(node *stackutils.StackTreeNode) bool
+		hasMultipleChildren = func(node *stackutils.StackTreeNode) bool {
+			if len(node.Children) > 1 {
+				return true
+			} else if len(node.Children) == 1 {
+				return hasMultipleChildren(node.Children[0])
+			}
+			return false
+		}
+
+		// Optimize navigation within a stack by making sure the output has the same shape everywhere.
+		if hasMultipleChildren(stack) {
+			visitComplex(stack, 0, nil)
+		} else {
+			visitSimple(stack, 0, nil)
+		}
 
 		if parentPullRequestLink != "" {
 			sb.WriteString("Depends on ")
@@ -813,7 +871,8 @@ func UpdatePullRequestWithStack(
 		return ErrRepoNotInitialized
 	}
 
-	stackToWrite, err := stackutils.BuildStackTreeForBranch(repo, tx, branchName)
+	stackToWrite, err := stackutils.BuildStackTreeForPullRequest(repo, tx, branchName)
+	stackutils.PrintNode(0, branchName, false, stackToWrite)
 	if err != nil {
 		return err
 	}
@@ -827,7 +886,8 @@ func UpdatePullRequestWithStack(
 
 	newBody := AddPRMetadataAndStack(body, prMeta, branchName, stackToWrite)
 	_, err = client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
-		Body: gh.Ptr(githubv4.String(newBody)),
+		PullRequestID: existingPR.ID,
+		Body:          gh.Ptr(githubv4.String(newBody)),
 	})
 	if err != nil {
 		return errors.WithStack(err)

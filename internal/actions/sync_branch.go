@@ -584,7 +584,7 @@ func syncBranchPushAndUpdatePullRequest(
 
 	var stackToWrite *stackutils.StackTreeNode
 	if config.Av.PullRequest.WriteStack {
-		if stackToWrite, err = stackutils.BuildStackTreeForBranch(repo, tx, branchName); err != nil {
+		if stackToWrite, err = stackutils.BuildStackTreeForPullRequest(repo, tx, branchName); err != nil {
 			return err
 		}
 	}

@@ -23,7 +23,7 @@ type StackTreeNode struct {
 	Children []*StackTreeNode
 }
 
-func buildTree(currentBranchName string, branches []*StackTreeBranchInfo) []*StackTreeNode {
+func buildTree(currentBranchName string, branches []*StackTreeBranchInfo, sortCurrent bool) []*StackTreeNode {
 	childBranches := make(map[string][]string)
 	branchMap := make(map[string]*StackTreeNode)
 	for _, branch := range branches {
@@ -61,8 +61,10 @@ func buildTree(currentBranchName string, branches []*StackTreeBranchInfo) []*Sta
 		}
 		return false
 	}
-	for _, rootBranch := range rootBranches {
-		currentBranchVisitFn(rootBranch)
+	if sortCurrent {
+		for _, rootBranch := range rootBranches {
+			currentBranchVisitFn(rootBranch)
+		}
 	}
 	for _, node := range branchMap {
 		// Visit the current branch first. Otherwise, use alphabetical order for the initial ones.
@@ -136,16 +138,18 @@ func getBranchInfo(repo *git.Repo, branch meta.Branch) *StackTreeBranchInfo {
 }
 
 func BuildStackTree(repo *git.Repo, tx meta.ReadTx, currentBranch string) []*StackTreeNode {
-	return buildStackTree(repo, currentBranch, tx.AllBranches())
+	return buildStackTree(repo, currentBranch, tx.AllBranches(), true)
 }
 
-func BuildStackTreeForBranch(repo *git.Repo, tx meta.ReadTx, currentBranch string) (*StackTreeNode, error) {
+func BuildStackTreeForPullRequest(repo *git.Repo, tx meta.ReadTx, currentBranch string) (*StackTreeNode, error) {
 	branchesToInclude, err := meta.StackBranchesMap(tx, currentBranch)
 	if err != nil {
 		return nil, err
 	}
 
-	stackTree := buildStackTree(repo, currentBranch, branchesToInclude)
+	// Don't sort based on the current branch so that the output is consistent between branches.
+	sortCurrent := false
+	stackTree := buildStackTree(repo, currentBranch, branchesToInclude, sortCurrent)
 	if len(stackTree) != 1 {
 		return nil, fmt.Errorf("expected one root branch, got %d", len(stackTree))
 	}
@@ -153,7 +157,7 @@ func BuildStackTreeForBranch(repo *git.Repo, tx meta.ReadTx, currentBranch strin
 	return stackTree[0], nil
 }
 
-func buildStackTree(repo *git.Repo, currentBranch string, branchesToInclude map[string]meta.Branch) []*StackTreeNode {
+func buildStackTree(repo *git.Repo, currentBranch string, branchesToInclude map[string]meta.Branch, sortCurrent bool) []*StackTreeNode {
 	trunks := map[string]bool{}
 	var branches []*StackTreeBranchInfo
 	for _, branch := range branchesToInclude {
@@ -170,7 +174,7 @@ func buildStackTree(repo *git.Repo, currentBranch string, branchesToInclude map[
 			Deleted:          false,
 		})
 	}
-	return buildTree(currentBranch, branches)
+	return buildTree(currentBranch, branches, sortCurrent)
 }
 
 var boldString = color.New(color.Bold).SprintFunc()

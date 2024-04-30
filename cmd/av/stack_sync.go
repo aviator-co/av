@@ -233,7 +233,7 @@ base branch.
 			if err != nil {
 				return err
 			}
-			branchesToSync, err := meta.StackBranches(tx, currentBranch)
+			branchesToSync, err = meta.StackBranches(tx, currentBranch)
 			if err != nil {
 				return err
 			}

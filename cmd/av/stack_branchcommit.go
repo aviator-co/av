@@ -64,6 +64,7 @@ var stackBranchCommitCmd = &cobra.Command{
 				_ = cmd.Usage()
 				return errors.New("Need a branch name or a commit message")
 			}
+			// TODO(oleg): add suffix if branch already exists.
 			branchName = branchNameFromMessage(stackBranchCommitFlags.Message)
 			if branchName == "" {
 				return errors.New("Cannot create a valid branch name from the message")
