@@ -805,6 +805,9 @@ func UpdatePullRequestWithStack(
 	tx meta.WriteTx,
 	branchName string,
 ) error {
+	branchMeta, _ := tx.Branch(branchName)
+	logrus.WithField("branch", branchName).WithField("pr", branchMeta.PullRequest.ID).Debug("Updating pull requests with stack")
+
 	repoMeta, ok := tx.Repository()
 	if !ok {
 		return ErrRepoNotInitialized
@@ -815,7 +818,6 @@ func UpdatePullRequestWithStack(
 		return err
 	}
 
-	branchMeta, _ := tx.Branch(branchName)
 	existingPR, err := getExistingOpenPR(ctx, client, repoMeta, branchMeta, branchName)
 	if err != nil {
 		return errors.WithStack(err)
