@@ -825,7 +825,7 @@ func AddPRMetadataAndStack(
 
 		if setting == config.WriteStackTop {
 			sb.WriteString(PRStackCommentStart)
-			sb.WriteString("<details>")
+			sb.WriteString("<details open>")
 			sb.WriteString("<summary>")
 			if parentPullRequestNumber != "" {
 				sb.WriteString("<b>Depends on #")
