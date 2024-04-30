@@ -102,8 +102,8 @@ If the --current flag is given, this command will create pull requests up to the
 			return err
 		}
 
-		if config.Av.PullRequest.WriteStack {
-			if err = actions.UpdatePullRequestsWithStack(ctx, client, repo, tx, currentStackBranches); err != nil {
+		if config.Av.PullRequest.WriteStack != "" {
+			if err = actions.UpdatePullRequestsWithStack(ctx, client, repo, tx, currentStackBranches, config.Av.PullRequest.WriteStack); err != nil {
 				return err
 			}
 		}

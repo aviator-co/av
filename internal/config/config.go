@@ -19,6 +19,13 @@ type GitHub struct {
 	BaseURL string
 }
 
+type WriteStackSetting string
+
+const (
+	WriteStackBottom WriteStackSetting = "bottom"
+	WriteStackTop    WriteStackSetting = "top"
+)
+
 type PullRequest struct {
 	Draft       bool
 	OpenBrowser bool
@@ -40,7 +47,7 @@ type PullRequest struct {
 
 	// If true, the CLI will automatically add/update a comment to all PRs linking other PRs in the stack.
 	// False by default, since MergeQueue also adds a similar comment.
-	WriteStack bool
+	WriteStack WriteStackSetting
 }
 
 type Aviator struct {

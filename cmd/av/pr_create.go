@@ -104,8 +104,8 @@ Examples:
 			}
 		}
 
-		if config.Av.PullRequest.WriteStack {
-			actions.UpdatePullRequestsWithStackForStack(ctx, client, repo, tx, branchName)
+		if config.Av.PullRequest.WriteStack != "" {
+			actions.UpdatePullRequestsWithStackForStack(ctx, client, repo, tx, branchName, config.Av.PullRequest.WriteStack)
 		}
 
 		return nil

@@ -514,7 +514,7 @@ func ensurePR(
 	var initialStack *stackutils.StackTreeNode = nil
 
 	if opts.existingPR != nil {
-		newBody := AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack)
+		newBody := AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack, "")
 		updatedPR, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
 			PullRequestID: opts.existingPR.ID,
 			Title:         gh.Ptr(githubv4.String(opts.title)),
@@ -531,7 +531,7 @@ func ensurePR(
 		BaseRefName:  githubv4.String(opts.baseRefName),
 		HeadRefName:  githubv4.String(opts.headRefName),
 		Title:        githubv4.String(opts.title),
-		Body:         gh.Ptr(githubv4.String(AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack))),
+		Body:         gh.Ptr(githubv4.String(AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack, ""))),
 		Draft:        gh.Ptr(githubv4.Boolean(opts.draft)),
 	})
 	if err != nil {
@@ -723,7 +723,13 @@ func ReadPRMetadata(body string) (PRMetadata, error) {
 	return prMeta, err
 }
 
-func AddPRMetadataAndStack(input string, prMeta PRMetadata, branchName string, stack *stackutils.StackTreeNode) string {
+func AddPRMetadataAndStack(
+	input string,
+	prMeta PRMetadata,
+	branchName string,
+	stack *stackutils.StackTreeNode,
+	setting config.WriteStackSetting,
+) string {
 	body, _, _, err := ParsePRBody(input)
 	if err != nil {
 		// No existing metadata comment, so add one.
@@ -732,22 +738,15 @@ func AddPRMetadataAndStack(input string, prMeta PRMetadata, branchName string, s
 	}
 
 	sb := strings.Builder{}
-	sb.WriteString(body)
 
 	has_multilevel_stack := stack != nil && len(stack.Children) > 0 && len(stack.Children[0].Children) > 0
 	if has_multilevel_stack {
-		sb.WriteString("\n\n")
-		sb.WriteString(PRStackCommentStart)
-		sb.WriteString("\n")
-		sb.WriteString("# PR Stack")
-		sb.WriteString("\n")
-
 		ssb := strings.Builder{}
-		var parentPullRequestLink string
+		var parentPullRequestNumber string
 
 		// For simple stacks (i.e., degenerate trees) print them top-down. For example:
-		// - PR #1
-		// - PR #2
+		// - #1
+		// - #2
 		// - main
 		var visitSimple func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode)
 		visitSimple = func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode) {
@@ -759,17 +758,17 @@ func AddPRMetadataAndStack(input string, prMeta PRMetadata, branchName string, s
 
 			ssb.WriteString("* ")
 
-			if depth == 0 || node.Branch.PullRequestLink == "" {
+			if depth == 0 || node.Branch.PullRequestNumber == "" {
 				ssb.WriteString("`")
 				ssb.WriteString(node.Branch.BranchName)
 				ssb.WriteString("`")
 			} else {
 				if node.Branch.BranchName == branchName {
 					ssb.WriteString("➡️ ")
-					parentPullRequestLink = parentNode.Branch.PullRequestLink
+					parentPullRequestNumber = parentNode.Branch.PullRequestNumber
 				}
-				ssb.WriteString("**PR ")
-				ssb.WriteString(node.Branch.PullRequestLink)
+				ssb.WriteString("**#")
+				ssb.WriteString(node.Branch.PullRequestNumber)
 				ssb.WriteString("**")
 			}
 			ssb.WriteString("\n")
@@ -777,9 +776,9 @@ func AddPRMetadataAndStack(input string, prMeta PRMetadata, branchName string, s
 
 		// For more complex stacks, print them sideways using a bulleted list. For example:
 		// - main
-		//   - PR #1
-		//     - PR #2
-		//   - PR #3
+		//   - #1
+		//     - #2
+		//   - #3
 		var visitComplex func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode)
 		visitComplex = func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode) {
 			if depth == 0 {
@@ -787,15 +786,15 @@ func AddPRMetadataAndStack(input string, prMeta PRMetadata, branchName string, s
 				ssb.WriteString("`")
 				ssb.WriteString(node.Branch.BranchName)
 				ssb.WriteString("`")
-			} else if node.Branch.PullRequestLink != "" {
+			} else if node.Branch.PullRequestNumber != "" {
 				ssb.WriteString(strings.Repeat("  ", depth))
 				ssb.WriteString("* ")
 				if node.Branch.BranchName == branchName {
 					ssb.WriteString("➡️ ")
-					parentPullRequestLink = parentNode.Branch.PullRequestLink
+					parentPullRequestNumber = parentNode.Branch.PullRequestNumber
 				}
-				ssb.WriteString("**PR ")
-				ssb.WriteString(node.Branch.PullRequestLink)
+				ssb.WriteString("**#")
+				ssb.WriteString(node.Branch.PullRequestNumber)
 				ssb.WriteString("**")
 			} else {
 				return
@@ -824,15 +823,42 @@ func AddPRMetadataAndStack(input string, prMeta PRMetadata, branchName string, s
 			visitSimple(stack, 0, nil)
 		}
 
-		if parentPullRequestLink != "" {
-			sb.WriteString("Depends on ")
-			sb.WriteString(parentPullRequestLink)
-			sb.WriteString(". ")
+		if setting == config.WriteStackTop {
+			sb.WriteString(PRStackCommentStart)
+			sb.WriteString("<details>")
+			sb.WriteString("<summary>")
+			if parentPullRequestNumber != "" {
+				sb.WriteString("<b>Depends on #")
+				sb.WriteString(parentPullRequestNumber)
+				sb.WriteString(". </b>")
+			}
+			sb.WriteString("This PR is part of a stack created with <a href=\"https://github.com/aviator-co/av\">Aviator</a>.")
+			sb.WriteString("</summary>")
+			sb.WriteString("\n")
+			sb.WriteString(ssb.String())
+			sb.WriteString("</details>")
+			sb.WriteString(PRStackCommentEnd)
+			sb.WriteString("\n\n")
+			sb.WriteString(body)
+		} else {
+			sb.WriteString(body)
+			sb.WriteString("\n\n")
+			sb.WriteString(PRStackCommentStart)
+			sb.WriteString("\n")
+			sb.WriteString("# PR Stack")
+			sb.WriteString("\n")
+			if parentPullRequestNumber != "" {
+				sb.WriteString("Depends on #")
+				sb.WriteString(parentPullRequestNumber)
+				sb.WriteString(". ")
+			}
+			sb.WriteString("This PR is part of a stack created with [Aviator](https://github.com/aviator-co/av):\n")
+			sb.WriteString(ssb.String())
+			sb.WriteString(PRStackCommentEnd)
+			sb.WriteString("\n")
 		}
-		sb.WriteString("This PR is part of a stack created with [Aviator](https://github.com/aviator-co/av):\n")
-		sb.WriteString(ssb.String())
-		sb.WriteString(PRStackCommentEnd)
-		sb.WriteString("\n")
+	} else {
+		sb.WriteString(body)
 	}
 
 	sb.WriteString("\n\n")
@@ -862,6 +888,7 @@ func UpdatePullRequestWithStack(
 	repo *git.Repo,
 	tx meta.WriteTx,
 	branchName string,
+	setting config.WriteStackSetting,
 ) error {
 	branchMeta, _ := tx.Branch(branchName)
 	logrus.WithField("branch", branchName).WithField("pr", branchMeta.PullRequest.ID).Debug("Updating pull requests with stack")
@@ -884,7 +911,7 @@ func UpdatePullRequestWithStack(
 
 	body, prMeta, _, err := ParsePRBody(existingPR.Body)
 
-	newBody := AddPRMetadataAndStack(body, prMeta, branchName, stackToWrite)
+	newBody := AddPRMetadataAndStack(body, prMeta, branchName, stackToWrite, setting)
 	_, err = client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
 		PullRequestID: existingPR.ID,
 		Body:          gh.Ptr(githubv4.String(newBody)),
@@ -902,9 +929,10 @@ func UpdatePullRequestsWithStack(
 	repo *git.Repo,
 	tx meta.WriteTx,
 	branchNames []string,
+	setting config.WriteStackSetting,
 ) error {
 	for _, branchName := range branchNames {
-		if err := UpdatePullRequestWithStack(ctx, client, repo, tx, branchName); err != nil {
+		if err := UpdatePullRequestWithStack(ctx, client, repo, tx, branchName, setting); err != nil {
 			return err
 		}
 	}
@@ -918,11 +946,12 @@ func UpdatePullRequestsWithStackForStack(
 	repo *git.Repo,
 	tx meta.WriteTx,
 	branchName string,
+	setting config.WriteStackSetting,
 ) error {
 	stackBranches, err := meta.StackBranches(tx, branchName)
 	if err != nil {
 		return err
 	}
 
-	return UpdatePullRequestsWithStack(ctx, client, repo, tx, stackBranches)
+	return UpdatePullRequestsWithStack(ctx, client, repo, tx, stackBranches, setting)
 }

@@ -3,6 +3,7 @@ package stackutils
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -11,11 +12,12 @@ import (
 )
 
 type StackTreeBranchInfo struct {
-	BranchName       string
-	ParentBranchName string
-	PullRequestLink  string
-	NeedSync         bool
-	Deleted          bool
+	BranchName        string
+	ParentBranchName  string
+	PullRequestNumber string
+	PullRequestLink   string
+	NeedSync          bool
+	Deleted           bool
 }
 
 type StackTreeNode struct {
@@ -94,6 +96,9 @@ func getBranchInfo(repo *git.Repo, branch meta.Branch) *StackTreeBranchInfo {
 	branchInfo := StackTreeBranchInfo{
 		BranchName:       branch.Name,
 		ParentBranchName: branch.Parent.Name,
+	}
+	if branch.PullRequest != nil && branch.PullRequest.Number != 0 {
+		branchInfo.PullRequestNumber = strconv.FormatInt(branch.PullRequest.Number, 10)
 	}
 	if branch.PullRequest != nil && branch.PullRequest.Permalink != "" {
 		branchInfo.PullRequestLink = branch.PullRequest.Permalink
