@@ -136,9 +136,27 @@ func getBranchInfo(repo *git.Repo, branch meta.Branch) *StackTreeBranchInfo {
 }
 
 func BuildStackTree(repo *git.Repo, tx meta.ReadTx, currentBranch string) []*StackTreeNode {
+	return buildStackTree(repo, currentBranch, tx.AllBranches())
+}
+
+func BuildStackTreeForBranch(repo *git.Repo, tx meta.ReadTx, currentBranch string) (*StackTreeNode, error) {
+	branchesToInclude, err := meta.StackBranchesMap(tx, currentBranch)
+	if err != nil {
+		return nil, err
+	}
+
+	stackTree := buildStackTree(repo, currentBranch, branchesToInclude)
+	if len(stackTree) != 1 {
+		return nil, fmt.Errorf("expected one root branch, got %d", len(stackTree))
+	}
+
+	return stackTree[0], nil
+}
+
+func buildStackTree(repo *git.Repo, currentBranch string, branchesToInclude map[string]meta.Branch) []*StackTreeNode {
 	trunks := map[string]bool{}
 	var branches []*StackTreeBranchInfo
-	for _, branch := range tx.AllBranches() {
+	for _, branch := range branchesToInclude {
 		branches = append(branches, getBranchInfo(repo, branch))
 		if branch.Parent.Trunk {
 			trunks[branch.Parent.Name] = true
@@ -222,34 +240,4 @@ func PrintNode(columns int, currentBranchName string, isTrunk bool, node *StackT
 		}
 		fmt.Println()
 	}
-}
-
-func BuildStackTreeForPr(repo *git.Repo, tx meta.WriteTx, branchName string) *StackTreeNode {
-	stackTree := BuildStackTree(repo, tx, branchName)
-
-	// Prune the stack tree to only include the branches that are in the PR body.
-	var containsBranch func(node *StackTreeNode) bool
-	containsBranch = func(node *StackTreeNode) bool {
-		if node.Branch.BranchName == branchName {
-			return true
-		}
-		for _, child := range node.Children {
-			if containsBranch(child) {
-				return true
-			}
-		}
-		return false
-	}
-
-	for _, node := range stackTree {
-		for _, child := range node.Children {
-			if containsBranch(child) {
-				// Only include this branch path from the trunk in the stack tree.
-				node.Children = []*StackTreeNode{child}
-				return node
-			}
-		}
-	}
-
-	return nil
 }

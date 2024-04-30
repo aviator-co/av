@@ -45,18 +45,19 @@ If the --current flag is given, this command will create pull requests up to the
 		if err != nil {
 			return err
 		}
-		previousBranches, err := meta.PreviousBranches(tx, currentBranch)
-		if err != nil {
-			return err
-		}
+
+		currentStackBranches, err := meta.StackBranches(tx, currentBranch)
 
 		var branchesToSubmit []string
-		branchesToSubmit = append(branchesToSubmit, previousBranches...)
-		branchesToSubmit = append(branchesToSubmit, currentBranch)
-
-		if !stackSubmitFlags.Current {
-			subsequentBranches := meta.SubsequentBranches(tx, currentBranch)
-			branchesToSubmit = append(branchesToSubmit, subsequentBranches...)
+		if stackSubmitFlags.Current {
+			previousBranches, err := meta.PreviousBranches(tx, currentBranch)
+			if err != nil {
+				return err
+			}
+			branchesToSubmit = append(branchesToSubmit, previousBranches...)
+			branchesToSubmit = append(branchesToSubmit, currentBranch)
+		} else {
+			branchesToSubmit = currentStackBranches
 		}
 
 		// ensure pull requests for each branch in the stack
@@ -95,6 +96,11 @@ If the --current flag is given, this command will create pull requests up to the
 		if err := tx.Commit(); err != nil {
 			return err
 		}
+
+		if config.Av.PullRequest.WriteStack {
+			actions.UpdatePullRequestsWithStack(ctx, client, repo, tx, currentStackBranches)
+		}
+
 		return nil
 	},
 }

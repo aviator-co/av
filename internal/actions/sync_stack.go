@@ -59,6 +59,7 @@ type (
 	SyncStackOpt  func(*syncStackOpts)
 	syncStackOpts struct {
 		skipNextCommit bool
+		noPush         bool
 	}
 )
 
@@ -68,7 +69,13 @@ func WithSkipNextCommit() SyncStackOpt {
 	}
 }
 
-// SyncStack performs stack sync on all branches in branchesToSync.
+func WithNoPush() SyncStackOpt {
+	return func(opts *syncStackOpts) {
+		opts.noPush = true
+	}
+}
+
+// SyncStack performs stack sync on all branches in branchesToSync. Branches may span multiple "stacks".
 func SyncStack(ctx context.Context,
 	repo *git.Repo,
 	client *gh.Client,
@@ -93,7 +100,7 @@ func SyncStack(ctx context.Context,
 		cont, err := SyncBranch(ctx, repo, client, tx, SyncBranchOpts{
 			Branch:       currentBranch,
 			Fetch:        !state.Config.NoFetch,
-			Push:         !state.Config.NoPush,
+			Push:         !state.Config.NoPush && !opts.noPush,
 			Continuation: state.Continuation,
 			ToTrunk:      state.Config.Trunk,
 			Skip:         skip,

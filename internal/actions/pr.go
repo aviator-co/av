@@ -372,10 +372,6 @@ func CreatePullRequest(
 		draft = true
 	}
 
-	var stackToWrite *stackutils.StackTreeNode
-	if config.Av.PullRequest.WriteStack {
-		stackToWrite = stackutils.BuildStackTreeForPr(repo, tx, opts.BranchName)
-	}
 	pull, didCreatePR, err := ensurePR(ctx, client, repoMeta, ensurePROpts{
 		baseRefName: parentState.Name,
 		headRefName: opts.BranchName,
@@ -384,7 +380,6 @@ func CreatePullRequest(
 		meta:        prMeta,
 		draft:       draft,
 		existingPR:  existingPR,
-		stack:       stackToWrite,
 	})
 	if err != nil {
 		_, _ = fmt.Fprint(os.Stderr,
@@ -495,7 +490,6 @@ type ensurePROpts struct {
 	title       string
 	body        string
 	meta        PRMetadata
-	stack       *stackutils.StackTreeNode
 	draft       bool
 	existingPR  *gh.PullRequest
 }
@@ -510,8 +504,11 @@ func ensurePR(
 	repoMeta meta.Repository,
 	opts ensurePROpts,
 ) (*gh.PullRequest, bool, error) {
+	// Don't pass in a stack to start; we'll do a pass over all open PRs in the stack later.
+	var initialStack *stackutils.StackTreeNode = nil
+
 	if opts.existingPR != nil {
-		newBody := AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, opts.stack)
+		newBody := AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack)
 		updatedPR, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
 			PullRequestID: opts.existingPR.ID,
 			Title:         gh.Ptr(githubv4.String(opts.title)),
@@ -528,7 +525,7 @@ func ensurePR(
 		BaseRefName:  githubv4.String(opts.baseRefName),
 		HeadRefName:  githubv4.String(opts.headRefName),
 		Title:        githubv4.String(opts.title),
-		Body:         gh.Ptr(githubv4.String(AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, opts.stack))),
+		Body:         gh.Ptr(githubv4.String(AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack))),
 		Draft:        gh.Ptr(githubv4.Boolean(opts.draft)),
 	})
 	if err != nil {
@@ -796,4 +793,74 @@ func AddPRMetadataAndStack(input string, prMeta PRMetadata, branchName string, s
 	sb.WriteString("\n")
 
 	return sb.String()
+}
+
+// UpdatePullRequestWithStack updates the GitHub pull request associated with the given branch to include
+// the stack of branches that the branch is a part of.
+// This should be called after all applicable PRs have been created to ensure we can properly link them.
+func UpdatePullRequestWithStack(
+	ctx context.Context,
+	client *gh.Client,
+	repo *git.Repo,
+	tx meta.WriteTx,
+	branchName string,
+) error {
+	repoMeta, ok := tx.Repository()
+	if !ok {
+		return ErrRepoNotInitialized
+	}
+
+	stackToWrite, err := stackutils.BuildStackTreeForBranch(repo, tx, branchName)
+	if err != nil {
+		return err
+	}
+
+	branchMeta, _ := tx.Branch(branchName)
+	existingPR, err := getExistingOpenPR(ctx, client, repoMeta, branchMeta, branchName)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	body, prMeta, _, err := ParsePRBody(existingPR.Body)
+
+	newBody := AddPRMetadataAndStack(body, prMeta, branchName, stackToWrite)
+	_, err = client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
+		Body: gh.Ptr(githubv4.String(newBody)),
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+func UpdatePullRequestsWithStack(
+	ctx context.Context,
+	client *gh.Client,
+	repo *git.Repo,
+	tx meta.WriteTx,
+	branchNames []string,
+) error {
+	for _, branchName := range branchNames {
+		if err := UpdatePullRequestWithStack(ctx, client, repo, tx, branchName); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func UpdatePullRequestsWithStackForStack(
+	ctx context.Context,
+	client *gh.Client,
+	repo *git.Repo,
+	tx meta.WriteTx,
+	branchName string,
+) error {
+	stackBranches, err := meta.StackBranches(tx, branchName)
+	if err != nil {
+		return err
+	}
+
+	return UpdatePullRequestsWithStack(ctx, client, repo, tx, stackBranches)
 }

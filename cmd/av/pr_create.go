@@ -104,6 +104,10 @@ Examples:
 			}
 		}
 
+		if config.Av.PullRequest.WriteStack {
+			actions.UpdatePullRequestsWithStackForStack(ctx, client, repo, tx, branchName)
+		}
+
 		return nil
 	},
 }

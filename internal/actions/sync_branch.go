@@ -584,7 +584,9 @@ func syncBranchPushAndUpdatePullRequest(
 
 	var stackToWrite *stackutils.StackTreeNode
 	if config.Av.PullRequest.WriteStack {
-		stackToWrite = stackutils.BuildStackTreeForPr(repo, tx, branchName)
+		if stackToWrite, err = stackutils.BuildStackTreeForBranch(repo, tx, branchName); err != nil {
+			return err
+		}
 	}
 	prBody := AddPRMetadataAndStack(pr.Body, prMeta, branchName, stackToWrite)
 	if _, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
