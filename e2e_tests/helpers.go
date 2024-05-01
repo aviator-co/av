@@ -1,7 +1,9 @@
 package e2e_tests
 
 import (
+	"os"
 	"testing"
+	"time"
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
@@ -20,6 +22,12 @@ func RequireCurrentBranchName(t *testing.T, repo *git.Repo, name string) {
 		name,
 		currentBranch,
 	)
+}
+
+func GetFetchHeadTimestamp(t *testing.T, repo *git.Repo) time.Time {
+	fileInfo, err := os.Stat(repo.Dir() + "/.git/FETCH_HEAD")
+	require.NoError(t, err, "failed to stat .git/FETCH_HEAD")
+	return fileInfo.ModTime()
 }
 
 func GetStoredParentBranchState(t *testing.T, repo *git.Repo, name string) meta.BranchState {
