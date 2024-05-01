@@ -78,7 +78,7 @@ var commitAmendCmd = &cobra.Command{
 		// Even if it's not configured, there's no need to fetch/push
 		state.Config.NoFetch = true
 		state.Config.NoPush = true
-		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, actions.WithNoPush())
+		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, actions.WithLocalOnly())
 		if err != nil {
 			return err
 		}
