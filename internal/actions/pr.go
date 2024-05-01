@@ -825,7 +825,11 @@ func AddPRMetadataAndStack(
 
 		if setting == config.WriteStackTop {
 			sb.WriteString(PRStackCommentStart)
-			sb.WriteString("<details open>")
+			// Enclose this stack summary in a table for two reasons:
+			// 1. It looks nicer on GitHub
+			// 2. For the Slack GitHub integration, Slack doesn't support and strips out <table> elements in unfurls - we can avoid showing the stack in the unfurl.
+			sb.WriteString("<table><tr><td>")
+			sb.WriteString("<details>")
 			sb.WriteString("<summary>")
 			if parentPullRequestNumber != "" {
 				sb.WriteString("<b>Depends on #")
@@ -837,6 +841,7 @@ func AddPRMetadataAndStack(
 			sb.WriteString("\n")
 			sb.WriteString(ssb.String())
 			sb.WriteString("</details>")
+			sb.WriteString("</td></tr></table>")
 			sb.WriteString(PRStackCommentEnd)
 			sb.WriteString("\n\n")
 			sb.WriteString(body)
