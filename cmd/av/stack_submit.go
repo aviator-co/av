@@ -46,6 +46,7 @@ If the --current flag is given, this command will create pull requests up to the
 			return err
 		}
 
+		currentStackBranches, err := meta.StackBranches(tx, currentBranch)
 		var branchesToSubmit []string
 		if stackSubmitFlags.Current {
 			previousBranches, err := meta.PreviousBranches(tx, currentBranch)
@@ -55,10 +56,7 @@ If the --current flag is given, this command will create pull requests up to the
 			branchesToSubmit = append(branchesToSubmit, previousBranches...)
 			branchesToSubmit = append(branchesToSubmit, currentBranch)
 		} else {
-			branchesToSubmit, err = meta.StackBranches(tx, currentBranch)
-			if err != nil {
-				return err
-			}
+			branchesToSubmit = currentStackBranches
 		}
 
 		if !stackSubmitFlags.Current {
@@ -102,6 +100,13 @@ If the --current flag is given, this command will create pull requests up to the
 		if err := tx.Commit(); err != nil {
 			return err
 		}
+
+		if config.Av.PullRequest.WriteStack {
+			if err = actions.UpdatePullRequestsWithStack(ctx, client, repo, tx, currentStackBranches); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	},
 }

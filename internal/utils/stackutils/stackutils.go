@@ -8,21 +8,22 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 )
 
-type stackTreeBranchInfo struct {
-	BranchName      string
-	Deleted         bool
-	NeedSync        bool
-	PullRequestLink string
+type StackTreeBranchInfo struct {
+	BranchName        string
+	Deleted           bool
+	NeedSync          bool
+	PullRequestNumber int64
+	PullRequestLink   string
 
 	parentBranchName string
 }
 
 type StackTreeNode struct {
-	Branch   *stackTreeBranchInfo
+	Branch   *StackTreeBranchInfo
 	Children []*StackTreeNode
 }
 
-func buildTree(currentBranchName string, branches []*stackTreeBranchInfo) []*StackTreeNode {
+func buildTree(currentBranchName string, branches []*StackTreeBranchInfo, sortCurrent bool) []*StackTreeNode {
 	childBranches := make(map[string][]string)
 	branchMap := make(map[string]*StackTreeNode)
 	for _, branch := range branches {
@@ -60,8 +61,10 @@ func buildTree(currentBranchName string, branches []*stackTreeBranchInfo) []*Sta
 		}
 		return false
 	}
-	for _, rootBranch := range rootBranches {
-		currentBranchVisitFn(rootBranch)
+	if sortCurrent {
+		for _, rootBranch := range rootBranches {
+			currentBranchVisitFn(rootBranch)
+		}
 	}
 	for _, node := range branchMap {
 		// Visit the current branch first. Otherwise, use alphabetical order for the initial ones.
@@ -88,12 +91,27 @@ func buildTree(currentBranchName string, branches []*stackTreeBranchInfo) []*Sta
 }
 
 func BuildStackTree(repo *git.Repo, tx meta.ReadTx, currentBranch string) []*StackTreeNode {
-	return buildStackTree(repo, currentBranch, tx.AllBranches())
+	return buildStackTree(repo, currentBranch, tx.AllBranches(), true)
 }
 
-func buildStackTree(repo *git.Repo, currentBranch string, branchesToInclude map[string]meta.Branch) []*StackTreeNode {
+func BuildStackTreeForPullRequest(repo *git.Repo, tx meta.ReadTx, currentBranch string) (*StackTreeNode, error) {
+	branchesToInclude, err := meta.StackBranchesMap(tx, currentBranch)
+	if err != nil {
+		return nil, err
+	}
+
+	// Don't sort based on the current branch so that the output is consistent between branches.
+	stackTree := buildStackTree(repo, currentBranch, branchesToInclude, false)
+	if len(stackTree) != 1 {
+		return nil, fmt.Errorf("expected one root branch, got %d", len(stackTree))
+	}
+
+	return stackTree[0], nil
+}
+
+func buildStackTree(repo *git.Repo, currentBranch string, branchesToInclude map[string]meta.Branch, sortCurrent bool) []*StackTreeNode {
 	trunks := map[string]bool{}
-	var branches []*stackTreeBranchInfo
+	var branches []*StackTreeBranchInfo
 	for _, branch := range branchesToInclude {
 		branches = append(branches, getBranchInfo(repo, branch))
 		if branch.Parent.Trunk {
@@ -101,20 +119,23 @@ func buildStackTree(repo *git.Repo, currentBranch string, branchesToInclude map[
 		}
 	}
 	for branch := range trunks {
-		branches = append(branches, &stackTreeBranchInfo{
+		branches = append(branches, &StackTreeBranchInfo{
 			BranchName:       branch,
 			parentBranchName: "",
 			NeedSync:         false,
 			Deleted:          false,
 		})
 	}
-	return buildTree(currentBranch, branches)
+	return buildTree(currentBranch, branches, sortCurrent)
 }
 
-func getBranchInfo(repo *git.Repo, branch meta.Branch) *stackTreeBranchInfo {
-	branchInfo := stackTreeBranchInfo{
+func getBranchInfo(repo *git.Repo, branch meta.Branch) *StackTreeBranchInfo {
+	branchInfo := StackTreeBranchInfo{
 		BranchName:       branch.Name,
 		parentBranchName: branch.Parent.Name,
+	}
+	if branch.PullRequest != nil && branch.PullRequest.Number != 0 {
+		branchInfo.PullRequestNumber = branch.PullRequest.Number
 	}
 	if branch.PullRequest != nil && branch.PullRequest.Permalink != "" {
 		branchInfo.PullRequestLink = branch.PullRequest.Permalink
