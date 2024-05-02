@@ -19,9 +19,7 @@ func TestReadPRMetadata(t *testing.T) {
 	prBody := actions.AddPRMetadata("Hello! This is a cool PR that does some neat things.", prMeta)
 	fmt.Println(prBody)
 	prMeta2, err := actions.ReadPRMetadata(prBody)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	assert.Equal(t, prMeta.Parent, prMeta2.Parent)
 	assert.Equal(t, prMeta.ParentHead, prMeta2.ParentHead)
 	assert.Equal(t, prMeta.ParentPull, prMeta2.ParentPull)
