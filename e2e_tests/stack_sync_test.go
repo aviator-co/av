@@ -26,7 +26,8 @@ func TestStackSync(t *testing.T) {
 	// Our stack looks like:
 	//     stack-1: main -> 1a
 	//     stack-2:           \ -> 2a
-	//     stack-3:                \ -> 3a
+	//     stack-3:           |    \ -> 3a
+	//     stack-4:           \ -> 4a
 	// Note: we create the first branch with a "vanilla" git checkout just to
 	// make sure that's working as intended.
 	require.Equal(t, 0, Cmd(t, "git", "checkout", "-b", "stack-1").ExitCode)
@@ -41,6 +42,10 @@ func TestStackSync(t *testing.T) {
 		[]byte("1a\n2a\n3a\n"),
 		gittest.WithMessage("Commit 3a"),
 	)
+	require.Equal(t, 0, Cmd(t, "git", "checkout", "stack-1").ExitCode)
+	require.Equal(t, 0, Av(t, "stack", "branch", "stack-4").ExitCode)
+	gittest.CommitFile(t, repo, "another-file", []byte("1a\n4a\n"), gittest.WithMessage("Commit 4a"))
+	require.Equal(t, 0, Cmd(t, "git", "checkout", "stack-3").ExitCode)
 
 	// Everything up to date now, so this should be a no-op.
 	require.Equal(t, 0, Av(t, "stack", "sync", "--no-fetch", "--no-push").ExitCode)
@@ -49,19 +54,22 @@ func TestStackSync(t *testing.T) {
 	// Our stack looks like:
 	//      stack-1: main -> 1a -> 1b
 	//      stack-2:           \ -> 2a
-	//      stack-3:                \ -> 3a
+	//      stack-3:           |    \ -> 3a
+	//      stack-4:           \ -> 4a
 
 	// (note that stack-2 has diverged with stack-1)
 	// Ultimately, after the sync (and resolving conflicts), our stack should look like:
 	//      stack-1: main -> 1a -> 1b
 	//      stack-2:                 \ -> 2a'
-	//      stack-3:                       \ -> 3a'
+	//      stack-3:                 |     \ -> 3a'
+	//      stack-4:                 \ -> 4a'
 	// It's very important here to make sure to handle the sync of stack-3 correctly.
 	// After syncing stack-2 onto stack-1 (before syncinc stack-3), our commit
 	// graph looks like:
 	//      stack-1: main -> 1a -> 1b
 	//      stack-2:                 \ -> 2a'
 	//      stack-3:          \ -> 2a -> 3a
+	//      stack-4:          \ -> 4a
 
 	// (remember that we haven't yet modified stack-3, so 3a still has parent 2a,
 	// but 2a is actually not even associated with stack-2 anymore since we had
@@ -159,6 +167,10 @@ func TestStackSync(t *testing.T) {
 		Name: "stack-2",
 		Head: stack2Commit,
 	}, GetStoredParentBranchState(t, repo, "stack-3"))
+	require.Equal(t, meta.BranchState{
+		Name: "stack-1",
+		Head: stack1Commit,
+	}, GetStoredParentBranchState(t, repo, "stack-4"))
 }
 
 func TestStackSyncAbort(t *testing.T) {

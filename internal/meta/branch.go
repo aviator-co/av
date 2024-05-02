@@ -128,6 +128,18 @@ func SubsequentBranches(tx ReadTx, name string) []string {
 	return res
 }
 
+// StackBranches returns branches in the stack associated with the given branch.
+func StackBranches(tx ReadTx, name string) ([]string, error) {
+	root, found := Root(tx, name)
+	if !found {
+		return nil, errors.Errorf("branch %q is not in a stack", name)
+	}
+
+	var res = []string{root}
+	res = append(res, SubsequentBranches(tx, root)...)
+	return res, nil
+}
+
 // Root determines the stack root of a branch.
 func Root(tx ReadTx, name string) (string, bool) {
 	for name != "" {
