@@ -2,8 +2,6 @@ package gittest
 
 import (
 	"fmt"
-	"os"
-	"path"
 	"testing"
 
 	"github.com/aviator-co/av/internal/git"
@@ -43,18 +41,14 @@ func CommitFile(
 		o(&opts)
 	}
 
-	filepath := path.Join(repo.Dir(), filename)
-	err := os.WriteFile(filepath, body, 0644)
-	require.NoError(t, err, "failed to write file: %s", filename)
-
-	_, err = repo.Git("add", filepath)
-	require.NoError(t, err, "failed to add file: %s", filename)
+	filepath := CreateFile(t, repo, filename, body)
+	AddFile(t, repo, filepath)
 
 	args := []string{"commit", "-m", opts.msg}
 	if opts.amend {
 		args = append(args, "--amend")
 	}
-	_, err = repo.Git(args...)
+	_, err := repo.Git(args...)
 	require.NoError(t, err, "failed to commit file: %s", filename)
 
 	head, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
