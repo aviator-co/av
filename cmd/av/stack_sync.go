@@ -232,13 +232,10 @@ base branch.
 			if err != nil {
 				return err
 			}
-			branchesToSync, err = meta.PreviousBranches(tx, currentBranch)
+			branchesToSync, err = meta.StackBranches(tx, currentBranch)
 			if err != nil {
 				return err
 			}
-			branchesToSync = append(branchesToSync, currentBranch)
-			nextBranches := meta.SubsequentBranches(tx, branchesToSync[len(branchesToSync)-1])
-			branchesToSync = append(branchesToSync, nextBranches...)
 			state.Branches = branchesToSync
 		}
 		// Either way (--continue or not), we sync all subsequent branches
