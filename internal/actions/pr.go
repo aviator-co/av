@@ -46,6 +46,8 @@ type CreatePullRequestOpts struct {
 	Force bool
 	// If true, open an editor for editing the title and body
 	Edit bool
+	// If true, do not open the browser after creating the PR
+	NoOpenBrowser bool
 }
 
 type CreatePullRequestResult struct {
@@ -407,19 +409,23 @@ func CreatePullRequest(
 		colors.UserInput(pull.Permalink), "\n",
 	)
 
-	if didCreatePR && config.Av.PullRequest.OpenBrowser {
-		if err := browser.Open(pull.Permalink); err != nil {
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - couldn't open browser ",
-				colors.UserInput(err),
-				" for pull request link ",
-				colors.UserInput(pull.Permalink),
-			)
-		}
+	if didCreatePR && !opts.NoOpenBrowser && config.Av.PullRequest.OpenBrowser {
+		OpenPullRequestInBrowser(pull.Permalink)
 	}
 
 	tx.SetBranch(branchMeta)
 	return &CreatePullRequestResult{didCreatePR, branchMeta, pull}, nil
+}
+
+func OpenPullRequestInBrowser(pullRequestLink string) {
+	if err := browser.Open(pullRequestLink); err != nil {
+		_, _ = fmt.Fprint(os.Stderr,
+			"  - couldn't open browser ",
+			colors.UserInput(err),
+			" for pull request link ",
+			colors.UserInput(pullRequestLink),
+		)
+	}
 }
 
 func savePRDescriptionToTemporaryFile(saveFile string, contents string) {

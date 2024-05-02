@@ -69,6 +69,7 @@ If the --current flag is given, this command will create pull requests up to the
 		}
 
 		// ensure pull requests for each branch in the stack
+		var lastCreatedPullRequest *meta.PullRequest
 		ctx := context.Background()
 		client, err := getGitHubClient()
 		if err != nil {
@@ -80,12 +81,16 @@ If the --current flag is given, this command will create pull requests up to the
 			result, err := actions.CreatePullRequest(
 				ctx, repo, client, tx,
 				actions.CreatePullRequestOpts{
-					BranchName: branchName,
-					Draft:      config.Av.PullRequest.Draft,
+					BranchName:    branchName,
+					Draft:         config.Av.PullRequest.Draft,
+					NoOpenBrowser: true,
 				},
 			)
 			if err != nil {
 				return err
+			}
+			if result.Created {
+				lastCreatedPullRequest = result.Branch.PullRequest
 			}
 			// make sure the base branch of the PR is up to date if it already exists
 			if !result.Created && result.Pull.BaseRefName != result.Branch.Parent.Name {
@@ -109,6 +114,10 @@ If the --current flag is given, this command will create pull requests up to the
 			if err = actions.UpdatePullRequestsWithStack(ctx, client, repo, tx, currentStackBranches); err != nil {
 				return err
 			}
+		}
+
+		if lastCreatedPullRequest != nil && config.Av.PullRequest.OpenBrowser {
+			actions.OpenPullRequestInBrowser(lastCreatedPullRequest.Permalink)
 		}
 
 		return nil
