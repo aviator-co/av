@@ -47,6 +47,10 @@ If the --current flag is given, this command will create pull requests up to the
 		}
 
 		currentStackBranches, err := meta.StackBranches(tx, currentBranch)
+		if err != nil {
+			return err
+		}
+
 		var branchesToSubmit []string
 		if stackSubmitFlags.Current {
 			previousBranches, err := meta.PreviousBranches(tx, currentBranch)

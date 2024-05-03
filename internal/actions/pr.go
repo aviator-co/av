@@ -905,6 +905,9 @@ func UpdatePullRequestWithStack(
 	}
 
 	body, prMeta, err := ParsePRBody(existingPR.Body)
+	if err != nil {
+		return err
+	}
 
 	newBody := AddPRMetadataAndStack(body, prMeta, branchName, stackToWrite)
 	_, err = client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
