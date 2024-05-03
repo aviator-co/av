@@ -1,7 +1,6 @@
 package actions
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -671,97 +670,78 @@ type PRMetadata struct {
 	Trunk      string `json:"trunk"`
 }
 
-const PRMetadataCommentStart = "<!-- av pr metadata\n"
+const PRMetadataCommentStart = "<!-- av pr metadata"
 
 const PRMetadataCommentHelpText = "This information is embedded by the av CLI when creating PRs to track the status of stacks when using Aviator. Please do not delete or edit this section of the PR.\n"
-const PRMetadataCommentEnd = "-->\n"
+const PRMetadataCommentEnd = "-->"
 
-func ParsePRMetadata(
-	input string,
-) (commentStart int, commentEnd int, prMeta PRMetadata, reterr error) {
-	buf := bytes.NewBufferString(input)
-
-	// Read until we find the "<!-- av pr metadata" line
-	if err := readLineUntil(buf, PRMetadataCommentStart); err != nil {
-		reterr = errors.WrapIff(err, "expecting %q", PRMetadataCommentStart)
-		return
+// extractContent parses the given input and looks for the start and end
+// strings. It returns the content between the start and end strings and the
+// remaining input. If the start or end strings are not found, the content is
+// empty and the input is returned as-is.
+func extractContent(input string, start string, end string) (content string, output string) {
+	startIndex := strings.Index(input, start)
+	if startIndex == -1 {
+		return "", input
 	}
-	commentStart = len(input) - buf.Len() - len(PRMetadataCommentStart)
-
-	// Read until we find the "```" line (which indicates that json starts
-	// on the following line)
-	if err := readLineUntil(buf, "```\n"); err != nil {
-		reterr = errors.WrapIff(err, "expecting \"```\"")
-		return
+	contentIndex := startIndex + len(start)
+	endIndex := strings.Index(input[contentIndex:], end)
+	if endIndex == -1 {
+		return "", input
 	}
 
-	// We need to create a copy of the buffer here since json.Decoder may read
-	// past the end of the JSON data (and we need to access that data below!)
-	if err := json.NewDecoder(bytes.NewBuffer(buf.Bytes())).Decode(&prMeta); err != nil {
-		reterr = errors.WrapIff(err, "decoding PR metadata")
+	content = strings.TrimSpace(input[contentIndex : contentIndex+endIndex])
+	preContent := strings.TrimSpace(input[:startIndex])
+	postContent := strings.TrimSpace(input[contentIndex+endIndex+len(end):])
+	output = preContent
+	if postContent != "" {
+		output += "\n" + postContent
+	}
+	return
+}
+
+func ParsePRBody(input string) (body string, prMeta PRMetadata, retErr error) {
+	metadata, body := extractContent(input, PRMetadataCommentStart, PRMetadataCommentEnd)
+	metadataContent, _ := extractContent(metadata, "```", "```")
+	if err := json.Unmarshal([]byte(metadataContent), &prMeta); err != nil {
+		retErr = errors.WrapIff(err, "decoding PR metadata")
 		return
 	}
 
-	// This will skip over any data lines (since those weren't consumed by buf,
-	// only by the copy of buf).
-	if err := readLineUntil(buf, "```\n"); err != nil {
-		reterr = errors.WrapIff(err, "expecting closing \"```\"")
-		return
-	}
-	if err := readLineUntil(buf, PRMetadataCommentEnd); err != nil {
-		reterr = errors.WrapIff(err, "expecting %q", PRMetadataCommentEnd)
-		return
-	}
-	commentEnd = len(input) - buf.Len()
 	return
 }
 
 func ReadPRMetadata(body string) (PRMetadata, error) {
-	_, _, prMeta, err := ParsePRMetadata(body)
+	_, prMeta, err := ParsePRBody(body)
 	return prMeta, err
 }
 
 func AddPRMetadata(body string, prMeta PRMetadata) string {
-	buf := bytes.NewBufferString(body)
-	if commentStart, commentEnd, _, err := ParsePRMetadata(body); err != nil {
+	body, _, err := ParsePRBody(body)
+	if err != nil {
 		// No existing metadata comment, so add one.
 		logrus.WithError(err).Debug("could not parse PR metadata (assuming it doesn't exist)")
-		buf.WriteString("\n\n")
-	} else {
-		buf.Truncate(commentStart)
-		if commentEnd < len(body) {
-			// The PR body doesn't end with the metadata comment. This probably
-			// means that the PR was edited after it was created with the av CLI
-			// (so we should preserve that text that comes after the comment).
-			buf.WriteString(body[commentEnd:])
-			// We also need newlines here to separate the metadata comment from
-			// the text that comes before it.
-			buf.WriteString("\n\n")
-		}
+		body += "\n\n"
 	}
 
-	buf.WriteString(PRMetadataCommentStart)
-	buf.WriteString(PRMetadataCommentHelpText)
-	buf.WriteString("```\n")
+	sb := strings.Builder{}
+	sb.WriteString(body)
+
+	sb.WriteString("\n\n")
+	sb.WriteString(PRMetadataCommentStart)
+	sb.WriteString("\n")
+	sb.WriteString(PRMetadataCommentHelpText)
+	sb.WriteString("```\n")
+
 	// Note: Encoder.Encode implicitly adds a newline at the end of the JSON
 	// which is important here so that the ``` below appears on its own line.
-	if err := json.NewEncoder(buf).Encode(prMeta); err != nil {
+	if err := json.NewEncoder(&sb).Encode(prMeta); err != nil {
 		// shouldn't ever happen since we're encoding a simple struct to a buffer
 		panic(errors.WrapIff(err, "encoding PR metadata"))
 	}
-	buf.WriteString("```\n")
-	buf.WriteString(PRMetadataCommentEnd)
-	return buf.String()
-}
+	sb.WriteString("```\n")
+	sb.WriteString(PRMetadataCommentEnd)
+	sb.WriteString("\n")
 
-func readLineUntil(b *bytes.Buffer, line string) error {
-	for {
-		l, err := b.ReadString('\n')
-		if err != nil {
-			return err
-		}
-		if l == line {
-			return nil
-		}
-	}
+	return sb.String()
 }

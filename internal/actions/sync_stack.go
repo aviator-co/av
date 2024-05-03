@@ -59,12 +59,19 @@ type (
 	SyncStackOpt  func(*syncStackOpts)
 	syncStackOpts struct {
 		skipNextCommit bool
+		localOnly      bool
 	}
 )
 
 func WithSkipNextCommit() SyncStackOpt {
 	return func(opts *syncStackOpts) {
 		opts.skipNextCommit = true
+	}
+}
+
+func WithLocalOnly() SyncStackOpt {
+	return func(opts *syncStackOpts) {
+		opts.localOnly = true
 	}
 }
 
@@ -92,8 +99,8 @@ func SyncStack(ctx context.Context,
 		state.CurrentBranch = currentBranch
 		cont, err := SyncBranch(ctx, repo, client, tx, SyncBranchOpts{
 			Branch:       currentBranch,
-			Fetch:        !state.Config.NoFetch,
-			Push:         !state.Config.NoPush,
+			Fetch:        !state.Config.NoFetch && !opts.localOnly,
+			Push:         !state.Config.NoPush && !opts.localOnly,
 			Continuation: state.Continuation,
 			ToTrunk:      state.Config.Trunk,
 			Skip:         skip,
