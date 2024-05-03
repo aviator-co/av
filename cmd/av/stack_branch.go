@@ -38,7 +38,7 @@ given as the first argument to the command. Branches should only be renamed
 with this command (not with git branch -m ...) because av needs to update
 internal tracking metadata that defines the order of branches within a stack.`,
 	SilenceUsage: true,
-	Args:         cobra.ExactArgs(1),
+	Args:         cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
 		repo, err := getRepo()
 		if err != nil {
@@ -51,6 +51,10 @@ internal tracking metadata that defines the order of branches within a stack.`,
 		}
 
 		branchName := args[0]
+		if len(args) == 2 {
+			stackBranchFlags.Parent = args[1]
+		}
+
 		if stackBranchFlags.Rename {
 			return stackBranchMove(repo, db, branchName, stackBranchFlags.Force)
 		}
