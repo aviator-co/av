@@ -830,8 +830,8 @@ func AddPRMetadataAndStack(
 	sb := strings.Builder{}
 
 	// Don't write out a stack unless there is more than one PR in it.
-	has_multilevel_stack := stack != nil && len(stack.Children) > 0 && len(stack.Children[0].Children) > 0
-	if has_multilevel_stack {
+	hasMultilevelStack := stack != nil && len(stack.Children) > 0 && len(stack.Children[0].Children) > 0
+	if hasMultilevelStack {
 		stackString, parentPullRequestNumber := walkStack(stack, branchName)
 		sb.WriteString(PRStackCommentStart)
 
