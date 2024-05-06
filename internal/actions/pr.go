@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/aviator-co/av/internal/utils/browser"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/sanitize"
+	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/aviator-co/av/internal/utils/stringutils"
 	"github.com/aviator-co/av/internal/utils/templateutils"
 	"github.com/fatih/color"
@@ -503,8 +505,11 @@ func ensurePR(
 	repoMeta meta.Repository,
 	opts ensurePROpts,
 ) (*gh.PullRequest, bool, error) {
+	// Don't pass in a stack to start; we'll do a pass over all open PRs in the stack later.
+	var initialStack *stackutils.StackTreeNode = nil
+
 	if opts.existingPR != nil {
-		newBody := AddPRMetadata(opts.body, opts.meta)
+		newBody := AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack)
 		updatedPR, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
 			PullRequestID: opts.existingPR.ID,
 			Title:         gh.Ptr(githubv4.String(opts.title)),
@@ -521,7 +526,7 @@ func ensurePR(
 		BaseRefName:  githubv4.String(opts.baseRefName),
 		HeadRefName:  githubv4.String(opts.headRefName),
 		Title:        githubv4.String(opts.title),
-		Body:         gh.Ptr(githubv4.String(AddPRMetadata(opts.body, opts.meta))),
+		Body:         gh.Ptr(githubv4.String(AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack))),
 		Draft:        gh.Ptr(githubv4.Boolean(opts.draft)),
 	})
 	if err != nil {
@@ -675,6 +680,9 @@ const PRMetadataCommentStart = "<!-- av pr metadata"
 const PRMetadataCommentHelpText = "This information is embedded by the av CLI when creating PRs to track the status of stacks when using Aviator. Please do not delete or edit this section of the PR.\n"
 const PRMetadataCommentEnd = "-->"
 
+const PRStackCommentStart = "<!-- av pr stack begin -->"
+const PRStackCommentEnd = "<!-- av pr stack end -->"
+
 // extractContent parses the given input and looks for the start and end
 // strings. It returns the content between the start and end strings and the
 // remaining input. If the start or end strings are not found, the content is
@@ -708,6 +716,8 @@ func ParsePRBody(input string) (body string, prMeta PRMetadata, retErr error) {
 		return
 	}
 
+	_, body = extractContent(body, PRStackCommentStart, PRStackCommentEnd)
+
 	return
 }
 
@@ -716,15 +726,135 @@ func ReadPRMetadata(body string) (PRMetadata, error) {
 	return prMeta, err
 }
 
-func AddPRMetadata(body string, prMeta PRMetadata) string {
+func walkStack(stack *stackutils.StackTreeNode, branchName string) (stackString string, parentPullRequestNumber int64) {
+	ssb := strings.Builder{}
+
+	// For simple stacks (i.e., degenerate trees) print them top-down. For example:
+	// - #1
+	// - #2
+	// - main
+	var visitSimple func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode)
+	visitSimple = func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode) {
+		if len(node.Children) > 1 {
+			panic("stack tree has more than one child")
+		} else if len(node.Children) == 1 {
+			visitSimple(node.Children[0], depth+1, node)
+		}
+
+		ssb.WriteString("* ")
+
+		if depth == 0 || node.Branch.PullRequestNumber <= 0 {
+			ssb.WriteString("`")
+			ssb.WriteString(node.Branch.BranchName)
+			ssb.WriteString("`")
+		} else {
+			if node.Branch.BranchName == branchName {
+				ssb.WriteString("➡️ ")
+				parentPullRequestNumber = parentNode.Branch.PullRequestNumber
+			}
+			ssb.WriteString("**#")
+			ssb.WriteString(strconv.FormatInt(node.Branch.PullRequestNumber, 10))
+			ssb.WriteString("**")
+		}
+		ssb.WriteString("\n")
+	}
+
+	// For more complex stacks, print them sideways using a bulleted list. For example:
+	// - main
+	//   - #1
+	//     - #2
+	//   - #3
+	var visitComplex func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode)
+	visitComplex = func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode) {
+		if depth == 0 {
+			ssb.WriteString("* ")
+			ssb.WriteString("`")
+			ssb.WriteString(node.Branch.BranchName)
+			ssb.WriteString("`")
+		} else {
+			ssb.WriteString(strings.Repeat("  ", depth))
+			ssb.WriteString("* ")
+			if node.Branch.BranchName == branchName {
+				ssb.WriteString("➡️ ")
+				parentPullRequestNumber = parentNode.Branch.PullRequestNumber
+			}
+			if node.Branch.PullRequestNumber > 0 {
+				ssb.WriteString("**#")
+				ssb.WriteString(strconv.FormatInt(node.Branch.PullRequestNumber, 10))
+				ssb.WriteString("**")
+			} else {
+				ssb.WriteString("`")
+				ssb.WriteString(node.Branch.BranchName)
+				ssb.WriteString("`")
+			}
+		}
+		ssb.WriteString("\n")
+
+		for _, child := range node.Children {
+			visitComplex(child, depth+1, node)
+		}
+	}
+
+	var hasMultipleChildren func(node *stackutils.StackTreeNode) bool
+	hasMultipleChildren = func(node *stackutils.StackTreeNode) bool {
+		if len(node.Children) > 1 {
+			return true
+		} else if len(node.Children) == 1 {
+			return hasMultipleChildren(node.Children[0])
+		}
+		return false
+	}
+
+	// Optimize navigation within a stack by making sure the output has the same shape everywhere.
+	if hasMultipleChildren(stack) {
+		visitComplex(stack, 0, nil)
+	} else {
+		visitSimple(stack, 0, nil)
+	}
+
+	return ssb.String(), parentPullRequestNumber
+}
+
+func AddPRMetadataAndStack(
+	body string,
+	prMeta PRMetadata,
+	branchName string,
+	stack *stackutils.StackTreeNode,
+) string {
 	body, _, err := ParsePRBody(body)
 	if err != nil {
 		// No existing metadata comment, so add one.
 		logrus.WithError(err).Debug("could not parse PR metadata (assuming it doesn't exist)")
-		body += "\n\n"
 	}
 
 	sb := strings.Builder{}
+
+	// Don't write out a stack unless there is more than one PR in it.
+	hasMultilevelStack := stack != nil && len(stack.Children) > 0 && len(stack.Children[0].Children) > 0
+	if hasMultilevelStack {
+		stackString, parentPullRequestNumber := walkStack(stack, branchName)
+		sb.WriteString(PRStackCommentStart)
+
+		// Enclose this stack summary in a table for two reasons:
+		// 1. It actually looks nicer on GitHub
+		// 2. For the Slack GitHub integration, Slack doesn't support and strips out <table> elements in unfurls - we can avoid showing the stack in the unfurl.
+		sb.WriteString("\n<table><tr><td>")
+		sb.WriteString("<details><summary>")
+		if parentPullRequestNumber > 0 {
+			sb.WriteString("<b>Depends on #")
+			sb.WriteString(strconv.FormatInt(parentPullRequestNumber, 10))
+			sb.WriteString(".</b> ")
+		}
+		sb.WriteString("This PR is part of a stack created with <a href=\"https://github.com/aviator-co/av\">Aviator</a>.")
+		sb.WriteString("</summary>")
+		sb.WriteString("\n\n")
+		sb.WriteString(stackString)
+		sb.WriteString("</details>")
+		sb.WriteString("</td></tr></table>\n")
+		sb.WriteString(PRStackCommentEnd)
+		sb.WriteString("\n\n")
+	}
+
 	sb.WriteString(body)
 
 	sb.WriteString("\n\n")
@@ -744,4 +874,67 @@ func AddPRMetadata(body string, prMeta PRMetadata) string {
 	sb.WriteString("\n")
 
 	return sb.String()
+}
+
+// UpdatePullRequestWithStack updates the GitHub pull request associated with the given branch to include
+// the stack of branches that the branch is a part of.
+// This should be called after all applicable PRs have been created to ensure we can properly link them.
+func UpdatePullRequestWithStack(
+	ctx context.Context,
+	client *gh.Client,
+	repo *git.Repo,
+	tx meta.WriteTx,
+	branchName string,
+) error {
+	branchMeta, _ := tx.Branch(branchName)
+	logrus.WithField("branch", branchName).WithField("pr", branchMeta.PullRequest.ID).Debug("Updating pull requests with stack")
+
+	repoMeta, ok := tx.Repository()
+	if !ok {
+		return ErrRepoNotInitialized
+	}
+
+	stackToWrite, err := stackutils.BuildStackTreeForPullRequest(repo, tx, branchName)
+	if err != nil {
+		return err
+	}
+
+	existingPR, err := getExistingOpenPR(ctx, client, repoMeta, branchMeta, branchName)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	body, prMeta, err := ParsePRBody(existingPR.Body)
+	if err != nil {
+		return err
+	}
+
+	newBody := AddPRMetadataAndStack(body, prMeta, branchName, stackToWrite)
+	_, err = client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
+		PullRequestID: existingPR.ID,
+		Body:          gh.Ptr(githubv4.String(newBody)),
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+// UpdatePullRequestsWithStack updates the GitHub pull requests associated with the given branches to include
+// the stack of branches that each branch is a part of.
+func UpdatePullRequestsWithStack(
+	ctx context.Context,
+	client *gh.Client,
+	repo *git.Repo,
+	tx meta.WriteTx,
+	branchNames []string,
+) error {
+	for _, branchName := range branchNames {
+		if err := UpdatePullRequestWithStack(ctx, client, repo, tx, branchName); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
