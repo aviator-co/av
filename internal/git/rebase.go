@@ -136,10 +136,11 @@ func parseRebaseResult(opts RebaseOpts, out *Output) (*RebaseResult, error) {
 	}
 
 	var status RebaseStatus
+	lowerStderr := strings.ToLower(stderr)
 	switch {
-	case strings.Contains(stderr, "No rebase in progress"):
+	case strings.Contains(lowerStderr, "no rebase in progress"):
 		status = RebaseNotInProgress
-	case strings.Contains(stderr, "Could not apply"):
+	case strings.Contains(lowerStderr, "could not apply"):
 		status = RebaseConflict
 	default:
 		logrus.WithField("exit_code", out.ExitCode).
