@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"emperror.dev/errors"
+	"github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
 	giturls "github.com/whilp/git-urls"
 )
@@ -21,16 +22,24 @@ var ErrRemoteNotFound = errors.Sentinel("this repository doesn't have a remote o
 type Repo struct {
 	repoDir string
 	gitDir  string
+	gitRepo *git.Repository
 	log     logrus.FieldLogger
 }
 
 func OpenRepo(repoDir string, gitDir string) (*Repo, error) {
+	repo, err := git.PlainOpenWithOptions(repoDir, &git.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	})
+	if err != nil {
+		return nil, errors.Errorf("failed to open git repo: %v", err)
+	}
 	r := &Repo{
 		repoDir,
 		gitDir,
+		repo,
 		logrus.WithFields(logrus.Fields{"repo": filepath.Base(repoDir)}),
 	}
-
 	return r, nil
 }
 
@@ -44,6 +53,10 @@ func (r *Repo) GitDir() string {
 
 func (r *Repo) AvDir() string {
 	return filepath.Join(r.GitDir(), "av")
+}
+
+func (r *Repo) GoGitRepo() *git.Repository {
+	return r.gitRepo
 }
 
 func (r *Repo) AvTmpDir() string {
