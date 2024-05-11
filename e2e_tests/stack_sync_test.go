@@ -2,7 +2,6 @@ package e2e_tests
 
 import (
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"testing"
@@ -201,7 +200,7 @@ func TestStackSyncAbort(t *testing.T) {
 	)
 	require.FileExists(
 		t,
-		path.Join(repo.GitDir(), "REBASE_HEAD"),
+		filepath.Join(repo.GitDir(), "REBASE_HEAD"),
 		"REBASE_HEAD should be created for conflict",
 	)
 
@@ -209,7 +208,7 @@ func TestStackSyncAbort(t *testing.T) {
 	RequireAv(t, "stack", "sync", "--abort")
 	require.NoFileExists(
 		t,
-		path.Join(repo.GitDir(), "REBASE_HEAD"),
+		filepath.Join(repo.GitDir(), "REBASE_HEAD"),
 		"REBASE_HEAD should be removed after abort",
 	)
 

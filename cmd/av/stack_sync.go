@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"emperror.dev/errors"
@@ -81,7 +81,7 @@ base branch.
 			}
 
 			// Abort the rebase if we need to
-			if stat, _ := os.Stat(path.Join(repo.GitDir(), "REBASE_HEAD")); stat != nil {
+			if stat, _ := os.Stat(filepath.Join(repo.GitDir(), "REBASE_HEAD")); stat != nil {
 				if _, err := repo.Rebase(git.RebaseOpts{Abort: true}); err != nil {
 					return errors.WrapIf(err, "failed to abort in-progress rebase")
 				}

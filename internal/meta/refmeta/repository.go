@@ -3,7 +3,7 @@ package refmeta
 import (
 	"encoding/json"
 	"os"
-	"path"
+	"path/filepath"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
@@ -18,7 +18,7 @@ var ErrRepoNotInitialized = errors.Sentinel("this repository not initialized: pl
 func ReadRepository(repo *git.Repo) (meta.Repository, error) {
 	var repository meta.Repository
 
-	metaPath := path.Join(repo.Dir(), ".git", "av", "repo-metadata.json")
+	metaPath := filepath.Join(repo.Dir(), ".git", "av", "repo-metadata.json")
 	data, err := os.ReadFile(metaPath)
 	if err != nil {
 		return repository, ErrRepoNotInitialized

@@ -2,13 +2,13 @@ package ghutils
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/aviator-co/av/internal/git"
 )
 
 func HasCodeowners(repo *git.Repo) bool {
-	if stat, _ := os.Stat(path.Join(repo.Dir(), ".github/CODEOWNERS")); stat != nil {
+	if stat, _ := os.Stat(filepath.Join(repo.Dir(), ".github/CODEOWNERS")); stat != nil {
 		return true
 	}
 	return false

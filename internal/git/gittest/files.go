@@ -2,7 +2,7 @@ package gittest
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/aviator-co/av/internal/git"
@@ -15,17 +15,17 @@ func CreateFile(
 	filename string,
 	body []byte,
 ) string {
-	filepath := path.Join(repo.Dir(), filename)
-	err := os.WriteFile(filepath, body, 0644)
+	fp := filepath.Join(repo.Dir(), filename)
+	err := os.WriteFile(fp, body, 0644)
 	require.NoError(t, err, "failed to write file: %s", filename)
-	return filepath
+	return fp
 }
 
 func AddFile(
 	t *testing.T,
 	repo *git.Repo,
-	filepath string,
+	fp string,
 ) {
-	_, err := repo.Git("add", filepath)
-	require.NoError(t, err, "failed to add file: %s", filepath)
+	_, err := repo.Git("add", fp)
+	require.NoError(t, err, "failed to add file: %s", fp)
 }

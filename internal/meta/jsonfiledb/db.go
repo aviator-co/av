@@ -2,7 +2,7 @@ package jsonfiledb
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"sync"
 
 	"github.com/aviator-co/av/internal/git"
@@ -17,7 +17,7 @@ type DB struct {
 }
 
 func RepoPath(repo *git.Repo) string {
-	return path.Join(repo.AvDir(), "av.db")
+	return filepath.Join(repo.AvDir(), "av.db")
 }
 
 func OpenRepo(repo *git.Repo) (*DB, error) {
@@ -26,13 +26,13 @@ func OpenRepo(repo *git.Repo) (*DB, error) {
 
 // OpenPath opens a JSON file database at the given path.
 // If the file does not exist, it is created (as well as all ancestor directories).
-func OpenPath(filepath string) (*DB, error) {
-	_ = os.MkdirAll(path.Dir(filepath), 0755)
-	state, err := readState(filepath)
+func OpenPath(fp string) (*DB, error) {
+	_ = os.MkdirAll(filepath.Dir(fp), 0755)
+	state, err := readState(fp)
 	if err != nil {
 		return nil, err
 	}
-	db := &DB{filepath, sync.Mutex{}, state}
+	db := &DB{filepath: fp, stateMu: sync.Mutex{}, state: state}
 	return db, nil
 }
 

@@ -3,7 +3,6 @@ package gittest
 import (
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"testing"
 
@@ -50,7 +49,7 @@ func NewTempRepo(t *testing.T) *git.Repo {
 	err = remoteInit.Run()
 	require.NoError(t, err, "failed to initialize remote git repository")
 
-	repo, err := git.OpenRepo(dir, path.Join(dir, ".git"))
+	repo, err := git.OpenRepo(dir, filepath.Join(dir, ".git"))
 	require.NoError(t, err, "failed to open repo")
 
 	settings := map[string]string{
