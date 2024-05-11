@@ -6,28 +6,26 @@ import (
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/aviator-co/av/internal/meta"
-	"github.com/aviator-co/av/internal/meta/jsonfiledb"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCreatePlan(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
 
-	db, err := jsonfiledb.OpenRepo(repo)
-	require.NoError(t, err)
+	db := repo.OpenDB(t)
 
-	initialCommit, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
-	require.NoError(t, err)
+	initialCommit := repo.GetCommitAtRef(t, plumbing.HEAD)
 
-	_, err = repo.CheckoutBranch(&git.CheckoutBranch{Name: "one", NewBranch: true})
-	require.NoError(t, err)
-	c1a := gittest.CommitFile(t, repo, "file", []byte("hello\n"))
-	c1b := gittest.CommitFile(t, repo, "file", []byte("hello\nworld\n"))
+	repo.CreateRef(t, plumbing.NewBranchReferenceName("one"))
+	repo.CheckoutBranch(t, plumbing.NewBranchReferenceName("one"))
+	c1a := repo.CommitFile(t, "file", "hello\n")
+	c1b := repo.CommitFile(t, "file", "hello\nworld\n")
 
-	_, err = repo.CheckoutBranch(&git.CheckoutBranch{Name: "two", NewBranch: true})
-	require.NoError(t, err)
-	c2a := gittest.CommitFile(t, repo, "fichier", []byte("bonjour\n"))
-	c2b := gittest.CommitFile(t, repo, "fichier", []byte("bonjour\nle monde\n"))
+	repo.CreateRef(t, plumbing.NewBranchReferenceName("two"))
+	repo.CheckoutBranch(t, plumbing.NewBranchReferenceName("two"))
+	c2a := repo.CommitFile(t, "fichier", "bonjour\n")
+	c2b := repo.CommitFile(t, "fichier", "bonjour\nle monde\n")
 
 	tx := db.WriteTx()
 	tx.SetBranch(meta.Branch{
@@ -42,24 +40,24 @@ func TestCreatePlan(t *testing.T) {
 		Parent: meta.BranchState{
 			Name:  "one",
 			Trunk: false,
-			Head:  c1b,
+			Head:  c1b.String(),
 		},
 	})
 	require.NoError(t, tx.Commit())
 
-	plan, err := CreatePlan(repo, db.ReadTx(), "one")
+	plan, err := CreatePlan(repo.AsAvGitRepo(), db.ReadTx(), "one")
 	require.NoError(t, err)
 	for _, cmd := range plan {
 		t.Log(cmd.String())
 	}
 
 	want := []Cmd{
-		StackBranchCmd{Name: "one", Trunk: "main@" + initialCommit},
-		PickCmd{Commit: c1a},
-		PickCmd{Commit: c1b},
+		StackBranchCmd{Name: "one", Trunk: "main@" + initialCommit.String()},
+		PickCmd{Commit: c1a.String()},
+		PickCmd{Commit: c1b.String()},
 		StackBranchCmd{Name: "two", Parent: "one"},
-		PickCmd{Commit: c2a},
-		PickCmd{Commit: c2b},
+		PickCmd{Commit: c2a.String()},
+		PickCmd{Commit: c2b.String()},
 	}
 	// This is a little bit fragile but :shrug:
 	for i, cmd := range plan {

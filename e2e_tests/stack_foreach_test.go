@@ -10,15 +10,15 @@ import (
 
 func TestStackForEach(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 
 	// Create a stack of three branches
 	RequireAv(t, "stack", "branch", "stack-1")
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n"), gittest.WithMessage("Commit 1a"))
+	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	RequireAv(t, "stack", "branch", "stack-2")
-	gittest.CommitFile(t, repo, "my-file", []byte("2a\n"), gittest.WithMessage("Commit 2a"))
+	repo.CommitFile(t, "my-file", "2a\n", gittest.WithMessage("Commit 2a"))
 	RequireAv(t, "stack", "branch", "stack-3")
-	gittest.CommitFile(t, repo, "my-file", []byte("3a\n"), gittest.WithMessage("Commit 3a"))
+	repo.CommitFile(t, "my-file", "3a\n", gittest.WithMessage("Commit 3a"))
 
 	out := RequireAv(t,
 		"stack", "for-each", "--",

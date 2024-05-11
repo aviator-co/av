@@ -9,7 +9,7 @@ import (
 
 func TestStackOrphan(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 
 	// To start, we create a simple two-stack where each stack has a single commit.
 	// Our stack looks like:
@@ -20,30 +20,27 @@ func TestStackOrphan(t *testing.T) {
 
 	// Setup initial state
 	require.Equal(t, 0, Cmd(t, "git", "checkout", "-b", "stack-1").ExitCode)
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n"), gittest.WithMessage("Commit 1a"))
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"), gittest.WithMessage("Commit 1b"))
+	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
+	repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 	RequireAv(t, "stack", "branch", "stack-2")
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n2a\n"), gittest.WithMessage("Commit 2a"))
-	gittest.CommitFile(
+	repo.CommitFile(t, "my-file", "1a\n1b\n2a\n", gittest.WithMessage("Commit 2a"))
+	repo.CommitFile(
 		t,
-		repo,
 		"my-file",
-		[]byte("1a\n1b\n2a\n2b\n"),
+		"1a\n1b\n2a\n2b\n",
 		gittest.WithMessage("Commit 2b"),
 	)
 	RequireAv(t, "stack", "branch", "stack-3")
-	gittest.CommitFile(
+	repo.CommitFile(
 		t,
-		repo,
 		"my-file",
-		[]byte("1a\n1b\n2a\n2b\n3a\n"),
+		"1a\n1b\n2a\n2b\n3a\n",
 		gittest.WithMessage("Commit 3a"),
 	)
-	gittest.CommitFile(
+	repo.CommitFile(
 		t,
-		repo,
 		"my-file",
-		[]byte("1a\n1b\n2a\n2b\n3a\n3b\n"),
+		"1a\n1b\n2a\n2b\n3a\n3b\n",
 		gittest.WithMessage("Commit 3b"),
 	)
 

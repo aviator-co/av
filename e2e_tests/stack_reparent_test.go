@@ -5,24 +5,25 @@ import (
 	"testing"
 
 	"github.com/aviator-co/av/internal/git/gittest"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/require"
 )
 
 func TestStackSyncReparent(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 
 	RequireAv(t, "stack", "branch", "foo")
-	gittest.CommitFile(t, repo, "foo.txt", []byte("foo"))
+	repo.CommitFile(t, "foo.txt", "foo")
 	requireFileContent(t, "foo.txt", "foo")
 
 	RequireAv(t, "stack", "branch", "bar")
-	gittest.CommitFile(t, repo, "bar.txt", []byte("bar"))
+	repo.CommitFile(t, "bar.txt", "bar")
 	requireFileContent(t, "bar.txt", "bar")
 	requireFileContent(t, "foo.txt", "foo")
 
 	RequireAv(t, "stack", "branch", "spam")
-	gittest.CommitFile(t, repo, "spam.txt", []byte("spam"))
+	repo.CommitFile(t, "spam.txt", "spam")
 	requireFileContent(t, "spam.txt", "spam")
 
 	// Now, re-parent spam on top of bar (should be relatively a no-op)
@@ -37,11 +38,10 @@ func TestStackSyncReparent(t *testing.T) {
 
 	// Now, re-parent spam on top of foo
 	RequireAv(t, "stack", "sync", "--parent", "foo", "--no-fetch", "--no-push")
-	currentBranch, err := repo.CurrentBranchName()
-	require.NoError(t, err)
+	currentBranch := repo.CurrentBranch(t)
 	require.Equal(
 		t,
-		"spam",
+		plumbing.ReferenceName("refs/heads/spam"),
 		currentBranch,
 		"branch should be set to original branch (spam) after reparenting onto foo",
 	)
@@ -59,13 +59,13 @@ func TestStackSyncReparent(t *testing.T) {
 
 func TestStackSyncReparentTrunk(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 
 	RequireAv(t, "stack", "branch", "foo")
-	gittest.CommitFile(t, repo, "foo.txt", []byte("foo"))
+	repo.CommitFile(t, "foo.txt", "foo")
 
 	RequireAv(t, "stack", "branch", "bar")
-	gittest.CommitFile(t, repo, "bar.txt", []byte("bar"))
+	repo.CommitFile(t, "bar.txt", "bar")
 
 	// Delete the local main. av should use the remote tracking branch.
 	Cmd(t, "git", "branch", "-D", "main")

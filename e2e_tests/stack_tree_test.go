@@ -8,17 +8,17 @@ import (
 
 func TestStackTree(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 
 	RequireAv(t, "stack", "branch", "foo")
-	gittest.CommitFile(t, repo, "foo", []byte("foo"))
+	repo.CommitFile(t, "foo", "foo")
 
 	RequireAv(t, "stack", "branch", "bar")
-	gittest.CommitFile(t, repo, "bar", []byte("bar"))
+	repo.CommitFile(t, "bar", "bar")
 
-	gittest.CheckoutBranch(t, repo, "main")
+	repo.CheckoutBranch(t, "refs/heads/main")
 	RequireAv(t, "stack", "branch", "spam")
-	gittest.CommitFile(t, repo, "spam", []byte("spam"))
+	repo.CommitFile(t, "spam", "spam")
 
 	RequireAv(t, "stack", "tree")
 }

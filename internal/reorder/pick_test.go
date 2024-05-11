@@ -6,7 +6,7 @@ import (
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
-	"github.com/aviator-co/av/internal/meta/jsonfiledb"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,33 +17,29 @@ func TestPickCmd_String(t *testing.T) {
 
 func TestPickCmd_Execute(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	db, err := jsonfiledb.OpenRepo(repo)
-	require.NoError(t, err)
+	db := repo.OpenDB(t)
 	out := &bytes.Buffer{}
-	ctx := &Context{repo, db, &State{Branch: "main"}, out}
+	ctx := &Context{repo.AsAvGitRepo(), db, &State{Branch: "main"}, out}
 
-	start, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
-	require.NoError(t, err)
-	next := gittest.CommitFile(t, repo, "file", []byte("hello\n"))
+	start := repo.GetCommitAtRef(t, plumbing.HEAD)
+	next := repo.CommitFile(t, "file", "hello\n")
 
 	t.Run("fast-forward commit", func(t *testing.T) {
-		_, err = repo.Git("reset", "--hard", start)
-		require.NoError(t, err)
+		repo.Git(t, "reset", "--hard", start.String())
 		require.NoError(
 			t,
-			PickCmd{Commit: next}.Execute(ctx),
+			PickCmd{Commit: next.String()}.Execute(ctx),
 			"PickCmd.Execute should succeed with a fast-forward",
 		)
-		require.Equal(t, next, ctx.State.Head, "PickCmd.Execute should update the state's head")
+		require.Equal(t, next.String(), ctx.State.Head, "PickCmd.Execute should update the state's head")
 	})
 
 	t.Run("conflicting commit", func(t *testing.T) {
 		out.Reset()
-		_, err = repo.Git("reset", "--hard", start)
-		require.NoError(t, err)
-		gittest.CommitFile(t, repo, "file", []byte("bonjour\n"))
+		repo.Git(t, "reset", "--hard", start.String())
+		repo.CommitFile(t, "file", "bonjour\n")
 		// Trying to re-apply the commit `next` should be a conflict
-		err := PickCmd{Commit: next}.Execute(ctx)
+		err := PickCmd{Commit: next.String()}.Execute(ctx)
 		require.ErrorIs(
 			t,
 			err,
@@ -53,7 +49,7 @@ func TestPickCmd_Execute(t *testing.T) {
 		require.Contains(
 			t,
 			out.String(),
-			git.ShortSha(next),
+			git.ShortSha(next.String()),
 			"PickCmd.Execute should print the conflicting commit",
 		)
 	})

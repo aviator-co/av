@@ -4,38 +4,36 @@ import (
 	"testing"
 
 	"github.com/aviator-co/av/internal/git/gittest"
-	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 )
 
 func TestCommitCreateInStack(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 	RequireCmd(t, "git", "fetch")
 	initialTimestamp := GetFetchHeadTimestamp(t, repo)
 
 	// Create a branch and commit a file.
-	filepath := gittest.CreateFile(t, repo, "one.txt", []byte("one"))
-	gittest.AddFile(t, repo, filepath)
+	filepath := repo.CreateFile(t, "one.txt", "one")
+	repo.AddFile(t, filepath)
 	RequireAv(t, "stack", "branch", "one")
 	RequireAv(t, "commit", "create", "-m", "one")
 
 	// Create another branch and commit a file.
-	filepath = gittest.CreateFile(t, repo, "two.txt", []byte("two"))
-	gittest.AddFile(t, repo, filepath)
+	filepath = repo.CreateFile(t, "two.txt", "two")
+	repo.AddFile(t, filepath)
 	RequireAv(t, "stack", "branch", "two")
 	RequireAv(t, "commit", "create", "-m", "two")
 
 	// Go back to the first branch and commit another file.
 	RequireCmd(t, "git", "checkout", "one")
-	filepath = gittest.CreateFile(t, repo, "one-b.txt", []byte("one-b"))
-	gittest.AddFile(t, repo, filepath)
+	filepath = repo.CreateFile(t, "one-b.txt", "one-b")
+	repo.AddFile(t, filepath)
 	RequireAv(t, "commit", "create", "-m", "one-b")
 
 	// Verify that the branches are still there.
-	db, err := jsonfiledb.OpenRepo(repo)
-	require.NoError(t, err, "failed to open repo db")
+	db := repo.OpenDB(t)
 	branchNames := maps.Keys(db.ReadTx().AllBranches())
 	require.ElementsMatch(t, branchNames, []string{"one", "two"})
 
