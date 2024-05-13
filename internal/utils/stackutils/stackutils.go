@@ -4,17 +4,11 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 )
 
 type StackTreeBranchInfo struct {
-	BranchName        string
-	Deleted           bool
-	NeedSync          bool
-	PullRequestNumber int64
-	PullRequestLink   string
-
+	BranchName       string
 	parentBranchName string
 }
 
@@ -90,18 +84,18 @@ func buildTree(currentBranchName string, branches []*StackTreeBranchInfo, sortCu
 	return rootBranches
 }
 
-func BuildStackTree(repo *git.Repo, tx meta.ReadTx, currentBranch string) []*StackTreeNode {
-	return buildStackTree(repo, currentBranch, tx.AllBranches(), true)
+func BuildStackTree(tx meta.ReadTx, currentBranch string) []*StackTreeNode {
+	return buildStackTree(currentBranch, tx.AllBranches(), true)
 }
 
-func BuildStackTreeForPullRequest(repo *git.Repo, tx meta.ReadTx, currentBranch string) (*StackTreeNode, error) {
+func BuildStackTreeForPullRequest(tx meta.ReadTx, currentBranch string) (*StackTreeNode, error) {
 	branchesToInclude, err := meta.StackBranchesMap(tx, currentBranch)
 	if err != nil {
 		return nil, err
 	}
 
 	// Don't sort based on the current branch so that the output is consistent between branches.
-	stackTree := buildStackTree(repo, currentBranch, branchesToInclude, false)
+	stackTree := buildStackTree(currentBranch, branchesToInclude, false)
 	if len(stackTree) != 1 {
 		return nil, fmt.Errorf("expected one root branch, got %d", len(stackTree))
 	}
@@ -109,11 +103,14 @@ func BuildStackTreeForPullRequest(repo *git.Repo, tx meta.ReadTx, currentBranch 
 	return stackTree[0], nil
 }
 
-func buildStackTree(repo *git.Repo, currentBranch string, branchesToInclude map[string]meta.Branch, sortCurrent bool) []*StackTreeNode {
+func buildStackTree(currentBranch string, branchesToInclude map[string]meta.Branch, sortCurrent bool) []*StackTreeNode {
 	trunks := map[string]bool{}
 	var branches []*StackTreeBranchInfo
 	for _, branch := range branchesToInclude {
-		branches = append(branches, getBranchInfo(repo, branch))
+		branches = append(branches, &StackTreeBranchInfo{
+			BranchName:       branch.Name,
+			parentBranchName: branch.Parent.Name,
+		})
 		if branch.Parent.Trunk {
 			trunks[branch.Parent.Name] = true
 		}
@@ -122,59 +119,7 @@ func buildStackTree(repo *git.Repo, currentBranch string, branchesToInclude map[
 		branches = append(branches, &StackTreeBranchInfo{
 			BranchName:       branch,
 			parentBranchName: "",
-			NeedSync:         false,
-			Deleted:          false,
 		})
 	}
 	return buildTree(currentBranch, branches, sortCurrent)
-}
-
-func getBranchInfo(repo *git.Repo, branch meta.Branch) *StackTreeBranchInfo {
-	branchInfo := StackTreeBranchInfo{
-		BranchName:       branch.Name,
-		parentBranchName: branch.Parent.Name,
-	}
-	if branch.PullRequest != nil && branch.PullRequest.Number != 0 {
-		branchInfo.PullRequestNumber = branch.PullRequest.Number
-	}
-	if branch.PullRequest != nil && branch.PullRequest.Permalink != "" {
-		branchInfo.PullRequestLink = branch.PullRequest.Permalink
-	}
-	if _, err := repo.RevParse(&git.RevParse{Rev: branch.Name}); err != nil {
-		branchInfo.Deleted = true
-	}
-
-	parentHead, err := repo.RevParse(&git.RevParse{Rev: branch.Parent.Name})
-	if err != nil {
-		// The parent branch doesn't exist.
-		branchInfo.NeedSync = true
-	} else {
-		mergeBase, err := repo.MergeBase(&git.MergeBase{
-			Revs: []string{parentHead, branch.Name},
-		})
-		if err != nil {
-			// The merge base doesn't exist. This is odd. Mark the branch as needing
-			// sync to see if we can fix this.
-			branchInfo.NeedSync = true
-		}
-		if mergeBase != parentHead {
-			// This branch is not on top of the parent branch. Need sync.
-			branchInfo.NeedSync = true
-		}
-	}
-
-	upstreamExists, err := repo.DoesRemoteBranchExist(branch.Name)
-	if err != nil || !upstreamExists {
-		// Not pushed.
-		branchInfo.NeedSync = true
-	}
-	upstreamBranch := fmt.Sprintf("remotes/origin/%s", branch.Name)
-	upstreamDiff, err := repo.Diff(&git.DiffOpts{
-		Quiet:      true,
-		Specifiers: []string{branch.Name, upstreamBranch},
-	})
-	if err != nil || !upstreamDiff.Empty {
-		branchInfo.NeedSync = true
-	}
-	return &branchInfo
 }

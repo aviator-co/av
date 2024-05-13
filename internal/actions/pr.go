@@ -375,7 +375,7 @@ func CreatePullRequest(
 		draft = true
 	}
 
-	pull, didCreatePR, err := ensurePR(ctx, client, repoMeta, ensurePROpts{
+	pull, didCreatePR, err := ensurePR(ctx, client, repoMeta, tx, ensurePROpts{
 		baseRefName: parentState.Name,
 		headRefName: opts.BranchName,
 		title:       opts.Title,
@@ -509,13 +509,14 @@ func ensurePR(
 	ctx context.Context,
 	client *gh.Client,
 	repoMeta meta.Repository,
+	tx meta.ReadTx,
 	opts ensurePROpts,
 ) (*gh.PullRequest, bool, error) {
 	// Don't pass in a stack to start; we'll do a pass over all open PRs in the stack later.
 	var initialStack *stackutils.StackTreeNode = nil
 
 	if opts.existingPR != nil {
-		newBody := AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack)
+		newBody := AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack, tx)
 		updatedPR, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
 			PullRequestID: opts.existingPR.ID,
 			Title:         gh.Ptr(githubv4.String(opts.title)),
@@ -532,7 +533,7 @@ func ensurePR(
 		BaseRefName:  githubv4.String(opts.baseRefName),
 		HeadRefName:  githubv4.String(opts.headRefName),
 		Title:        githubv4.String(opts.title),
-		Body:         gh.Ptr(githubv4.String(AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack))),
+		Body:         gh.Ptr(githubv4.String(AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack, tx))),
 		Draft:        gh.Ptr(githubv4.Boolean(opts.draft)),
 	})
 	if err != nil {
@@ -732,34 +733,34 @@ func ReadPRMetadata(body string) (PRMetadata, error) {
 	return prMeta, err
 }
 
-func walkStack(stack *stackutils.StackTreeNode, branchName string) (stackString string, parentPullRequestNumber int64) {
+func walkStack(tx meta.ReadTx, stack *stackutils.StackTreeNode, branchName string) string {
 	ssb := strings.Builder{}
 
 	// For simple stacks (i.e., degenerate trees) print them top-down. For example:
 	// - #1
 	// - #2
 	// - main
-	var visitSimple func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode)
-	visitSimple = func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode) {
+	var visitSimple func(node *stackutils.StackTreeNode, depth int)
+	visitSimple = func(node *stackutils.StackTreeNode, depth int) {
+		bi, _ := tx.Branch(node.Branch.BranchName)
 		if len(node.Children) > 1 {
 			panic("stack tree has more than one child")
 		} else if len(node.Children) == 1 {
-			visitSimple(node.Children[0], depth+1, node)
+			visitSimple(node.Children[0], depth+1)
 		}
 
 		ssb.WriteString("* ")
 
-		if depth == 0 || node.Branch.PullRequestNumber <= 0 {
+		if depth == 0 || bi.PullRequest == nil {
 			ssb.WriteString("`")
 			ssb.WriteString(node.Branch.BranchName)
 			ssb.WriteString("`")
 		} else {
 			if node.Branch.BranchName == branchName {
 				ssb.WriteString("➡️ ")
-				parentPullRequestNumber = parentNode.Branch.PullRequestNumber
 			}
 			ssb.WriteString("**#")
-			ssb.WriteString(strconv.FormatInt(node.Branch.PullRequestNumber, 10))
+			ssb.WriteString(strconv.FormatInt(bi.PullRequest.Number, 10))
 			ssb.WriteString("**")
 		}
 		ssb.WriteString("\n")
@@ -770,23 +771,23 @@ func walkStack(stack *stackutils.StackTreeNode, branchName string) (stackString 
 	//   - #1
 	//     - #2
 	//   - #3
-	var visitComplex func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode)
-	visitComplex = func(node *stackutils.StackTreeNode, depth int, parentNode *stackutils.StackTreeNode) {
+	var visitComplex func(node *stackutils.StackTreeNode, depth int)
+	visitComplex = func(node *stackutils.StackTreeNode, depth int) {
 		if depth == 0 {
 			ssb.WriteString("* ")
 			ssb.WriteString("`")
 			ssb.WriteString(node.Branch.BranchName)
 			ssb.WriteString("`")
 		} else {
+			bi, _ := tx.Branch(node.Branch.BranchName)
 			ssb.WriteString(strings.Repeat("  ", depth))
 			ssb.WriteString("* ")
 			if node.Branch.BranchName == branchName {
 				ssb.WriteString("➡️ ")
-				parentPullRequestNumber = parentNode.Branch.PullRequestNumber
 			}
-			if node.Branch.PullRequestNumber > 0 {
+			if bi.PullRequest != nil {
 				ssb.WriteString("**#")
-				ssb.WriteString(strconv.FormatInt(node.Branch.PullRequestNumber, 10))
+				ssb.WriteString(strconv.FormatInt(bi.PullRequest.Number, 10))
 				ssb.WriteString("**")
 			} else {
 				ssb.WriteString("`")
@@ -797,7 +798,7 @@ func walkStack(stack *stackutils.StackTreeNode, branchName string) (stackString 
 		ssb.WriteString("\n")
 
 		for _, child := range node.Children {
-			visitComplex(child, depth+1, node)
+			visitComplex(child, depth+1)
 		}
 	}
 
@@ -813,12 +814,12 @@ func walkStack(stack *stackutils.StackTreeNode, branchName string) (stackString 
 
 	// Optimize navigation within a stack by making sure the output has the same shape everywhere.
 	if hasMultipleChildren(stack) {
-		visitComplex(stack, 0, nil)
+		visitComplex(stack, 0)
 	} else {
-		visitSimple(stack, 0, nil)
+		visitSimple(stack, 0)
 	}
 
-	return ssb.String(), parentPullRequestNumber
+	return ssb.String()
 }
 
 func AddPRMetadataAndStack(
@@ -826,6 +827,7 @@ func AddPRMetadataAndStack(
 	prMeta PRMetadata,
 	branchName string,
 	stack *stackutils.StackTreeNode,
+	tx meta.ReadTx,
 ) string {
 	body, _, err := ParsePRBody(body)
 	if err != nil {
@@ -838,7 +840,8 @@ func AddPRMetadataAndStack(
 	// Don't write out a stack unless there is more than one PR in it.
 	hasMultilevelStack := stack != nil && len(stack.Children) > 0 && len(stack.Children[0].Children) > 0
 	if hasMultilevelStack {
-		stackString, parentPullRequestNumber := walkStack(stack, branchName)
+		bi, _ := tx.Branch(branchName)
+		stackString := walkStack(tx, stack, branchName)
 		sb.WriteString(PRStackCommentStart)
 
 		// Enclose this stack summary in a table for two reasons:
@@ -846,9 +849,10 @@ func AddPRMetadataAndStack(
 		// 2. For the Slack GitHub integration, Slack doesn't support and strips out <table> elements in unfurls - we can avoid showing the stack in the unfurl.
 		sb.WriteString("\n<table><tr><td>")
 		sb.WriteString("<details><summary>")
-		if parentPullRequestNumber > 0 {
+		if !bi.Parent.Trunk {
+			parentBi, _ := tx.Branch(bi.Parent.Name)
 			sb.WriteString("<b>Depends on #")
-			sb.WriteString(strconv.FormatInt(parentPullRequestNumber, 10))
+			sb.WriteString(strconv.FormatInt(parentBi.PullRequest.Number, 10))
 			sb.WriteString(".</b> ")
 		}
 		sb.WriteString("This PR is part of a stack created with <a href=\"https://github.com/aviator-co/av\">Aviator</a>.")
@@ -888,7 +892,6 @@ func AddPRMetadataAndStack(
 func UpdatePullRequestWithStack(
 	ctx context.Context,
 	client *gh.Client,
-	repo *git.Repo,
 	tx meta.WriteTx,
 	branchName string,
 ) error {
@@ -900,7 +903,7 @@ func UpdatePullRequestWithStack(
 		return ErrRepoNotInitialized
 	}
 
-	stackToWrite, err := stackutils.BuildStackTreeForPullRequest(repo, tx, branchName)
+	stackToWrite, err := stackutils.BuildStackTreeForPullRequest(tx, branchName)
 	if err != nil {
 		return err
 	}
@@ -915,7 +918,7 @@ func UpdatePullRequestWithStack(
 		return err
 	}
 
-	newBody := AddPRMetadataAndStack(body, prMeta, branchName, stackToWrite)
+	newBody := AddPRMetadataAndStack(body, prMeta, branchName, stackToWrite, tx)
 	_, err = client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
 		PullRequestID: existingPR.ID,
 		Body:          gh.Ptr(githubv4.String(newBody)),
@@ -932,12 +935,11 @@ func UpdatePullRequestWithStack(
 func UpdatePullRequestsWithStack(
 	ctx context.Context,
 	client *gh.Client,
-	repo *git.Repo,
 	tx meta.WriteTx,
 	branchNames []string,
 ) error {
 	for _, branchName := range branchNames {
-		if err := UpdatePullRequestWithStack(ctx, client, repo, tx, branchName); err != nil {
+		if err := UpdatePullRequestWithStack(ctx, client, tx, branchName); err != nil {
 			return err
 		}
 	}
