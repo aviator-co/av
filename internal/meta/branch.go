@@ -128,6 +128,37 @@ func SubsequentBranches(tx ReadTx, name string) []string {
 	return res
 }
 
+// StackBranches returns branches in the stack associated with the given branch.
+func StackBranches(tx ReadTx, name string) ([]string, error) {
+	root, found := Root(tx, name)
+	if !found {
+		return nil, errors.Errorf("branch %q is not in a stack", name)
+	}
+
+	var res = []string{root}
+	res = append(res, SubsequentBranches(tx, root)...)
+	return res, nil
+}
+
+// StackBranchesMap returns a map of branch names to their metadata for the stack
+// associated with the given branch.
+func StackBranchesMap(tx ReadTx, name string) (map[string]Branch, error) {
+	branchNames, err := StackBranches(tx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	branches := make(map[string]Branch, len(branchNames))
+	for _, branchName := range branchNames {
+		branch, ok := tx.Branch(branchName)
+		if !ok {
+			return nil, errors.Errorf("branch metadata not found for %q", branchName)
+		}
+		branches[branchName] = branch
+	}
+	return branches, nil
+}
+
 // Root determines the stack root of a branch.
 func Root(tx ReadTx, name string) (string, bool) {
 	for name != "" {

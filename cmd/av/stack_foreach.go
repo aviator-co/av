@@ -65,12 +65,10 @@ Examples:
 			branches = meta.SubsequentBranches(tx, currentBranch)
 			branches = append([]string{currentBranch}, branches...)
 		} else {
-			branches, err = meta.PreviousBranches(tx, currentBranch)
+			branches, err = meta.StackBranches(tx, currentBranch)
 			if err != nil {
 				return err
 			}
-			branches = append(branches, currentBranch)
-			branches = append(branches, meta.SubsequentBranches(tx, currentBranch)...)
 		}
 
 		_, _ = fmt.Fprint(os.Stderr,

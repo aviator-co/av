@@ -13,6 +13,7 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/ghutils"
+	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -580,7 +581,14 @@ func syncBranchPushAndUpdatePullRequest(
 	if err != nil {
 		return err
 	}
-	prBody := AddPRMetadata(pr.Body, prMeta)
+
+	var stackToWrite *stackutils.StackTreeNode
+	if config.Av.PullRequest.WriteStack {
+		if stackToWrite, err = stackutils.BuildStackTreeForPullRequest(repo, tx, branchName); err != nil {
+			return err
+		}
+	}
+	prBody := AddPRMetadataAndStack(pr.Body, prMeta, branchName, stackToWrite)
 	if _, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
 		PullRequestID: branch.PullRequest.ID,
 		BaseRefName:   gh.Ptr(githubv4.String(branch.Parent.Name)),
