@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -28,7 +28,7 @@ func OpenRepo(repoDir string, gitDir string) (*Repo, error) {
 	r := &Repo{
 		repoDir,
 		gitDir,
-		logrus.WithFields(logrus.Fields{"repo": path.Base(repoDir)}),
+		logrus.WithFields(logrus.Fields{"repo": filepath.Base(repoDir)}),
 	}
 
 	return r, nil
@@ -43,11 +43,11 @@ func (r *Repo) GitDir() string {
 }
 
 func (r *Repo) AvDir() string {
-	return path.Join(r.GitDir(), "av")
+	return filepath.Join(r.GitDir(), "av")
 }
 
 func (r *Repo) AvTmpDir() string {
-	dir := path.Join(r.AvDir(), "tmp")
+	dir := filepath.Join(r.AvDir(), "tmp")
 	// Try to create the directory, but swallow the error since it will
 	// ultimately be surfaced when trying to create a file in the directory.
 	_ = os.MkdirAll(dir, 0755)

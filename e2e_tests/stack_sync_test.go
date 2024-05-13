@@ -2,14 +2,13 @@ package e2e_tests
 
 import (
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"testing"
 
-	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +19,7 @@ func TestHelp(t *testing.T) {
 
 func TestStackSync(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 
 	// To start, we create a simple three-stack where each stack has a single commit.
 	// Our stack looks like:
@@ -31,20 +30,19 @@ func TestStackSync(t *testing.T) {
 	// Note: we create the first branch with a "vanilla" git checkout just to
 	// make sure that's working as intended.
 	require.Equal(t, 0, Cmd(t, "git", "checkout", "-b", "stack-1").ExitCode)
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n"), gittest.WithMessage("Commit 1a"))
+	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	require.Equal(t, 0, Av(t, "stack", "branch", "stack-2").ExitCode)
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n2a\n"), gittest.WithMessage("Commit 2a"))
+	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
 	require.Equal(t, 0, Av(t, "stack", "branch", "stack-3").ExitCode)
-	gittest.CommitFile(
+	repo.CommitFile(
 		t,
-		repo,
 		"different-file",
-		[]byte("1a\n2a\n3a\n"),
+		"1a\n2a\n3a\n",
 		gittest.WithMessage("Commit 3a"),
 	)
 	require.Equal(t, 0, Cmd(t, "git", "checkout", "stack-1").ExitCode)
 	require.Equal(t, 0, Av(t, "stack", "branch", "stack-4").ExitCode)
-	gittest.CommitFile(t, repo, "another-file", []byte("1a\n4a\n"), gittest.WithMessage("Commit 4a"))
+	repo.CommitFile(t, "another-file", "1a\n4a\n", gittest.WithMessage("Commit 4a"))
 	require.Equal(t, 0, Cmd(t, "git", "checkout", "stack-3").ExitCode)
 
 	// Everything up to date now, so this should be a no-op.
@@ -83,8 +81,8 @@ func TestStackSync(t *testing.T) {
 	// commit since 2a and play it on top of 2a').
 	// This also applies to any situation where the user has modified a commit
 	// that was stacked-upon (e.g., with `git commit --amend`).
-	gittest.WithCheckoutBranch(t, repo, "stack-1", func() {
-		gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"), gittest.WithMessage("Commit 1b"))
+	repo.WithCheckoutBranch(t, "refs/heads/stack-1", func() {
+		repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 	})
 
 	// Since both commits updated my-file in ways that conflict, we should get
@@ -110,9 +108,9 @@ func TestStackSync(t *testing.T) {
 		"stack sync --continue should return non-zero exit code if conflicts have not been resolved",
 	)
 	// resolve the conflict
-	err := os.WriteFile(filepath.Join(repo.Dir(), "my-file"), []byte("1a\n1b\n2a\n"), 0644)
+	err := os.WriteFile(filepath.Join(repo.RepoDir, "my-file"), []byte("1a\n1b\n2a\n"), 0644)
 	require.NoError(t, err)
-	_, err = repo.Git("add", "my-file")
+	repo.Git(t, "add", "my-file")
 	require.NoError(t, err, "failed to stage file")
 	syncContinue := Av(t, "stack", "sync", "--continue")
 	require.Equal(
@@ -124,17 +122,12 @@ func TestStackSync(t *testing.T) {
 
 	// Make sure we've handled the rebase of stack-3 correctly (see the long
 	// comment above).
-	revs, err := repo.RevList(git.RevListOpts{
-		Specifiers: []string{"stack-2..stack-3"},
-	})
-	require.NoError(t, err)
-	require.Equal(t, 1, len(revs))
+	commits := repo.GetCommits(t, plumbing.NewBranchReferenceName("stack-3"), plumbing.NewBranchReferenceName("stack-2"))
+	require.Len(t, commits, 1)
 
-	mergeBase, err := repo.MergeBase(&git.MergeBase{Revs: []string{"stack-1", "stack-2"}})
-	require.NoError(t, err)
-	stack1Head, err := repo.RevParse(&git.RevParse{Rev: "stack-1"})
-	require.NoError(t, err)
-	require.Equal(t, mergeBase, stack1Head, "stack-2 should be up-to-date with stack-1")
+	mergeBases := repo.MergeBase(t, plumbing.NewBranchReferenceName("stack-1"), plumbing.NewBranchReferenceName("stack-2"))
+	stack1Head := repo.GetCommitAtRef(t, plumbing.NewBranchReferenceName("stack-1"))
+	require.Equal(t, mergeBases[0], stack1Head, "stack-2 should be up-to-date with stack-1")
 
 	// Further sync attemps should yield no-ops
 	syncNoop := Av(t, "stack", "sync", "--no-fetch", "--no-push")
@@ -143,17 +136,12 @@ func TestStackSync(t *testing.T) {
 
 	// Make sure we've not introduced any extra commits
 	// We should have 4 (corresponding to 1a, 1b, 2a, and 3a).
-	revs, err = repo.RevList(git.RevListOpts{
-		Specifiers: []string{"main..stack-3"},
-	})
+	commits = repo.GetCommits(t, plumbing.NewBranchReferenceName("stack-3"), plumbing.NewBranchReferenceName("main"))
 	require.NoError(t, err)
-	require.Equal(t, 4, len(revs))
+	require.Len(t, commits, 4)
 
-	stack1Commit, err := repo.RevParse(&git.RevParse{Rev: "stack-1"})
-	require.NoError(t, err)
-
-	stack2Commit, err := repo.RevParse(&git.RevParse{Rev: "stack-2"})
-	require.NoError(t, err)
+	stack1Commit := repo.GetCommitAtRef(t, plumbing.NewBranchReferenceName("stack-1"))
+	stack2Commit := repo.GetCommitAtRef(t, plumbing.NewBranchReferenceName("stack-2"))
 
 	require.Equal(t, meta.BranchState{
 		Name:  "main",
@@ -161,35 +149,34 @@ func TestStackSync(t *testing.T) {
 	}, GetStoredParentBranchState(t, repo, "stack-1"))
 	require.Equal(t, meta.BranchState{
 		Name: "stack-1",
-		Head: stack1Commit,
+		Head: stack1Commit.String(),
 	}, GetStoredParentBranchState(t, repo, "stack-2"))
 	require.Equal(t, meta.BranchState{
 		Name: "stack-2",
-		Head: stack2Commit,
+		Head: stack2Commit.String(),
 	}, GetStoredParentBranchState(t, repo, "stack-3"))
 	require.Equal(t, meta.BranchState{
 		Name: "stack-1",
-		Head: stack1Commit,
+		Head: stack1Commit.String(),
 	}, GetStoredParentBranchState(t, repo, "stack-4"))
 }
 
 func TestStackSyncAbort(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 
 	// Create a two stack...
 	RequireCmd(t, "git", "checkout", "-b", "stack-1")
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n"), gittest.WithMessage("Commit 1a"))
+	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	RequireAv(t, "stack", "branch", "stack-2")
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n2a\n"), gittest.WithMessage("Commit 2a"))
+	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
 
 	// Save the original parent HEAD for stack-2, which is the stack-1's commit.
-	origStack1Commit, err := repo.RevParse(&git.RevParse{Rev: "stack-1"})
-	require.NoError(t, err)
+	origStack1Commit := repo.GetCommitAtRef(t, plumbing.NewBranchReferenceName("stack-1"))
 
 	// ... and introduce a commit onto stack-1 that will conflict with stack-2...
-	gittest.CheckoutBranch(t, repo, "stack-1")
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"), gittest.WithMessage("Commit 1b"))
+	repo.CheckoutBranch(t, "refs/heads/stack-1")
+	repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 
 	// ... and make sure we get a conflict on sync...
 	syncConflict := Av(t, "stack", "sync", "--no-fetch", "--no-push")
@@ -201,7 +188,7 @@ func TestStackSyncAbort(t *testing.T) {
 	)
 	require.FileExists(
 		t,
-		path.Join(repo.GitDir(), "REBASE_HEAD"),
+		filepath.Join(repo.GitDir, "REBASE_HEAD"),
 		"REBASE_HEAD should be created for conflict",
 	)
 
@@ -209,19 +196,17 @@ func TestStackSyncAbort(t *testing.T) {
 	RequireAv(t, "stack", "sync", "--abort")
 	require.NoFileExists(
 		t,
-		path.Join(repo.GitDir(), "REBASE_HEAD"),
+		filepath.Join(repo.GitDir, "REBASE_HEAD"),
 		"REBASE_HEAD should be removed after abort",
 	)
 
 	// ... and make sure that we return to stack-1 (where we started).
 	// (this also makes sure that we've actually aborted the rebase and are not
 	// in a detached HEAD state).
-	currentBranch, err := repo.RevParse(&git.RevParse{Rev: "HEAD", SymbolicFullName: true})
-	require.NoError(t, err, "failed to get current branch")
 	require.Equal(
 		t,
-		"refs/heads/stack-1",
-		currentBranch,
+		plumbing.ReferenceName("refs/heads/stack-1"),
+		repo.CurrentBranch(t),
 		"current branch should be reset to starting branch (stack-1) after abort",
 	)
 
@@ -229,45 +214,43 @@ func TestStackSyncAbort(t *testing.T) {
 	// HEAD.
 	require.Equal(t, meta.BranchState{
 		Name: "stack-1",
-		Head: origStack1Commit,
+		Head: origStack1Commit.String(),
 	}, GetStoredParentBranchState(t, repo, "stack-2"))
 }
 
 func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 
 	// Create a three stack...
 	RequireCmd(t, "git", "checkout", "-b", "stack-1")
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n"), gittest.WithMessage("Commit 1a"))
+	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	RequireAv(t, "stack", "branch", "stack-2")
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n2a\n"), gittest.WithMessage("Commit 2a"))
+	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
 	RequireAv(t, "stack", "branch", "stack-3")
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n2a\n3a\n"), gittest.WithMessage("Commit 3a"))
+	repo.CommitFile(t, "my-file", "1a\n2a\n3a\n", gittest.WithMessage("Commit 3a"))
 
 	// Go back to the first branch (to make sure that the sync constructs the
 	// list of branches correctly).
-	gittest.CheckoutBranch(t, repo, "stack-1")
+	repo.CheckoutBranch(t, "refs/heads/stack-1")
 
 	// Add new conflicting commits to each branch
-	gittest.WithCheckoutBranch(t, repo, "stack-1", func() {
-		gittest.CommitFile(t, repo, "my-file", []byte("1a\n1b\n"), gittest.WithMessage("Commit 1b"))
+	repo.WithCheckoutBranch(t, "refs/heads/stack-1", func() {
+		repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 	})
-	gittest.WithCheckoutBranch(t, repo, "stack-2", func() {
-		gittest.CommitFile(
+	repo.WithCheckoutBranch(t, "refs/heads/stack-2", func() {
+		repo.CommitFile(
 			t,
-			repo,
 			"my-file",
-			[]byte("1a\n2a\n2b\n"),
+			"1a\n2a\n2b\n",
 			gittest.WithMessage("Commit 2b"),
 		)
 	})
-	gittest.WithCheckoutBranch(t, repo, "stack-3", func() {
-		gittest.CommitFile(
+	repo.WithCheckoutBranch(t, "refs/heads/stack-3", func() {
+		repo.CommitFile(
 			t,
-			repo,
 			"my-file",
-			[]byte("1a\n2a\n3a\n3b\n"),
+			"1a\n2a\n3a\n3b\n",
 			gittest.WithMessage("Commit 3b"),
 		)
 	})

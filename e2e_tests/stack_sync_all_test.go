@@ -9,18 +9,18 @@ import (
 
 func TestStackSyncAll(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 
 	require.Equal(t, 0, Cmd(t, "git", "switch", "main").ExitCode)
 	RequireAv(t, "stack", "branch", "stack-1")
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n"), gittest.WithMessage("Commit 1a"))
+	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 
 	require.Equal(t, 0, Cmd(t, "git", "switch", "main").ExitCode)
 	RequireAv(t, "stack", "branch", "stack-2")
-	gittest.CommitFile(t, repo, "my-file", []byte("2a\n"), gittest.WithMessage("Commit 2a"))
+	repo.CommitFile(t, "my-file", "2a\n", gittest.WithMessage("Commit 2a"))
 
 	require.Equal(t, 0, Cmd(t, "git", "switch", "main").ExitCode)
-	gittest.CommitFile(t, repo, "other-file", []byte("X2\n"), gittest.WithMessage("Commit X2"))
+	repo.CommitFile(t, "other-file", "X2\n", gittest.WithMessage("Commit X2"))
 	require.Equal(t, 0, Cmd(t, "git", "push", "origin", "main").ExitCode)
 
 	//     main:    X  -> X2

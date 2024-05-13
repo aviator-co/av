@@ -5,17 +5,18 @@ import (
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRepoDiffAmbiguousPathName(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
 
-	_, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: "foo", NewBranch: true})
-	require.NoError(t, err, "repo.CheckoutBranch should not error given a valid branch name")
+	repo.CreateRef(t, plumbing.NewBranchReferenceName("foo"))
+	repo.CheckoutBranch(t, plumbing.NewBranchReferenceName("foo"))
 
-	gittest.CommitFile(t, repo, "foo", []byte("foo"))
-	diff, err := repo.Diff(&git.DiffOpts{
+	repo.CommitFile(t, "foo", "foo")
+	diff, err := repo.AsAvGitRepo().Diff(&git.DiffOpts{
 		Quiet:      true,
 		Specifiers: []string{"main", "foo"},
 	})

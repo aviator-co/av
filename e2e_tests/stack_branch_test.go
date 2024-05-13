@@ -5,44 +5,42 @@ import (
 
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/aviator-co/av/internal/meta"
-	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/stretchr/testify/require"
 )
 
 func TestStackBranchMove(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 
 	// Create one -> two -> three stack
 	RequireAv(t, "stack", "branch", "one")
-	gittest.CommitFile(t, repo, "one.txt", []byte("one"))
+	repo.CommitFile(t, "one.txt", "one")
 	RequireAv(t, "stack", "branch", "two")
-	gittest.CommitFile(t, repo, "two.txt", []byte("two"))
+	repo.CommitFile(t, "two.txt", "two")
 	RequireAv(t, "stack", "branch", "three")
-	gittest.CommitFile(t, repo, "three.txt", []byte("three"))
+	repo.CommitFile(t, "three.txt", "three")
 
 	// one -> un
 	RequireCmd(t, "git", "checkout", "one")
 	RequireAv(t, "stack", "branch", "-m", "un")
-	RequireCurrentBranchName(t, repo, "un")
+	RequireCurrentBranchName(t, repo, "refs/heads/un")
 
 	// two -> deux
 	// use "av stack next" here to make sure the parent child relationship is
 	// correct
 	RequireAv(t, "stack", "next")
-	RequireCurrentBranchName(t, repo, "two")
+	RequireCurrentBranchName(t, repo, "refs/heads/two")
 	RequireAv(t, "stack", "branch", "-m", "deux")
-	RequireCurrentBranchName(t, repo, "deux")
+	RequireCurrentBranchName(t, repo, "refs/heads/deux")
 
 	// three -> trois
 	RequireAv(t, "stack", "next")
-	RequireCurrentBranchName(t, repo, "three")
+	RequireCurrentBranchName(t, repo, "refs/heads/three")
 	RequireAv(t, "stack", "branch", "-m", "trois")
-	RequireCurrentBranchName(t, repo, "trois")
+	RequireCurrentBranchName(t, repo, "refs/heads/trois")
 
 	// Make sure we've handled all the parent/child renames correctly
-	db, err := jsonfiledb.OpenRepo(repo)
-	require.NoError(t, err, "failed to open repo db")
+	db := repo.OpenDB(t)
 	branches := db.ReadTx().AllBranches()
 	require.Equal(t, true, branches["un"].Parent.Trunk, "expected parent(un) to be a trunk")
 	require.Equal(
@@ -64,27 +62,26 @@ func TestStackBranchMove(t *testing.T) {
 
 func TestStackBranchRetroactiveMove(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 
 	// Create one -> two -> three stack
 	RequireAv(t, "stack", "branch", "one")
-	gittest.CommitFile(t, repo, "one.txt", []byte("one"))
+	repo.CommitFile(t, "one.txt", "one")
 	RequireAv(t, "stack", "branch", "two")
-	gittest.CommitFile(t, repo, "two.txt", []byte("two"))
+	repo.CommitFile(t, "two.txt", "two")
 	RequireAv(t, "stack", "branch", "three")
-	gittest.CommitFile(t, repo, "three.txt", []byte("three"))
+	repo.CommitFile(t, "three.txt", "three")
 
 	// one -> un without av
 	RequireCmd(t, "git", "checkout", "one")
 	RequireCmd(t, "git", "branch", "-m", "un")
-	RequireCurrentBranchName(t, repo, "un")
+	RequireCurrentBranchName(t, repo, "refs/heads/un")
 
 	// Retroactive rename with av
 	RequireAv(t, "stack", "branch", "--rename", "one:un")
 
 	// Make sure we've handled all the parent/child renames correctly
-	db, err := jsonfiledb.OpenRepo(repo)
-	require.NoError(t, err, "failed to open repo db")
+	db := repo.OpenDB(t)
 	branches := db.ReadTx().AllBranches()
 	require.Equal(t, true, branches["un"].Parent.Trunk, "expected parent(un) to be a trunk")
 	require.Equal(

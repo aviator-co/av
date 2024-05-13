@@ -11,10 +11,10 @@ import (
 
 func TestStackSyncAdopt(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.Dir())
+	Chdir(t, repo.RepoDir)
 
 	require.Equal(t, 0, Cmd(t, "git", "checkout", "-b", "stack-1").ExitCode)
-	gittest.CommitFile(t, repo, "my-file", []byte("1a\n"), gittest.WithMessage("Commit 1a"))
+	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 
 	require.Equal(
 		t,

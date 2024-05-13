@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"emperror.dev/errors"
@@ -51,7 +51,7 @@ func getRepo() (*git.Repo, error) {
 }
 
 func getDB(repo *git.Repo) (meta.DB, error) {
-	dbPath := path.Join(repo.AvDir(), "av.db")
+	dbPath := filepath.Join(repo.AvDir(), "av.db")
 	existingStat, _ := os.Stat(dbPath)
 	db, err := jsonfiledb.OpenPath(dbPath)
 	if err != nil {

@@ -1,36 +1,37 @@
 package gittest
 
 import (
+	"bytes"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"testing"
 
-	"github.com/aviator-co/av/internal/git"
+	avgit "github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/meta/jsonfiledb"
-	"github.com/sirupsen/logrus"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/kr/text"
 	"github.com/stretchr/testify/require"
 )
 
-func init() {
-	logrus.SetLevel(logrus.DebugLevel)
-}
-
 // NewTempRepo initializes a new git repository with reasonable defaults.
-func NewTempRepo(t *testing.T) *git.Repo {
+func NewTempRepo(t *testing.T) *GitTestRepo {
 	var dir string
 	var remoteDir string
 	if os.Getenv("AV_TEST_PRESERVE_TEMP_REPO") != "" {
 		var err error
 		dir, err = os.MkdirTemp("", "repo")
 		require.NoError(t, err)
-		logrus.Infof("created git test repo: %s", dir)
+		t.Logf("Created git test repo: %s", dir)
 
 		remoteDir, err = os.MkdirTemp("", "remote-repo")
 		require.NoError(t, err)
-		logrus.Infof("created git remote test repo: %s", remoteDir)
+		t.Logf("Created git remote test repo: %s", remoteDir)
 	} else {
 		dir = filepath.Join(t.TempDir(), "local")
 		require.NoError(t, os.MkdirAll(dir, 0755))
@@ -50,7 +51,10 @@ func NewTempRepo(t *testing.T) *git.Repo {
 	err = remoteInit.Run()
 	require.NoError(t, err, "failed to initialize remote git repository")
 
-	repo, err := git.OpenRepo(dir, path.Join(dir, ".git"))
+	ggRepo, err := git.PlainOpen(dir)
+	require.NoError(t, err, "failed to open git repository")
+
+	repo := &GitTestRepo{dir, filepath.Join(dir, ".git"), ggRepo}
 	require.NoError(t, err, "failed to open repo")
 
 	settings := map[string]string{
@@ -58,32 +62,23 @@ func NewTempRepo(t *testing.T) *git.Repo {
 		"user.email": "av-test@nonexistant",
 	}
 	for k, v := range settings {
-		_, err = repo.Git("config", k, v)
-		require.NoErrorf(t, err, "failed to set config %s=%s", k, v)
+		repo.Git(t, "config", k, v)
 	}
 
-	_, err = repo.Git("remote", "add", "origin", remoteDir, "--master=main")
-	require.NoError(t, err, "failed to set remote")
+	repo.Git(t, "remote", "add", "origin", remoteDir, "--master=main")
 
 	err = os.WriteFile(dir+"/README.md", []byte("# Hello World"), 0644)
 	require.NoError(t, err, "failed to write README.md")
 
-	_, err = repo.Git("add", "README.md")
-	require.NoError(t, err, "failed to stage README.md")
-
-	_, err = repo.Git("commit", "-m", "Initial commit")
-	require.NoError(t, err, "failed to create initial commit")
-
-	_, err = repo.Git("push", "origin", "main")
-	require.NoError(t, err, "failed to push to remote")
-
-	db, err := jsonfiledb.OpenRepo(repo)
-	require.NoError(t, err, "failed to open database")
+	repo.Git(t, "add", "README.md")
+	repo.Git(t, "commit", "-m", "Initial commit")
+	repo.Git(t, "push", "origin", "main")
 
 	// Write metadata because some commands expect it to be there.
 	// This repository obviously doesn't exist so tests still need to be careful
 	// not to invoke operations that would communicate with GitHub (e.g.,
 	// by using the `--no-fetch` and `--no-push` flags).
+	db := repo.OpenDB(t)
 	tx := db.WriteTx()
 	tx.SetRepository(meta.Repository{
 		ID:    "R_nonexistent_",
@@ -93,4 +88,185 @@ func NewTempRepo(t *testing.T) *git.Repo {
 	require.NoError(t, tx.Commit(), "failed to write repository metadata")
 
 	return repo
+}
+
+type GitTestRepo struct {
+	RepoDir string
+	GitDir  string
+	GoGit   *git.Repository
+}
+
+func (r *GitTestRepo) AsAvGitRepo() *avgit.Repo {
+	repo, _ := avgit.OpenRepo(r.RepoDir, r.GitDir)
+	return repo
+}
+
+func (r *GitTestRepo) Git(t *testing.T, args ...string) string {
+	cmd := exec.Command("git", args...)
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	cmd.Dir = r.RepoDir
+	err := cmd.Run()
+	var exitError *exec.ExitError
+	if err != nil && !errors.As(err, &exitError) {
+		t.Fatal(err)
+	}
+	t.Logf("Running git\n"+
+		"args: %v\n"+
+		"exit code: %v\n"+
+		"stdout:\n"+
+		"%s"+
+		"stderr:\n"+
+		"%s",
+		args,
+		cmd.ProcessState.ExitCode(),
+		text.Indent(stdout.String(), "  "),
+		text.Indent(stderr.String(), "  "),
+	)
+	return stdout.String()
+}
+
+func (r *GitTestRepo) OpenDB(t *testing.T) *jsonfiledb.DB {
+	db, err := jsonfiledb.OpenPath(filepath.Join(r.GitDir, "av", "av.db"))
+	require.NoError(t, err, "failed to open database")
+	return db
+}
+
+func (r *GitTestRepo) AddFile(t *testing.T, fp string) {
+	r.Git(t, "add", fp)
+}
+
+func (r *GitTestRepo) CreateFile(t *testing.T, filename string, body string) string {
+	fp := filepath.Join(r.RepoDir, filename)
+	err := os.WriteFile(fp, []byte(body), 0644)
+	require.NoError(t, err, "failed to write file: %s", filename)
+	return fp
+}
+
+type commitFileOpts struct {
+	msg   string
+	amend bool
+}
+
+type CommitFileOpt func(*commitFileOpts)
+
+func WithMessage(msg string) CommitFileOpt {
+	return func(opts *commitFileOpts) {
+		opts.msg = msg
+	}
+}
+
+func WithAmend() CommitFileOpt {
+	return func(opts *commitFileOpts) {
+		opts.amend = true
+	}
+}
+
+func (r *GitTestRepo) CommitFile(
+	t *testing.T,
+	filename string,
+	body string,
+	cfOpts ...CommitFileOpt,
+) plumbing.Hash {
+	opts := commitFileOpts{
+		msg: fmt.Sprintf("Write %s", filename),
+	}
+	for _, o := range cfOpts {
+		o(&opts)
+	}
+
+	filepath := r.CreateFile(t, filename, body)
+	r.AddFile(t, filepath)
+
+	args := []string{"commit", "-m", opts.msg}
+	if opts.amend {
+		args = append(args, "--amend")
+	}
+	r.Git(t, args...)
+	headRef, err := r.GoGit.Head()
+	require.NoError(t, err, "failed to get HEAD")
+	return headRef.Hash()
+}
+
+func (r *GitTestRepo) IsWorkdirClean(t *testing.T) bool {
+	return r.Git(t, "status", "--porcelain") == ""
+}
+
+func (r *GitTestRepo) CurrentBranch(t *testing.T) plumbing.ReferenceName {
+	head, err := r.GoGit.Head()
+	require.NoError(t, err, "failed to get HEAD")
+	return head.Name()
+}
+
+func (r *GitTestRepo) GetCommitAtRef(t *testing.T, name plumbing.ReferenceName) plumbing.Hash {
+	ref, err := r.GoGit.Reference(name, true)
+	require.NoError(t, err, "failed to get a ref at %q", name)
+	return ref.Hash()
+}
+
+func (r *GitTestRepo) CreateRef(t *testing.T, ref plumbing.ReferenceName) {
+	head, err := r.GoGit.Head()
+	require.NoError(t, err, "failed to get HEAD")
+
+	err = r.GoGit.Storer.SetReference(plumbing.NewHashReference(ref, head.Hash()))
+	require.NoError(t, err, "failed to create branch %q", ref)
+}
+
+// CheckoutBranch checks out the specified branch and returns the original branch.
+func (r *GitTestRepo) CheckoutBranch(t *testing.T, branch plumbing.ReferenceName) plumbing.ReferenceName {
+	original := r.CurrentBranch(t)
+	wt, err := r.GoGit.Worktree()
+	require.NoError(t, err, "failed to get worktree")
+	err = wt.Checkout(&git.CheckoutOptions{Branch: branch})
+	require.NoError(t, err, "failed to checkout branch")
+	return original
+}
+
+func (r *GitTestRepo) CheckoutCommit(t *testing.T, hash plumbing.Hash) {
+	wt, err := r.GoGit.Worktree()
+	require.NoError(t, err, "failed to get worktree")
+	err = wt.Checkout(&git.CheckoutOptions{Hash: hash})
+	require.NoError(t, err, "failed to checkout branch")
+}
+
+// WithCheckoutBranch runs the given function after checking out the specified branch.
+// It returns to the original branch after the function returns.
+func (r *GitTestRepo) WithCheckoutBranch(t *testing.T, branch plumbing.ReferenceName, f func()) {
+	original := r.CheckoutBranch(t, branch)
+	defer r.CheckoutBranch(t, original)
+	f()
+}
+
+func (r *GitTestRepo) GetCommits(t *testing.T, includedFromRef, excludedFromRef plumbing.ReferenceName) []plumbing.Hash {
+	from := r.GetCommitAtRef(t, includedFromRef)
+	excluded := r.GetCommitAtRef(t, excludedFromRef)
+
+	commit, err := r.GoGit.CommitObject(from)
+	require.NoError(t, err, "failed to get commit at %q", from)
+
+	commits := []plumbing.Hash{}
+	commitIter := object.NewCommitPreorderIter(commit, nil, []plumbing.Hash{excluded})
+	err = commitIter.ForEach(func(c *object.Commit) error {
+		commits = append(commits, c.Hash)
+		return nil
+	})
+	require.NoError(t, err, "failed to iterate commits")
+	return commits
+}
+
+func (r *GitTestRepo) MergeBase(t *testing.T, ref1, ref2 plumbing.ReferenceName) []plumbing.Hash {
+	c1, err := r.GoGit.CommitObject(r.GetCommitAtRef(t, ref1))
+	require.NoError(t, err, "failed to get commit at %q", ref1)
+	c2, err := r.GoGit.CommitObject(r.GetCommitAtRef(t, ref2))
+	require.NoError(t, err, "failed to get commit at %q", ref2)
+
+	bases, err := c1.MergeBase(c2)
+	require.NoError(t, err, "failed to get merge bases")
+	var ret []plumbing.Hash
+	for _, c := range bases {
+		ret = append(ret, c.Hash)
+	}
+	return ret
 }

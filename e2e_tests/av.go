@@ -2,7 +2,6 @@ package e2e_tests
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,7 +9,6 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/kr/text"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,10 +16,9 @@ var avCmdPath string
 
 func init() {
 	if err := os.Setenv("AV_GITHUB_TOKEN", "ghp_thisisntarealltokenitsjustfortesting"); err != nil {
-		logrus.WithError(err).Fatal("failed to set AV_GITHUB_TOKEN env var")
+		panic(err)
 	}
 
-	logrus.SetLevel(logrus.DebugLevel)
 	cmd := exec.Command("go", "build", "../cmd/av")
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
@@ -60,13 +57,18 @@ func Cmd(t *testing.T, exe string, args ...string) AvOutput {
 		Stdout:   stdout.String(),
 		Stderr:   stderr.String(),
 	}
-
-	fmt.Printf("\nRunning command:\n    %v\n", args)
-	fmt.Printf("    exit code: %v\n", cmd.ProcessState.ExitCode())
-	fmt.Printf("    stdout:\n%s\n", text.Indent(stdout.String(), "        "))
-	fmt.Printf("    stderr:\n%s\n", text.Indent(stderr.String(), "        "))
-	fmt.Printf("\n")
-
+	t.Logf("Running av-cli\n"+
+		"args: %v\n"+
+		"exit code: %v\n"+
+		"stdout:\n"+
+		"%s"+
+		"stderr:\n"+
+		"%s",
+		args,
+		cmd.ProcessState.ExitCode(),
+		text.Indent(stdout.String(), "  "),
+		text.Indent(stderr.String(), "  "),
+	)
 	return output
 }
 

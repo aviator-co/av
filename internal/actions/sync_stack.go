@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/gh"
@@ -238,7 +238,7 @@ const stackSyncStateFile = "stack-sync.state.json"
 
 func ReadStackSyncState(repo *git.Repo) (StackSyncState, error) {
 	var state StackSyncState
-	data, err := os.ReadFile(path.Join(repo.AvDir(), stackSyncStateFile))
+	data, err := os.ReadFile(filepath.Join(repo.AvDir(), stackSyncStateFile))
 	if err != nil {
 		return state, err
 	}
@@ -261,7 +261,7 @@ func WriteStackSyncState(repo *git.Repo, state *StackSyncState) error {
 
 	// delete the file if state is nil (i.e., --abort)
 	if state == nil {
-		err := os.Remove(path.Join(avDir, stackSyncStateFile))
+		err := os.Remove(filepath.Join(avDir, stackSyncStateFile))
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
@@ -273,5 +273,5 @@ func WriteStackSyncState(repo *git.Repo, state *StackSyncState) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path.Join(avDir, stackSyncStateFile), data, 0644)
+	return os.WriteFile(filepath.Join(avDir, stackSyncStateFile), data, 0644)
 }
