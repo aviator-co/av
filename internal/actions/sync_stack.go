@@ -197,8 +197,10 @@ func SyncStack(ctx context.Context,
 				"  - deleting merged branch ", colors.UserInput(currentBranch),
 				"\n",
 			)
-			if _, err := repo.Git("switch", "--detach"); err != nil {
-				return errors.Errorf("cannot switch to detached HEAD: %v", err)
+
+			trunk, _ := meta.Trunk(tx, currentBranch)
+			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: trunk}); err != nil {
+				return errors.Errorf("cannot checkout to trunk %s: %v", trunk, err)
 			}
 			if _, err := repo.Git("branch", "-D", currentBranch); err != nil {
 				return errors.Errorf("cannot delete merged branch %q: %v", currentBranch, err)
