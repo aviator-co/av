@@ -584,11 +584,11 @@ func syncBranchPushAndUpdatePullRequest(
 
 	var stackToWrite *stackutils.StackTreeNode
 	if config.Av.PullRequest.WriteStack {
-		if stackToWrite, err = stackutils.BuildStackTreeForPullRequest(repo, tx, branchName); err != nil {
+		if stackToWrite, err = stackutils.BuildStackTreeForPullRequest(tx, branchName); err != nil {
 			return err
 		}
 	}
-	prBody := AddPRMetadataAndStack(pr.Body, prMeta, branchName, stackToWrite)
+	prBody := AddPRMetadataAndStack(pr.Body, prMeta, branchName, stackToWrite, tx)
 	if _, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
 		PullRequestID: branch.PullRequest.ID,
 		BaseRefName:   gh.Ptr(githubv4.String(branch.Parent.Name)),

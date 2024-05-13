@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -37,17 +39,29 @@ var stackTreeCmd = &cobra.Command{
 			}
 		}
 
-		rootNodes := stackutils.BuildStackTree(repo, tx, currentBranch)
+		rootNodes := stackutils.BuildStackTree(tx, currentBranch)
+		np := &nodePrinter{repo, tx}
 		for _, node := range rootNodes {
-			printNode(0, currentBranch, true, node)
+			np.printNode(0, currentBranch, true, node)
 		}
 		return nil
 	},
 }
 
-func printNode(columns int, currentBranchName string, isTrunk bool, node *stackutils.StackTreeNode) {
+type StackTreeBranchInfo struct {
+	Deleted         bool
+	NeedSync        bool
+	PullRequestLink string
+}
+
+type nodePrinter struct {
+	repo *git.Repo
+	tx   meta.ReadTx
+}
+
+func (np *nodePrinter) printNode(columns int, currentBranchName string, isTrunk bool, node *stackutils.StackTreeNode) {
 	for i, child := range node.Children {
-		printNode(columns+i, currentBranchName, false, child)
+		np.printNode(columns+i, currentBranchName, false, child)
 	}
 	if len(node.Children) > 1 {
 		fmt.Print(" ")
@@ -80,15 +94,16 @@ func printNode(columns int, currentBranchName string, isTrunk bool, node *stacku
 	}
 	fmt.Print(" *")
 	branch := node.Branch
+	sbi := np.getBranchInfo(branch.BranchName)
 	fmt.Printf(" %s", boldString(color.GreenString(branch.BranchName)))
 	var stats []string
 	if branch.BranchName == currentBranchName {
 		stats = append(stats, boldString(color.CyanString("HEAD")))
 	}
-	if branch.Deleted {
+	if sbi.Deleted {
 		stats = append(stats, boldString(color.RedString("deleted")))
 	}
-	if branch.NeedSync {
+	if sbi.NeedSync {
 		stats = append(stats, boldString(color.RedString("need sync")))
 	}
 	if len(stats) > 0 {
@@ -103,11 +118,56 @@ func printNode(columns int, currentBranchName string, isTrunk bool, node *stacku
 		for i := 0; i < columns+1; i++ {
 			fmt.Print(" │")
 		}
-		if branch.PullRequestLink != "" {
-			fmt.Print(" " + color.HiBlackString(branch.PullRequestLink))
+		if sbi.PullRequestLink != "" {
+			fmt.Print(" " + color.HiBlackString(sbi.PullRequestLink))
 		} else {
 			fmt.Print(" No pull request")
 		}
 		fmt.Println()
 	}
+}
+
+func (np *nodePrinter) getBranchInfo(branchName string) *StackTreeBranchInfo {
+	bi, _ := np.tx.Branch(branchName)
+	branchInfo := StackTreeBranchInfo{}
+	if bi.PullRequest != nil && bi.PullRequest.Permalink != "" {
+		branchInfo.PullRequestLink = bi.PullRequest.Permalink
+	}
+	if _, err := np.repo.RevParse(&git.RevParse{Rev: branchName}); err != nil {
+		branchInfo.Deleted = true
+	}
+
+	parentHead, err := np.repo.RevParse(&git.RevParse{Rev: bi.Parent.Name})
+	if err != nil {
+		// The parent branch doesn't exist.
+		branchInfo.NeedSync = true
+	} else {
+		mergeBase, err := np.repo.MergeBase(&git.MergeBase{
+			Revs: []string{parentHead, branchName},
+		})
+		if err != nil {
+			// The merge base doesn't exist. This is odd. Mark the branch as needing
+			// sync to see if we can fix this.
+			branchInfo.NeedSync = true
+		}
+		if mergeBase != parentHead {
+			// This branch is not on top of the parent branch. Need sync.
+			branchInfo.NeedSync = true
+		}
+	}
+
+	upstreamExists, err := np.repo.DoesRemoteBranchExist(branchName)
+	if err != nil || !upstreamExists {
+		// Not pushed.
+		branchInfo.NeedSync = true
+	}
+	upstreamBranch := fmt.Sprintf("remotes/origin/%s", branchName)
+	upstreamDiff, err := np.repo.Diff(&git.DiffOpts{
+		Quiet:      true,
+		Specifiers: []string{branchName, upstreamBranch},
+	})
+	if err != nil || !upstreamDiff.Empty {
+		branchInfo.NeedSync = true
+	}
+	return &branchInfo
 }

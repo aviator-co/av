@@ -111,7 +111,7 @@ Examples:
 				return err
 			}
 
-			return actions.UpdatePullRequestsWithStack(ctx, client, repo, tx, stackBranches)
+			return actions.UpdatePullRequestsWithStack(ctx, client, tx, stackBranches)
 		}
 
 		return nil

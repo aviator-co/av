@@ -111,7 +111,7 @@ If the --current flag is given, this command will create pull requests up to the
 		}
 
 		if config.Av.PullRequest.WriteStack {
-			if err = actions.UpdatePullRequestsWithStack(ctx, client, repo, tx, currentStackBranches); err != nil {
+			if err = actions.UpdatePullRequestsWithStack(ctx, client, tx, currentStackBranches); err != nil {
 				return err
 			}
 		}

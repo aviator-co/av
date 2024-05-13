@@ -4,19 +4,22 @@ import (
 	"testing"
 
 	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/maputils"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestReadPRMetadata(t *testing.T) {
+	tx := fakeReadTx{}
 	prMeta := actions.PRMetadata{
 		Parent:     "foo",
 		ParentHead: "bar",
 		ParentPull: 123,
 		Trunk:      "baz",
 	}
-	prBody := actions.AddPRMetadataAndStack("Hello! This is a cool PR that does some neat things.", prMeta, "foo", nil)
+	prBody := actions.AddPRMetadataAndStack("Hello! This is a cool PR that does some neat things.", prMeta, "foo", nil, tx)
 	prMeta2, err := actions.ReadPRMetadata(prBody)
 	require.NoError(t, err)
 	assert.Equal(t, prMeta.Parent, prMeta2.Parent)
@@ -29,7 +32,7 @@ func TestReadPRMetadata(t *testing.T) {
 		ParentHead: "bar2",
 		ParentPull: 1234,
 		Trunk:      "baz2",
-	}, "foo2", nil)
+	}, "foo2", nil, tx)
 	assert.Contains(t, prBody, "Hello! This is a cool PR that does some neat things.\n\n")
 	prMeta2, err = actions.ReadPRMetadata(prBody)
 	require.NoError(t, err)
@@ -38,6 +41,7 @@ func TestReadPRMetadata(t *testing.T) {
 }
 
 func TestPRMetadataPreservesBody(t *testing.T) {
+	tx := fakeReadTx{}
 	sampleMeta := actions.PRMetadata{
 		Parent:     "foo",
 		ParentHead: "bar",
@@ -49,42 +53,54 @@ func TestPRMetadataPreservesBody(t *testing.T) {
 		sampleMeta,
 		"foo",
 		nil,
+		tx,
 	)
 	// Add some text to the end of the body (as if someone had edited manually)
 	body1 += "\n\nIt's very neat, actually."
 
-	body2 := actions.AddPRMetadataAndStack(body1, sampleMeta, "foo", nil)
+	body2 := actions.AddPRMetadataAndStack(body1, sampleMeta, "foo", nil, tx)
 	assert.Contains(t, body2, "Hello! This is a cool PR that does some neat things.")
 	assert.Contains(t, body2, "It's very neat, actually.")
 	assert.Contains(t, body2, "\n"+actions.PRMetadataCommentStart)
 }
 
 func TestPRWithStack(t *testing.T) {
+	tx := fakeReadTx{
+		"baz": {
+			Name: "baz",
+			Parent: meta.BranchState{
+				Name:  "main",
+				Trunk: true,
+			},
+			PullRequest: &meta.PullRequest{
+				Number:    1001,
+				Permalink: "https://github.com/org/repo/pull/1001",
+			},
+		},
+		"foo": {
+			Name: "foo",
+			Parent: meta.BranchState{
+				Name: "baz",
+			},
+			PullRequest: &meta.PullRequest{
+				Number:    1002,
+				Permalink: "https://github.com/org/repo/pull/1002",
+			},
+		},
+	}
 	stack := &stackutils.StackTreeNode{
 		Branch: &stackutils.StackTreeBranchInfo{
-			BranchName:        "main",
-			Deleted:           false,
-			NeedSync:          false,
-			PullRequestNumber: 1001,
-			PullRequestLink:   "",
+			BranchName: "main",
 		},
 		Children: []*stackutils.StackTreeNode{
 			{
 				Branch: &stackutils.StackTreeBranchInfo{
-					BranchName:        "baz",
-					Deleted:           false,
-					NeedSync:          false,
-					PullRequestNumber: 1001,
-					PullRequestLink:   "https://github.com/org/repo/pull/1001",
+					BranchName: "baz",
 				},
 				Children: []*stackutils.StackTreeNode{
 					{
 						Branch: &stackutils.StackTreeBranchInfo{
-							BranchName:        "foo",
-							Deleted:           false,
-							NeedSync:          false,
-							PullRequestNumber: 1002,
-							PullRequestLink:   "https://github.com/org/repo/pull/1002",
+							BranchName: "foo",
 						},
 						Children: []*stackutils.StackTreeNode{},
 					},
@@ -104,6 +120,7 @@ func TestPRWithStack(t *testing.T) {
 		sampleMeta,
 		"foo",
 		stack,
+		tx,
 	)
 
 	assert.Equal(t, `<!-- av pr stack begin -->
@@ -127,31 +144,53 @@ This information is embedded by the av CLI when creating PRs to track the status
 }
 
 func TestPRWithForkedStack(t *testing.T) {
+	tx := fakeReadTx{
+		"baz": {
+			Name: "baz",
+			Parent: meta.BranchState{
+				Name:  "main",
+				Trunk: true,
+			},
+			PullRequest: &meta.PullRequest{
+				Number:    1001,
+				Permalink: "https://github.com/org/repo/pull/1001",
+			},
+		},
+		"foo": {
+			Name: "foo",
+			Parent: meta.BranchState{
+				Name: "baz",
+			},
+			PullRequest: &meta.PullRequest{
+				Number:    1002,
+				Permalink: "https://github.com/org/repo/pull/1002",
+			},
+		},
+		"qux": {
+			Name: "qux",
+			Parent: meta.BranchState{
+				Name:  "main",
+				Trunk: true,
+			},
+			PullRequest: &meta.PullRequest{
+				Number:    1003,
+				Permalink: "https://github.com/org/repo/pull/1003",
+			},
+		},
+	}
 	stack := &stackutils.StackTreeNode{
 		Branch: &stackutils.StackTreeBranchInfo{
-			BranchName:        "main",
-			Deleted:           false,
-			NeedSync:          false,
-			PullRequestNumber: 1001,
-			PullRequestLink:   "",
+			BranchName: "main",
 		},
 		Children: []*stackutils.StackTreeNode{
 			{
 				Branch: &stackutils.StackTreeBranchInfo{
-					BranchName:        "baz",
-					Deleted:           false,
-					NeedSync:          false,
-					PullRequestNumber: 1001,
-					PullRequestLink:   "https://github.com/org/repo/pull/1001",
+					BranchName: "baz",
 				},
 				Children: []*stackutils.StackTreeNode{
 					{
 						Branch: &stackutils.StackTreeBranchInfo{
-							BranchName:        "foo",
-							Deleted:           false,
-							NeedSync:          false,
-							PullRequestNumber: 1002,
-							PullRequestLink:   "https://github.com/org/repo/pull/1002",
+							BranchName: "foo",
 						},
 						Children: []*stackutils.StackTreeNode{},
 					},
@@ -159,11 +198,7 @@ func TestPRWithForkedStack(t *testing.T) {
 			},
 			{
 				Branch: &stackutils.StackTreeBranchInfo{
-					BranchName:        "qux",
-					Deleted:           false,
-					NeedSync:          false,
-					PullRequestNumber: 1003,
-					PullRequestLink:   "https://github.com/org/repo/pull/1003",
+					BranchName: "qux",
 				},
 				Children: []*stackutils.StackTreeNode{},
 			},
@@ -181,6 +216,7 @@ func TestPRWithForkedStack(t *testing.T) {
 		sampleMeta,
 		"foo",
 		stack,
+		tx,
 	)
 
 	assert.Equal(t, `<!-- av pr stack begin -->
@@ -202,4 +238,22 @@ This information is embedded by the av CLI when creating PRs to track the status
 `+"```"+`
 -->
 `, body1)
+}
+
+type fakeReadTx map[string]meta.Branch
+
+func (tx fakeReadTx) Repository() (meta.Repository, bool) {
+	return meta.Repository{}, false
+}
+
+func (tx fakeReadTx) Branch(name string) (meta.Branch, bool) {
+	branch, ok := tx[name]
+	if branch.Name == "" {
+		branch.Name = name
+	}
+	return branch, ok
+}
+
+func (tx fakeReadTx) AllBranches() map[string]meta.Branch {
+	return maputils.Copy(tx)
 }
