@@ -6,12 +6,11 @@ import (
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
-	"github.com/fatih/color"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
-
-var boldString = color.New(color.Bold).SprintFunc()
 
 var stackTreeCmd = &cobra.Command{
 	Use:     "tree",
@@ -43,25 +42,41 @@ var stackTreeCmd = &cobra.Command{
 		for _, node := range rootNodes {
 			fmt.Print(stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
 				stbi := getStackTreeBranchInfo(repo, tx, branchName)
-				return renderStackTreeBranchInfo(stbi, currentBranch, branchName, isTrunk)
+				return renderStackTreeBranchInfo(stackTreeStackBranchInfoStyles, stbi, currentBranch, branchName, isTrunk)
 			}))
 		}
 		return nil
 	},
 }
 
-func renderStackTreeBranchInfo(stbi *stackTreeBranchInfo, currentBranchName string, branchName string, isTrunk bool) string {
+type stackBranchInfoStyles struct {
+	BranchName      lipgloss.Style
+	HEAD            lipgloss.Style
+	Deleted         lipgloss.Style
+	NeedSync        lipgloss.Style
+	PullRequestLink lipgloss.Style
+}
+
+var stackTreeStackBranchInfoStyles = stackBranchInfoStyles{
+	BranchName:      lipgloss.NewStyle().Bold(true).Foreground(colors.Green600),
+	HEAD:            lipgloss.NewStyle().Bold(true).Foreground(colors.Cyan600),
+	Deleted:         lipgloss.NewStyle().Bold(true).Foreground(colors.Red700),
+	NeedSync:        lipgloss.NewStyle().Bold(true).Foreground(colors.Red700),
+	PullRequestLink: lipgloss.NewStyle(),
+}
+
+func renderStackTreeBranchInfo(styles stackBranchInfoStyles, stbi *stackTreeBranchInfo, currentBranchName string, branchName string, isTrunk bool) string {
 	sb := strings.Builder{}
-	sb.WriteString(boldString(color.GreenString(branchName)))
+	sb.WriteString(styles.BranchName.Render(branchName))
 	var stats []string
 	if branchName == currentBranchName {
-		stats = append(stats, boldString(color.CyanString("HEAD")))
+		stats = append(stats, styles.HEAD.Render("HEAD"))
 	}
 	if stbi.Deleted {
-		stats = append(stats, boldString(color.RedString("deleted")))
+		stats = append(stats, styles.Deleted.Render("deleted"))
 	}
 	if !isTrunk && stbi.NeedSync {
-		stats = append(stats, boldString(color.RedString("need sync")))
+		stats = append(stats, styles.NeedSync.Render("need sync"))
 	}
 	if len(stats) > 0 {
 		sb.WriteString(" (")
@@ -72,9 +87,9 @@ func renderStackTreeBranchInfo(stbi *stackTreeBranchInfo, currentBranchName stri
 
 	if !isTrunk {
 		if stbi.PullRequestLink != "" {
-			sb.WriteString(color.HiBlackString(stbi.PullRequestLink))
+			sb.WriteString(styles.PullRequestLink.Render(stbi.PullRequestLink))
 		} else {
-			sb.WriteString("No pull request")
+			sb.WriteString(styles.PullRequestLink.Render("No pull request"))
 		}
 		sb.WriteString("\n")
 	}
