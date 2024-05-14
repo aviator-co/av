@@ -9,7 +9,7 @@ type DB interface {
 // It presents a consistent view of the underlying database.
 type ReadTx interface {
 	// Repository returns the repository information.
-	Repository() (Repository, bool)
+	Repository() Repository
 	// Branch returns the branch with the given name. If no such branch exists,
 	// the second return value is false.
 	Branch(name string) (Branch, bool)

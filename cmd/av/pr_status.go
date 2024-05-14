@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/avgql"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/timeutils"
@@ -225,11 +224,7 @@ func getQueryVariables() (map[string]interface{}, error) {
 	}
 
 	prNumber := branch.PullRequest.Number
-	repository, exists := tx.Repository()
-	if !exists {
-		return nil, actions.ErrRepoNotInitialized
-	}
-
+	repository := tx.Repository()
 	var variables = map[string]interface{}{
 		"repoOwner": graphql.String(repository.Owner),
 		"repoName":  graphql.String(repository.Name),

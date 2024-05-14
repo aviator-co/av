@@ -147,10 +147,7 @@ func CreatePullRequest(
 		logrus.Panicf("internal invariant error: CreatePullRequest called with empty branch name")
 	}
 
-	repoMeta, ok := tx.Repository()
-	if !ok {
-		return nil, ErrRepoNotInitialized
-	}
+	repoMeta := tx.Repository()
 	branchMeta, _ := tx.Branch(opts.BranchName)
 
 	var existingPR *gh.PullRequest
@@ -558,10 +555,7 @@ func UpdatePullRequestState(
 	tx meta.WriteTx,
 	branchName string,
 ) (*UpdatePullRequestResult, error) {
-	repoMeta, ok := tx.Repository()
-	if !ok {
-		return nil, ErrRepoNotInitialized
-	}
+	repoMeta := tx.Repository()
 	branch, _ := tx.Branch(branchName)
 
 	_, _ = fmt.Fprint(os.Stderr,
@@ -898,10 +892,7 @@ func UpdatePullRequestWithStack(
 	branchMeta, _ := tx.Branch(branchName)
 	logrus.WithField("branch", branchName).WithField("pr", branchMeta.PullRequest.ID).Debug("Updating pull requests with stack")
 
-	repoMeta, ok := tx.Repository()
-	if !ok {
-		return ErrRepoNotInitialized
-	}
+	repoMeta := tx.Repository()
 
 	stackToWrite, err := stackutils.BuildStackTreeForPullRequest(tx, branchName)
 	if err != nil {

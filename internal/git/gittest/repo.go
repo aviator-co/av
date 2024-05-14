@@ -78,7 +78,10 @@ func NewTempRepo(t *testing.T) *GitTestRepo {
 	// This repository obviously doesn't exist so tests still need to be careful
 	// not to invoke operations that would communicate with GitHub (e.g.,
 	// by using the `--no-fetch` and `--no-push` flags).
-	db := repo.OpenDB(t)
+	db, _, err := jsonfiledb.OpenPath(filepath.Join(repo.GitDir, "av", "av.db"))
+	if err != nil {
+		require.NoError(t, err, "failed to open database")
+	}
 	tx := db.WriteTx()
 	tx.SetRepository(meta.Repository{
 		ID:    "R_nonexistent_",
@@ -129,7 +132,7 @@ func (r *GitTestRepo) Git(t *testing.T, args ...string) string {
 }
 
 func (r *GitTestRepo) OpenDB(t *testing.T) *jsonfiledb.DB {
-	db, err := jsonfiledb.OpenPath(filepath.Join(r.GitDir, "av", "av.db"))
+	db, _, err := jsonfiledb.OpenPath(filepath.Join(r.GitDir, "av", "av.db"))
 	require.NoError(t, err, "failed to open database")
 	return db
 }

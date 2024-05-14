@@ -12,14 +12,16 @@ import (
 func TestJSONFileDB(t *testing.T) {
 	tempfile := t.TempDir() + "/db.json"
 
-	db, err := jsonfiledb.OpenPath(tempfile)
+	db, exists, err := jsonfiledb.OpenPath(tempfile)
 	require.NoError(t, err, "db open should succeed if state file does not exist")
+	require.False(t, exists, "db should not exist if state file does not exist")
 
 	if _, ok := db.ReadTx().Branch("foo"); ok {
 		t.Error("non existent branch should not be found")
 	}
 
 	tx := db.WriteTx()
+	tx.SetRepository(meta.Repository{ID: "foo"})
 	tx.SetBranch(meta.Branch{Name: "foo"})
 	require.NoError(t, tx.Commit(), "tx commit should succeed")
 
@@ -41,8 +43,9 @@ func TestJSONFileDB(t *testing.T) {
 	require.Equal(t, "foo", foo.Name, "branch name should match")
 
 	// Re-open the database and cause it to re-read from disk
-	db, err = jsonfiledb.OpenPath(tempfile)
+	db, exists, err = jsonfiledb.OpenPath(tempfile)
 	require.NoError(t, err, "db open should succeed if state file exists")
+	require.True(t, exists, "db should exist if state file exists")
 	foo, ok = db.ReadTx().Branch("foo")
 	require.True(t, ok, "branch should be found after re-open")
 	require.Equal(t, "foo", foo.Name, "branch name should match")
