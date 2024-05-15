@@ -9,7 +9,7 @@ import (
 
 type StackTreeBranchInfo struct {
 	BranchName       string
-	parentBranchName string
+	ParentBranchName string
 }
 
 type StackTreeNode struct {
@@ -22,7 +22,7 @@ func buildTree(currentBranchName string, branches []*StackTreeBranchInfo, sortCu
 	branchMap := make(map[string]*StackTreeNode)
 	for _, branch := range branches {
 		branchMap[branch.BranchName] = &StackTreeNode{Branch: branch}
-		childBranches[branch.parentBranchName] = append(childBranches[branch.parentBranchName], branch.BranchName)
+		childBranches[branch.ParentBranchName] = append(childBranches[branch.ParentBranchName], branch.BranchName)
 	}
 	for _, branch := range branches {
 		node := branchMap[branch.BranchName]
@@ -34,7 +34,7 @@ func buildTree(currentBranchName string, branches []*StackTreeBranchInfo, sortCu
 	// Find the root branches.
 	var rootBranches []*StackTreeNode
 	for _, branch := range branches {
-		if branch.parentBranchName == "" || branchMap[branch.parentBranchName] == nil {
+		if branch.ParentBranchName == "" || branchMap[branch.ParentBranchName] == nil {
 			rootBranches = append(rootBranches, branchMap[branch.BranchName])
 		}
 	}
@@ -84,22 +84,19 @@ func buildTree(currentBranchName string, branches []*StackTreeBranchInfo, sortCu
 	return rootBranches
 }
 
-func BuildStackTree(tx meta.ReadTx, currentBranch string) []*StackTreeNode {
-	return buildStackTree(currentBranch, tx.AllBranches(), true)
+func BuildStackTreeAllBranches(tx meta.ReadTx, currentBranch string, sortCurrent bool) []*StackTreeNode {
+	return buildStackTree(currentBranch, tx.AllBranches(), sortCurrent)
 }
 
-func BuildStackTreeForPullRequest(tx meta.ReadTx, currentBranch string) (*StackTreeNode, error) {
+func BuildStackTreeCurrentStack(tx meta.ReadTx, currentBranch string, sortCurrent bool) (*StackTreeNode, error) {
 	branchesToInclude, err := meta.StackBranchesMap(tx, currentBranch)
 	if err != nil {
 		return nil, err
 	}
-
-	// Don't sort based on the current branch so that the output is consistent between branches.
-	stackTree := buildStackTree(currentBranch, branchesToInclude, false)
+	stackTree := buildStackTree(currentBranch, branchesToInclude, sortCurrent)
 	if len(stackTree) != 1 {
 		return nil, fmt.Errorf("expected one root branch, got %d", len(stackTree))
 	}
-
 	return stackTree[0], nil
 }
 
@@ -109,7 +106,7 @@ func buildStackTree(currentBranch string, branchesToInclude map[string]meta.Bran
 	for _, branch := range branchesToInclude {
 		branches = append(branches, &StackTreeBranchInfo{
 			BranchName:       branch.Name,
-			parentBranchName: branch.Parent.Name,
+			ParentBranchName: branch.Parent.Name,
 		})
 		if branch.Parent.Trunk {
 			trunks[branch.Parent.Name] = true
@@ -118,7 +115,7 @@ func buildStackTree(currentBranch string, branchesToInclude map[string]meta.Bran
 	for branch := range trunks {
 		branches = append(branches, &StackTreeBranchInfo{
 			BranchName:       branch,
-			parentBranchName: "",
+			ParentBranchName: "",
 		})
 	}
 	return buildTree(currentBranch, branches, sortCurrent)

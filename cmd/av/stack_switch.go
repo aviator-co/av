@@ -38,7 +38,7 @@ var stackSwitchCmd = &cobra.Command{
 			}
 		}
 
-		rootNodes := stackutils.BuildStackTree(tx, currentBranch)
+		rootNodes := stackutils.BuildStackTreeAllBranches(tx, currentBranch, true)
 		var branchList []*stackTreeBranchInfo
 		branches := map[string]*stackTreeBranchInfo{}
 		for _, node := range rootNodes {
