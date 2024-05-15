@@ -35,7 +35,7 @@ var commitCreateCmd = &cobra.Command{
 			return errors.WrapIf(err, "failed to determine current branch")
 		}
 
-		if err := commitCreate(repo, currentBranchName, commitCreateFlags); err != nil {
+		if err := commitCreate(repo, currentBranchName); err != nil {
 			return err
 		}
 
@@ -50,10 +50,7 @@ func init() {
 		BoolVarP(&commitCreateFlags.All, "all", "a", false, "automatically stage modified files (same as git commit --all)")
 }
 
-func commitCreate(repo *git.Repo, currentBranchName string, flags struct {
-	Message string
-	All     bool
-}) error {
+func commitCreate(repo *git.Repo, currentBranchName string) error {
 	commitArgs := []string{"commit"}
 	if commitCreateFlags.All {
 		commitArgs = append(commitArgs, "--all")
@@ -73,12 +70,12 @@ func commitCreate(repo *git.Repo, currentBranchName string, flags struct {
 		return actions.ErrExitSilently{ExitCode: 1}
 	}
 
-	state, err := actions.ReadStackSyncState(repo)
-	state.OriginalBranch = currentBranchName
-
-	if err != nil && !os.IsNotExist(err) {
+	var state actions.StackSyncState
+	if err := repo.ReadStateFile(git.StateFileKindSync, &state); err != nil && !os.IsNotExist(err) {
 		return err
 	}
+
+	state.OriginalBranch = currentBranchName
 	ctx := context.Background()
 	db, err := getDB(repo)
 	if err != nil {
