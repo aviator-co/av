@@ -1,8 +1,10 @@
 package main
 
 import (
+	"os"
 	"strings"
 
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
@@ -10,6 +12,7 @@ import (
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -43,6 +46,10 @@ var stackSwitchCmd = &cobra.Command{
 		branches := map[string]*stackTreeBranchInfo{}
 		for _, node := range rootNodes {
 			branchList = append(branchList, stackSwitchBranchList(repo, tx, branches, node)...)
+		}
+
+		if !isatty.IsTerminal(os.Stdout.Fd()) {
+			return errors.New("stack switch command must be run in a terminal")
 		}
 		p := tea.NewProgram(stackSwitchViewModel{
 			repo:                 repo,
