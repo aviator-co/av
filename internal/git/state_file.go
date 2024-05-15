@@ -11,6 +11,7 @@ type StateFileKind string
 const (
 	StateFileKindSync    StateFileKind = "stack-sync.state.json"
 	StateFileKindReorder StateFileKind = "stack-reorder.state.json"
+	StateFileKindRestack StateFileKind = "stack-restack.state.json"
 )
 
 func (r *Repo) ReadStateFile(kind StateFileKind, msg any) error {

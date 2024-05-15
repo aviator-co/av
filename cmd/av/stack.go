@@ -21,6 +21,7 @@ func init() {
 		stackPrevCmd,
 		stackReorderCmd,
 		stackReparentCmd,
+		stackRestackCmd,
 		stackSubmitCmd,
 		stackSwitchCmd,
 		stackSyncCmd,

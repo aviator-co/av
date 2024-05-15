@@ -7,6 +7,7 @@ toolchain go1.22.1
 require (
 	emperror.dev/errors v0.8.1
 	github.com/charmbracelet/bubbletea v0.26.2
+	github.com/charmbracelet/lipgloss v0.10.0
 	github.com/fatih/color v1.17.0
 	github.com/golangci/golangci-lint v1.58.2
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
@@ -88,7 +89,7 @@ require (
 	github.com/ccojocar/zxcvbn-go v1.0.2 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charithe/durationcheck v0.0.10 // indirect
-	github.com/charmbracelet/lipgloss v0.10.0
+	github.com/charmbracelet/bubbles v0.18.0
 	github.com/chavacava/garif v0.1.0 // indirect
 	github.com/ckaznocha/intrange v0.1.2 // indirect
 	github.com/curioswitch/go-reassign v0.2.0 // indirect
