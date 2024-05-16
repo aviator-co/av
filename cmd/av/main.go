@@ -14,6 +14,7 @@ import (
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/fatih/color"
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
@@ -102,6 +103,7 @@ func main() {
 	// Note: this doesn't include whatever time is spent in initializing the
 	// runtime and various packages (e.g., package init functions).
 	startTime := time.Now()
+	colors.SetupBackgroundColorTypeFromEnv()
 	err := rootCmd.Execute()
 	logrus.WithField("duration", time.Since(startTime)).Debug("command exited")
 	checkCliVersion()

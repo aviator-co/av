@@ -6,12 +6,11 @@ import (
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
-	"github.com/fatih/color"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
-
-var boldString = color.New(color.Bold).SprintFunc()
 
 var stackTreeCmd = &cobra.Command{
 	Use:     "tree",
@@ -40,109 +39,88 @@ var stackTreeCmd = &cobra.Command{
 		}
 
 		rootNodes := stackutils.BuildStackTree(tx, currentBranch)
-		np := &nodePrinter{repo, tx}
 		for _, node := range rootNodes {
-			np.printNode(0, currentBranch, true, node)
+			fmt.Print(stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
+				stbi := getStackTreeBranchInfo(repo, tx, branchName)
+				return renderStackTreeBranchInfo(stackTreeStackBranchInfoStyles, stbi, currentBranch, branchName, isTrunk)
+			}))
 		}
 		return nil
 	},
 }
 
-type StackTreeBranchInfo struct {
+type stackBranchInfoStyles struct {
+	BranchName      lipgloss.Style
+	HEAD            lipgloss.Style
+	Deleted         lipgloss.Style
+	NeedSync        lipgloss.Style
+	PullRequestLink lipgloss.Style
+}
+
+var stackTreeStackBranchInfoStyles = stackBranchInfoStyles{
+	BranchName:      lipgloss.NewStyle().Bold(true).Foreground(colors.Green600),
+	HEAD:            lipgloss.NewStyle().Bold(true).Foreground(colors.Cyan600),
+	Deleted:         lipgloss.NewStyle().Bold(true).Foreground(colors.Red700),
+	NeedSync:        lipgloss.NewStyle().Bold(true).Foreground(colors.Red700),
+	PullRequestLink: lipgloss.NewStyle(),
+}
+
+func renderStackTreeBranchInfo(styles stackBranchInfoStyles, stbi *stackTreeBranchInfo, currentBranchName string, branchName string, isTrunk bool) string {
+	sb := strings.Builder{}
+	sb.WriteString(styles.BranchName.Render(branchName))
+	var stats []string
+	if branchName == currentBranchName {
+		stats = append(stats, styles.HEAD.Render("HEAD"))
+	}
+	if stbi.Deleted {
+		stats = append(stats, styles.Deleted.Render("deleted"))
+	}
+	if !isTrunk && stbi.NeedSync {
+		stats = append(stats, styles.NeedSync.Render("need sync"))
+	}
+	if len(stats) > 0 {
+		sb.WriteString(" (")
+		sb.WriteString(strings.Join(stats, ", "))
+		sb.WriteString(")")
+	}
+	sb.WriteString("\n")
+
+	if !isTrunk {
+		if stbi.PullRequestLink != "" {
+			sb.WriteString(styles.PullRequestLink.Render(stbi.PullRequestLink))
+		} else {
+			sb.WriteString(styles.PullRequestLink.Render("No pull request"))
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
+type stackTreeBranchInfo struct {
+	BranchName      string
 	Deleted         bool
 	NeedSync        bool
 	PullRequestLink string
 }
 
-type nodePrinter struct {
-	repo *git.Repo
-	tx   meta.ReadTx
-}
-
-func (np *nodePrinter) printNode(columns int, currentBranchName string, isTrunk bool, node *stackutils.StackTreeNode) {
-	for i, child := range node.Children {
-		np.printNode(columns+i, currentBranchName, false, child)
+func getStackTreeBranchInfo(repo *git.Repo, tx meta.ReadTx, branchName string) *stackTreeBranchInfo {
+	bi, _ := tx.Branch(branchName)
+	branchInfo := stackTreeBranchInfo{
+		BranchName: branchName,
 	}
-	if len(node.Children) > 1 {
-		fmt.Print(" ")
-		for i := 0; i < columns; i++ {
-			fmt.Print(" │")
-		}
-		fmt.Print(" ├")
-		for i := 0; i < len(node.Children)-2; i++ {
-			fmt.Print("─┴")
-		}
-		fmt.Print("─┘")
-		fmt.Println()
-	} else if len(node.Children) == 1 {
-		fmt.Print(" ")
-		for i := 0; i < columns+1; i++ {
-			fmt.Print(" │")
-		}
-		fmt.Println()
-	} else if columns > 0 {
-		fmt.Print(" ")
-		for i := 0; i < columns; i++ {
-			fmt.Print(" │")
-		}
-		fmt.Println()
-	}
-
-	fmt.Print(" ")
-	for i := 0; i < columns; i++ {
-		fmt.Print(" │")
-	}
-	fmt.Print(" *")
-	branch := node.Branch
-	sbi := np.getBranchInfo(branch.BranchName)
-	fmt.Printf(" %s", boldString(color.GreenString(branch.BranchName)))
-	var stats []string
-	if branch.BranchName == currentBranchName {
-		stats = append(stats, boldString(color.CyanString("HEAD")))
-	}
-	if sbi.Deleted {
-		stats = append(stats, boldString(color.RedString("deleted")))
-	}
-	if sbi.NeedSync {
-		stats = append(stats, boldString(color.RedString("need sync")))
-	}
-	if len(stats) > 0 {
-		fmt.Print(" (")
-		fmt.Print(strings.Join(stats, ", "))
-		fmt.Print(")")
-	}
-	fmt.Println()
-
-	if !isTrunk {
-		fmt.Print(" ")
-		for i := 0; i < columns+1; i++ {
-			fmt.Print(" │")
-		}
-		if sbi.PullRequestLink != "" {
-			fmt.Print(" " + color.HiBlackString(sbi.PullRequestLink))
-		} else {
-			fmt.Print(" No pull request")
-		}
-		fmt.Println()
-	}
-}
-
-func (np *nodePrinter) getBranchInfo(branchName string) *StackTreeBranchInfo {
-	bi, _ := np.tx.Branch(branchName)
-	branchInfo := StackTreeBranchInfo{}
 	if bi.PullRequest != nil && bi.PullRequest.Permalink != "" {
 		branchInfo.PullRequestLink = bi.PullRequest.Permalink
 	}
-	if _, err := np.repo.RevParse(&git.RevParse{Rev: branchName}); err != nil {
+	if _, err := repo.RevParse(&git.RevParse{Rev: branchName}); err != nil {
 		branchInfo.Deleted = true
 	}
 
-	parentHead, err := np.repo.RevParse(&git.RevParse{Rev: bi.Parent.Name})
+	parentHead, err := repo.RevParse(&git.RevParse{Rev: bi.Parent.Name})
 	if err != nil {
 		// The parent branch doesn't exist.
 		branchInfo.NeedSync = true
 	} else {
-		mergeBase, err := np.repo.MergeBase(&git.MergeBase{
+		mergeBase, err := repo.MergeBase(&git.MergeBase{
 			Revs: []string{parentHead, branchName},
 		})
 		if err != nil {
@@ -156,13 +134,13 @@ func (np *nodePrinter) getBranchInfo(branchName string) *StackTreeBranchInfo {
 		}
 	}
 
-	upstreamExists, err := np.repo.DoesRemoteBranchExist(branchName)
+	upstreamExists, err := repo.DoesRemoteBranchExist(branchName)
 	if err != nil || !upstreamExists {
 		// Not pushed.
 		branchInfo.NeedSync = true
 	}
 	upstreamBranch := fmt.Sprintf("remotes/origin/%s", branchName)
-	upstreamDiff, err := np.repo.Diff(&git.DiffOpts{
+	upstreamDiff, err := repo.Diff(&git.DiffOpts{
 		Quiet:      true,
 		Specifiers: []string{branchName, upstreamBranch},
 	})
