@@ -242,8 +242,8 @@ This information is embedded by the av CLI when creating PRs to track the status
 
 type fakeReadTx map[string]meta.Branch
 
-func (tx fakeReadTx) Repository() (meta.Repository, bool) {
-	return meta.Repository{}, false
+func (tx fakeReadTx) Repository() meta.Repository {
+	return meta.Repository{}
 }
 
 func (tx fakeReadTx) Branch(name string) (meta.Branch, bool) {

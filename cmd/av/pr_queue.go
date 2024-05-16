@@ -9,7 +9,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/avgql"
 	"github.com/shurcooL/graphql"
 	"github.com/spf13/cobra"
@@ -51,10 +50,7 @@ var prQueueCmd = &cobra.Command{
 		}
 
 		prNumber := branch.PullRequest.Number
-		repository, exists := tx.Repository()
-		if !exists {
-			return actions.ErrRepoNotInitialized
-		}
+		repository := tx.Repository()
 
 		var variables = map[string]interface{}{
 			"repoOwner": graphql.String(repository.Owner),

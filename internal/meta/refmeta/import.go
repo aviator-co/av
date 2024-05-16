@@ -1,7 +1,6 @@
 package refmeta
 
 import (
-	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
@@ -15,7 +14,7 @@ func Import(repo *git.Repo, db meta.DB) error {
 	defer cu.Cleanup()
 
 	repoMeta, err := ReadRepository(repo)
-	if err != nil && !errors.Is(err, ErrRepoNotInitialized) {
+	if err != nil {
 		return err
 	}
 	tx.SetRepository(repoMeta)

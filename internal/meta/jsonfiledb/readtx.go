@@ -11,8 +11,8 @@ type readTx struct {
 
 var _ meta.ReadTx = &readTx{}
 
-func (tx *readTx) Repository() (meta.Repository, bool) {
-	return tx.state.RepositoryState, tx.state.RepositoryState.ID != ""
+func (tx *readTx) Repository() meta.Repository {
+	return tx.state.RepositoryState
 }
 
 func (tx *readTx) Branch(name string) (meta.Branch, bool) {

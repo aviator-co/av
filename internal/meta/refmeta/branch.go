@@ -10,38 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ReadBranch loads information about the branch from the git repository.
-// Returns the branch metadata and a boolean indicating if the branch metadata
-// already existed and was loaded. If the branch metadata does not exist, a
-// useful default is returned.
-func ReadBranch(repo *git.Repo, branchName string) (meta.Branch, bool) {
-	refName := branchMetaRefName(branchName)
-	blob, err := repo.Git("cat-file", "blob", refName)
-
-	// Just assume that any error here means that the metadata ref doesn't exist
-	// (there's no easy way to distinguish between that and an actual Git error)
-	if err != nil {
-		defaultBranch, err := repo.DefaultBranch()
-		if err != nil {
-			// panic isn't great, but plumbing through the error is more effort
-			// that it's worth here
-			panic(errors.Wrap(err, "failed to determine repository default branch"))
-		}
-		// If there is no branch metadata, it probably means that they created
-		// the branch with "git checkout -b" and we implicitly assume that
-		// the branch is a stack root whose trunk is the repo default branch.
-		return meta.Branch{
-			Name: branchName,
-			Parent: meta.BranchState{
-				Trunk: true,
-				Name:  defaultBranch,
-			},
-		}, false
-	}
-
-	return unmarshalBranch(repo, branchName, refName, blob)
-}
-
 // ReadAllBranches fetches all branch metadata stored in the git repository.
 // It returns a map where the key is the name of the branch.
 func ReadAllBranches(repo *git.Repo) (map[string]meta.Branch, error) {
@@ -81,10 +49,6 @@ func ReadAllBranches(repo *git.Repo) (map[string]meta.Branch, error) {
 }
 
 const branchMetaRefPrefix = "refs/av/branch-metadata/"
-
-func branchMetaRefName(branchName string) string {
-	return branchMetaRefPrefix + branchName
-}
 
 func unmarshalBranch(repo *git.Repo, name string, refName string, blob string) (meta.Branch, bool) {
 	branch := meta.Branch{Name: name}

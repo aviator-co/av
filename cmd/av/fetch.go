@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"emperror.dev/errors"
-	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
@@ -38,10 +37,7 @@ var fetchCmd = &cobra.Command{
 			tx.Abort()
 		})
 
-		info, ok := tx.Repository()
-		if !ok {
-			return actions.ErrRepoNotInitialized
-		}
+		info := tx.Repository()
 		branches := tx.AllBranches()
 
 		client, err := getGitHubClient()
