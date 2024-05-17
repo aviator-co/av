@@ -66,15 +66,37 @@ func SyncBranch(
 			if err != nil {
 				return nil, err
 			}
+			fmt.Fprint(os.Stderr,
+				"  - fetching latest pull request information for ", colors.UserInput(branch.Name),
+				"\n",
+			)
 			update, err := UpdatePullRequestState(ctx, client, tx, branch.Name)
 			if err != nil {
 				_, _ = fmt.Fprint(os.Stderr, colors.Failure("      - error: ", err.Error()), "\n")
 				return nil, errors.Wrap(err, "failed to fetch latest PR info")
 			}
-			pull = update.Pull
 			if update.Changed {
-				_, _ = fmt.Fprint(os.Stderr, "      - found updated pull request: ", colors.UserInput(update.Pull.Permalink), "\n")
+				if update.Pull == nil && branch.PullRequest != nil {
+					fmt.Fprint(os.Stderr,
+						"  - ", colors.Failure("ERROR:"),
+						" pull request for ", colors.UserInput(branch.Name),
+						" could not be found on GitHub: ", colors.UserInput(branch.PullRequest.Permalink),
+						" (removing reference from local state)\n",
+					)
+				} else if update.Pull != nil && branch.PullRequest == nil {
+					fmt.Fprint(os.Stderr,
+						"  - found new pull request for ", colors.UserInput(branch.Name),
+						": ", colors.UserInput(update.Pull.Permalink),
+						"\n",
+					)
+				} else if update.Pull != nil && branch.PullRequest != nil && branch.PullRequest.ID != update.Pull.ID {
+					fmt.Fprint(os.Stderr,
+						"   - found updated pull request: ", colors.UserInput(update.Pull.Permalink),
+						"\n",
+					)
+				}
 			}
+			pull = update.Pull
 			branch, _ = tx.Branch(opts.Branch)
 			if branch.PullRequest == nil {
 				_, _ = fmt.Fprint(os.Stderr,

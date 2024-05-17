@@ -558,10 +558,6 @@ func UpdatePullRequestState(
 	repoMeta := tx.Repository()
 	branch, _ := tx.Branch(branchName)
 
-	_, _ = fmt.Fprint(os.Stderr,
-		"  - fetching latest pull request information for ", colors.UserInput(branchName),
-		"\n",
-	)
 	page, err := client.GetPullRequests(ctx, gh.GetPullRequestsInput{
 		Owner:       repoMeta.Owner,
 		Repo:        repoMeta.Name,
@@ -625,11 +621,6 @@ func UpdatePullRequestState(
 	var newPull *gh.PullRequest
 	if openPull != nil {
 		if oldId != openPull.ID {
-			_, _ = fmt.Fprint(os.Stderr,
-				"  - found new pull request for ", colors.UserInput(branchName),
-				": ", colors.UserInput(openPull.Permalink),
-				"\n",
-			)
 			changed = true
 		}
 		branch.PullRequest = &meta.PullRequest{
@@ -652,12 +643,6 @@ func UpdatePullRequestState(
 		} else {
 			// openPull and currentPull is nil
 			if branch.PullRequest != nil {
-				_, _ = fmt.Fprint(os.Stderr,
-					"  - ", colors.Failure("ERROR:"),
-					" pull request for ", colors.UserInput(branchName),
-					" could not be found on GitHub: ", colors.UserInput(branch.PullRequest.Permalink),
-					" (removing reference from local state)\n",
-				)
 				changed = true
 			}
 			branch.PullRequest = nil
