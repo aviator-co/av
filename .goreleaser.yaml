@@ -1,6 +1,6 @@
 before:
   hooks:
-    - 'rm -rf man'
+    - "rm -rf man"
     - 'sh -c "cd docs && go run convert-manpages.go --output-dir ../man --version v{{ .Version }}"'
 
 builds:
@@ -29,10 +29,26 @@ archives:
       {{- else if eq .Arch "darwin" }}macos
       {{- else }}{{ .Arch }}{{ end }}
     files:
-      - 'LICENSE'
-      - 'README.md'
-      - 'man'
+      - "LICENSE"
+      - "README.md"
+      - "man"
 
+nfpms:
+  - vendor: "Aviator"
+    homepage: "https://aviator.co"
+    maintainer: "Masaya Suzuki <masaya@aviator.co>"
+    description: "CLI tool to create, update, review and merge stacked PRs on GitHub."
+    license: "MIT"
+    section: "utils"
+    formats: ["deb", "rpm"]
+    dependencies: ["git"]
+    contents:
+      - src: "man/man1/*"
+        dst: "/usr/share/man/man1"
+    deb:
+      lintian_overrides:
+        - "statically-linked-binary"
+        - "changelog-file-missing-in-native-package"
 
 # Push to the homebrew tap
 brews:
@@ -48,8 +64,26 @@ brews:
       bin.install "av"
       man.install Dir["man/*"]
 
+aurs:
+  - name: "av-cli-bin"
+    homepage: "https://aviator.co"
+    description: "CLI tool to create, update, review and merge stacked PRs on GitHub."
+    maintainers:
+      - "Masaya Suzuki <masaya@aviator.co>"
+    license: "MIT"
+    depends: ["git"]
+    provides: ["av-cli"]
+    conflicts: ["av-cli"]
+    optdepends: ["github-cli: for GitHub authentication"]
+    package: |-
+      install -Dm755 "./av" "${pkgdir}/usr/bin/av"
+      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/av/LICENSE"
+      for manpage in $(ls ./man/man1); do
+        install -Dm644 "./man/man1/${manpage}" "${pkgdir}/usr/share/man/man1/${manpage}"
+      done
+
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 
 snapshot:
   name_template: "{{ incpatch .Version }}-dev-{{ .ShortCommit }}"
@@ -58,6 +92,6 @@ changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
-      - '^chore:'
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
