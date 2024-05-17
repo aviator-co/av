@@ -311,9 +311,11 @@ func init() {
 	stackSyncCmd.MarkFlagsMutuallyExclusive("trunk", "parent")
 	stackSyncCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
 
-	stackSyncCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if err := stackSyncCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return allBranches(), cobra.ShellCompDirectiveDefault
-	})
+	}); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func allBranches() []string {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -168,9 +169,11 @@ func init() {
 	stackBranchCmd.Flags().
 		BoolVar(&stackBranchFlags.Force, "force", false, "force rename the current branch")
 
-	stackBranchCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if err := stackBranchCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return allBranches(), cobra.ShellCompDirectiveDefault
-	})
+	}); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func stackBranchMove(
