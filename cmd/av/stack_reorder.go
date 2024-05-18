@@ -47,8 +47,8 @@ var stackReorderCmd = &cobra.Command{
 			return err
 		}
 
-		continuation, err := reorder.ReadContinuation(repo)
-		if os.IsNotExist(err) {
+		var continuation reorder.Continuation
+		if err := repo.ReadStateFile(git.StateFileKindReorder, &continuation); os.IsNotExist(err) {
 			if stackReorderFlags.Continue || stackReorderFlags.Abort {
 				_, _ = fmt.Fprint(os.Stderr,
 					colors.Failure("ERROR: no reorder in progress\n"),
@@ -61,8 +61,8 @@ var stackReorderCmd = &cobra.Command{
 
 		var state *reorder.State
 		if stackReorderFlags.Abort {
-			if continuation == nil {
-				_ = reorder.WriteContinuation(repo, nil)
+			if continuation.State == nil {
+				_ = repo.WriteStateFile(git.StateFileKindReorder, nil)
 				return errors.New("no reorder in progress")
 			}
 
@@ -75,11 +75,11 @@ var stackReorderCmd = &cobra.Command{
 			//   associated with the reorder to the original. It might be worth
 			//   storing some history and allow the user to do --undo to restore
 			//   their Git state to the state before the reorder.
-			return reorder.WriteContinuation(repo, nil)
+			return repo.WriteStateFile(git.StateFileKindReorder, nil)
 		} else if stackReorderFlags.Continue {
 			state = continuation.State
 		} else {
-			if continuation != nil {
+			if continuation.State != nil {
 				_, _ = fmt.Fprint(os.Stderr,
 					colors.Failure("ERROR: reorder already in progress\n"),
 					colors.Failure("	   use --continue or --abort to continue or abort the reorder\n"),
@@ -117,7 +117,7 @@ var stackReorderCmd = &cobra.Command{
 			state = &reorder.State{Commands: plan}
 		}
 
-		continuation, err = reorder.Reorder(reorder.Context{
+		state, err = reorder.Reorder(reorder.Context{
 			Repo:   repo,
 			DB:     db,
 			State:  state,
@@ -126,14 +126,18 @@ var stackReorderCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if continuation == nil {
+		if state == nil {
+			if err := repo.WriteStateFile(git.StateFileKindReorder, nil); err != nil {
+				return err
+			}
 			_, _ = fmt.Fprint(os.Stderr,
 				colors.Success("\nThe stack was reordered successfully.\n"),
 			)
 			return nil
 		}
 
-		if err := reorder.WriteContinuation(repo, continuation); err != nil {
+		continuation = reorder.Continuation{State: state}
+		if err := repo.WriteStateFile(git.StateFileKindReorder, &continuation); err != nil {
 			return err
 		}
 		_, _ = fmt.Fprint(os.Stderr,

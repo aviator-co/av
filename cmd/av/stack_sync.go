@@ -68,15 +68,15 @@ base branch.
 
 		// Read any preexisting state.
 		// This is required to allow us to handle --continue/--abort/--skip
-		state, err := actions.ReadStackSyncState(repo)
-		if err != nil && !os.IsNotExist(err) {
+		var state actions.StackSyncState
+		if err := repo.ReadStateFile(git.StateFileKindSync, &state); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 
 		if stackSyncFlags.Abort {
 			if state.CurrentBranch == "" || state.Continuation == nil {
 				// Try to clear the state file if it exists just to be safe.
-				_ = actions.WriteStackSyncState(repo, nil)
+				_ = repo.WriteStateFile(git.StateFileKindSync, nil)
 				return errors.New("no sync in progress")
 			}
 
@@ -87,7 +87,7 @@ base branch.
 				}
 			}
 
-			err := actions.WriteStackSyncState(repo, nil)
+			_ = repo.WriteStateFile(git.StateFileKindSync, nil)
 			if err != nil {
 				return errors.Wrap(err, "failed to reset stack sync state")
 			}
@@ -169,7 +169,7 @@ base branch.
 				return err
 			}
 			if !res.Success {
-				if err := actions.WriteStackSyncState(repo, &state); err != nil {
+				if err := repo.WriteStateFile(git.StateFileKindSync, &state); err != nil {
 					return errors.Wrap(err, "failed to write stack sync state")
 				}
 				_, _ = fmt.Fprint(os.Stderr,

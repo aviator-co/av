@@ -24,7 +24,7 @@ func TestReorder(t *testing.T) {
 	c2a := repo.CommitFile(t, "fichier", "bonjour\n")
 	c2b := repo.CommitFile(t, "fichier", "bonjour\nle monde\n")
 
-	continuation, err := reorder.Reorder(reorder.Context{
+	state, err := reorder.Reorder(reorder.Context{
 		Repo: repo.AsAvGitRepo(),
 		DB:   db,
 		State: &reorder.State{
@@ -41,7 +41,7 @@ func TestReorder(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "expected reorder to complete cleanly")
-	require.Nil(t, continuation, "expected reorder to complete cleanly")
+	require.Nil(t, state, "expected reorder to complete cleanly")
 
 	mainHead := repo.GetCommitAtRef(t, plumbing.NewBranchReferenceName("main"))
 	assert.Equal(t, initial, mainHead, "expected main to be at initial commit")
@@ -68,7 +68,7 @@ func TestReorderConflict(t *testing.T) {
 	c2a := repo.CommitFile(t, "file", "bonjour\n")
 	c2b := repo.CommitFile(t, "file", "bonjour\nle monde\n")
 
-	continuation, err := reorder.Reorder(reorder.Context{
+	state, err := reorder.Reorder(reorder.Context{
 		Repo: repo.AsAvGitRepo(),
 		DB:   db,
 		State: &reorder.State{
@@ -84,6 +84,6 @@ func TestReorderConflict(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "expected reorder to complete without error even with conflicts")
-	require.NotNil(t, continuation, "expected continuation to be returned after conflicts")
-	require.Equal(t, continuation.State.Commands[0], reorder.PickCmd{Commit: c2a.String()})
+	require.NotNil(t, state, "expected state to be returned after conflicts")
+	require.Equal(t, state.Commands[0], reorder.PickCmd{Commit: c2a.String()})
 }
