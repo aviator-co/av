@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"strings"
@@ -311,28 +310,28 @@ func init() {
 	stackSyncCmd.MarkFlagsMutuallyExclusive("trunk", "parent")
 	stackSyncCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
 
-	if err := stackSyncCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return allBranches(), cobra.ShellCompDirectiveDefault
-	}); err != nil {
-		log.Fatal(err)
-	}
+	branches, _ := allBranches()
+	_ = stackSyncCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return branches, cobra.ShellCompDirectiveDefault
+	})
 }
 
-func allBranches() []string {
+func allBranches() ([]string, error) {
 	repo, err := getRepo()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	db, err := getDB(repo)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	tx := db.ReadTx()
-	branches := []string{}
+
+	var branches []string
 	for b := range tx.AllBranches() {
 		branches = append(branches, b)
 	}
 
-	return branches
+	return branches, nil
 }
