@@ -8,7 +8,7 @@ require (
 	emperror.dev/errors v0.8.1
 	github.com/charmbracelet/bubbletea v0.26.2
 	github.com/fatih/color v1.17.0
-	github.com/golangci/golangci-lint v1.58.1
+	github.com/golangci/golangci-lint v1.58.2
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kr/text v0.2.0
