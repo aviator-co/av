@@ -7,7 +7,9 @@ import (
 )
 
 func TestStackSyncAll(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
 	Chdir(t, repo.RepoDir)
 
 	repo.Git(t, "switch", "main")
@@ -26,7 +28,7 @@ func TestStackSyncAll(t *testing.T) {
 	//     stack-1:  \ -> 1a
 	//     stack-2:  \ -> 2a
 
-	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push", "--trunk", "--all")
+	RequireAv(t, "stack", "sync", "--trunk", "--all")
 
 	//     main:    X  -> X2
 	//     stack-1:        \ -> 1a

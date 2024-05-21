@@ -10,7 +10,9 @@ import (
 )
 
 func TestStackSyncDeleteMerged(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
 	Chdir(t, repo.RepoDir)
 
 	// To start, we create a simple two-stack where each stack has a single commit.
@@ -31,7 +33,7 @@ func TestStackSyncDeleteMerged(t *testing.T) {
 	)
 
 	// Everything up to date now, so this should be a no-op.
-	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
+	RequireAv(t, "stack", "sync")
 
 	// We simulate the pull branches on the remote.
 	repo.Git(t, "push", "origin", "stack-1:refs/pull/42/head")
@@ -54,6 +56,14 @@ func TestStackSyncDeleteMerged(t *testing.T) {
 		repo.Git(t, "push", "origin", "main")
 	})
 
+	server.pulls = append(server.pulls, mockPR{
+		ID:             "nodeid-42",
+		Number:         42,
+		State:          "MERGED",
+		HeadRefName:    "stack-1",
+		MergeCommitOID: squashCommit.String(),
+	})
+
 	// We shouldn't do this as part of an E2E test since it depends on internal
 	// knowledge of the codebase, but :shrug:. We need to set the merge commit
 	// manually since we can't actually communicate with the GitHub API as part
@@ -61,12 +71,11 @@ func TestStackSyncDeleteMerged(t *testing.T) {
 	db := repo.OpenDB(t)
 	tx := db.WriteTx()
 	stack1Meta, _ := tx.Branch("stack-1")
-	stack1Meta.MergeCommit = squashCommit.String()
-	stack1Meta.PullRequest = &meta.PullRequest{Number: 42}
+	stack1Meta.PullRequest = &meta.PullRequest{ID: "nodeid-42", Number: 42}
 	tx.SetBranch(stack1Meta)
 	require.NoError(t, tx.Commit())
 
-	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push", "--trunk", "--prune")
+	RequireAv(t, "stack", "sync", "--trunk", "--prune")
 
 	require.Equal(t, 1,
 		Cmd(t, "git", "show-ref", "refs/heads/stack-1").ExitCode,

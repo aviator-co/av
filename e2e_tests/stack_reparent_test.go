@@ -10,7 +10,9 @@ import (
 )
 
 func TestStackSyncReparent(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
 	Chdir(t, repo.RepoDir)
 
 	RequireAv(t, "stack", "branch", "foo")
@@ -27,7 +29,7 @@ func TestStackSyncReparent(t *testing.T) {
 	requireFileContent(t, "spam.txt", "spam")
 
 	// Now, re-parent spam on top of bar (should be relatively a no-op)
-	RequireAv(t, "stack", "sync", "--parent", "bar", "--no-fetch", "--no-push")
+	RequireAv(t, "stack", "sync", "--parent", "bar")
 	requireFileContent(t, "spam.txt", "spam")
 	requireFileContent(
 		t,
@@ -37,7 +39,7 @@ func TestStackSyncReparent(t *testing.T) {
 	)
 
 	// Now, re-parent spam on top of foo
-	RequireAv(t, "stack", "sync", "--parent", "foo", "--no-fetch", "--no-push")
+	RequireAv(t, "stack", "sync", "--parent", "foo")
 	currentBranch := repo.CurrentBranch(t)
 	require.Equal(
 		t,
@@ -56,7 +58,9 @@ func TestStackSyncReparent(t *testing.T) {
 }
 
 func TestStackSyncReparentTrunk(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
 	Chdir(t, repo.RepoDir)
 
 	RequireAv(t, "stack", "branch", "foo")
@@ -68,7 +72,7 @@ func TestStackSyncReparentTrunk(t *testing.T) {
 	// Delete the local main. av should use the remote tracking branch.
 	repo.Git(t, "branch", "-D", "main")
 
-	RequireAv(t, "stack", "sync", "--parent", "main", "--no-fetch", "--no-push")
+	RequireAv(t, "stack", "sync", "--parent", "main")
 }
 
 func requireFileContent(t *testing.T, file string, expected string, args ...any) {

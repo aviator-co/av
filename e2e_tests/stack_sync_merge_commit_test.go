@@ -11,7 +11,9 @@ import (
 )
 
 func TestStackSyncMergeCommit(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
 	Chdir(t, repo.RepoDir)
 
 	// To start, we create a simple two-stack where each stack has a single commit.
@@ -45,7 +47,7 @@ func TestStackSyncMergeCommit(t *testing.T) {
 	)
 
 	// Everything up to date now, so this should be a no-op.
-	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
+	RequireAv(t, "stack", "sync")
 
 	// We simulate a merge here so that our history looks like:
 	//     main:    X                         / -> 1S
@@ -96,7 +98,7 @@ func TestStackSyncMergeCommit(t *testing.T) {
 		"squash commit of stack-1 should not be an ancestor of HEAD of stack-1 before running sync",
 	)
 
-	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
+	RequireAv(t, "stack", "sync")
 
 	repo.Git(t, "merge-base", "--is-ancestor", squashCommit.String(), "stack-3")
 	assert.Equal(t,

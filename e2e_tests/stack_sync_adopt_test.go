@@ -9,13 +9,15 @@ import (
 )
 
 func TestStackSyncAdopt(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
 	Chdir(t, repo.RepoDir)
 
 	repo.Git(t, "checkout", "-b", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 
-	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push", "--parent", "main")
+	RequireAv(t, "stack", "sync", "--parent", "main")
 
 	assert.Equal(t,
 		meta.BranchState{
