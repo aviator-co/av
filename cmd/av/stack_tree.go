@@ -2,16 +2,15 @@ package main
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
-	"github.com/fatih/color"
+	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/stackutils"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
-
-var boldString = color.New(color.Bold).SprintFunc()
 
 var stackTreeCmd = &cobra.Command{
 	Use:     "tree",
@@ -39,218 +38,114 @@ var stackTreeCmd = &cobra.Command{
 			}
 		}
 
-		trunks := map[string]bool{}
-		var branches []*stackTreeBranchInfo
-		for _, branch := range tx.AllBranches() {
-			branches = append(branches, getBranchInfo(repo, branch))
-			if branch.Parent.Trunk {
-				trunks[branch.Parent.Name] = true
-			}
-		}
-		for branch := range trunks {
-			branches = append(branches, &stackTreeBranchInfo{
-				branchName:       branch,
-				parentBranchName: "",
-				needSync:         false,
-				deleted:          false,
-			})
-		}
-		rootNodes := buildTree(currentBranch, branches)
+		rootNodes := stackutils.BuildStackTree(tx, currentBranch)
 		for _, node := range rootNodes {
-			printNode(0, currentBranch, true, node)
+			fmt.Print(stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
+				stbi := getStackTreeBranchInfo(repo, tx, branchName)
+				return renderStackTreeBranchInfo(stackTreeStackBranchInfoStyles, stbi, currentBranch, branchName, isTrunk)
+			}))
 		}
 		return nil
 	},
 }
 
-type stackTreeBranchInfo struct {
-	branchName       string
-	parentBranchName string
-	pullRequestLink  string
-	needSync         bool
-	deleted          bool
+type stackBranchInfoStyles struct {
+	BranchName      lipgloss.Style
+	HEAD            lipgloss.Style
+	Deleted         lipgloss.Style
+	NeedSync        lipgloss.Style
+	PullRequestLink lipgloss.Style
 }
 
-func getBranchInfo(repo *git.Repo, branch meta.Branch) *stackTreeBranchInfo {
+var stackTreeStackBranchInfoStyles = stackBranchInfoStyles{
+	BranchName:      lipgloss.NewStyle().Bold(true).Foreground(colors.Green600),
+	HEAD:            lipgloss.NewStyle().Bold(true).Foreground(colors.Cyan600),
+	Deleted:         lipgloss.NewStyle().Bold(true).Foreground(colors.Red700),
+	NeedSync:        lipgloss.NewStyle().Bold(true).Foreground(colors.Red700),
+	PullRequestLink: lipgloss.NewStyle(),
+}
+
+func renderStackTreeBranchInfo(styles stackBranchInfoStyles, stbi *stackTreeBranchInfo, currentBranchName string, branchName string, isTrunk bool) string {
+	sb := strings.Builder{}
+	sb.WriteString(styles.BranchName.Render(branchName))
+	var stats []string
+	if branchName == currentBranchName {
+		stats = append(stats, styles.HEAD.Render("HEAD"))
+	}
+	if stbi.Deleted {
+		stats = append(stats, styles.Deleted.Render("deleted"))
+	}
+	if !isTrunk && stbi.NeedSync {
+		stats = append(stats, styles.NeedSync.Render("need sync"))
+	}
+	if len(stats) > 0 {
+		sb.WriteString(" (")
+		sb.WriteString(strings.Join(stats, ", "))
+		sb.WriteString(")")
+	}
+	sb.WriteString("\n")
+
+	if !isTrunk {
+		if stbi.PullRequestLink != "" {
+			sb.WriteString(styles.PullRequestLink.Render(stbi.PullRequestLink))
+		} else {
+			sb.WriteString(styles.PullRequestLink.Render("No pull request"))
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
+type stackTreeBranchInfo struct {
+	BranchName      string
+	Deleted         bool
+	NeedSync        bool
+	PullRequestLink string
+}
+
+func getStackTreeBranchInfo(repo *git.Repo, tx meta.ReadTx, branchName string) *stackTreeBranchInfo {
+	bi, _ := tx.Branch(branchName)
 	branchInfo := stackTreeBranchInfo{
-		branchName:       branch.Name,
-		parentBranchName: branch.Parent.Name,
+		BranchName: branchName,
 	}
-	if branch.PullRequest != nil && branch.PullRequest.Permalink != "" {
-		branchInfo.pullRequestLink = branch.PullRequest.Permalink
+	if bi.PullRequest != nil && bi.PullRequest.Permalink != "" {
+		branchInfo.PullRequestLink = bi.PullRequest.Permalink
 	}
-	if _, err := repo.RevParse(&git.RevParse{Rev: branch.Name}); err != nil {
-		branchInfo.deleted = true
+	if _, err := repo.RevParse(&git.RevParse{Rev: branchName}); err != nil {
+		branchInfo.Deleted = true
 	}
 
-	parentHead, err := repo.RevParse(&git.RevParse{Rev: branch.Parent.Name})
+	parentHead, err := repo.RevParse(&git.RevParse{Rev: bi.Parent.Name})
 	if err != nil {
 		// The parent branch doesn't exist.
-		branchInfo.needSync = true
+		branchInfo.NeedSync = true
 	} else {
 		mergeBase, err := repo.MergeBase(&git.MergeBase{
-			Revs: []string{parentHead, branch.Name},
+			Revs: []string{parentHead, branchName},
 		})
 		if err != nil {
 			// The merge base doesn't exist. This is odd. Mark the branch as needing
 			// sync to see if we can fix this.
-			branchInfo.needSync = true
+			branchInfo.NeedSync = true
 		}
 		if mergeBase != parentHead {
 			// This branch is not on top of the parent branch. Need sync.
-			branchInfo.needSync = true
+			branchInfo.NeedSync = true
 		}
 	}
 
-	upstreamExists, err := repo.DoesRemoteBranchExist(branch.Name)
+	upstreamExists, err := repo.DoesRemoteBranchExist(branchName)
 	if err != nil || !upstreamExists {
 		// Not pushed.
-		branchInfo.needSync = true
+		branchInfo.NeedSync = true
 	}
-	upstreamBranch := fmt.Sprintf("remotes/origin/%s", branch.Name)
+	upstreamBranch := fmt.Sprintf("remotes/origin/%s", branchName)
 	upstreamDiff, err := repo.Diff(&git.DiffOpts{
 		Quiet:      true,
-		Specifiers: []string{branch.Name, upstreamBranch},
+		Specifiers: []string{branchName, upstreamBranch},
 	})
 	if err != nil || !upstreamDiff.Empty {
-		branchInfo.needSync = true
+		branchInfo.NeedSync = true
 	}
 	return &branchInfo
-}
-
-type stackTreeNode struct {
-	branch   *stackTreeBranchInfo
-	children []*stackTreeNode
-}
-
-func buildTree(currentBranchName string, branches []*stackTreeBranchInfo) []*stackTreeNode {
-	childBranches := make(map[string][]string)
-	branchMap := make(map[string]*stackTreeNode)
-	for _, branch := range branches {
-		branchMap[branch.branchName] = &stackTreeNode{branch: branch}
-		childBranches[branch.parentBranchName] = append(childBranches[branch.parentBranchName], branch.branchName)
-	}
-	for _, branch := range branches {
-		node := branchMap[branch.branchName]
-		for _, childBranch := range childBranches[branch.branchName] {
-			node.children = append(node.children, branchMap[childBranch])
-		}
-	}
-
-	// Find the root branches.
-	var rootBranches []*stackTreeNode
-	for _, branch := range branches {
-		if branch.parentBranchName == "" || branchMap[branch.parentBranchName] == nil {
-			rootBranches = append(rootBranches, branchMap[branch.branchName])
-		}
-	}
-
-	// Find the path that contains the current branch.
-	currentBranchPath := make(map[string]bool)
-	var currentBranchVisitFn func(node *stackTreeNode) bool
-	currentBranchVisitFn = func(node *stackTreeNode) bool {
-		if node.branch.branchName == currentBranchName {
-			currentBranchPath[node.branch.branchName] = true
-			return true
-		}
-		for _, child := range node.children {
-			if currentBranchVisitFn(child) {
-				currentBranchPath[node.branch.branchName] = true
-				return true
-			}
-		}
-		return false
-	}
-	for _, rootBranch := range rootBranches {
-		currentBranchVisitFn(rootBranch)
-	}
-	for _, node := range branchMap {
-		// Visit the current branch first. Otherwise, use alphabetical order for the initial ones.
-		sort.Slice(node.children, func(i, j int) bool {
-			if currentBranchPath[node.children[i].branch.branchName] {
-				return true
-			}
-			if currentBranchPath[node.children[j].branch.branchName] {
-				return false
-			}
-			return node.children[i].branch.branchName < node.children[j].branch.branchName
-		})
-	}
-	sort.Slice(rootBranches, func(i, j int) bool {
-		if currentBranchPath[rootBranches[i].branch.branchName] {
-			return true
-		}
-		if currentBranchPath[rootBranches[j].branch.branchName] {
-			return false
-		}
-		return rootBranches[i].branch.branchName < rootBranches[j].branch.branchName
-	})
-	return rootBranches
-}
-
-func printNode(columns int, currentBranchName string, isTrunk bool, node *stackTreeNode) {
-	for i, child := range node.children {
-		printNode(columns+i, currentBranchName, false, child)
-	}
-	if len(node.children) > 1 {
-		fmt.Print(" ")
-		for i := 0; i < columns; i++ {
-			fmt.Print(" │")
-		}
-		fmt.Print(" ├")
-		for i := 0; i < len(node.children)-2; i++ {
-			fmt.Print("─┴")
-		}
-		fmt.Print("─┘")
-		fmt.Println()
-	} else if len(node.children) == 1 {
-		fmt.Print(" ")
-		for i := 0; i < columns+1; i++ {
-			fmt.Print(" │")
-		}
-		fmt.Println()
-	} else if columns > 0 {
-		fmt.Print(" ")
-		for i := 0; i < columns; i++ {
-			fmt.Print(" │")
-		}
-		fmt.Println()
-	}
-
-	fmt.Print(" ")
-	for i := 0; i < columns; i++ {
-		fmt.Print(" │")
-	}
-	fmt.Print(" *")
-	branch := node.branch
-	fmt.Printf(" %s", boldString(color.GreenString(branch.branchName)))
-	var stats []string
-	if branch.branchName == currentBranchName {
-		stats = append(stats, boldString(color.CyanString("HEAD")))
-	}
-	if branch.deleted {
-		stats = append(stats, boldString(color.RedString("deleted")))
-	}
-	if branch.needSync {
-		stats = append(stats, boldString(color.RedString("need sync")))
-	}
-	if len(stats) > 0 {
-		fmt.Print(" (")
-		fmt.Print(strings.Join(stats, ", "))
-		fmt.Print(")")
-	}
-	fmt.Println()
-
-	if !isTrunk {
-		fmt.Print(" ")
-		for i := 0; i < columns+1; i++ {
-			fmt.Print(" │")
-		}
-		if branch.pullRequestLink != "" {
-			fmt.Print(" " + color.HiBlackString(branch.pullRequestLink))
-		} else {
-			fmt.Print(" No pull request")
-		}
-		fmt.Println()
-	}
 }

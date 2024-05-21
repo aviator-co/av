@@ -9,15 +9,14 @@ import (
 
 func TestOrigin(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	_, err := repo.Git("remote", "set-url", "origin", "https://github.com/aviator-co/av.git")
-	require.NoError(t, err)
-	origin, err := repo.Origin()
+	repo.Git(t, "remote", "set-url", "origin", "https://github.com/aviator-co/av.git")
+	origin, err := repo.AsAvGitRepo().Origin()
 	require.NoError(t, err)
 	require.Equal(t, "aviator-co/av", origin.RepoSlug)
 
-	_, err = repo.Git("remote", "set-url", "origin", "git@github.com:aviator-co/av.git")
+	repo.Git(t, "remote", "set-url", "origin", "git@github.com:aviator-co/av.git")
 	require.NoError(t, err)
-	origin, err = repo.Origin()
+	origin, err = repo.AsAvGitRepo().Origin()
 	require.NoError(t, err)
 	require.Equal(t, "aviator-co/av", origin.RepoSlug)
 }

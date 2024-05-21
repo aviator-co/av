@@ -18,7 +18,7 @@ var initCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := getDB(repo)
+		db, _, err := getOrCreateDB(repo)
 		if err != nil {
 			return err
 		}

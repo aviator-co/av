@@ -11,7 +11,7 @@ import (
 
 func TestRepo_ListRefs(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	refs, err := repo.ListRefs(&git.ListRefs{
+	refs, err := repo.AsAvGitRepo().ListRefs(&git.ListRefs{
 		Patterns: []string{"refs/heads/*"},
 	})
 	require.NoError(t, err)

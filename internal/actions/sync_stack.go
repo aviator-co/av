@@ -2,10 +2,8 @@ package actions
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"path"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/gh"
@@ -59,12 +57,19 @@ type (
 	SyncStackOpt  func(*syncStackOpts)
 	syncStackOpts struct {
 		skipNextCommit bool
+		localOnly      bool
 	}
 )
 
 func WithSkipNextCommit() SyncStackOpt {
 	return func(opts *syncStackOpts) {
 		opts.skipNextCommit = true
+	}
+}
+
+func WithLocalOnly() SyncStackOpt {
+	return func(opts *syncStackOpts) {
+		opts.localOnly = true
 	}
 }
 
@@ -92,8 +97,8 @@ func SyncStack(ctx context.Context,
 		state.CurrentBranch = currentBranch
 		cont, err := SyncBranch(ctx, repo, client, tx, SyncBranchOpts{
 			Branch:       currentBranch,
-			Fetch:        !state.Config.NoFetch,
-			Push:         !state.Config.NoPush,
+			Fetch:        !state.Config.NoFetch && !opts.localOnly,
+			Push:         !state.Config.NoPush && !opts.localOnly,
 			Continuation: state.Continuation,
 			ToTrunk:      state.Config.Trunk,
 			Skip:         skip,
@@ -103,7 +108,7 @@ func SyncStack(ctx context.Context,
 		}
 		if cont != nil {
 			state.Continuation = cont
-			if err := WriteStackSyncState(repo, &state); err != nil {
+			if err := repo.WriteStateFile(git.StateFileKindSync, &state); err != nil {
 				return errors.Wrap(err, "failed to write stack sync state")
 			}
 			if err := tx.Commit(); err != nil {
@@ -190,8 +195,10 @@ func SyncStack(ctx context.Context,
 				"  - deleting merged branch ", colors.UserInput(currentBranch),
 				"\n",
 			)
-			if _, err := repo.Git("switch", "--detach"); err != nil {
-				return errors.Errorf("cannot switch to detached HEAD: %v", err)
+
+			trunk, _ := meta.Trunk(tx, currentBranch)
+			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: trunk}); err != nil {
+				return errors.Errorf("cannot checkout to trunk %s: %v", trunk, err)
 			}
 			if _, err := repo.Git("branch", "-D", currentBranch); err != nil {
 				return errors.Errorf("cannot delete merged branch %q: %v", currentBranch, err)
@@ -215,7 +222,7 @@ func SyncStack(ctx context.Context,
 			return err
 		}
 	}
-	if err := WriteStackSyncState(repo, nil); err != nil {
+	if err := repo.WriteStateFile(git.StateFileKindSync, nil); err != nil {
 		return errors.Wrap(err, "failed to write stack sync state")
 	}
 	if err := tx.Commit(); err != nil {
@@ -223,46 +230,4 @@ func SyncStack(ctx context.Context,
 	}
 
 	return nil
-}
-
-const stackSyncStateFile = "stack-sync.state.json"
-
-func ReadStackSyncState(repo *git.Repo) (StackSyncState, error) {
-	var state StackSyncState
-	data, err := os.ReadFile(path.Join(repo.AvDir(), stackSyncStateFile))
-	if err != nil {
-		return state, err
-	}
-	if err := json.Unmarshal(data, &state); err != nil {
-		return state, err
-	}
-	return state, nil
-}
-
-func WriteStackSyncState(repo *git.Repo, state *StackSyncState) error {
-	avDir := repo.AvDir()
-	if _, err := os.Stat(avDir); err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
-		if err := os.Mkdir(avDir, 0755); err != nil {
-			return err
-		}
-	}
-
-	// delete the file if state is nil (i.e., --abort)
-	if state == nil {
-		err := os.Remove(path.Join(avDir, stackSyncStateFile))
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		return nil
-	}
-
-	// otherwise, create/write the file
-	data, err := json.Marshal(state)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path.Join(avDir, stackSyncStateFile), data, 0644)
 }

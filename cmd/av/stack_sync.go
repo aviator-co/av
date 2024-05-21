@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"emperror.dev/errors"
@@ -68,26 +68,26 @@ base branch.
 
 		// Read any preexisting state.
 		// This is required to allow us to handle --continue/--abort/--skip
-		state, err := actions.ReadStackSyncState(repo)
-		if err != nil && !os.IsNotExist(err) {
+		var state actions.StackSyncState
+		if err := repo.ReadStateFile(git.StateFileKindSync, &state); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 
 		if stackSyncFlags.Abort {
 			if state.CurrentBranch == "" || state.Continuation == nil {
 				// Try to clear the state file if it exists just to be safe.
-				_ = actions.WriteStackSyncState(repo, nil)
+				_ = repo.WriteStateFile(git.StateFileKindSync, nil)
 				return errors.New("no sync in progress")
 			}
 
 			// Abort the rebase if we need to
-			if stat, _ := os.Stat(path.Join(repo.GitDir(), "REBASE_HEAD")); stat != nil {
+			if stat, _ := os.Stat(filepath.Join(repo.GitDir(), "REBASE_HEAD")); stat != nil {
 				if _, err := repo.Rebase(git.RebaseOpts{Abort: true}); err != nil {
 					return errors.WrapIf(err, "failed to abort in-progress rebase")
 				}
 			}
 
-			err := actions.WriteStackSyncState(repo, nil)
+			_ = repo.WriteStateFile(git.StateFileKindSync, nil)
 			if err != nil {
 				return errors.Wrap(err, "failed to reset stack sync state")
 			}
@@ -169,7 +169,7 @@ base branch.
 				return err
 			}
 			if !res.Success {
-				if err := actions.WriteStackSyncState(repo, &state); err != nil {
+				if err := repo.WriteStateFile(git.StateFileKindSync, &state); err != nil {
 					return errors.Wrap(err, "failed to write stack sync state")
 				}
 				_, _ = fmt.Fprint(os.Stderr,
@@ -232,13 +232,10 @@ base branch.
 			if err != nil {
 				return err
 			}
-			branchesToSync, err = meta.PreviousBranches(tx, currentBranch)
+			branchesToSync, err = meta.StackBranches(tx, currentBranch)
 			if err != nil {
 				return err
 			}
-			branchesToSync = append(branchesToSync, currentBranch)
-			nextBranches := meta.SubsequentBranches(tx, branchesToSync[len(branchesToSync)-1])
-			branchesToSync = append(branchesToSync, nextBranches...)
 			state.Branches = branchesToSync
 		}
 		// Either way (--continue or not), we sync all subsequent branches

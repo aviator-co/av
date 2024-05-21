@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"emperror.dev/errors"
@@ -11,7 +11,6 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/aviator-co/av/internal/meta/refmeta"
-	"github.com/sirupsen/logrus"
 )
 
 var cachedRepo *git.Repo
@@ -50,18 +49,37 @@ func getRepo() (*git.Repo, error) {
 	return cachedRepo, nil
 }
 
+var ErrRepoNotInitialized = errors.Sentinel(
+	"this repository is not initialized; please run `av init`",
+)
+
 func getDB(repo *git.Repo) (meta.DB, error) {
-	dbPath := path.Join(repo.AvDir(), "av.db")
-	existingStat, _ := os.Stat(dbPath)
-	db, err := jsonfiledb.OpenPath(dbPath)
+	db, exists, err := getOrCreateDB(repo)
 	if err != nil {
 		return nil, err
 	}
-	if existingStat == nil {
-		logrus.Debug("Initializing new av database")
-		if err := refmeta.Import(repo, db); err != nil {
-			return nil, errors.WrapIff(err, "failed to import ref metadata into av database")
-		}
+	if !exists {
+		return nil, ErrRepoNotInitialized
 	}
 	return db, nil
+}
+
+func getOrCreateDB(repo *git.Repo) (meta.DB, bool, error) {
+	dbPath := filepath.Join(repo.AvDir(), "av.db")
+	oldDBPathPath := filepath.Join(repo.AvDir(), "repo-metadata.json")
+	dbPathStat, _ := os.Stat(dbPath)
+	oldDBPathStat, _ := os.Stat(oldDBPathPath)
+
+	if dbPathStat == nil && oldDBPathStat != nil {
+		// Migrate old db to new db
+		db, exists, err := jsonfiledb.OpenPath(dbPath)
+		if err != nil {
+			return nil, false, err
+		}
+		if err := refmeta.Import(repo, db); err != nil {
+			return nil, false, errors.WrapIff(err, "failed to import ref metadata into av database")
+		}
+		return db, exists, nil
+	}
+	return jsonfiledb.OpenPath(dbPath)
 }

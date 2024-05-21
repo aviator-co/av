@@ -54,12 +54,12 @@ var commitAmendCmd = &cobra.Command{
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
 
-		state, err := actions.ReadStackSyncState(repo)
-		state.OriginalBranch = currentBranchName
-
-		if err != nil && !os.IsNotExist(err) {
+		var state actions.StackSyncState
+		if err := repo.ReadStateFile(git.StateFileKindSync, &state); err != nil && !os.IsNotExist(err) {
 			return err
 		}
+
+		state.OriginalBranch = currentBranchName
 		ctx := context.Background()
 		db, err := getDB(repo)
 		if err != nil {
@@ -78,7 +78,7 @@ var commitAmendCmd = &cobra.Command{
 		// Even if it's not configured, there's no need to fetch/push
 		state.Config.NoFetch = true
 		state.Config.NoPush = true
-		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state)
+		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, actions.WithLocalOnly())
 		if err != nil {
 			return err
 		}

@@ -8,6 +8,7 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
+	"github.com/aviator-co/av/internal/meta"
 	"github.com/spf13/cobra"
 )
 
@@ -102,6 +103,15 @@ Examples:
 			if err := actions.AddPullRequestReviewers(ctx, client, res.Pull.ID, prCreateFlags.Reviewers); err != nil {
 				return err
 			}
+		}
+
+		if config.Av.PullRequest.WriteStack {
+			stackBranches, err := meta.StackBranches(tx, branchName)
+			if err != nil {
+				return err
+			}
+
+			return actions.UpdatePullRequestsWithStack(ctx, client, tx, stackBranches)
 		}
 
 		return nil
