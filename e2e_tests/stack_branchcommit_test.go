@@ -15,8 +15,7 @@ func TestStackBranchCommit(t *testing.T) {
 	t.Run("FlagAll", func(t *testing.T) {
 		require.NoError(t, os.WriteFile("myfile.txt", []byte("hello\n"), 0644))
 		RequireAv(t, "stack", "branch-commit", "--all", "-m", "branch one")
-		clean := repo.IsWorkdirClean(t)
-		require.True(t, clean)
+		require.True(t, repo.IsWorkdirClean(t))
 	})
 
 	t.Run("FlagAllModified", func(t *testing.T) {
@@ -24,10 +23,9 @@ func TestStackBranchCommit(t *testing.T) {
 		require.NoError(t, os.WriteFile("yourfile.txt", []byte("bonjour\n"), 0644))
 		RequireAv(t, "stack", "branch-commit", "--all-modified", "-m", "branch two")
 
-		clean := repo.IsWorkdirClean(t)
 		require.False(
 			t,
-			clean,
+			repo.IsWorkdirClean(t),
 			"workdir should not be clean since yourfile.txt should not be committed",
 		)
 

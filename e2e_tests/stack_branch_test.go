@@ -21,7 +21,7 @@ func TestStackBranchMove(t *testing.T) {
 	repo.CommitFile(t, "three.txt", "three")
 
 	// one -> un
-	RequireCmd(t, "git", "checkout", "one")
+	repo.Git(t, "checkout", "one")
 	RequireAv(t, "stack", "branch", "-m", "un")
 	RequireCurrentBranchName(t, repo, "refs/heads/un")
 
@@ -73,8 +73,8 @@ func TestStackBranchRetroactiveMove(t *testing.T) {
 	repo.CommitFile(t, "three.txt", "three")
 
 	// one -> un without av
-	RequireCmd(t, "git", "checkout", "one")
-	RequireCmd(t, "git", "branch", "-m", "un")
+	repo.Git(t, "checkout", "one")
+	repo.Git(t, "branch", "-m", "un")
 	RequireCurrentBranchName(t, repo, "refs/heads/un")
 
 	// Retroactive rename with av

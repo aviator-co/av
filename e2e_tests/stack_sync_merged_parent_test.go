@@ -19,7 +19,7 @@ func TestStackSyncMergedParent(t *testing.T) {
 	//     stack-1: main -> 1a -> 2b
 	//     stack-2:                \ -> 2a -> 2b
 	//     stack-3:                             \ -> 3a -> 3b
-	require.Equal(t, 0, Cmd(t, "git", "checkout", "-b", "stack-1").ExitCode)
+	repo.Git(t, "checkout", "-b", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 	RequireAv(t, "stack", "branch", "stack-2")
@@ -45,7 +45,7 @@ func TestStackSyncMergedParent(t *testing.T) {
 	)
 
 	// Everything up to date now, so this should be a no-op.
-	require.Equal(t, 0, Av(t, "stack", "sync", "--no-fetch", "--no-push").ExitCode)
+	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
 
 	// We simulate a merge here so that our history looks like:
 	//     main:    X
@@ -57,10 +57,10 @@ func TestStackSyncMergedParent(t *testing.T) {
 	repo.WithCheckoutBranch(t, "refs/heads/stack-1", func() {
 		oldHead := repo.GetCommitAtRef(t, plumbing.HEAD)
 
-		RequireCmd(t, "git", "merge", "--squash", "stack-2")
+		repo.Git(t, "merge", "--squash", "stack-2")
 		// `git merge --squash` doesn't actually create the commit, so we have to
 		// do that separately.
-		RequireCmd(t, "git", "commit", "--no-edit")
+		repo.Git(t, "commit", "--no-edit")
 		squashCommit = repo.GetCommitAtRef(t, plumbing.HEAD)
 
 		require.NotEqual(
@@ -82,10 +82,8 @@ func TestStackSyncMergedParent(t *testing.T) {
 	tx.SetBranch(stack2Meta)
 	require.NoError(t, tx.Commit())
 
-	require.Equal(t, 0,
-		Cmd(t, "git", "merge-base", "--is-ancestor", "stack-2", "stack-3").ExitCode,
-		"HEAD of stack-1 should be an ancestor of HEAD of stack-2 before running sync",
-	)
+	// HEAD of stack-1 should be an ancestor of HEAD of stack-2 before running sync
+	repo.Git(t, "merge-base", "--is-ancestor", "stack-2", "stack-3")
 	require.NotEqual(t, 0,
 		Cmd(t, "git", "merge-base", "--is-ancestor", squashCommit.String(), "stack-3").ExitCode,
 		"squash commit of stack-1 should not be an ancestor of HEAD of stack-1 before running sync",
@@ -93,10 +91,7 @@ func TestStackSyncMergedParent(t *testing.T) {
 
 	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
 
-	assert.Equal(t, 0,
-		Cmd(t, "git", "merge-base", "--is-ancestor", squashCommit.String(), "stack-3").ExitCode,
-		"squash commit of stack-2 should be an ancestor of HEAD of stack-3 after running sync",
-	)
+	// squash commit of stack-2 should be an ancestor of HEAD of stack-3 after running sync
 	assert.Equal(t,
 		meta.BranchState{
 			Name: "stack-1",

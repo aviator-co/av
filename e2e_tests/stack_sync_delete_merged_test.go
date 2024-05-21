@@ -18,7 +18,7 @@ func TestStackSyncDeleteMerged(t *testing.T) {
 	//     main:    X
 	//     stack-1:  \ -> 1a -> 1b
 	//     stack-2:              \ -> 2a -> 2b
-	require.Equal(t, 0, Cmd(t, "git", "checkout", "-b", "stack-1").ExitCode)
+	repo.Git(t, "checkout", "-b", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 	RequireAv(t, "stack", "branch", "stack-2")
@@ -31,10 +31,10 @@ func TestStackSyncDeleteMerged(t *testing.T) {
 	)
 
 	// Everything up to date now, so this should be a no-op.
-	require.Equal(t, 0, Av(t, "stack", "sync", "--no-fetch", "--no-push").ExitCode)
+	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
 
 	// We simulate the pull branches on the remote.
-	RequireCmd(t, "git", "push", "origin", "stack-1:refs/pull/42/head")
+	repo.Git(t, "push", "origin", "stack-1:refs/pull/42/head")
 
 	// We simulate a merge here so that our history looks like:
 	//     main:    X --------------> 1S
@@ -44,14 +44,14 @@ func TestStackSyncDeleteMerged(t *testing.T) {
 	// a squash commit, 1S is not a *merge commit* in the Git definition.
 	var squashCommit plumbing.Hash
 	repo.WithCheckoutBranch(t, "refs/heads/main", func() {
-		RequireCmd(t, "git", "merge", "--squash", "stack-1")
+		repo.Git(t, "merge", "--squash", "stack-1")
 		// `git merge --squash` doesn't actually create the commit, so we have to
 		// do that separately.
-		RequireCmd(t, "git", "commit", "--no-edit")
+		repo.Git(t, "commit", "--no-edit")
 
 		squashCommit = repo.GetCommitAtRef(t, plumbing.HEAD)
 
-		RequireCmd(t, "git", "push", "origin", "main")
+		repo.Git(t, "push", "origin", "main")
 	})
 
 	// We shouldn't do this as part of an E2E test since it depends on internal

@@ -72,12 +72,6 @@ func Cmd(t *testing.T, exe string, args ...string) AvOutput {
 	return output
 }
 
-func RequireCmd(t *testing.T, exe string, args ...string) AvOutput {
-	output := Cmd(t, exe, args...)
-	require.Equal(t, 0, output.ExitCode, "cmd %s: exited with %v", args, output.ExitCode)
-	return output
-}
-
 func Av(t *testing.T, args ...string) AvOutput {
 	args = append([]string{"--debug"}, args...)
 	return Cmd(t, avCmdPath, args...)
