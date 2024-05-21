@@ -879,7 +879,8 @@ func UpdatePullRequestWithStack(
 
 	repoMeta := tx.Repository()
 
-	stackToWrite, err := stackutils.BuildStackTreeForPullRequest(tx, branchName)
+	// Don't sort based on the current branch so that the output is consistent between branches.
+	stackToWrite, err := stackutils.BuildStackTreeCurrentStack(tx, branchName, false)
 	if err != nil {
 		return err
 	}

@@ -38,7 +38,7 @@ var stackTreeCmd = &cobra.Command{
 			}
 		}
 
-		rootNodes := stackutils.BuildStackTree(tx, currentBranch)
+		rootNodes := stackutils.BuildStackTreeAllBranches(tx, currentBranch, true)
 		for _, node := range rootNodes {
 			fmt.Print(stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
 				stbi := getStackTreeBranchInfo(repo, tx, branchName)
