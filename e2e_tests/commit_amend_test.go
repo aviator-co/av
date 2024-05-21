@@ -11,7 +11,7 @@ import (
 func TestCommitAmendInStack(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
 	Chdir(t, repo.RepoDir)
-	RequireCmd(t, "git", "fetch")
+	repo.Git(t, "fetch")
 	initialTimestamp := GetFetchHeadTimestamp(t, repo)
 
 	// Create a branch and commit a file.
@@ -27,7 +27,7 @@ func TestCommitAmendInStack(t *testing.T) {
 	RequireAv(t, "commit", "create", "-m", "two")
 
 	// Go back to the first branch and amend the commit with another file.
-	RequireCmd(t, "git", "checkout", "one")
+	repo.Git(t, "checkout", "one")
 	filepath = repo.CreateFile(t, "one-b.txt", "one-b")
 	repo.AddFile(t, filepath)
 	RequireAv(t, "commit", "amend", "--no-edit")

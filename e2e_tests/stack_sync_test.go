@@ -13,8 +13,7 @@ import (
 )
 
 func TestHelp(t *testing.T) {
-	res := Av(t, "--help")
-	require.Equal(t, 0, res.ExitCode)
+	RequireAv(t, "--help")
 }
 
 func TestStackSync(t *testing.T) {
@@ -29,24 +28,24 @@ func TestStackSync(t *testing.T) {
 	//     stack-4:           \ -> 4a
 	// Note: we create the first branch with a "vanilla" git checkout just to
 	// make sure that's working as intended.
-	require.Equal(t, 0, Cmd(t, "git", "checkout", "-b", "stack-1").ExitCode)
+	repo.Git(t, "checkout", "-b", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
-	require.Equal(t, 0, Av(t, "stack", "branch", "stack-2").ExitCode)
+	RequireAv(t, "stack", "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
-	require.Equal(t, 0, Av(t, "stack", "branch", "stack-3").ExitCode)
+	RequireAv(t, "stack", "branch", "stack-3")
 	repo.CommitFile(
 		t,
 		"different-file",
 		"1a\n2a\n3a\n",
 		gittest.WithMessage("Commit 3a"),
 	)
-	require.Equal(t, 0, Cmd(t, "git", "checkout", "stack-1").ExitCode)
-	require.Equal(t, 0, Av(t, "stack", "branch", "stack-4").ExitCode)
+	repo.Git(t, "checkout", "stack-1")
+	RequireAv(t, "stack", "branch", "stack-4")
 	repo.CommitFile(t, "another-file", "1a\n4a\n", gittest.WithMessage("Commit 4a"))
-	require.Equal(t, 0, Cmd(t, "git", "checkout", "stack-3").ExitCode)
+	repo.Git(t, "checkout", "stack-3")
 
 	// Everything up to date now, so this should be a no-op.
-	require.Equal(t, 0, Av(t, "stack", "sync", "--no-fetch", "--no-push").ExitCode)
+	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
 
 	// We're going to add a commit to the first branch in the stack.
 	// Our stack looks like:
@@ -112,13 +111,8 @@ func TestStackSync(t *testing.T) {
 	require.NoError(t, err)
 	repo.Git(t, "add", "my-file")
 	require.NoError(t, err, "failed to stage file")
-	syncContinue := Av(t, "stack", "sync", "--continue")
-	require.Equal(
-		t,
-		0,
-		syncContinue.ExitCode,
-		"stack sync --continue should return zero exit code after resolving conflicts",
-	)
+	// stack sync --continue should return zero exit code after resolving conflicts
+	RequireAv(t, "stack", "sync", "--continue")
 
 	// Make sure we've handled the rebase of stack-3 correctly (see the long
 	// comment above).
@@ -130,8 +124,7 @@ func TestStackSync(t *testing.T) {
 	require.Equal(t, mergeBases[0], stack1Head, "stack-2 should be up-to-date with stack-1")
 
 	// Further sync attemps should yield no-ops
-	syncNoop := Av(t, "stack", "sync", "--no-fetch", "--no-push")
-	require.Equal(t, 0, syncNoop.ExitCode)
+	syncNoop := RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
 	require.Contains(t, syncNoop.Stderr, "already up-to-date")
 
 	// Make sure we've not introduced any extra commits
@@ -166,7 +159,7 @@ func TestStackSyncAbort(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create a two stack...
-	RequireCmd(t, "git", "checkout", "-b", "stack-1")
+	repo.Git(t, "checkout", "-b", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	RequireAv(t, "stack", "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
@@ -223,7 +216,7 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create a three stack...
-	RequireCmd(t, "git", "checkout", "-b", "stack-1")
+	repo.Git(t, "checkout", "-b", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	RequireAv(t, "stack", "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
@@ -264,7 +257,7 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 	)
 	require.Regexp(t, regexp.MustCompile("could not apply .+ Commit 2a"), sync.Stderr)
 	require.NoError(t, os.WriteFile("my-file", []byte("1a\n1b\n2a\n"), 0644))
-	RequireCmd(t, "git", "add", "my-file")
+	repo.Git(t, "add", "my-file")
 
 	// Commit 2b should be able to be applied normally, then we should have a
 	// conflict with 3a
@@ -277,10 +270,9 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 	)
 	require.Regexp(t, regexp.MustCompile("could not apply .+ Commit 3a"), sync.Stderr)
 	require.NoError(t, os.WriteFile("my-file", []byte("1a\n1b\n2a\n2b\n3a\n"), 0644))
-	RequireCmd(t, "git", "add", "my-file")
+	repo.Git(t, "add", "my-file")
 
 	// And finally, 3b should be able to be applied without conflict and our stack
 	// sync should be over.
-	sync = Av(t, "stack", "sync", "--continue")
-	require.Equal(t, 0, sync.ExitCode, "stack sync should return zero exit code if no conflicts")
+	RequireAv(t, "stack", "sync", "--continue")
 }
