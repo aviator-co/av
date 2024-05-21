@@ -53,8 +53,6 @@ func TestStackSyncReparent(t *testing.T) {
 		"foo.txt should be set after reparenting onto foo branch",
 	)
 	require.NoFileExists(t, "bar.txt", "bar.txt should not exist after reparenting onto foo branch")
-
-	Cmd(t, "git", "log")
 }
 
 func TestStackSyncReparentTrunk(t *testing.T) {
@@ -68,7 +66,7 @@ func TestStackSyncReparentTrunk(t *testing.T) {
 	repo.CommitFile(t, "bar.txt", "bar")
 
 	// Delete the local main. av should use the remote tracking branch.
-	Cmd(t, "git", "branch", "-D", "main")
+	repo.Git(t, "branch", "-D", "main")
 
 	RequireAv(t, "stack", "sync", "--parent", "main", "--no-fetch", "--no-push")
 }

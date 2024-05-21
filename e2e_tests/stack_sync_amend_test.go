@@ -13,7 +13,7 @@ func TestSyncAfterAmendingCommit(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create a three stack...
-	RequireCmd(t, "git", "checkout", "-b", "stack-1")
+	repo.Git(t, "checkout", "-b", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 	RequireAv(t, "stack", "branch", "stack-2")
@@ -41,8 +41,7 @@ func TestSyncAfterAmendingCommit(t *testing.T) {
 	// Now we amend commit 1b and make sure the sync after succeeds
 	repo.CheckoutBranch(t, "refs/heads/stack-1")
 	repo.CommitFile(t, "my-file", "1a\n1c\n1b\n", gittest.WithAmend())
-	sync := Av(t, "stack", "sync", "--no-fetch", "--no-push")
-	require.Equal(t, 0, sync.ExitCode, "expected sync to succeed")
+	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
 	repo.CheckoutBranch(t, "refs/heads/stack-3")
 	contents, err := os.ReadFile("my-file")
 	require.NoError(t, err)

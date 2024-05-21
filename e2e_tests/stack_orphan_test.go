@@ -19,7 +19,7 @@ func TestStackOrphan(t *testing.T) {
 	// Then stack-2 (and child branch stack-3) will be orphaned
 
 	// Setup initial state
-	require.Equal(t, 0, Cmd(t, "git", "checkout", "-b", "stack-1").ExitCode)
+	repo.Git(t, "checkout", "-b", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 	RequireAv(t, "stack", "branch", "stack-2")
@@ -45,14 +45,13 @@ func TestStackOrphan(t *testing.T) {
 	)
 
 	RequireAv(t, "stack", "prev")
-	tree := Av(t, "stack", "tree")
+	tree := RequireAv(t, "stack", "tree")
 	require.Contains(t, tree.Stdout, "stack-2")
 	require.Contains(t, tree.Stdout, "stack-3")
 
 	RequireAv(t, "stack", "orphan")
 
-	tree = Av(t, "stack", "tree")
+	tree = RequireAv(t, "stack", "tree")
 	require.NotContains(t, tree.Stdout, "stack-2")
 	require.NotContains(t, tree.Stdout, "stack-3")
-
 }
