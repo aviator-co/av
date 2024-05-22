@@ -12,6 +12,7 @@ var stackCmd = &cobra.Command{
 
 func init() {
 	stackCmd.AddCommand(
+		stackAdoptCmd,
 		stackBranchCmd,
 		stackBranchCommitCmd,
 		stackDiffCmd,
