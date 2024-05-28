@@ -21,6 +21,10 @@ import (
 
 // NewTempRepo initializes a new git repository with reasonable defaults.
 func NewTempRepo(t *testing.T) *GitTestRepo {
+	return NewTempRepoWithGitHubServer(t, "http://github.invalid")
+}
+
+func NewTempRepoWithGitHubServer(t *testing.T, serverURL string) *GitTestRepo {
 	var dir string
 	var remoteDir string
 	if os.Getenv("AV_TEST_PRESERVE_TEMP_REPO") != "" {
@@ -89,6 +93,17 @@ func NewTempRepo(t *testing.T) *GitTestRepo {
 		Name:  "nonexistent",
 	})
 	require.NoError(t, tx.Commit(), "failed to write repository metadata")
+
+	err = os.WriteFile(
+		filepath.Join(repo.GitDir, "av", "config.yml"),
+		[]byte(fmt.Sprintf(`
+github:
+    token: "dummy_valid_token"
+    baseUrl: %q
+`, serverURL)),
+		0644,
+	)
+	require.NoError(t, err, "failed to write .git/av/config.yml")
 
 	return repo
 }

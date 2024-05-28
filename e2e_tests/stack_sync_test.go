@@ -17,7 +17,9 @@ func TestHelp(t *testing.T) {
 }
 
 func TestStackSync(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
 	Chdir(t, repo.RepoDir)
 
 	// To start, we create a simple three-stack where each stack has a single commit.
@@ -45,7 +47,7 @@ func TestStackSync(t *testing.T) {
 	repo.Git(t, "checkout", "stack-3")
 
 	// Everything up to date now, so this should be a no-op.
-	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
+	RequireAv(t, "stack", "sync")
 
 	// We're going to add a commit to the first branch in the stack.
 	// Our stack looks like:
@@ -86,7 +88,7 @@ func TestStackSync(t *testing.T) {
 
 	// Since both commits updated my-file in ways that conflict, we should get
 	// a merge/rebase conflict here.
-	syncConflict := Av(t, "stack", "sync", "--no-fetch", "--no-push")
+	syncConflict := Av(t, "stack", "sync")
 	require.NotEqual(
 		t, 0, syncConflict.ExitCode,
 		"stack sync should return non-zero exit code if conflicts",
@@ -124,7 +126,7 @@ func TestStackSync(t *testing.T) {
 	require.Equal(t, mergeBases[0], stack1Head, "stack-2 should be up-to-date with stack-1")
 
 	// Further sync attemps should yield no-ops
-	syncNoop := RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
+	syncNoop := RequireAv(t, "stack", "sync")
 	require.Contains(t, syncNoop.Stderr, "already up-to-date")
 
 	// Make sure we've not introduced any extra commits
@@ -155,7 +157,9 @@ func TestStackSync(t *testing.T) {
 }
 
 func TestStackSyncAbort(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
 	Chdir(t, repo.RepoDir)
 
 	// Create a two stack...
@@ -172,7 +176,7 @@ func TestStackSyncAbort(t *testing.T) {
 	repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 
 	// ... and make sure we get a conflict on sync...
-	syncConflict := Av(t, "stack", "sync", "--no-fetch", "--no-push")
+	syncConflict := Av(t, "stack", "sync")
 	require.NotEqual(
 		t,
 		0,
@@ -212,7 +216,9 @@ func TestStackSyncAbort(t *testing.T) {
 }
 
 func TestStackSyncWithLotsOfConflicts(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
 	Chdir(t, repo.RepoDir)
 
 	// Create a three stack...
@@ -248,7 +254,7 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 		)
 	})
 
-	sync := Av(t, "stack", "sync", "--no-fetch", "--no-push")
+	sync := Av(t, "stack", "sync")
 	require.NotEqual(
 		t,
 		0,

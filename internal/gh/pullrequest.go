@@ -9,17 +9,11 @@ import (
 )
 
 type PullRequest struct {
-	ID     string
-	Number int64
-	Author struct {
-		Login string
-	}
+	ID                  string
+	Number              int64
 	HeadRefName         string
-	HeadRefOID          string
 	BaseRefName         string
 	IsDraft             bool
-	Mergeable           githubv4.MergeableState
-	Merged              bool
 	Permalink           string
 	State               githubv4.PullRequestState
 	Title               string

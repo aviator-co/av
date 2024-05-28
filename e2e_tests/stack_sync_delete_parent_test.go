@@ -10,7 +10,9 @@ import (
 )
 
 func TestStackSyncDeleteParent(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
 	Chdir(t, repo.RepoDir)
 
 	// To start, we create a simple two-stack where each stack has a single commit.
@@ -44,7 +46,7 @@ func TestStackSyncDeleteParent(t *testing.T) {
 	)
 
 	// Everything up to date now, so this should be a no-op.
-	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
+	RequireAv(t, "stack", "sync")
 
 	// We simulate the stack-2 is deleted and submerged into stack-1
 	//     main:    X
@@ -57,7 +59,7 @@ func TestStackSyncDeleteParent(t *testing.T) {
 		newStack1Head = repo.GetCommitAtRef(t, plumbing.HEAD)
 	})
 	RequireAv(t, "stack", "tidy")
-	RequireAv(t, "stack", "sync", "--no-fetch", "--no-push")
+	RequireAv(t, "stack", "sync")
 
 	// stack-1 should be an ancestor of stack-3 after running sync
 	repo.Git(t, "merge-base", "--is-ancestor", newStack1Head.String(), "stack-3")
