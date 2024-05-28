@@ -17,7 +17,7 @@ type StackTreeNode struct {
 	Children []*StackTreeNode
 }
 
-func buildTree(currentBranchName string, branches []*StackTreeBranchInfo, sortCurrent bool) []*StackTreeNode {
+func BuildTree(currentBranchName string, branches []*StackTreeBranchInfo, sortCurrent bool) []*StackTreeNode {
 	childBranches := make(map[string][]string)
 	branchMap := make(map[string]*StackTreeNode)
 	for _, branch := range branches {
@@ -118,5 +118,5 @@ func buildStackTree(currentBranch string, branchesToInclude map[string]meta.Bran
 			ParentBranchName: "",
 		})
 	}
-	return buildTree(currentBranch, branches, sortCurrent)
+	return BuildTree(currentBranch, branches, sortCurrent)
 }
