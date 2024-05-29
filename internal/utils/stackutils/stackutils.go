@@ -89,15 +89,38 @@ func BuildStackTreeAllBranches(tx meta.ReadTx, currentBranch string, sortCurrent
 }
 
 func BuildStackTreeCurrentStack(tx meta.ReadTx, currentBranch string, sortCurrent bool) (*StackTreeNode, error) {
-	branchesToInclude, err := meta.StackBranchesMap(tx, currentBranch)
+	nodes, err := BuildStackTreeRelatedBranchStacks(tx, currentBranch, sortCurrent, []string{currentBranch})
 	if err != nil {
 		return nil, err
 	}
-	stackTree := buildStackTree(currentBranch, branchesToInclude, sortCurrent)
-	if len(stackTree) != 1 {
-		return nil, fmt.Errorf("expected one root branch, got %d", len(stackTree))
+	if len(nodes) != 1 {
+		return nil, fmt.Errorf("expected one root branch, got %d", len(nodes))
 	}
-	return stackTree[0], nil
+	return nodes[0], nil
+}
+
+func BuildStackTreeRelatedBranchStacks(tx meta.ReadTx, currentBranch string, sortCurrent bool, relatedBranches []string) ([]*StackTreeNode, error) {
+	branches := map[string]bool{}
+	for _, branch := range relatedBranches {
+		stack, err := meta.StackBranches(tx, branch)
+		if err != nil {
+			// Ignore branches that are not adopted to av.
+			continue
+		}
+		for _, name := range stack {
+			branches[name] = true
+		}
+	}
+	var names []string
+	for name := range branches {
+		names = append(names, name)
+	}
+
+	branchesToInclude, err := meta.BranchesMap(tx, names)
+	if err != nil {
+		return nil, err
+	}
+	return buildStackTree(currentBranch, branchesToInclude, sortCurrent), nil
 }
 
 func buildStackTree(currentBranch string, branchesToInclude map[string]meta.Branch, sortCurrent bool) []*StackTreeNode {

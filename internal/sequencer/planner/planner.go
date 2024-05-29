@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/sequencer"
@@ -57,6 +58,41 @@ func PlanForSync(tx meta.ReadTx, repo *git.Repo, targetBranches []plumbing.Refer
 		}
 		ret = append(ret, sequencer.RestackOp{
 			Name:             br,
+			NewParent:        plumbing.NewBranchReferenceName(avbr.Parent.Name),
+			NewParentIsTrunk: avbr.Parent.Trunk,
+		})
+	}
+	return ret, nil
+}
+
+func PlanForReparent(tx meta.ReadTx, repo *git.Repo, currentBranch, newParentBranch plumbing.ReferenceName) ([]sequencer.RestackOp, error) {
+	if newParentBranch == currentBranch {
+		return nil, errors.New("cannot re-parent to self")
+	}
+	children := meta.SubsequentBranches(tx, currentBranch.Short())
+	for _, child := range children {
+		if child == newParentBranch.Short() {
+			return nil, errors.New("cannot re-parent to a child branch")
+		}
+	}
+	isParentTrunk, err := repo.IsTrunkBranch(newParentBranch.Short())
+	if err != nil {
+		return nil, err
+	}
+	var ret []sequencer.RestackOp
+	ret = append(ret, sequencer.RestackOp{
+		Name:             currentBranch,
+		NewParent:        newParentBranch,
+		NewParentIsTrunk: isParentTrunk,
+	})
+	for _, child := range children {
+		avbr, _ := tx.Branch(child)
+		if avbr.MergeCommit != "" {
+			// Skip rebasing branches that have merge commits.
+			continue
+		}
+		ret = append(ret, sequencer.RestackOp{
+			Name:             plumbing.NewBranchReferenceName(child),
 			NewParent:        plumbing.NewBranchReferenceName(avbr.Parent.Name),
 			NewParentIsTrunk: avbr.Parent.Trunk,
 		})

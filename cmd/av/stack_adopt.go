@@ -418,4 +418,9 @@ func init() {
 		&stackAdoptFlags.Parent, "parent", "",
 		"force specifying the parent branch",
 	)
+
+	branches, _ := allBranches()
+	_ = stackSyncCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return branches, cobra.ShellCompDirectiveDefault
+	})
 }
