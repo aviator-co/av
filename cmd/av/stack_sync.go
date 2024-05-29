@@ -151,14 +151,14 @@ base branch.
 		if state.Config.Parent != "" {
 			var res *actions.ReparentResult
 			var err error
-			defaultBranch, err := repo.DefaultBranch()
+			newParentTrunk, err := repo.IsTrunkBranch(state.Config.Parent)
 			if err != nil {
 				return err
 			}
 			opts := actions.ReparentOpts{
 				Branch:         state.CurrentBranch,
 				NewParent:      state.Config.Parent,
-				NewParentTrunk: state.Config.Parent == defaultBranch,
+				NewParentTrunk: newParentTrunk,
 			}
 			if stackSyncFlags.Continue || stackSyncFlags.Skip {
 				res, err = actions.ReparentSkipContinue(repo, tx, opts, stackSyncFlags.Skip)

@@ -87,12 +87,6 @@ var stackBranchCommitCmd = &cobra.Command{
 			tx.Abort()
 		})
 
-		// Determine important contextual information from Git
-		defaultBranch, err := repo.DefaultBranch()
-		if err != nil {
-			return errors.WrapIf(err, "failed to determine repository default branch")
-		}
-
 		parentBranchName, err := repo.CurrentBranchName()
 		if err != nil {
 			return errors.WrapIff(err, "failed to get current branch name")
@@ -102,7 +96,10 @@ var stackBranchCommitCmd = &cobra.Command{
 		// We might want to allow other branches to be trunks in the future, but
 		// that does run the risk of allowing the user to get into a weird state
 		// (where some stacks assume a branch is a trunk and others don't).
-		isBranchFromTrunk := parentBranchName == defaultBranch
+		isBranchFromTrunk, err := repo.IsTrunkBranch(parentBranchName)
+		if err != nil {
+			return errors.WrapIf(err, "failed to check if branch is trunk")
+		}
 		var parentHead string
 		if !isBranchFromTrunk {
 			parentHead, err = repo.RevParse(&git.RevParse{Rev: parentBranchName})
