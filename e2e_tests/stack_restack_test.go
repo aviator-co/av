@@ -316,3 +316,41 @@ func TestStackRestackAfterAmendingCommit(t *testing.T) {
 	// Now we amend commit 2a and make sure the sync succeeds
 	repo.CheckoutBranch(t, "refs/heads/stack-2")
 }
+
+func TestStackRestackAll(t *testing.T) {
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
+	Chdir(t, repo.RepoDir)
+
+	repo.Git(t, "switch", "main")
+	RequireAv(t, "stack", "branch", "stack-1")
+	repo.CommitFile(t, "my-file", "1\n", gittest.WithMessage("Commit 1"))
+
+	repo.Git(t, "switch", "stack-1")
+	RequireAv(t, "stack", "branch", "stack-1a")
+	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
+
+	repo.Git(t, "switch", "stack-1")
+	RequireAv(t, "stack", "branch", "stack-1b")
+	repo.CommitFile(t, "my-file", "1b\n", gittest.WithMessage("Commit 1b"))
+
+	repo.Git(t, "switch", "stack-1")
+	repo.CommitFile(t, "other-file", "2\n", gittest.WithMessage("Commit 2"))
+
+	//     main:    X
+	//     stack-1:  \ -> 1 -> 2
+	//     stack-1a:      \ -> 1a
+	//     stack-1b:      \ -> 1b
+
+	repo.Git(t, "switch", "stack-1a")
+	RequireAv(t, "stack", "restack", "--all")
+
+	//     main:    X
+	//     stack-1:  \ -> 1 -> 2
+	//     stack-1a:           \ -> 1a
+	//     stack-1b:           \ -> 1b
+
+	repo.Git(t, "merge-base", "--is-ancestor", "stack-1", "stack-1a")
+	repo.Git(t, "merge-base", "--is-ancestor", "stack-1", "stack-1b")
+}

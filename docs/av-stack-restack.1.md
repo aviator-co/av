@@ -26,6 +26,13 @@ the branches.
 
 ## OPTIONS
 
+`--all`
+: Rebase all branches.
+
+`--current`
+: Only rebase up to the current branch. (Don't recurse into descendant
+  branches.)
+
 `--continue`
 : Continue an in-progress rebase.
 
