@@ -8,7 +8,20 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
-func PlanForRestack(tx meta.ReadTx, repo *git.Repo, targetBranches []plumbing.ReferenceName) ([]sequencer.RestackOp, error) {
+func PlanForRestack(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.ReferenceName, restackAll, restackCurrent bool) ([]sequencer.RestackOp, error) {
+	var targetBranches []plumbing.ReferenceName
+	var err error
+	if restackAll {
+		targetBranches, err = GetTargetBranches(tx, repo, false, AllBranches)
+	} else if restackCurrent {
+		targetBranches, err = GetTargetBranches(tx, repo, false, CurrentAndParents)
+	} else {
+		targetBranches, err = GetTargetBranches(tx, repo, false, CurrentStack)
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	var ret []sequencer.RestackOp
 	for _, br := range targetBranches {
 		avbr, _ := tx.Branch(br.Short())

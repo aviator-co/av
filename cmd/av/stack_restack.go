@@ -21,10 +21,12 @@ import (
 )
 
 var stackRestackFlags struct {
-	DryRun   bool
+	All      bool
+	Current  bool
 	Abort    bool
 	Continue bool
 	Skip     bool
+	DryRun   bool
 }
 
 var stackRestackCmd = &cobra.Command{
@@ -69,7 +71,7 @@ var stackRestackCmd = &cobra.Command{
 
 type stackRestackState struct {
 	InitialBranch string
-	StNode        *stackutils.StackTreeNode
+	RestackingAll bool
 	Seq           *sequencer.Sequencer
 }
 
@@ -117,8 +119,10 @@ func (vm stackRestackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err := vm.repo.WriteStateFile(git.StateFileKindRestack, nil); err != nil {
 				vm.err = err
 			}
-			if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: vm.state.InitialBranch}); err != nil {
-				vm.err = err
+			if vm.state.InitialBranch != "" {
+				if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: vm.state.InitialBranch}); err != nil {
+					vm.err = err
+				}
 			}
 			return vm, tea.Quit
 		}
@@ -171,22 +175,35 @@ func (vm stackRestackViewModel) View() string {
 			}
 		}
 
-		sb.WriteString(stackutils.RenderTree(vm.state.StNode, func(branchName string, isTrunk bool) string {
-			bn := plumbing.NewBranchReferenceName(branchName)
-			if syncedBranches[bn] {
-				return colors.Success("✓ " + branchName)
+		var nodes []*stackutils.StackTreeNode
+		var err error
+		if vm.state.RestackingAll {
+			nodes = stackutils.BuildStackTreeAllBranches(vm.db.ReadTx(), vm.state.InitialBranch, true)
+		} else {
+			nodes, err = stackutils.BuildStackTreeRelatedBranchStacks(vm.db.ReadTx(), vm.state.InitialBranch, true, []string{vm.state.InitialBranch})
+		}
+		if err != nil {
+			sb.WriteString("Failed to build stack tree: " + err.Error() + "\n")
+		} else {
+			for _, node := range nodes {
+				sb.WriteString(stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
+					bn := plumbing.NewBranchReferenceName(branchName)
+					if syncedBranches[bn] {
+						return colors.Success("✓ " + branchName)
+					}
+					if pendingBranches[bn] {
+						return lipgloss.NewStyle().Foreground(colors.Amber500).Render(branchName)
+					}
+					if bn == vm.state.Seq.CurrentSyncRef {
+						return lipgloss.NewStyle().Foreground(colors.Amber500).Render(vm.spinner.View() + branchName)
+					}
+					if bn == vm.abortedBranch {
+						return colors.Failure("✗ " + branchName)
+					}
+					return branchName
+				}))
 			}
-			if pendingBranches[bn] {
-				return lipgloss.NewStyle().Foreground(colors.Amber500).Render(branchName)
-			}
-			if bn == vm.state.Seq.CurrentSyncRef {
-				return lipgloss.NewStyle().Foreground(colors.Amber500).Render(vm.spinner.View() + branchName)
-			}
-			if bn == vm.abortedBranch {
-				return colors.Failure("✗ " + branchName)
-			}
-			return branchName
-		}))
+		}
 	}
 	if vm.rebaseConflictErrorHeadline != "" {
 		sb.WriteString("\n")
@@ -205,6 +222,9 @@ func (vm stackRestackViewModel) View() string {
 func (vm stackRestackViewModel) initCmd() tea.Msg {
 	var state stackRestackState
 	if err := vm.repo.ReadStateFile(git.StateFileKindRestack, &state); err != nil && os.IsNotExist(err) {
+		if stackRestackFlags.Abort || stackRestackFlags.Continue || stackRestackFlags.Skip {
+			return errors.New("no restack in progress")
+		}
 		var currentBranch string
 		if dh, err := vm.repo.DetachedHead(); err != nil {
 			return err
@@ -214,19 +234,22 @@ func (vm stackRestackViewModel) initCmd() tea.Msg {
 				return err
 			}
 		}
-		if _, exist := vm.db.ReadTx().Branch(currentBranch); !exist {
-			return errors.New("current branch is not adopted to av")
-		}
 		state.InitialBranch = currentBranch
-		state.StNode, err = stackutils.BuildStackTreeCurrentStack(vm.db.ReadTx(), currentBranch, true)
-		if err != nil {
-			return err
+
+		if stackRestackFlags.All {
+			state.RestackingAll = true
+		} else {
+			if _, exist := vm.db.ReadTx().Branch(currentBranch); !exist {
+				return errors.New("current branch is not adopted to av")
+			}
 		}
-		targetBranches, err := planner.GetTargetBranches(vm.db.ReadTx(), vm.repo, false, planner.CurrentStack)
-		if err != nil {
-			return err
+
+		var currentBranchRef plumbing.ReferenceName
+		if currentBranch != "" {
+			currentBranchRef = plumbing.NewBranchReferenceName(currentBranch)
 		}
-		ops, err := planner.PlanForRestack(vm.db.ReadTx(), vm.repo, targetBranches)
+
+		ops, err := planner.PlanForRestack(vm.db.ReadTx(), vm.repo, currentBranchRef, stackRestackFlags.All, stackRestackFlags.Current)
 		if err != nil {
 			return err
 		}
@@ -251,6 +274,14 @@ func (vm stackRestackViewModel) runSeq() tea.Msg {
 }
 
 func init() {
+	stackRestackCmd.Flags().BoolVar(
+		&stackRestackFlags.All, "all", false,
+		"restack all branches",
+	)
+	stackRestackCmd.Flags().BoolVar(
+		&stackRestackFlags.Current, "current", false,
+		"only restack up to the current branch\n(don't recurse into descendant branches)",
+	)
 	stackRestackCmd.Flags().BoolVar(
 		&stackRestackFlags.Continue, "continue", false,
 		"continue an in-progress restack",
