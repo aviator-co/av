@@ -58,11 +58,15 @@ type Sequencer struct {
 }
 
 func NewSequencer(remoteName string, db meta.DB, ops []RestackOp) *Sequencer {
+	var currentSyncRef plumbing.ReferenceName
+	if len(ops) > 0 {
+		currentSyncRef = ops[0].Name
+	}
 	return &Sequencer{
 		RemoteName:              remoteName,
 		OriginalBranchSnapshots: getBranchSnapshots(db),
 		Operations:              ops,
-		CurrentSyncRef:          ops[0].Name,
+		CurrentSyncRef:          currentSyncRef,
 	}
 }
 
@@ -193,6 +197,7 @@ func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB) (*git.RebaseResul
 		return nil, err
 	}
 	if result.Status == git.RebaseConflict {
+		result.ErrorHeadline = fmt.Sprintf("Failed to rebase %q onto %q (merge base is %q)\n", op.Name, op.NewParent, previousParentHash.String()[:7]) + result.ErrorHeadline
 		seq.SequenceInterruptedNewParentHash = newParentHash
 		return result, nil
 	}
