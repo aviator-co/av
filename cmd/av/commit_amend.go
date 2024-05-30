@@ -1,14 +1,12 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
-	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/spf13/cobra"
 )
@@ -30,61 +28,43 @@ var commitAmendCmd = &cobra.Command{
 			return err
 		}
 
-		currentBranchName, err := repo.CurrentBranchName()
-		if err != nil {
-			return errors.WrapIf(err, "failed to determine current branch")
-		}
-
-		commitArgs := []string{"commit", "--amend"}
-		if commitAmendFlags.NoEdit {
-			commitArgs = append(commitArgs, "--no-edit")
-		}
-		if commitAmendFlags.Message != "" {
-			commitArgs = append(commitArgs, "--message", commitAmendFlags.Message)
-		}
-
-		if _, err := repo.Run(&git.RunOpts{
-			Args:        commitArgs,
-			ExitError:   true,
-			Interactive: true,
-		}); err != nil {
-			_, _ = fmt.Fprint(os.Stderr,
-				"\n", colors.Failure("Failed to amend."), "\n",
-			)
-			return actions.ErrExitSilently{ExitCode: 1}
-		}
-
-		var state actions.StackSyncState
-		if err := repo.ReadStateFile(git.StateFileKindSync, &state); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-
-		state.OriginalBranch = currentBranchName
-		ctx := context.Background()
 		db, err := getDB(repo)
 		if err != nil {
 			return err
 		}
-		tx := db.WriteTx()
-		defer tx.Abort()
 
-		client, err := getGitHubClient()
-		if err != nil {
-			return err
+		// We need to run git commit --amend before bubbletea grabs the terminal. Otherwise,
+		// we need to make p.ReleaseTerminal() and p.RestoreTerminal().
+		if err := runAmend(repo); err != nil {
+			fmt.Fprint(os.Stderr, "\n", colors.Failure("Failed to amend."), "\n")
+			return actions.ErrExitSilently{ExitCode: 1}
 		}
 
-		branchesToSync := meta.SubsequentBranches(tx, currentBranchName)
-
-		// Even if it's not configured, there's no need to fetch/push
-		state.Config.NoFetch = true
-		state.Config.NoPush = true
-		err = actions.SyncStack(ctx, repo, client, tx, branchesToSync, state, actions.WithLocalOnly())
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return runPostCommitRestack(repo, db)
 	},
+}
+
+func runAmend(repo *git.Repo) error {
+	if _, err := repo.CurrentBranchName(); err != nil {
+		return errors.WrapIf(err, "failed to determine current branch")
+	}
+
+	commitArgs := []string{"commit", "--amend"}
+	if commitAmendFlags.NoEdit {
+		commitArgs = append(commitArgs, "--no-edit")
+	}
+	if commitAmendFlags.Message != "" {
+		commitArgs = append(commitArgs, "--message", commitAmendFlags.Message)
+	}
+
+	if _, err := repo.Run(&git.RunOpts{
+		Args:        commitArgs,
+		ExitError:   true,
+		Interactive: true,
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func init() {

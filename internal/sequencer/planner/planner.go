@@ -112,3 +112,20 @@ func PlanForReparent(tx meta.ReadTx, repo *git.Repo, currentBranch, newParentBra
 	}
 	return ret, nil
 }
+
+func PlanForAmend(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.ReferenceName) ([]sequencer.RestackOp, error) {
+	var ret []sequencer.RestackOp
+	for _, child := range meta.SubsequentBranches(tx, currentBranch.Short()) {
+		avbr, _ := tx.Branch(child)
+		if avbr.MergeCommit != "" {
+			// Skip rebasing branches that have merge commits.
+			continue
+		}
+		ret = append(ret, sequencer.RestackOp{
+			Name:             plumbing.NewBranchReferenceName(child),
+			NewParent:        plumbing.NewBranchReferenceName(avbr.Parent.Name),
+			NewParentIsTrunk: avbr.Parent.Trunk,
+		})
+	}
+	return ret, nil
+}

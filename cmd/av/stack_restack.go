@@ -10,11 +10,9 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/sequencer"
 	"github.com/aviator-co/av/internal/sequencer/planner"
-	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/aviator-co/av/internal/utils/stackutils"
+	"github.com/aviator-co/av/internal/sequencer/sequencerui"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
@@ -50,168 +48,93 @@ var stackRestackCmd = &cobra.Command{
 				tea.WithInput(nil),
 			}
 		}
-		p := tea.NewProgram(stackRestackViewModel{
-			repo:    repo,
-			db:      db,
-			spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
-		}, opts...)
+		p := tea.NewProgram(&stackRestackViewModel{repo: repo, db: db}, opts...)
 		model, err := p.Run()
 		if err != nil {
 			return err
 		}
-		if err := model.(stackRestackViewModel).err; err != nil {
+		if err := model.(*stackRestackViewModel).err; err != nil {
+			if errors.Is(err, nothingToRestackError) {
+				return nil
+			}
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
-		if s := model.(stackRestackViewModel).rebaseConflictErrorHeadline; s != "" {
+		if model.(*stackRestackViewModel).quitWithConflict {
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
 		return nil
 	},
 }
 
-type stackRestackState struct {
-	InitialBranch string
-	RestackingAll bool
-	Seq           *sequencer.Sequencer
-}
-
-type stackRestackSeqResult struct {
-	result *git.RebaseResult
-	err    error
-}
-
 type stackRestackViewModel struct {
-	repo    *git.Repo
-	db      meta.DB
-	state   *stackRestackState
-	spinner spinner.Model
+	repo *git.Repo
+	db   meta.DB
 
-	rebaseConflictErrorHeadline string
-	rebaseConflictHint          string
-	abortedBranch               plumbing.ReferenceName
-	err                         error
+	restackModel *sequencerui.RestackModel
+
+	quitWithConflict bool
+	err              error
 }
 
-func (vm stackRestackViewModel) Init() tea.Cmd {
-	return tea.Batch(vm.spinner.Tick, vm.initCmd)
+func (vm *stackRestackViewModel) Init() tea.Cmd {
+	state, err := vm.readState()
+	if err != nil {
+		return func() tea.Msg { return err }
+	}
+	if state == nil {
+		if stackRestackFlags.Abort || stackRestackFlags.Continue || stackRestackFlags.Skip {
+			return func() tea.Msg { return errors.New("no restack in progress") }
+		}
+		state, err = vm.createState()
+		if err != nil {
+			return func() tea.Msg { return err }
+		}
+	}
+	if state == nil {
+		return func() tea.Msg { return nothingToRestackError }
+	}
+	vm.restackModel = sequencerui.NewRestackModel(vm.repo, vm.db)
+	vm.restackModel.State = state
+	vm.restackModel.Abort = stackRestackFlags.Abort
+	vm.restackModel.Continue = stackRestackFlags.Continue
+	vm.restackModel.Skip = stackRestackFlags.Skip
+	vm.restackModel.DryRun = stackRestackFlags.DryRun
+	return vm.restackModel.Init()
 }
 
-func (vm stackRestackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (vm *stackRestackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case error:
-		vm.err = msg
-		return vm, tea.Quit
-	case *stackRestackState:
-		vm.state = msg
-		if stackRestackFlags.DryRun {
-			return vm, tea.Quit
-		}
-		if stackRestackFlags.Skip || stackRestackFlags.Continue || stackRestackFlags.Abort {
-			if stackRestackFlags.Abort {
-				vm.abortedBranch = vm.state.Seq.CurrentSyncRef
-			}
-			return vm, vm.runSeqWithContinuationFlags
-		}
-		return vm, vm.runSeq
-	case *stackRestackSeqResult:
-		if msg.err == nil && msg.result == nil {
-			// Finished the sequence.
-			if err := vm.repo.WriteStateFile(git.StateFileKindRestack, nil); err != nil {
-				vm.err = err
-			}
-			if vm.state.InitialBranch != "" {
-				if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: vm.state.InitialBranch}); err != nil {
-					vm.err = err
-				}
-			}
-			return vm, tea.Quit
-		}
-		if msg.result != nil && msg.result.Status == git.RebaseConflict {
-			vm.rebaseConflictErrorHeadline = msg.result.ErrorHeadline
-			vm.rebaseConflictHint = msg.result.Hint
-			if err := vm.repo.WriteStateFile(git.StateFileKindRestack, vm.state); err != nil {
-				vm.err = err
-			}
-			return vm, tea.Quit
-		}
-		vm.err = msg.err
-		if vm.err != nil {
-			return vm, tea.Quit
-		}
-		return vm, vm.runSeq
-	case spinner.TickMsg:
+	case *sequencerui.RestackProgress, spinner.TickMsg:
 		var cmd tea.Cmd
-		vm.spinner, cmd = vm.spinner.Update(msg)
+		vm.restackModel, cmd = vm.restackModel.Update(msg)
 		return vm, cmd
+	case *sequencerui.RestackConflict:
+		if err := vm.writeState(vm.restackModel.State); err != nil {
+			return vm, func() tea.Msg { return err }
+		}
+		vm.quitWithConflict = true
+		return vm, tea.Quit
+	case *sequencerui.RestackAbort, *sequencerui.RestackDone:
+		if err := vm.writeState(nil); err != nil {
+			return vm, func() tea.Msg { return err }
+		}
+		return vm, tea.Quit
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			return vm, tea.Quit
 		}
+	case error:
+		vm.err = msg
+		return vm, tea.Quit
 	}
 	return vm, nil
 }
 
-func (vm stackRestackViewModel) View() string {
+func (vm *stackRestackViewModel) View() string {
 	sb := strings.Builder{}
-	if vm.state != nil && vm.state.Seq != nil {
-		if vm.state.Seq.CurrentSyncRef != "" {
-			sb.WriteString("Restacking " + vm.state.Seq.CurrentSyncRef.Short() + "...\n")
-		} else if vm.abortedBranch != "" {
-			sb.WriteString("Restack aborted\n")
-		} else {
-			sb.WriteString("Restack done\n")
-		}
-		syncedBranches := map[plumbing.ReferenceName]bool{}
-		pendingBranches := map[plumbing.ReferenceName]bool{}
-		seenCurrent := false
-		for _, op := range vm.state.Seq.Operations {
-			if op.Name == vm.state.Seq.CurrentSyncRef || op.Name == vm.abortedBranch {
-				seenCurrent = true
-			} else if !seenCurrent {
-				syncedBranches[op.Name] = true
-			} else {
-				pendingBranches[op.Name] = true
-			}
-		}
-
-		var nodes []*stackutils.StackTreeNode
-		var err error
-		if vm.state.RestackingAll {
-			nodes = stackutils.BuildStackTreeAllBranches(vm.db.ReadTx(), vm.state.InitialBranch, true)
-		} else {
-			nodes, err = stackutils.BuildStackTreeRelatedBranchStacks(vm.db.ReadTx(), vm.state.InitialBranch, true, []string{vm.state.InitialBranch})
-		}
-		if err != nil {
-			sb.WriteString("Failed to build stack tree: " + err.Error() + "\n")
-		} else {
-			for _, node := range nodes {
-				sb.WriteString(stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
-					bn := plumbing.NewBranchReferenceName(branchName)
-					if syncedBranches[bn] {
-						return colors.Success("✓ " + branchName)
-					}
-					if pendingBranches[bn] {
-						return lipgloss.NewStyle().Foreground(colors.Amber500).Render(branchName)
-					}
-					if bn == vm.state.Seq.CurrentSyncRef {
-						return lipgloss.NewStyle().Foreground(colors.Amber500).Render(vm.spinner.View() + branchName)
-					}
-					if bn == vm.abortedBranch {
-						return colors.Failure("✗ " + branchName)
-					}
-					return branchName
-				}))
-			}
-		}
-	}
-	if vm.rebaseConflictErrorHeadline != "" {
-		sb.WriteString("\n")
-		sb.WriteString(colors.Failure("Rebase conflict while rebasing ", vm.state.Seq.CurrentSyncRef.Short()) + "\n")
-		sb.WriteString(vm.rebaseConflictErrorHeadline + "\n")
-		sb.WriteString(vm.rebaseConflictHint + "\n")
-		sb.WriteString("\n")
-		sb.WriteString("Resolve the conflicts and continue the restack with " + colors.CliCmd("av stack restack --continue") + "\n")
+	if vm.restackModel != nil {
+		sb.WriteString(vm.restackModel.View())
 	}
 	if vm.err != nil {
 		sb.WriteString(vm.err.Error() + "\n")
@@ -219,58 +142,59 @@ func (vm stackRestackViewModel) View() string {
 	return sb.String()
 }
 
-func (vm stackRestackViewModel) initCmd() tea.Msg {
-	var state stackRestackState
+func (vm *stackRestackViewModel) readState() (*sequencerui.RestackState, error) {
+	var state sequencerui.RestackState
 	if err := vm.repo.ReadStateFile(git.StateFileKindRestack, &state); err != nil && os.IsNotExist(err) {
-		if stackRestackFlags.Abort || stackRestackFlags.Continue || stackRestackFlags.Skip {
-			return errors.New("no restack in progress")
-		}
-		var currentBranch string
-		if dh, err := vm.repo.DetachedHead(); err != nil {
-			return err
-		} else if !dh {
-			currentBranch, err = vm.repo.CurrentBranchName()
-			if err != nil {
-				return err
-			}
-		}
-		state.InitialBranch = currentBranch
-
-		if stackRestackFlags.All {
-			state.RestackingAll = true
-		} else {
-			if _, exist := vm.db.ReadTx().Branch(currentBranch); !exist {
-				return errors.New("current branch is not adopted to av")
-			}
-		}
-
-		var currentBranchRef plumbing.ReferenceName
-		if currentBranch != "" {
-			currentBranchRef = plumbing.NewBranchReferenceName(currentBranch)
-		}
-
-		ops, err := planner.PlanForRestack(vm.db.ReadTx(), vm.repo, currentBranchRef, stackRestackFlags.All, stackRestackFlags.Current)
-		if err != nil {
-			return err
-		}
-		if len(ops) == 0 {
-			return errors.New("nothing to restack")
-		}
-		state.Seq = sequencer.NewSequencer("origin", vm.db, ops)
+		return nil, nil
 	} else if err != nil {
-		return err
+		return nil, err
 	}
-	return &state
+	return &state, nil
 }
 
-func (vm stackRestackViewModel) runSeqWithContinuationFlags() tea.Msg {
-	result, err := vm.state.Seq.Run(vm.repo, vm.db, stackRestackFlags.Abort, stackRestackFlags.Continue, stackRestackFlags.Skip)
-	return &stackRestackSeqResult{result: result, err: err}
+func (vm *stackRestackViewModel) writeState(state *sequencerui.RestackState) error {
+	if state == nil {
+		return vm.repo.WriteStateFile(git.StateFileKindRestack, nil)
+	}
+	return vm.repo.WriteStateFile(git.StateFileKindRestack, state)
 }
 
-func (vm stackRestackViewModel) runSeq() tea.Msg {
-	result, err := vm.state.Seq.Run(vm.repo, vm.db, false, false, false)
-	return &stackRestackSeqResult{result: result, err: err}
+func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error) {
+	var state sequencerui.RestackState
+	var currentBranch string
+	if dh, err := vm.repo.DetachedHead(); err != nil {
+		return nil, err
+	} else if !dh {
+		currentBranch, err = vm.repo.CurrentBranchName()
+		if err != nil {
+			return nil, err
+		}
+	}
+	state.InitialBranch = currentBranch
+
+	if stackRestackFlags.All {
+		state.RestackingAll = true
+	} else {
+		if _, exist := vm.db.ReadTx().Branch(currentBranch); !exist {
+			return nil, errors.New("current branch is not adopted to av")
+		}
+		state.RelatedBranches = append(state.RelatedBranches, currentBranch)
+	}
+
+	var currentBranchRef plumbing.ReferenceName
+	if currentBranch != "" {
+		currentBranchRef = plumbing.NewBranchReferenceName(currentBranch)
+	}
+
+	ops, err := planner.PlanForRestack(vm.db.ReadTx(), vm.repo, currentBranchRef, stackRestackFlags.All, stackRestackFlags.Current)
+	if err != nil {
+		return nil, err
+	}
+	if len(ops) == 0 {
+		return nil, errors.New("nothing to restack")
+	}
+	state.Seq = sequencer.NewSequencer("origin", vm.db, ops)
+	return &state, nil
 }
 
 func init() {
