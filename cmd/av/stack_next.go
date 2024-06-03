@@ -4,12 +4,16 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/erikgeiser/promptkit/selection"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -23,38 +27,6 @@ var stackNextCmd = &cobra.Command{
 	Aliases: []string{"n"},
 	Short:   "checkout the next branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		repo, err := getRepo()
-		if err != nil {
-			return err
-		}
-
-		db, err := getDB(repo)
-		if err != nil {
-			return err
-		}
-		tx := db.ReadTx()
-
-		currentBranch, err := repo.CurrentBranchName()
-		if err != nil {
-			return err
-		}
-
-		if len(meta.Children(tx, currentBranch)) == 0 {
-			return errors.New("there is no next branch")
-		}
-
-		if stackNextFlags.Last {
-			for len(meta.Children(tx, currentBranch)) > 0 {
-				selectedChild, err := nextChild(tx, currentBranch)
-				if err != nil {
-					return err
-				}
-
-				currentBranch = selectedChild.Name
-			}
-			return checkoutBranch(currentBranch, repo)
-		}
-
 		var n int = 1
 		if len(args) == 1 {
 			var err error
@@ -70,20 +42,23 @@ var stackNextCmd = &cobra.Command{
 			return errors.New("invalid number (must be >= 1)")
 		}
 
-		for i := 0; i < n; i++ {
-			if len(meta.Children(tx, currentBranch)) == 0 {
-				return fmt.Errorf("invalid number (there are only %d subsequent branches in the stack)", i)
+		var opts []tea.ProgramOption
+		if !isatty.IsTerminal(os.Stdout.Fd()) {
+			opts = []tea.ProgramOption{
+				tea.WithInput(nil),
 			}
-
-			selectedChild, err := nextChild(tx, currentBranch)
-			if err != nil {
-				return err
-			}
-
-			currentBranch = selectedChild.Name
+		}
+		stackNext, err := newStackNextModel(stackNextFlags.Last, n)
+		p := tea.NewProgram(stackNext, opts...)
+		model, err := p.Run()
+		if err != nil {
+			return err
 		}
 
-		return checkoutBranch(currentBranch, repo)
+		if err := model.(*stackNextModel).err; err != nil {
+			return actions.ErrExitSilently{ExitCode: 1}
+		}
+		return nil
 
 	},
 }
@@ -95,53 +70,151 @@ func init() {
 	)
 }
 
-func checkoutBranch(branchname string, repo *git.Repo) error {
-	if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
-		Name: branchname,
-	}); err != nil {
-		return err
-	}
+type stackNextModel struct {
+	currentBranch string
+	db            meta.DB
+	repo          *git.Repo
 
-	fmt.Fprint(
-		os.Stderr,
-		"Checked out branch ",
-		colors.UserInput(branchname),
-		"\n",
-	)
+	err error
 
-	return nil
+	selection   *selection.Model[string]
+	lastInStack bool
+	nInStack    int
 }
 
-// nextChild prompts the user to select the next child branch to follow or returns the only child if there is only one.
-func nextChild(tx meta.ReadTx, branchName string) (meta.Branch, error) {
-	children := meta.Children(tx, branchName)
-	if len(children) == 0 {
-		return meta.Branch{}, errors.New("no children")
+func newStackNextModel(lastInStack bool, nInStack int) (*stackNextModel, error) {
+	repo, err := getRepo()
+	if err != nil {
+		return nil, err
 	}
 
-	if len(children) == 1 {
-		return children[0], nil
+	db, err := getDB(repo)
+	if err != nil {
+		return nil, err
 	}
 
+	currentBranch, err := repo.CurrentBranchName()
+	if err != nil {
+		return nil, err
+	}
+
+	return &stackNextModel{
+		currentBranch: currentBranch,
+		db:            db,
+		repo:          repo,
+		nInStack:      nInStack,
+		lastInStack:   lastInStack,
+	}, nil
+}
+func (m *stackNextModel) currentBranchChildren() []string {
+	tx := m.db.ReadTx()
+	children := meta.Children(tx, m.currentBranch)
 	options := make([]string, 0, len(children))
 	for _, child := range children {
 		options = append(options, child.Name)
 	}
 
-	sp := selection.New(fmt.Sprintf("There are multiple children of branch %s. Which branch would you like to follow?", colors.UserInput(branchName)), options)
-	sp.PageSize = 4
-	sp.Filter = nil
+	return options
+}
 
-	choice, err := sp.RunPrompt()
-	if err != nil {
-		return meta.Branch{}, err
+type branchCheckedOutMsg struct{}
+
+func (m *stackNextModel) checkoutCurrentBranch() tea.Msg {
+	if _, err := m.repo.CheckoutBranch(&git.CheckoutBranch{
+		Name: m.currentBranch,
+	}); err != nil {
+		return err
 	}
 
-	for _, child := range children {
-		if child.Name == choice {
-			return child, nil
+	return branchCheckedOutMsg{}
+}
+
+type checkoutBranchMsg struct{}
+type nextBranchMsg struct{}
+type showSelectionMsg struct{}
+
+func (m *stackNextModel) nextBranch() tea.Msg {
+	if m.lastInStack && len(m.currentBranchChildren()) == 0 {
+		return checkoutBranchMsg{}
+	}
+
+	if m.nInStack == 0 && !m.lastInStack {
+		return checkoutBranchMsg{}
+	}
+
+	if m.nInStack > 0 && len(m.currentBranchChildren()) == 0 {
+		return errors.New("invalid number (there are not enough subsequent branches in the stack)")
+	}
+
+	if len(m.currentBranchChildren()) == 0 {
+		return fmt.Errorf("there are no children of branch %s", colors.UserInput(m.currentBranch))
+	}
+
+	if len(m.currentBranchChildren()) == 1 {
+		m.currentBranch = m.currentBranchChildren()[0]
+		m.nInStack--
+
+		return nextBranchMsg{}
+	}
+
+	return showSelectionMsg{}
+}
+
+var _ tea.Model = &stackNextModel{}
+
+func (m *stackNextModel) Init() tea.Cmd {
+	return m.nextBranch
+}
+
+func (m *stackNextModel) View() string {
+	sb := strings.Builder{}
+	if m.err != nil {
+		sb.WriteString(m.err.Error() + "\n")
+		return sb.String()
+	}
+
+	if m.selection != nil {
+		sb.WriteString(m.selection.View())
+	}
+
+	return sb.String()
+}
+
+func (m *stackNextModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case error:
+		m.err = msg
+		return m, tea.Quit
+	case branchCheckedOutMsg:
+		return m, tea.Quit
+	case checkoutBranchMsg:
+		return m, m.checkoutCurrentBranch
+	case nextBranchMsg:
+		return m, m.nextBranch
+
+	case showSelectionMsg:
+		sel := selection.New(fmt.Sprintf("There are multiple children of branch %s. Which branch would you like to follow?", colors.UserInput(m.currentBranch)), m.currentBranchChildren())
+		sel.Filter = nil
+		m.selection = selection.NewModel(sel)
+		return m, m.selection.Init()
+
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "enter":
+			currentBranch, err := m.selection.Value()
+			if err != nil {
+				m.err = err
+				return m, tea.Quit
+			}
+			m.currentBranch = currentBranch
+			m.nInStack--
+
+			return m, m.nextBranch
+		default:
+			_, cmd := m.selection.Update(msg)
+
+			return m, cmd
 		}
 	}
-
-	return meta.Branch{}, errors.New("could not find next branch")
+	return m, nil
 }
