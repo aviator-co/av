@@ -122,7 +122,7 @@ func (vm stackRestackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return vm, tea.Quit
 		}
-		if msg.result.Status == git.RebaseConflict {
+		if msg.result != nil && msg.result.Status == git.RebaseConflict {
 			vm.rebaseConflictErrorHeadline = msg.result.ErrorHeadline
 			vm.rebaseConflictHint = msg.result.Hint
 			if err := vm.repo.WriteStateFile(git.StateFileKindRestack, vm.state); err != nil {
