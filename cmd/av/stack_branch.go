@@ -95,11 +95,11 @@ internal tracking metadata that defines the order of branches within a stack.`,
 			}
 		}
 
-		// Currently, we only allow the repo default branch to be a trunk.
-		// We might want to allow other branches to be trunks in the future, but
-		// that does run the risk of allowing the user to get into a weird state
-		// (where some stacks assume a branch is a trunk and others don't).
-		isBranchFromTrunk := parentBranchName == defaultBranch
+		isBranchFromTrunk, err := repo.IsTrunkBranch(parentBranchName)
+		if err != nil {
+			return errors.WrapIf(err, "failed to determine if branch is a trunk")
+		}
+
 		var parentHead string
 		if !isBranchFromTrunk {
 			var err error

@@ -82,6 +82,27 @@ func (r *Repo) DefaultBranch() (string, error) {
 	return strings.TrimPrefix(ref, "refs/remotes/origin/"), nil
 }
 
+func (r *Repo) IsTrunkBranch(name string) (bool, error) {
+	branches, err := r.TrunkBranches()
+	if err != nil {
+		return false, err
+	}
+	for _, branch := range branches {
+		if name == branch {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *Repo) TrunkBranches() ([]string, error) {
+	defaultBranch, err := r.DefaultBranch()
+	if err != nil {
+		return nil, err
+	}
+	return []string{defaultBranch}, nil
+}
+
 func (r *Repo) Git(args ...string) (string, error) {
 	startTime := time.Now()
 	cmd := exec.Command("git", args...)
