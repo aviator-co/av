@@ -3,6 +3,7 @@ package git_test
 import (
 	"testing"
 
+	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/stretchr/testify/require"
 )
@@ -19,4 +20,18 @@ func TestOrigin(t *testing.T) {
 	origin, err = repo.AsAvGitRepo().Origin()
 	require.NoError(t, err)
 	require.Equal(t, "aviator-co/av", origin.RepoSlug)
+}
+
+func TestTrunkBranches(t *testing.T) {
+	repo := gittest.NewTempRepo(t)
+
+	branches, err := repo.AsAvGitRepo().TrunkBranches()
+	require.NoError(t, err)
+	require.Equal(t, branches, []string{"main"})
+
+	// add some branches to AdditionalTrunkBranches
+	config.Av.AdditionalTrunkBranches = []string{"develop", "staging"}
+	branches, err = repo.AsAvGitRepo().TrunkBranches()
+	require.NoError(t, err)
+	require.Equal(t, branches, []string{"main", "develop", "staging"})
 }
