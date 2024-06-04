@@ -49,13 +49,17 @@ var stackNextCmd = &cobra.Command{
 			}
 		}
 		stackNext, err := newStackNextModel(stackNextFlags.Last, n)
+		if err != nil {
+			return err
+		}
+
 		p := tea.NewProgram(stackNext, opts...)
 		model, err := p.Run()
 		if err != nil {
 			return err
 		}
 
-		if err := model.(*stackNextModel).err; err != nil {
+		if err := model.(stackNextModel).err; err != nil {
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
 		return nil
@@ -82,23 +86,23 @@ type stackNextModel struct {
 	nInStack    int
 }
 
-func newStackNextModel(lastInStack bool, nInStack int) (*stackNextModel, error) {
+func newStackNextModel(lastInStack bool, nInStack int) (stackNextModel, error) {
 	repo, err := getRepo()
 	if err != nil {
-		return nil, err
+		return stackNextModel{}, err
 	}
 
 	db, err := getDB(repo)
 	if err != nil {
-		return nil, err
+		return stackNextModel{}, err
 	}
 
 	currentBranch, err := repo.CurrentBranchName()
 	if err != nil {
-		return nil, err
+		return stackNextModel{}, err
 	}
 
-	return &stackNextModel{
+	return stackNextModel{
 		currentBranch: currentBranch,
 		db:            db,
 		repo:          repo,
@@ -106,7 +110,7 @@ func newStackNextModel(lastInStack bool, nInStack int) (*stackNextModel, error) 
 		lastInStack:   lastInStack,
 	}, nil
 }
-func (m *stackNextModel) currentBranchChildren() []string {
+func (m stackNextModel) currentBranchChildren() []string {
 	tx := m.db.ReadTx()
 	children := meta.Children(tx, m.currentBranch)
 	options := make([]string, 0, len(children))
@@ -119,7 +123,7 @@ func (m *stackNextModel) currentBranchChildren() []string {
 
 type branchCheckedOutMsg struct{}
 
-func (m *stackNextModel) checkoutCurrentBranch() tea.Msg {
+func (m stackNextModel) checkoutCurrentBranch() tea.Msg {
 	if _, err := m.repo.CheckoutBranch(&git.CheckoutBranch{
 		Name: m.currentBranch,
 	}); err != nil {
@@ -133,7 +137,7 @@ type checkoutBranchMsg struct{}
 type nextBranchMsg struct{}
 type showSelectionMsg struct{}
 
-func (m *stackNextModel) nextBranch() tea.Msg {
+func (m stackNextModel) nextBranch() tea.Msg {
 	if m.lastInStack && len(m.currentBranchChildren()) == 0 {
 		return checkoutBranchMsg{}
 	}
@@ -151,9 +155,6 @@ func (m *stackNextModel) nextBranch() tea.Msg {
 	}
 
 	if len(m.currentBranchChildren()) == 1 {
-		m.currentBranch = m.currentBranchChildren()[0]
-		m.nInStack--
-
 		return nextBranchMsg{}
 	}
 
@@ -162,11 +163,11 @@ func (m *stackNextModel) nextBranch() tea.Msg {
 
 var _ tea.Model = &stackNextModel{}
 
-func (m *stackNextModel) Init() tea.Cmd {
+func (m stackNextModel) Init() tea.Cmd {
 	return m.nextBranch
 }
 
-func (m *stackNextModel) View() string {
+func (m stackNextModel) View() string {
 	sb := strings.Builder{}
 	if m.err != nil {
 		sb.WriteString(m.err.Error() + "\n")
@@ -180,7 +181,7 @@ func (m *stackNextModel) View() string {
 	return sb.String()
 }
 
-func (m *stackNextModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m stackNextModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case error:
 		m.err = msg
@@ -190,6 +191,8 @@ func (m *stackNextModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case checkoutBranchMsg:
 		return m, m.checkoutCurrentBranch
 	case nextBranchMsg:
+		m.currentBranch = m.currentBranchChildren()[0]
+		m.nInStack--
 		return m, m.nextBranch
 
 	case showSelectionMsg:
