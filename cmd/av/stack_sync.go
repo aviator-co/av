@@ -151,14 +151,14 @@ base branch.
 		if state.Config.Parent != "" {
 			var res *actions.ReparentResult
 			var err error
-			defaultBranch, err := repo.DefaultBranch()
+			newParentTrunk, err := repo.IsTrunkBranch(state.Config.Parent)
 			if err != nil {
 				return err
 			}
 			opts := actions.ReparentOpts{
 				Branch:         state.CurrentBranch,
 				NewParent:      state.Config.Parent,
-				NewParentTrunk: state.Config.Parent == defaultBranch,
+				NewParentTrunk: newParentTrunk,
 			}
 			if stackSyncFlags.Continue || stackSyncFlags.Skip {
 				res, err = actions.ReparentSkipContinue(repo, tx, opts, stackSyncFlags.Skip)
@@ -306,29 +306,8 @@ func init() {
 	stackSyncCmd.MarkFlagsMutuallyExclusive("current", "trunk")
 	stackSyncCmd.MarkFlagsMutuallyExclusive("trunk", "parent")
 	stackSyncCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
-
-	branches, _ := allBranches()
 	_ = stackSyncCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		branches, _ := allBranches()
 		return branches, cobra.ShellCompDirectiveDefault
 	})
-}
-
-func allBranches() ([]string, error) {
-	repo, err := getRepo()
-	if err != nil {
-		return nil, err
-	}
-	db, err := getDB(repo)
-	if err != nil {
-		return nil, err
-	}
-
-	tx := db.ReadTx()
-
-	var branches []string
-	for b := range tx.AllBranches() {
-		branches = append(branches, b)
-	}
-
-	return branches, nil
 }

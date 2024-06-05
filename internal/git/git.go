@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/config"
 	"github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
 	giturls "github.com/whilp/git-urls"
@@ -80,6 +81,31 @@ func (r *Repo) DefaultBranch() (string, error) {
 		return "", errors.New("failed to determine remote HEAD")
 	}
 	return strings.TrimPrefix(ref, "refs/remotes/origin/"), nil
+}
+
+func (r *Repo) IsTrunkBranch(name string) (bool, error) {
+	branches, err := r.TrunkBranches()
+	if err != nil {
+		return false, err
+	}
+	for _, branch := range branches {
+		if name == branch {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *Repo) TrunkBranches() ([]string, error) {
+	defaultBranch, err := r.DefaultBranch()
+	if err != nil {
+		return nil, err
+	}
+
+	branches := []string{defaultBranch}
+	branches = append(branches, config.Av.AdditionalTrunkBranches...)
+
+	return branches, nil
 }
 
 func (r *Repo) Git(args ...string) (string, error) {

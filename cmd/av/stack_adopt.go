@@ -89,15 +89,17 @@ func stackAdoptForceAdoption(repo *git.Repo, db meta.DB, currentBranch, parent s
 		return errors.New("cannot adopt the current branch as its parent")
 	}
 
-	defaultBranch, err := repo.DefaultBranch()
-	if err != nil {
-		return err
-	}
-	if currentBranch == defaultBranch {
+	if isCurrentBranchTrunk, err := repo.IsTrunkBranch(currentBranch); err != nil {
+		return errors.Wrap(err, "failed to check if the current branch is trunk")
+	} else if isCurrentBranchTrunk {
 		return errors.New("cannot adopt the default branch")
 	}
 
-	if parent == defaultBranch {
+	isParentBranchTrunk, err := repo.IsTrunkBranch(parent)
+	if err != nil {
+		return errors.Wrap(err, "failed to check if the parent branch is trunk")
+	}
+	if isParentBranchTrunk {
 		branch.Parent = meta.BranchState{
 			Name:  parent,
 			Trunk: true,
@@ -187,17 +189,15 @@ func (vm stackAdoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (vm stackAdoptViewModel) initCmd() tea.Msg {
-	defaultBranch, err := vm.repo.DefaultBranch()
+	trunkBranches, err := vm.repo.TrunkBranches()
 	if err != nil {
 		return err
 	}
-	allBranches, err := treedetector.DetectBranchTree(
-		vm.repo.GoGitRepo(),
-		"origin",
-		[]plumbing.ReferenceName{
-			plumbing.NewBranchReferenceName(defaultBranch),
-		},
-	)
+	var refs []plumbing.ReferenceName
+	for _, branch := range trunkBranches {
+		refs = append(refs, plumbing.NewBranchReferenceName(branch))
+	}
+	allBranches, err := treedetector.DetectBranchTree(vm.repo.GoGitRepo(), "origin", refs)
 	if err != nil {
 		return err
 	}
@@ -418,4 +418,9 @@ func init() {
 		&stackAdoptFlags.Parent, "parent", "",
 		"force specifying the parent branch",
 	)
+
+	_ = stackSyncCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		branches, _ := allBranches()
+		return branches, cobra.ShellCompDirectiveDefault
+	})
 }
