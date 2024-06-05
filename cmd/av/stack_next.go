@@ -138,7 +138,9 @@ type nextBranchMsg struct{}
 type showSelectionMsg struct{}
 
 func (m stackNextModel) nextBranch() tea.Msg {
-	if m.lastInStack && len(m.currentBranchChildren()) == 0 {
+	currentBanchChildren := m.currentBranchChildren()
+
+	if m.lastInStack && len(currentBanchChildren) == 0 {
 		return checkoutBranchMsg{}
 	}
 
@@ -146,15 +148,15 @@ func (m stackNextModel) nextBranch() tea.Msg {
 		return checkoutBranchMsg{}
 	}
 
-	if m.nInStack > 0 && len(m.currentBranchChildren()) == 0 {
+	if m.nInStack > 0 && len(currentBanchChildren) == 0 {
 		return errors.New("invalid number (there are not enough subsequent branches in the stack)")
 	}
 
-	if len(m.currentBranchChildren()) == 0 {
+	if len(currentBanchChildren) == 0 {
 		return fmt.Errorf("there are no children of branch %s", colors.UserInput(m.currentBranch))
 	}
 
-	if len(m.currentBranchChildren()) == 1 {
+	if len(currentBanchChildren) == 1 {
 		return nextBranchMsg{}
 	}
 
