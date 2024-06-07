@@ -48,9 +48,11 @@ var stackPrevCmd = &cobra.Command{
 				return nil
 			}
 			branchToCheckout = previousBranches[0]
+		} else if len(args) == 0 && len(previousBranches) == 0 {
+			branchToCheckout, _ = meta.Trunk(tx, currentBranch)
 		} else {
 			if len(previousBranches) == 0 {
-				return errors.New("there is no previous branch")
+				return errors.New("there are no previous branches in the stack")
 			}
 			var n int = 1
 			if len(args) == 1 {
