@@ -61,8 +61,8 @@ func runAmend(repo *git.Repo, db meta.DB) error {
 		commitArgs = append(commitArgs, "--message", commitAmendFlags.Message)
 	}
 
-	writeTx := db.WriteTx()
-	defer writeTx.Abort()
+	tx := db.WriteTx()
+	defer tx.Abort()
 
 	client, err := getGitHubClient()
 	if err != nil {
@@ -70,13 +70,14 @@ func runAmend(repo *git.Repo, db meta.DB) error {
 	}
 
 	ctx := context.Background()
-	prUpdateResult, err := actions.UpdatePullRequestState(ctx, client, writeTx, currentBranch)
-
+	_, err = actions.UpdatePullRequestState(ctx, client, tx, currentBranch)
 	if err != nil {
 		fmt.Fprint(os.Stderr, colors.Warning("failed to check pull request state, continuing with amendment"), "\n")
 	}
 
-	if prUpdateResult != nil && prUpdateResult.Pull != nil && prUpdateResult.Pull.State == githubv4.PullRequestStateMerged {
+	branch, _ := tx.Branch(currentBranch)
+	if branch.PullRequest != nil && branch.PullRequest.State == githubv4.PullRequestStateMerged {
+		fmt.Fprint(os.Stderr, colors.Failure("This branch has already been merged, amending is not allowed"), "\n")
 		return errors.New("this branch has already been merged, amending is not allowed")
 	}
 
