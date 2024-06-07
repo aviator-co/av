@@ -73,7 +73,7 @@ func runAmend(repo *git.Repo, db meta.DB) error {
 	prUpdateResult, err := actions.UpdatePullRequestState(ctx, client, writeTx, currentBranch)
 
 	if err != nil {
-		fmt.Fprint(os.Stderr, colors.Warning("failed to check pull request state, continuing with commit"), "\n")
+		fmt.Fprint(os.Stderr, colors.Warning("failed to check pull request state, continuing with amendment"), "\n")
 	}
 
 	if prUpdateResult != nil && prUpdateResult.Pull != nil && prUpdateResult.Pull.State == githubv4.PullRequestStateMerged {
