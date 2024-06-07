@@ -53,12 +53,29 @@ internal tracking metadata that defines the order of branches within a stack.`,
 		}
 
 		branchName := args[0]
-		if len(args) == 2 {
-			stackBranchFlags.Parent = args[1]
-		}
-
 		if stackBranchFlags.Rename {
 			return stackBranchMove(repo, db, branchName, stackBranchFlags.Force)
+		}
+
+		// Determine important contextual information from Git
+		// or if a parent branch is provided, check it allows as a default branch
+		defaultBranch, err := repo.DefaultBranch()
+		if err != nil {
+			return errors.WrapIf(err, "failed to determine repository default branch")
+		}
+
+		if len(args) == 2 {
+			parent := args[1]
+			stackBranchFlags.Parent = parent
+
+			isTrunk, err := repo.IsTrunkBranch(parent)
+			if err != nil {
+				return errors.WrapIf(err, "failed to check if the parent branch is trunk")
+			}
+
+			if isTrunk {
+				defaultBranch = parent
+			}
 		}
 
 		tx := db.WriteTx()
@@ -67,12 +84,6 @@ internal tracking metadata that defines the order of branches within a stack.`,
 			tx.Abort()
 		})
 		defer cu.Cleanup()
-
-		// Determine important contextual information from Git
-		defaultBranch, err := repo.DefaultBranch()
-		if err != nil {
-			return errors.WrapIf(err, "failed to determine repository default branch")
-		}
 
 		// Determine the parent branch and make sure it's checked out
 		var parentBranchName string
@@ -174,8 +185,8 @@ func init() {
 	stackBranchCmd.Flags().
 		BoolVar(&stackBranchFlags.Force, "force", false, "force rename the current branch")
 
-	branches, _ := allBranches()
 	_ = stackBranchCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		branches, _ := allBranches()
 		return branches, cobra.ShellCompDirectiveDefault
 	})
 }

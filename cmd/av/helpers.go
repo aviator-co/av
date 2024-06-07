@@ -83,3 +83,23 @@ func getOrCreateDB(repo *git.Repo) (meta.DB, bool, error) {
 	}
 	return jsonfiledb.OpenPath(dbPath)
 }
+
+func allBranches() ([]string, error) {
+	repo, err := getRepo()
+	if err != nil {
+		return nil, err
+	}
+	db, err := getDB(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := db.ReadTx()
+
+	var branches []string
+	for b := range tx.AllBranches() {
+		branches = append(branches, b)
+	}
+
+	return branches, nil
+}

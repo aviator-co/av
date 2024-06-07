@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/config"
 	"github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
 	giturls "github.com/whilp/git-urls"
@@ -100,7 +101,11 @@ func (r *Repo) TrunkBranches() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []string{defaultBranch}, nil
+
+	branches := []string{defaultBranch}
+	branches = append(branches, config.Av.AdditionalTrunkBranches...)
+
+	return branches, nil
 }
 
 func (r *Repo) Git(args ...string) (string, error) {

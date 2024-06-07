@@ -54,9 +54,10 @@ type Aviator struct {
 }
 
 var Av = struct {
-	PullRequest PullRequest
-	GitHub      GitHub
-	Aviator     Aviator
+	PullRequest             PullRequest
+	GitHub                  GitHub
+	Aviator                 Aviator
+	AdditionalTrunkBranches []string
 }{
 	Aviator: Aviator{
 		APIHost: "https://api.aviator.co",
@@ -64,7 +65,8 @@ var Av = struct {
 	PullRequest: PullRequest{
 		OpenBrowser: true,
 	},
-	GitHub: GitHub{},
+	GitHub:                  GitHub{},
+	AdditionalTrunkBranches: []string{},
 }
 
 // Load initializes the configuration values.
