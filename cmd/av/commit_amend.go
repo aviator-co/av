@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -60,10 +61,21 @@ func runAmend(repo *git.Repo, db meta.DB) error {
 		commitArgs = append(commitArgs, "--message", commitAmendFlags.Message)
 	}
 
-	tx := db.ReadTx()
-	branch, _ := tx.Branch(currentBranch)
-	// Todo: do we need to refresh the state of the branch
-	if branch.PullRequest != nil && branch.PullRequest.State == githubv4.PullRequestStateMerged {
+	writeTx := db.WriteTx()
+	defer writeTx.Abort()
+
+	client, err := getGitHubClient()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	prUpdateResult, err := actions.UpdatePullRequestState(ctx, client, writeTx, currentBranch)
+	if err != nil {
+		return err
+	}
+
+	if prUpdateResult.Pull != nil && prUpdateResult.Pull.State == githubv4.PullRequestStateMerged {
 		return errors.New("this branch has already been merged, amending is not allowed")
 	}
 
