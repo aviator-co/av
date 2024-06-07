@@ -71,11 +71,12 @@ func runAmend(repo *git.Repo, db meta.DB) error {
 
 	ctx := context.Background()
 	prUpdateResult, err := actions.UpdatePullRequestState(ctx, client, writeTx, currentBranch)
+
 	if err != nil {
-		return err
+		fmt.Fprint(os.Stderr, colors.Warning("failed to check pull request state, continuing with commit"), "\n")
 	}
 
-	if prUpdateResult.Pull != nil && prUpdateResult.Pull.State == githubv4.PullRequestStateMerged {
+	if prUpdateResult != nil && prUpdateResult.Pull != nil && prUpdateResult.Pull.State == githubv4.PullRequestStateMerged {
 		return errors.New("this branch has already been merged, amending is not allowed")
 	}
 
