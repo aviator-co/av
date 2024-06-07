@@ -7,7 +7,9 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +37,7 @@ var commitAmendCmd = &cobra.Command{
 
 		// We need to run git commit --amend before bubbletea grabs the terminal. Otherwise,
 		// we need to make p.ReleaseTerminal() and p.RestoreTerminal().
-		if err := runAmend(repo); err != nil {
+		if err := runAmend(repo, db); err != nil {
 			fmt.Fprint(os.Stderr, "\n", colors.Failure("Failed to amend."), "\n")
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
@@ -44,8 +46,9 @@ var commitAmendCmd = &cobra.Command{
 	},
 }
 
-func runAmend(repo *git.Repo) error {
-	if _, err := repo.CurrentBranchName(); err != nil {
+func runAmend(repo *git.Repo, db meta.DB) error {
+	currentBranch, err := repo.CurrentBranchName()
+	if err != nil {
 		return errors.WrapIf(err, "failed to determine current branch")
 	}
 
@@ -55,6 +58,13 @@ func runAmend(repo *git.Repo) error {
 	}
 	if commitAmendFlags.Message != "" {
 		commitArgs = append(commitArgs, "--message", commitAmendFlags.Message)
+	}
+
+	tx := db.ReadTx()
+	branch, _ := tx.Branch(currentBranch)
+	// Todo: do we need to refresh the state of the branch
+	if branch.PullRequest != nil && branch.PullRequest.State == githubv4.PullRequestStateMerged {
+		return errors.New("this branch has already been merged, amending is not allowed")
 	}
 
 	if _, err := repo.Run(&git.RunOpts{
