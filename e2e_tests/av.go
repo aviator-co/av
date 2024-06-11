@@ -18,6 +18,9 @@ func init() {
 	if err := os.Setenv("AV_GITHUB_TOKEN", "ghp_thisisntarealltokenitsjustfortesting"); err != nil {
 		panic(err)
 	}
+	if err := os.Setenv("AV_STACK_SYNC_CHANGE_NO_ASK", "1"); err != nil {
+		panic(err)
+	}
 
 	cmd := exec.Command("go", "build", "../cmd/av")
 	cmd.Stdout = os.Stderr

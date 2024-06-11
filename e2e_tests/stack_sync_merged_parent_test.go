@@ -56,7 +56,7 @@ func TestStackSyncMergedParent(t *testing.T) {
 	// where 2S is the squash-merge commit of 2b onto stack-1. Note that since it's
 	// a squash commit, 2S is not a *merge commit* in the Git definition.
 	var squashCommit plumbing.Hash
-	repo.WithCheckoutBranch(t, "refs/heads/stack-1", func() {
+	repo.WithCheckoutBranch(t, "refs/heads/main", func() {
 		oldHead := repo.GetCommitAtRef(t, plumbing.HEAD)
 
 		repo.Git(t, "merge", "--squash", "stack-2")
@@ -71,6 +71,7 @@ func TestStackSyncMergedParent(t *testing.T) {
 			squashCommit,
 			"squash commit should be different from old HEAD",
 		)
+		repo.Git(t, "push", "origin", "main")
 	})
 
 	// We shouldn't do this as part of an E2E test since it depends on internal
@@ -93,13 +94,12 @@ func TestStackSyncMergedParent(t *testing.T) {
 
 	RequireAv(t, "stack", "sync")
 
-	// squash commit of stack-2 should be an ancestor of HEAD of stack-3 after running sync
 	assert.Equal(t,
 		meta.BranchState{
-			Name: "stack-1",
-			Head: squashCommit.String(),
+			Name:  "main",
+			Trunk: true,
 		},
 		GetStoredParentBranchState(t, repo, "stack-3"),
-		"stack-3 should be re-rooted onto stack-1",
+		"stack-3 should be re-rooted onto main",
 	)
 }

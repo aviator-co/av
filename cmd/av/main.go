@@ -74,6 +74,9 @@ var rootCmd = &cobra.Command{
 		if err := config.Load(repoConfigDir); err != nil {
 			return errors.Wrap(err, "failed to load configuration")
 		}
+		if err := config.LoadUserState(); err != nil {
+			return errors.Wrap(err, "failed to load the user state")
+		}
 		return nil
 	},
 }
