@@ -65,9 +65,9 @@ internal tracking metadata that defines the order of branches within a stack.`,
 		}
 
 		if len(args) == 2 {
-			parent := args[1]
-			stackBranchFlags.Parent = parent
+			parent := parseInputParentBranch(args[1])
 
+			stackBranchFlags.Parent = parent
 			isTrunk, err := repo.IsTrunkBranch(parent)
 			if err != nil {
 				return errors.WrapIf(err, "failed to check if the parent branch is trunk")
@@ -290,4 +290,9 @@ func stackBranchMove(
 		return err
 	}
 	return nil
+}
+
+func parseInputParentBranch(branch string) string {
+	// If the input parent branch is contained remote name, trim it
+	return strings.Replace(branch, "origin/", "", 1)
 }
