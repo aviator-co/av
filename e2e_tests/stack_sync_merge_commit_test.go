@@ -71,6 +71,7 @@ func TestStackSyncMergeCommit(t *testing.T) {
 			squashCommit,
 			"squash commit should be different from old HEAD",
 		)
+		repo.Git(t, "push", "origin", "main")
 	})
 
 	// We shouldn't do this as part of an E2E test since it depends on internal

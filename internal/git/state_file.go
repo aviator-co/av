@@ -9,10 +9,10 @@ import (
 type StateFileKind string
 
 const (
-	StateFileKindSync     StateFileKind = "stack-sync.state.json"
-	StateFileKindReorder  StateFileKind = "stack-reorder.state.json"
-	StateFileKindRestack  StateFileKind = "stack-restack.state.json"
-	StateFileKindReparent StateFileKind = "stack-reparent.state.json"
+	StateFileKindSync    StateFileKind = "stack-sync.state.json"
+	StateFileKindReorder StateFileKind = "stack-reorder.state.json"
+	StateFileKindRestack StateFileKind = "stack-restack.state.json"
+	StateFileKindSyncV2  StateFileKind = "stack-sync-v2.state.json"
 )
 
 func (r *Repo) ReadStateFile(kind StateFileKind, msg any) error {

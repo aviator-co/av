@@ -1,6 +1,9 @@
 package colors
 
-import "github.com/fatih/color"
+import (
+	"github.com/charmbracelet/lipgloss"
+	"github.com/fatih/color"
+)
 
 var (
 	CliCmdC          = color.New(color.FgMagenta)
@@ -20,4 +23,10 @@ var (
 	Troubleshooting = TroubleshootingC.Sprint
 	UserInput       = UserInputC.Sprint
 	Faint           = FaintC.Sprint
+)
+
+var (
+	ProgressStyle = lipgloss.NewStyle().Foreground(Amber600)
+	SuccessStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color('2'))
+	FailureStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color('1'))
 )
