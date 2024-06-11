@@ -75,7 +75,7 @@ func TestStackSyncDeleteMerged(t *testing.T) {
 	tx.SetBranch(stack1Meta)
 	require.NoError(t, tx.Commit())
 
-	RequireAv(t, "stack", "sync", "--trunk", "--prune")
+	RequireAv(t, "stack", "sync", "--trunk", "--prune=yes")
 
 	require.Equal(t, 1,
 		Cmd(t, "git", "show-ref", "refs/heads/stack-1").ExitCode,

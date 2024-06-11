@@ -38,7 +38,20 @@ func PlanForRestack(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.Refer
 	return ret, nil
 }
 
-func PlanForSync(tx meta.ReadTx, repo *git.Repo, targetBranches []plumbing.ReferenceName, syncToTrunkInsteadOfMergeCommit bool) ([]sequencer.RestackOp, error) {
+func PlanForSync(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.ReferenceName, restackAll, restackCurrent bool) ([]sequencer.RestackOp, error) {
+	var targetBranches []plumbing.ReferenceName
+	var err error
+	if restackAll {
+		targetBranches, err = GetTargetBranches(tx, repo, true, AllBranches)
+	} else if restackCurrent {
+		targetBranches, err = GetTargetBranches(tx, repo, true, CurrentAndParents)
+	} else {
+		targetBranches, err = GetTargetBranches(tx, repo, true, CurrentStack)
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	var ret []sequencer.RestackOp
 	for _, br := range targetBranches {
 		avbr, _ := tx.Branch(br.Short())
@@ -50,21 +63,12 @@ func PlanForSync(tx meta.ReadTx, repo *git.Repo, targetBranches []plumbing.Refer
 			// Check if the parent branch is merged.
 			avpbr, _ := tx.Branch(avbr.Parent.Name)
 			if avpbr.MergeCommit != "" {
-				// The parent is merged. Sync to either trunk or merge commit.
+				// The parent is merged.
 				trunk, _ := meta.Trunk(tx, br.Short())
-				var newParentHash plumbing.Hash
-				if syncToTrunkInsteadOfMergeCommit {
-					// By setting this to ZeroHash, the sequencer will sync to
-					// the remote tracking branch.
-					newParentHash = plumbing.ZeroHash
-				} else {
-					newParentHash = plumbing.NewHash(avpbr.MergeCommit)
-				}
 				ret = append(ret, sequencer.RestackOp{
 					Name:             br,
 					NewParent:        plumbing.NewBranchReferenceName(trunk),
 					NewParentIsTrunk: true,
-					NewParentHash:    newParentHash,
 				})
 				continue
 			}

@@ -190,9 +190,6 @@ func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error
 	if err != nil {
 		return nil, err
 	}
-	if len(ops) == 0 {
-		return nil, errors.New("nothing to restack")
-	}
 	state.Seq = sequencer.NewSequencer("origin", vm.db, ops)
 	return &state, nil
 }

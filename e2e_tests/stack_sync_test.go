@@ -94,11 +94,11 @@ func TestStackSync(t *testing.T) {
 		"stack sync should return non-zero exit code if conflicts",
 	)
 	require.Contains(
-		t, syncConflict.Stderr,
+		t, syncConflict.Stdout,
 		"error: could not apply", "stack sync should include error message on rebase",
 	)
 	require.Contains(
-		t, syncConflict.Stderr, "av stack sync --continue",
+		t, syncConflict.Stdout, "av stack sync --continue",
 		"stack sync should print a message with instructions to continue",
 	)
 	syncContinueWithoutResolving := Av(t, "stack", "sync", "--continue")
@@ -127,7 +127,7 @@ func TestStackSync(t *testing.T) {
 
 	// Further sync attemps should yield no-ops
 	syncNoop := RequireAv(t, "stack", "sync")
-	require.Contains(t, syncNoop.Stderr, "already up-to-date")
+	require.Contains(t, syncNoop.Stdout, "Restack is done")
 
 	// Make sure we've not introduced any extra commits
 	// We should have 4 (corresponding to 1a, 1b, 2a, and 3a).
@@ -261,7 +261,7 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 		sync.ExitCode,
 		"stack sync should return non-zero exit code if conflicts",
 	)
-	require.Regexp(t, regexp.MustCompile("could not apply .+ Commit 2a"), sync.Stderr)
+	require.Regexp(t, regexp.MustCompile("could not apply .+ Commit 2a"), sync.Stdout)
 	require.NoError(t, os.WriteFile("my-file", []byte("1a\n1b\n2a\n"), 0644))
 	repo.Git(t, "add", "my-file")
 
@@ -274,7 +274,7 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 		sync.ExitCode,
 		"stack sync should return non-zero exit code if conflicts",
 	)
-	require.Regexp(t, regexp.MustCompile("could not apply .+ Commit 3a"), sync.Stderr)
+	require.Regexp(t, regexp.MustCompile("could not apply .+ Commit 3a"), sync.Stdout)
 	require.NoError(t, os.WriteFile("my-file", []byte("1a\n1b\n2a\n2b\n3a\n"), 0644))
 	repo.Git(t, "add", "my-file")
 

@@ -2,42 +2,27 @@
 
 ## NAME
 
-av-stack-sync - Synchronize stacked branches
+av-stack-sync - Synchronize stacked branches with GitHub
 
 ## SYNOPSIS
 
 ```synopsis
-av stack sync [--all | --current] [--no-push] [--no-fetch] [--prune]
-              [--trunk] [--continue | --abort | --skip] [--parent=<parent>]
+av stack sync [--all | --current] [--push=(yes|no|ask)] [--prune=(yes|no|ask)]
+              [--continue | --abort | --skip]
 ```
 
 ## DESCRIPTION
 
-Over the time, branches get unsynchronized in many ways. Some branches are
-merged. The upstream branch is moved. A parent branch get their commit amended.
-`av stack sync` synchronizes the branches following the changes.
-
-For each branch, this command does the following
-
-* Rebase onto the parent branch. By default, if the parent is the trunk branch
-  (e.g. `main`), this step is skipped. If `--trunk` is used, it fetches the
-  trunk branch from the remote and rebase onto it.
-
-* Push to the remote branch. With Git's default config, the push updates the
-  same name branch on the remote.
+`av stack sync` is a command to fetch and push the changes to the remote GitHub
+repository. This command fetches from the remote, restacks the branches, and
+pushes the changes back to the remote.
 
 Note that currently, this overwrites the remote with force. This can overwrite
 any changes happen on GitHub. To avoid this, pull or manually cherry-pick the
 changes on the remote.
 
-By default, this command will sync all branches starting at the root of the
-stack and repeatedly executes the above steps. If the --current flag is given,
-this command will sync the branches up to the current one, and the rest of the
-branches are not synced. This allows you to make changes to the current branch
-before syncing the rest of the stack. If the --all flag is given, it will sync
-all branches in the repository.
-
-If --prune option is given, it deletes the merged branches at the end of sync.
+When a branch is merged, the child branches are restacked to the new parent. The
+command prompts you if the merged branches should be deleted.
 
 ## REBASE CONFLICT
 
@@ -46,19 +31,6 @@ resolve the conflict, and continue with `av stack sync --continue`. This is
 similar to `git rebase --continue`, but it continues with syncing the rest of
 the branches.
 
-## CHANGE PARENT
-
-If you want to change the parent, use `--parent=<parent>` to specify the new
-parent. This rebases the current branch onto the new parent and runs the sync
-operations on the children.
-
-## ADOPTING BRANCHES
-
-If you want to adopt a Git branch that is created outside of `av`, you can run
-`av stack sync --parent=<parent>` or `av stack sync --parent=<parent> --trunk`
-to adopt a branch to `av`. If the parent is a trunk branch (e.g. main), use
-`--trunk`.
-
 ## OPTIONS
 
 `--all`
@@ -66,19 +38,15 @@ to adopt a branch to `av`. If the parent is a trunk branch (e.g. main), use
 
 `--current`
 : Only sync changes to the current branch. (Don't recurse into descendant
-  branches.)
+branches.)
 
-`--no-push`
-: Do not force-push updated branches to GitHub.
+`--push=(yes|no|ask)`
+: Push the changes to the remote. If `ask`, it prompts to you when push is
+needed. Default is `ask`.
 
-`--no-fetch`
-: Do not fetch latest PR information from GitHub.
-
-`--prune`
-: Delete the merged branches.
-
-`--trunk`
-: Synchronize the trunk into the stack.
+`--prune=(yes|no|ask)`
+: Delete the merged branches. If `ask`, it prompts to you when there's a merged
+branch to delete. Default is `ask`.
 
 `--continue`
 : Continue an in-progress sync.
@@ -89,5 +57,8 @@ to adopt a branch to `av`. If the parent is a trunk branch (e.g. main), use
 `--skip`
 : Skip the current commit and continue an in-progress sync.
 
-`--parent=<parent>`
-: Parent branch to rebase onto.
+## SEE ALSO
+
+`av-stack-restack`(1) for restacking the branches locally.
+`av-stack-adopt`(1) for adopting a new branch.
+`av-stack-reparent`(1) for changing the parent of a branch.

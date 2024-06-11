@@ -26,7 +26,8 @@ func TidyDB(repo *git.Repo, db meta.DB) (int, error) {
 			continue
 		}
 		if newParent, ok := newParents[br.Parent.Name]; ok {
-			br.Parent = newParent
+			br.Parent.Name = newParent.Name
+			br.Parent.Trunk = newParent.Trunk
 		}
 	}
 
