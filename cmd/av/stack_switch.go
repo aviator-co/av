@@ -10,6 +10,8 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
+	"github.com/aviator-co/av/internal/utils/uiutils"
+	"github.com/charmbracelet/bubbles/help"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
@@ -47,14 +49,18 @@ var stackSwitchCmd = &cobra.Command{
 		for _, node := range rootNodes {
 			branchList = append(branchList, stackSwitchBranchList(repo, tx, branches, node)...)
 		}
+		if len(branchList) == 0 {
+			return errors.New("no branches found")
+		}
 
 		if !isatty.IsTerminal(os.Stdout.Fd()) {
 			return errors.New("stack switch command must be run in a terminal")
 		}
 		p := tea.NewProgram(stackSwitchViewModel{
 			repo:                 repo,
+			help:                 help.New(),
 			currentHEADBranch:    currentBranch,
-			currentChoosenBranch: currentBranch,
+			currentChoosenBranch: getInitialChoosenBranch(branchList, currentBranch),
 			rootNodes:            rootNodes,
 			branchList:           branchList,
 			branches:             branches,
@@ -68,6 +74,16 @@ var stackSwitchCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+func getInitialChoosenBranch(branchList []*stackTreeBranchInfo, currentBranch string) string {
+	for _, branch := range branchList {
+		if branch.BranchName == currentBranch {
+			return currentBranch
+		}
+	}
+	// If the current branch is not in the list, choose the first branch
+	return branchList[0].BranchName
 }
 
 func stackSwitchBranchList(repo *git.Repo, tx meta.ReadTx, branches map[string]*stackTreeBranchInfo, node *stackutils.StackTreeNode) []*stackTreeBranchInfo {
@@ -95,6 +111,7 @@ type stackSwitchViewModel struct {
 	currentChoosenBranch string
 	checkingOut          bool
 	checkoutError        error
+	help                 help.Model
 
 	repo              *git.Repo
 	currentHEADBranch string
@@ -116,7 +133,7 @@ func (vm stackSwitchViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return vm, tea.Quit
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			return vm, tea.Quit
 		case "up", "k":
 			vm.currentChoosenBranch = vm.getPreviousBranch()
@@ -181,11 +198,12 @@ func (vm stackSwitchViewModel) View() string {
 			return renderStackTreeBranchInfo(stackTreeStackBranchInfoStyles, stbi, vm.currentHEADBranch, branchName, isTrunk)
 		}))
 	}
+	sb.WriteString(vm.help.ShortHelpView(uiutils.PromptKeys) + "\n")
 	if vm.checkingOut {
 		sb.WriteString("Checking out branch " + vm.currentChoosenBranch + "...\n")
 	}
 	if vm.checkoutError != nil {
-		sb.WriteString(vm.checkoutError.Error())
+		sb.WriteString(vm.checkoutError.Error() + "\n")
 	}
 	return sb.String()
 }
