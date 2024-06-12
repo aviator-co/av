@@ -7,7 +7,7 @@ import (
 )
 
 func RenderTree(node *StackTreeNode, branchDataFn func(branchName string, isTrunk bool) string) string {
-	return renderTreeInternal(0, node, true, branchDataFn)
+	return strings.TrimSuffix(renderTreeInternal(0, node, true, branchDataFn), "\n")
 }
 
 func renderTreeInternal(columns int, node *StackTreeNode, isTrunk bool, branchDataFn func(branchName string, isTrunk bool) string) string {

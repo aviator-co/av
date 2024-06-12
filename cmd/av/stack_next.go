@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
@@ -12,6 +11,7 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/erikgeiser/promptkit/selection"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
@@ -169,18 +169,25 @@ func (m stackNextModel) Init() tea.Cmd {
 	return m.nextBranch
 }
 
-func (m stackNextModel) View() string {
-	sb := strings.Builder{}
-	if m.err != nil {
-		sb.WriteString(m.err.Error() + "\n")
-		return sb.String()
+func (vm stackNextModel) View() string {
+	var ss []string
+	if vm.selection != nil {
+		ss = append(ss, vm.selection.View())
 	}
 
-	if m.selection != nil {
-		sb.WriteString(m.selection.View())
+	var ret string
+	if len(ss) != 0 {
+		ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
+			lipgloss.JoinVertical(0, ss...),
+		)
 	}
-
-	return sb.String()
+	if vm.err != nil {
+		if len(ret) != 0 {
+			ret += "\n"
+		}
+		ret += renderError(vm.err)
+	}
+	return ret
 }
 
 func (m stackNextModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
