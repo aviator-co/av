@@ -168,6 +168,7 @@ func (vm *RestackModel) View() string {
 					return branchName + suffix
 				}))
 			}
+			sb.WriteString("\n")
 		}
 	}
 	if vm.rebaseConflictErrorHeadline != "" {

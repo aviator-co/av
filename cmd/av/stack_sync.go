@@ -300,12 +300,20 @@ func (vm *stackSyncViewModel) View() string {
 	if vm.pruneBranchModel != nil {
 		ss = append(ss, vm.pruneBranchModel.View())
 	}
-	if vm.err != nil {
-		ss = append(ss, vm.err.Error())
+
+	var ret string
+	if len(ss) != 0 {
+		ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
+			lipgloss.JoinVertical(0, ss...),
+		)
 	}
-	return lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
-		lipgloss.JoinVertical(0, ss...),
-	)
+	if vm.err != nil {
+		if len(ret) != 0 {
+			ret += "\n"
+		}
+		ret += renderError(vm.err)
+	}
+	return ret
 }
 
 var commandStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
