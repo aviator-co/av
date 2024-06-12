@@ -10,6 +10,8 @@ import (
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/uiutils"
+	"github.com/charmbracelet/bubbles/help"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/erikgeiser/promptkit/selection"
@@ -78,12 +80,12 @@ type stackNextModel struct {
 	currentBranch string
 	db            meta.DB
 	repo          *git.Repo
-
-	err error
+	help          help.Model
 
 	selection   *selection.Model[string]
 	lastInStack bool
 	nInStack    int
+	err         error
 }
 
 func newStackNextModel(lastInStack bool, nInStack int) (stackNextModel, error) {
@@ -106,6 +108,7 @@ func newStackNextModel(lastInStack bool, nInStack int) (stackNextModel, error) {
 		currentBranch: currentBranch,
 		db:            db,
 		repo:          repo,
+		help:          help.New(),
 		nInStack:      nInStack,
 		lastInStack:   lastInStack,
 	}, nil
@@ -172,14 +175,14 @@ func (m stackNextModel) Init() tea.Cmd {
 func (vm stackNextModel) View() string {
 	var ss []string
 	if vm.selection != nil {
-		ss = append(ss, vm.selection.View())
+		ss = append(ss, vm.selection.View()+vm.help.ShortHelpView(uiutils.PromptKeys))
 	}
 
 	var ret string
 	if len(ss) != 0 {
 		ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
 			lipgloss.JoinVertical(0, ss...),
-		)
+		) + "\n"
 	}
 	if vm.err != nil {
 		if len(ret) != 0 {
@@ -205,9 +208,10 @@ func (m stackNextModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.nextBranch
 
 	case showSelectionMsg:
-		sel := selection.New(fmt.Sprintf("There are multiple children of branch %s. Which branch would you like to follow?", colors.UserInput(m.currentBranch)), m.currentBranchChildren())
-		sel.Filter = nil
-		m.selection = selection.NewModel(sel)
+		m.selection = uiutils.NewPromptModel(
+			fmt.Sprintf("There are multiple children of branch %s. Which branch would you like to follow?", colors.UserInput(m.currentBranch)),
+			m.currentBranchChildren(),
+		)
 		return m, m.selection.Init()
 
 	case tea.KeyMsg:
@@ -222,9 +226,10 @@ func (m stackNextModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.nInStack--
 
 			return m, m.nextBranch
+		case "ctrl+c":
+			return m, tea.Quit
 		default:
 			_, cmd := m.selection.Update(msg)
-
 			return m, cmd
 		}
 	}
