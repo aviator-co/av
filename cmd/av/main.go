@@ -119,9 +119,9 @@ func main() {
 		// (including the stack trace if using pkg/errors).
 		if rootFlags.Debug {
 			stackTrace := fmt.Sprintf("%+v", err)
-			_, _ = fmt.Fprintf(os.Stderr, "error: %s\n%s\n", err, text.Indent(stackTrace, "\t"))
+			fmt.Fprintf(os.Stderr, "error: %s\n%s\n", err, text.Indent(stackTrace, "\t"))
 		} else {
-			_, _ = fmt.Fprintf(os.Stderr, "error: %s\n", err)
+			fmt.Fprint(os.Stderr, renderError(err))
 		}
 
 		os.Exit(1)
@@ -172,7 +172,7 @@ func discoverGitHubAPIToken() string {
 	return ""
 }
 
-var errNoGitHubToken = errors.New("No GitHub token is set (do you need to configure one?).")
+var errNoGitHubToken = errors.Sentinel("No GitHub token is set (do you need to configure one?).")
 
 func getGitHubClient() (*gh.Client, error) {
 	token := discoverGitHubAPIToken()
