@@ -19,10 +19,7 @@ import (
 )
 
 var stackReparentFlags struct {
-	Parent   string
-	Abort    bool
-	Continue bool
-	Skip     bool
+	Parent string
 }
 
 var stackReparentCmd = &cobra.Command{
@@ -37,6 +34,18 @@ var stackReparentCmd = &cobra.Command{
 		db, err := getDB(repo)
 		if err != nil {
 			return err
+		}
+
+		if stackReparentFlags.Parent != "" && len(args) > 0 && args[0] != "" {
+			if stackReparentFlags.Parent != args[0] {
+				return errors.New("conflicting parent branch names")
+			}
+		}
+		if len(args) > 0 && args[0] != "" {
+			stackReparentFlags.Parent = args[0]
+		}
+		if stackReparentFlags.Parent == "" {
+			return errors.New("missing parent branch name")
 		}
 
 		var opts []tea.ProgramOption
