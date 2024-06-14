@@ -200,7 +200,7 @@ func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error
 	if err != nil {
 		return nil, err
 	}
-	state.Seq = sequencer.NewSequencer("origin", vm.db, ops)
+	state.Seq = sequencer.NewSequencer(vm.repo.GetRemoteName(), vm.db, ops)
 	return &state, nil
 }
 

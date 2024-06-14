@@ -240,7 +240,7 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 }
 
 func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
-	remoteBranches, err := vm.repo.LsRemote("origin")
+	remoteBranches, err := vm.repo.LsRemote(vm.repo.GetRemoteName())
 	if err != nil {
 		return err
 	}
