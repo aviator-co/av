@@ -1,22 +1,25 @@
 <div align="center">
   <img src="resources/isotype-color.svg" width="100">
-  <p><strong>av:</strong> Stacked PR manager</p>
+  <p><strong>av:</strong> CLI to manage Stacked PRs</p>
 </div>
 
 ---
 
-`av` is a command-line tool that helps you manage your PRs in a stacked way. It
-allows you to create a PR that depends on another PR, and it will automatically
-update the dependent PR when the base PR is updated.
+`av` is a command-line tool that helps you manage your stacked PRs on GitHub. It
+allows you to create a PR stacked on top of another PR, and it will
+automatically update the dependent PR when the base PR is updated. Read more at
+[Rethinking code reviews with stacked
+PRs](https://www.aviator.co/blog/rethinking-code-reviews-with-stacked-prs/).
 
 # Features
 
-- Create a PR that depends on another PR.
-- Visualize the PR stack.
+- Create a PR that is stacked on another PR.
+- Visualize the entire stack of PRs.
 - Interactively navigate through the PR stack.
 - Rebase the dependent PR when the base PR is updated.
 - Remove the merged PRs from the stack.
-- Split a PR / commit into multiple PRs / commits.
+- Split a PR into multiple PRs.
+- Split a commit into multiple commits.
 - Reorder the PRs and commits in the stack.
 
 # Demo
@@ -109,9 +112,9 @@ $ av stack sync
 # Installation
 
 `av` is available for macOS and Linux. In order to interact with GitHub, `av`
-requires an API token. If you have [GitHub CLI](https://cli.github.com/)
-installed, `av` will use the token from the GitHub CLI. Recommended to install
-both.
+uses the GitHub API token. If you have [GitHub CLI](https://cli.github.com/)
+installed, `av` will use the token automatically from the GitHub CLI. It is
+recommended to install both.
 
 ## macOS
 
@@ -168,10 +171,10 @@ Download the binary from the [releases page](https://github.com/aviator-co/av/re
 
 # How it works
 
-`av` internally keeps tracks of the PRs and their dependencies. For each branch,
-it remembers where the branch started. When the base branch is updated, `av`
-rebases the dependent branches on top of the new base branch using the
-remembered starting point as the merge base.
+`av` internally keeps tracks of the PRs, their associated branches and their dependent branches.
+For each branch, it remembers where the branch started (the base commit of the branch). When
+the base branch is updated, `av` rebases the dependent branches on top of the
+new base branch using the remembered starting point as the merge base.
 
 # Learn more
 
