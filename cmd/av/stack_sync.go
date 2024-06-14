@@ -70,6 +70,15 @@ base branch.
 		if !sliceutils.Contains([]string{"ask", "yes", "no"}, strings.ToLower(stackSyncFlags.Prune)) {
 			return errors.New("invalid value for --prune; must be one of ask, yes, no")
 		}
+		if cmd.Flags().Changed("no-fetch") {
+			return actions.ErrExitSilently{ExitCode: 1}
+		}
+		if cmd.Flags().Changed("trunk") {
+			return actions.ErrExitSilently{ExitCode: 1}
+		}
+		if cmd.Flags().Changed("parent") {
+			return actions.ErrExitSilently{ExitCode: 1}
+		}
 		repo, err := getRepo()
 		if err != nil {
 			return err
@@ -551,8 +560,9 @@ func init() {
 	)
 	_ = stackSyncCmd.Flags().MarkDeprecated("no-fetch", "please use av stack restack for offline restacking")
 	stackSyncCmd.Flags().Bool("trunk", false,
-		"(deprecated; use av stack restack for prevent rebasing on trunk) rebase the stack on the trunk branch",
+		"(deprecated; now av stack sync automatically restacks on the trunk branch without this option. Use av stack restack for stacking without the trunk branch) rebase the stack on the trunk branch",
 	)
+	_ = stackSyncCmd.Flags().MarkDeprecated("trunk", "now av stack sync automatically restacks on the trunk branch without this option. Use av stack restack for restacking without the trunk branch")
 	stackSyncCmd.Flags().String("parent", "",
 		"(deprecated; use av stack adopt or av stack reparent) parent branch to rebase onto",
 	)
