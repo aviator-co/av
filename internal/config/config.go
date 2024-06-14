@@ -58,6 +58,7 @@ var Av = struct {
 	GitHub                  GitHub
 	Aviator                 Aviator
 	AdditionalTrunkBranches []string
+	Remote                  string
 }{
 	Aviator: Aviator{
 		APIHost: "https://api.aviator.co",
@@ -67,6 +68,7 @@ var Av = struct {
 	},
 	GitHub:                  GitHub{},
 	AdditionalTrunkBranches: []string{},
+	Remote:                  "",
 }
 
 // Load initializes the configuration values.
