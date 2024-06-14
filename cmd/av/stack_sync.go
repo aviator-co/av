@@ -560,9 +560,9 @@ func init() {
 	)
 	_ = stackSyncCmd.Flags().MarkDeprecated("no-fetch", "please use av stack restack for offline restacking")
 	stackSyncCmd.Flags().Bool("trunk", false,
-		"(deprecated; use av stack sync without this option, or use av stack restack for not restacking on the trunk branch) rebase the stack on the trunk branch",
+		"(deprecated; now av stack sync automatically restacks on the trunk branch without this option. Use av stack restack for stacking without the trunk branch) rebase the stack on the trunk branch",
 	)
-	_ = stackSyncCmd.Flags().MarkDeprecated("trunk", "please use av stack sync without this option or use av stack restack for not restacking on the trunk branch")
+	_ = stackSyncCmd.Flags().MarkDeprecated("trunk", "now av stack sync automatically restacks on the trunk branch without this option. Use av stack restack for restacking without the trunk branch")
 	stackSyncCmd.Flags().String("parent", "",
 		"(deprecated; use av stack adopt or av stack reparent) parent branch to rebase onto",
 	)
