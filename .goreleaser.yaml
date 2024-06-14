@@ -58,7 +58,7 @@ brews:
       owner: "aviator-co"
       name: "homebrew-tap"
       git:
-        url: "ssh://git@github.com:aviator-co/homebrew-tap.git"
+        url: "git@github.com:aviator-co/homebrew-tap.git"
         private_key: "{{ .Env.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}"
     commit_author:
       name: "aviator-bot"
