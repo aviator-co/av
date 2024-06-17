@@ -65,17 +65,7 @@ internal tracking metadata that defines the order of branches within a stack.`,
 		}
 
 		if len(args) == 2 {
-			parent := parseInputParentBranch(args[1])
-
-			stackBranchFlags.Parent = parent
-			isTrunk, err := repo.IsTrunkBranch(parent)
-			if err != nil {
-				return errors.WrapIf(err, "failed to check if the parent branch is trunk")
-			}
-
-			if isTrunk {
-				defaultBranch = parent
-			}
+			stackBranchFlags.Parent = args[1]
 		}
 
 		tx := db.WriteTx()
@@ -89,15 +79,6 @@ internal tracking metadata that defines the order of branches within a stack.`,
 		var parentBranchName string
 		if stackBranchFlags.Parent != "" {
 			parentBranchName = stackBranchFlags.Parent
-			origBranch, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: parentBranchName})
-			if err != nil {
-				return errors.WrapIf(err, "failed to checkout parent branch")
-			}
-			cu.Add(func() {
-				if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: origBranch}); err != nil {
-					logrus.WithError(err).Warn("cleanup error: failed to return to original branch")
-				}
-			})
 		} else {
 			var err error
 			parentBranchName, err = repo.CurrentBranchName()
@@ -106,13 +87,24 @@ internal tracking metadata that defines the order of branches within a stack.`,
 			}
 		}
 
+		remoteName := repo.GetRemoteName()
+		if parentBranchName == remoteName+"/HEAD" {
+			parentBranchName = defaultBranch
+		}
+		parentBranchName = strings.TrimPrefix(parentBranchName, remoteName+"/")
+
 		isBranchFromTrunk, err := repo.IsTrunkBranch(parentBranchName)
 		if err != nil {
 			return errors.WrapIf(err, "failed to determine if branch is a trunk")
 		}
-
+		checkoutStartingPoint := parentBranchName
 		var parentHead string
-		if !isBranchFromTrunk {
+		if isBranchFromTrunk {
+			// If the parent is trunk, start from the remote tracking branch.
+			checkoutStartingPoint = remoteName + "/" + defaultBranch
+			// If the parent is the trunk, we don't log the parent branch's head
+			parentHead = ""
+		} else {
 			var err error
 			parentHead, err = repo.RevParse(&git.RevParse{Rev: parentBranchName})
 			if err != nil {
@@ -122,16 +114,17 @@ internal tracking metadata that defines the order of branches within a stack.`,
 					parentHead,
 				)
 			}
+
+			if _, exist := tx.Branch(parentBranchName); !exist {
+				return errParentNotAdopted
+			}
 		}
 
 		// Create a new branch off of the parent
-		logrus.WithFields(logrus.Fields{
-			"parent":     parentBranchName,
-			"new_branch": branchName,
-		}).Debug("creating new branch from parent")
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
-			Name:      branchName,
-			NewBranch: true,
+			Name:       branchName,
+			NewBranch:  true,
+			NewHeadRef: checkoutStartingPoint,
 		}); err != nil {
 			return errors.WrapIff(err, "checkout error")
 		}
@@ -144,28 +137,6 @@ internal tracking metadata that defines the order of branches within a stack.`,
 				Head:  parentHead,
 			},
 		})
-
-		// If this isn't a new stack root, update the parent metadata to include
-		// the new branch as a child.
-		if !isBranchFromTrunk {
-			parentMeta, ok := tx.Branch(parentBranchName)
-			if !ok {
-				// Handle case where the user created first branch by
-				// `git switch -c` from trunk (i.e., created first branch
-				// without using av), then wants to create a stacked branch
-				// after it.
-				parentMeta = meta.Branch{
-					Name: parentBranchName,
-					Parent: meta.BranchState{
-						// Assume the parent is a branch from the default branch
-						Name:  defaultBranch,
-						Trunk: true,
-					},
-				}
-			}
-			logrus.WithField("meta", parentMeta).Debug("writing parent branch metadata")
-			tx.SetBranch(parentMeta)
-		}
 
 		cu.Cancel()
 		if err := tx.Commit(); err != nil {
@@ -290,9 +261,4 @@ func stackBranchMove(
 		return err
 	}
 	return nil
-}
-
-func parseInputParentBranch(branch string) string {
-	// If the input parent branch is contained remote name, trim it
-	return strings.Replace(branch, "origin/", "", 1)
 }

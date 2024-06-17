@@ -15,7 +15,7 @@ func TestSyncAfterAmendingCommit(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create a three stack...
-	repo.Git(t, "checkout", "-b", "stack-1")
+	RequireAv(t, "stack", "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 	RequireAv(t, "stack", "branch", "stack-2")

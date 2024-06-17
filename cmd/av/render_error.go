@@ -1,11 +1,16 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 
+	"emperror.dev/errors"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
+)
+
+var (
+	errNoGitHubToken    = errors.Sentinel("No GitHub token is set (do you need to configure one?).")
+	errParentNotAdopted = errors.Sentinel("Parent not adopted")
 )
 
 const noGitHubToken = `# ERROR: No GitHub Token
@@ -18,6 +23,15 @@ const noGitHubToken = `# ERROR: No GitHub Token
 We couldn't find the GitHub CLI setup nor a Personal Access Token in the config. Please set up the token and try again.
 `
 
+const parentNotAdopted = `# ERROR: Parent branch is not adopted to ` + "`av`" + `
+
+` + "`av`" + ` keeps metadata internally to keep track of branch relationships. If a branch is
+created via ` + "`git`" + ` command, ` + "`av`" + ` doesn't have such metadata for that branch.
+
+` + "`av stack adopt`" + ` is a command to adopt a ` + "`git`" + ` created branch to ` + "`av`" + `.
+Please run ` + "`av stack adopt`" + ` to adopt the parent branch first.
+`
+
 func renderError(err error) string {
 	var style string
 	if lipgloss.HasDarkBackground() {
@@ -25,10 +39,18 @@ func renderError(err error) string {
 	} else {
 		style = glamour.LightStyle
 	}
+	var markdownText string
 	if errors.Is(err, errNoGitHubToken) {
-		if out, rerr := glamour.Render(noGitHubToken, style); rerr == nil {
+		markdownText = noGitHubToken
+	} else if errors.Is(err, errParentNotAdopted) {
+		markdownText = parentNotAdopted
+	}
+
+	if markdownText != "" {
+		if out, rerr := glamour.Render(markdownText, style); rerr == nil {
 			return out
 		}
+		// If there's an error, fallback to the plaintext message.
 	}
 	// This is a placeholder for a more sophisticated error renderer.
 	// For now, we just print the error message.

@@ -19,7 +19,7 @@ func TestStackOrphan(t *testing.T) {
 	// Then stack-2 (and child branch stack-3) will be orphaned
 
 	// Setup initial state
-	repo.Git(t, "checkout", "-b", "stack-1")
+	RequireAv(t, "stack", "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 	RequireAv(t, "stack", "branch", "stack-2")
