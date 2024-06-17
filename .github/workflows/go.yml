@@ -1,35 +1,39 @@
 name: Go
 
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref_name }}"
+  cancel-in-progress: true
+
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ "**" ]
+    branches: ["**"]
 
 jobs:
   go-unit-test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-        cache-dependency-path: go.sum
-    - name: Build
-      run: go build -v ./...
-    - name: Test
-      run: go test -v --vet=all ./...
-    - name: CLI smoke test
-      run: go run ./cmd/av --help
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Build
+        run: go build -v ./...
+      - name: Test
+        run: go test -v --vet=all ./...
+      - name: CLI smoke test
+        run: go run ./cmd/av --help
 
   golangci-lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-        cache-dependency-path: go.sum
-    - run: |
-        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-        golangci-lint run --out-format github-actions
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          golangci-lint run --out-format github-actions
