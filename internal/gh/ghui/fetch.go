@@ -162,8 +162,9 @@ func (vm *GitHubFetchModel) View() string {
 }
 
 func (vm *GitHubFetchModel) runGitFetch() tea.Msg {
-	if _, err := vm.repo.Git("fetch", "origin"); err != nil {
-		return errors.Errorf("failed to fetch from origin: %v", err)
+	remote := vm.repo.GetRemoteName()
+	if _, err := vm.repo.Git("fetch", remote); err != nil {
+		return errors.Errorf("failed to fetch from %s: %v", remote, err)
 	}
 	return &GitHubFetchProgress{gitFetchIsDone: true}
 }
@@ -199,9 +200,9 @@ func (vm *GitHubFetchModel) updateMergeCommitsFromCommitMessage() tea.Msg {
 	}
 
 	repo := vm.repo.GoGitRepo()
-	remote, err := repo.Remote("origin")
+	remote, err := repo.Remote(vm.repo.GetRemoteName())
 	if err != nil {
-		return errors.Errorf("failed to get remote origin: %v", err)
+		return errors.Errorf("failed to get remote %s: %v", vm.repo.GetRemoteName(), err)
 	}
 	remoteConfig := remote.Config()
 

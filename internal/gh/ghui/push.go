@@ -259,7 +259,7 @@ func (vm *GitHubPushModel) runUpdate() (ret tea.Msg) {
 }
 
 func (vm *GitHubPushModel) runGitPush() error {
-	pushArgs := []string{"push", "origin", "--atomic"}
+	pushArgs := []string{"push", vm.repo.GetRemoteName(), "--atomic"}
 	for _, branch := range vm.pushCandidates {
 		// Do a compare-and-swap to be strict on what we show as a difference.
 		pushArgs = append(pushArgs,
@@ -283,7 +283,7 @@ func (vm *GitHubPushModel) runGitPush() error {
 	}
 
 	for _, branch := range vm.pushCandidates {
-		if err := vm.repo.BranchSetConfig(branch.branch.Short(), "av-pushed-remote", "origin"); err != nil {
+		if err := vm.repo.BranchSetConfig(branch.branch.Short(), "av-pushed-remote", vm.repo.GetRemoteName()); err != nil {
 			return err
 		}
 		if err := vm.repo.BranchSetConfig(branch.branch.Short(), "av-pushed-ref", branch.branch.String()); err != nil {
@@ -370,9 +370,9 @@ func (vm *GitHubPushModel) undraftPRs(ghPRs map[plumbing.ReferenceName]*gh.PullR
 
 func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 	repo := vm.repo.GoGitRepo()
-	remote, err := repo.Remote("origin")
+	remote, err := repo.Remote(vm.repo.GetRemoteName())
 	if err != nil {
-		return errors.Errorf("failed to get remote origin: %v", err)
+		return errors.Errorf("failed to get remote %s: %v", vm.repo.GetRemoteName(), err)
 	}
 	remoteConfig := remote.Config()
 

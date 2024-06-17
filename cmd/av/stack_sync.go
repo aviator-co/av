@@ -504,7 +504,7 @@ func (vm *stackSyncViewModel) createState() (*savedStackSyncState, error) {
 	if err != nil {
 		return nil, err
 	}
-	state.RestackState.Seq = sequencer.NewSequencer("origin", vm.db, ops)
+	state.RestackState.Seq = sequencer.NewSequencer(vm.repo.GetRemoteName(), vm.db, ops)
 	return &state, nil
 }
 

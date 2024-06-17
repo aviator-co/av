@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/aviator-co/av/internal/config"
+	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/stretchr/testify/require"
 )
@@ -34,4 +35,13 @@ func TestTrunkBranches(t *testing.T) {
 	branches, err = repo.AsAvGitRepo().TrunkBranches()
 	require.NoError(t, err)
 	require.Equal(t, branches, []string{"main", "develop", "staging"})
+}
+
+func TestGetRemoteName(t *testing.T) {
+	repo := gittest.NewTempRepo(t)
+	require.Equal(t, repo.AsAvGitRepo().GetRemoteName(), git.DEFAULT_REMOTE_NAME)
+
+	config.Av.Remote = "new-remote"
+	require.Equal(t, repo.AsAvGitRepo().GetRemoteName(), "new-remote")
+
 }
