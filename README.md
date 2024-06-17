@@ -11,6 +11,9 @@ automatically update the dependent PR when the base PR is updated. Read more at
 [Rethinking code reviews with stacked
 PRs](https://www.aviator.co/blog/rethinking-code-reviews-with-stacked-prs/).
 
+# Community
+Join our discord community: https://discord.gg/TFgtZtN8
+
 # Features
 
 - Create a PR that is stacked on another PR.
@@ -120,6 +123,31 @@ recommended to install both.
 
 ```sh
 brew install gh aviator-co/tap/av
+```
+
+## Arch Linux (AUR)
+
+Published as [`av-cli-bin`](https://aur.archlinux.org/packages/av-cli-bin) in
+AUR.
+
+```sh
+yay av-cli
+```
+
+## Debian/Ubuntu
+
+Download the `.deb` file from the [releases page](https://github.com/aviator-co/av/releases).
+
+```sh
+apt install ./av_$VERSION_linux_$ARCH.deb
+```
+
+## RPM-based systems
+
+Download the `.rpm` file from the [releases page](https://github.com/aviator-co/av/releases).
+
+```sh
+rpm -i ./av_$VERSION_linux_$ARCH.rpm
 ```
 
 ## Binary download

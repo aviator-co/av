@@ -58,7 +58,7 @@ brews:
       owner: "aviator-co"
       name: "homebrew-tap"
       git:
-        url: "ssh://git@github.com:aviator-co/homebrew-tap.git"
+        url: "git@github.com:aviator-co/homebrew-tap.git"
         private_key: "{{ .Env.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}"
     commit_author:
       name: "aviator-bot"
@@ -80,6 +80,8 @@ aurs:
     provides: ["av-cli"]
     conflicts: ["av-cli"]
     optdepends: ["github-cli: for GitHub authentication"]
+    private_key: "{{ .Env.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}"
+    git_url: "ssh://aur@aur.archlinux.org/av-cli-bin.git"
     package: |-
       install -Dm755 "./av" "${pkgdir}/usr/bin/av"
       install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/av/LICENSE"
