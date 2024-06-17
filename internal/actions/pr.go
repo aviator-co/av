@@ -197,19 +197,18 @@ func CreatePullRequest(
 			pushFlags = append(pushFlags, "--force-with-lease")
 		}
 
-		// NOTE: This assumes that the user use the default push strategy (simple). It would
-		// be rare to use the upstream strategy.
-		pushFlags = append(pushFlags, "origin", opts.BranchName)
+		remote := repo.GetRemoteName()
+		pushFlags = append(pushFlags, remote, opts.BranchName)
 		logrus.Debug("pushing latest changes")
 
 		_, _ = fmt.Fprint(os.Stderr,
-			"  - pushing to ", color.CyanString("origin/%s", opts.BranchName),
+			"  - pushing to ", color.CyanString("%s/%s", remote, opts.BranchName),
 			"\n",
 		)
 		if _, err := repo.Git(pushFlags...); err != nil {
 			return nil, errors.WrapIf(err, "failed to push")
 		}
-		if err := repo.BranchSetConfig(opts.BranchName, "av-pushed-remote", "origin"); err != nil {
+		if err := repo.BranchSetConfig(opts.BranchName, "av-pushed-remote", remote); err != nil {
 			return nil, err
 		}
 		if err := repo.BranchSetConfig(opts.BranchName, "av-pushed-ref", fmt.Sprintf("refs/heads/%s", opts.BranchName)); err != nil {
@@ -255,7 +254,7 @@ func CreatePullRequest(
 		}
 	} else {
 		logrus.WithField("base", parentState.Name).Debug("base branch is a trunk branch")
-		prCompareRef = "origin/" + parentState.Name
+		prCompareRef = fmt.Sprintf("%s/%s", repo.GetRemoteName(), parentState.Name)
 	}
 
 	commitsList, err := repo.Git("rev-list", "--reverse", fmt.Sprintf("%s..%s", prCompareRef, opts.BranchName))

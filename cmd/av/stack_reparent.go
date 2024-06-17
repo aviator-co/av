@@ -181,7 +181,7 @@ func (vm *stackReparentViewModel) createState() (*sequencerui.RestackState, erro
 	if len(ops) == 0 {
 		return nil, nothingToRestackError
 	}
-	state.Seq = sequencer.NewSequencer("origin", vm.db, ops)
+	state.Seq = sequencer.NewSequencer(vm.repo.GetRemoteName(), vm.db, ops)
 	return &state, nil
 }
 

@@ -20,6 +20,8 @@ import (
 
 var ErrRemoteNotFound = errors.Sentinel("this repository doesn't have a remote origin")
 
+const DEFAULT_REMOTE_NAME = "origin"
+
 type Repo struct {
 	repoDir string
 	gitDir  string
@@ -106,6 +108,14 @@ func (r *Repo) TrunkBranches() ([]string, error) {
 	branches = append(branches, config.Av.AdditionalTrunkBranches...)
 
 	return branches, nil
+}
+
+func (r *Repo) GetRemoteName() string {
+	if config.Av.Remote != "" {
+		return config.Av.Remote
+	}
+
+	return DEFAULT_REMOTE_NAME
 }
 
 func (r *Repo) Git(args ...string) (string, error) {
