@@ -11,6 +11,9 @@ automatically update the dependent PR when the base PR is updated. Read more at
 [Rethinking code reviews with stacked
 PRs](https://www.aviator.co/blog/rethinking-code-reviews-with-stacked-prs/).
 
+# Community
+Join our discord community: https://discord.gg/TFgtZtN8
+
 # Features
 
 - Create a PR that is stacked on another PR.
