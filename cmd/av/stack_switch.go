@@ -198,6 +198,8 @@ func (vm stackSwitchViewModel) View() string {
 			return renderStackTreeBranchInfo(stackTreeStackBranchInfoStyles, stbi, vm.currentHEADBranch, branchName, isTrunk)
 		}))
 	}
+	sb.WriteString("\n")
+
 	sb.WriteString(vm.help.ShortHelpView(uiutils.PromptKeys) + "\n")
 	if vm.checkingOut {
 		sb.WriteString("Checking out branch " + vm.currentChoosenBranch + "...\n")
