@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -63,17 +62,6 @@ func runCreate(repo *git.Repo, db meta.DB) error {
 
 	tx := db.WriteTx()
 	defer tx.Abort()
-
-	client, err := getGitHubClient()
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-	_, err = actions.UpdatePullRequestState(ctx, client, tx, currentBranch)
-	if err != nil {
-		fmt.Fprint(os.Stderr, colors.Warning("failed to check pull request state, continuing with commit"), "\n")
-	}
 
 	branch, _ := tx.Branch(currentBranch)
 	if branch.PullRequest != nil && branch.PullRequest.State == githubv4.PullRequestStateMerged {
