@@ -12,7 +12,7 @@ automatically update the dependent PR when the base PR is updated. Read more at
 PRs](https://www.aviator.co/blog/rethinking-code-reviews-with-stacked-prs/).
 
 # Community
-Join our discord community: https://discord.gg/TFgtZtN8
+Join our discord community: [https://discord.gg/TFgtZtN8](https://discord.gg/NFsYWNzXcH)
 
 # Features
 
