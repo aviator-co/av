@@ -48,9 +48,7 @@ func TestCommitAmendInStack(t *testing.T) {
 }
 
 func TestCommitAmendOnMergedBranch(t *testing.T) {
-	server := RunMockGitHubServer(t)
-	defer server.Close()
-	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
+	repo := gittest.NewTempRepo(t)
 	Chdir(t, repo.RepoDir)
 	repo.Git(t, "fetch")
 
@@ -60,19 +58,11 @@ func TestCommitAmendOnMergedBranch(t *testing.T) {
 	repo.AddFile(t, filepath)
 	RequireAv(t, "commit", "create", "-m", "one")
 
-	// Simulate a merge state on the mock server
-	server.pulls = append(server.pulls, mockPR{
-		ID:          "nodeid-42",
-		Number:      42,
-		State:       "MERGED",
-		HeadRefName: "one",
-	})
-
 	// Update the branch meta with the PR data
 	db := repo.OpenDB(t)
 	tx := db.WriteTx()
 	oneMeta, _ := tx.Branch("one")
-	oneMeta.PullRequest = &meta.PullRequest{ID: "nodeid-42", Number: 42}
+	oneMeta.PullRequest = &meta.PullRequest{ID: "nodeid-42", Number: 42, State: "MERGED"}
 	tx.SetBranch(oneMeta)
 	require.NoError(t, tx.Commit())
 
