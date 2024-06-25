@@ -7,7 +7,9 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +37,7 @@ var commitCreateCmd = &cobra.Command{
 
 		// We need to run git commit before bubbletea grabs the terminal. Otherwise,
 		// we need to make p.ReleaseTerminal() and p.RestoreTerminal().
-		if err := runCreate(repo); err != nil {
+		if err := runCreate(repo, db); err != nil {
 			fmt.Fprint(os.Stderr, "\n", colors.Failure("Failed to create commit."), "\n")
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
@@ -44,8 +46,9 @@ var commitCreateCmd = &cobra.Command{
 	},
 }
 
-func runCreate(repo *git.Repo) error {
-	if _, err := repo.CurrentBranchName(); err != nil {
+func runCreate(repo *git.Repo, db meta.DB) error {
+	currentBranch, err := repo.CurrentBranchName()
+	if err != nil {
 		return errors.WrapIf(err, "failed to determine current branch")
 	}
 
@@ -55,6 +58,15 @@ func runCreate(repo *git.Repo) error {
 	}
 	if commitCreateFlags.Message != "" {
 		commitArgs = append(commitArgs, "--message", commitCreateFlags.Message)
+	}
+
+	tx := db.WriteTx()
+	defer tx.Abort()
+
+	branch, _ := tx.Branch(currentBranch)
+	if branch.PullRequest != nil && branch.PullRequest.State == githubv4.PullRequestStateMerged {
+		fmt.Fprint(os.Stderr, colors.Failure("This branch has already been merged, commit is not allowed"), "\n")
+		return errors.New("this branch has already been merged, commit is not allowed")
 	}
 
 	if _, err := repo.Run(&git.RunOpts{
