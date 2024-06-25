@@ -121,7 +121,7 @@ func TestStackRestack(t *testing.T) {
 
 	// Further sync attemps should yield no-ops
 	syncNoop := RequireAv(t, "stack", "restack")
-	require.Contains(t, syncNoop.Stdout, "Restack done")
+	require.Contains(t, syncNoop.Stdout, "Restack is done")
 
 	// Make sure we've not introduced any extra commits
 	// We should have 4 (corresponding to 1a, 1b, 2a, and 3a).

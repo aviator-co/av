@@ -73,13 +73,13 @@ func TestStackSyncTrunk(t *testing.T) {
 		"squash commit of stack-1 should not be an ancestor of HEAD of stack-2 before running sync",
 	)
 
-	RequireAv(t, "stack", "sync", "--trunk")
+	RequireAv(t, "stack", "sync")
 	// At this point, the stack should be:
 	//
 	//     main:    X --------------> 1S -> 3a
 	//     stack-1:  \ -> 1a -> 1b           \
 	//     stack-2:                           \ -> 2a -> 2b
 
-	// commit 3a should be an ancestor of HEAD of stack-2 after running sync with --trunk
+	// commit 3a should be an ancestor of HEAD of stack-2 after running sync
 	repo.Git(t, "merge-base", "--is-ancestor", threeACommit.String(), "stack-2")
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"strings"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
@@ -13,6 +12,7 @@ import (
 	"github.com/aviator-co/av/internal/sequencer/sequencerui"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
@@ -132,14 +132,24 @@ func (vm *stackRestackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (vm *stackRestackViewModel) View() string {
-	sb := strings.Builder{}
+	var ss []string
 	if vm.restackModel != nil {
-		sb.WriteString(vm.restackModel.View())
+		ss = append(ss, vm.restackModel.View())
+	}
+
+	var ret string
+	if len(ss) != 0 {
+		ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
+			lipgloss.JoinVertical(0, ss...),
+		)
 	}
 	if vm.err != nil {
-		sb.WriteString(vm.err.Error() + "\n")
+		if len(ret) != 0 {
+			ret += "\n"
+		}
+		ret += renderError(vm.err)
 	}
-	return sb.String()
+	return ret
 }
 
 func (vm *stackRestackViewModel) readState() (*sequencerui.RestackState, error) {
@@ -190,10 +200,7 @@ func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error
 	if err != nil {
 		return nil, err
 	}
-	if len(ops) == 0 {
-		return nil, errors.New("nothing to restack")
-	}
-	state.Seq = sequencer.NewSequencer("origin", vm.db, ops)
+	state.Seq = sequencer.NewSequencer(vm.repo.GetRemoteName(), vm.db, ops)
 	return &state, nil
 }
 

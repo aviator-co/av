@@ -1,3 +1,5 @@
+version: 2
+
 before:
   hooks:
     - "rm -rf man"
@@ -53,8 +55,11 @@ nfpms:
 # Push to the homebrew tap
 brews:
   - repository:
-      owner: aviator-co
-      name: homebrew-tap
+      owner: "aviator-co"
+      name: "homebrew-tap"
+      git:
+        url: "git@github.com:aviator-co/homebrew-tap.git"
+        private_key: "{{ .Env.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}"
     commit_author:
       name: "aviator-bot"
       email: "105820887+aviator-bot@users.noreply.github.com"
@@ -75,6 +80,8 @@ aurs:
     provides: ["av-cli"]
     conflicts: ["av-cli"]
     optdepends: ["github-cli: for GitHub authentication"]
+    private_key: "{{ .Env.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}"
+    git_url: "ssh://aur@aur.archlinux.org/av-cli-bin.git"
     package: |-
       install -Dm755 "./av" "${pkgdir}/usr/bin/av"
       install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/av/LICENSE"

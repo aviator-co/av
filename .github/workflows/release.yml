@@ -3,11 +3,13 @@ name: goreleaser
 on:
   push:
     tags:
-      - '*'
+      - "*"
 
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    permissions:
+      contents: "write"
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -21,9 +23,10 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GORELEASER_TOKEN }}
+          AVIATOR_CO_HOMEBREW_REPO_SSH_KEY: ${{ secrets.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

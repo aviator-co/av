@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"strings"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
@@ -13,16 +12,14 @@ import (
 	"github.com/aviator-co/av/internal/sequencer/sequencerui"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
 var stackReparentFlags struct {
-	Parent   string
-	Abort    bool
-	Continue bool
-	Skip     bool
+	Parent string
 }
 
 var stackReparentCmd = &cobra.Command{
@@ -37,6 +34,18 @@ var stackReparentCmd = &cobra.Command{
 		db, err := getDB(repo)
 		if err != nil {
 			return err
+		}
+
+		if stackReparentFlags.Parent != "" && len(args) > 0 && args[0] != "" {
+			if stackReparentFlags.Parent != args[0] {
+				return errors.New("conflicting parent branch names")
+			}
+		}
+		if len(args) > 0 && args[0] != "" {
+			stackReparentFlags.Parent = args[0]
+		}
+		if stackReparentFlags.Parent == "" {
+			return errors.New("missing parent branch name")
 		}
 
 		var opts []tea.ProgramOption
@@ -113,13 +122,25 @@ func (vm *stackReparentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (vm *stackReparentViewModel) View() string {
-	sb := strings.Builder{}
-	sb.WriteString("Reparenting onto " + stackReparentFlags.Parent + "...\n")
-	sb.WriteString(vm.restackModel.View())
-	if vm.err != nil {
-		sb.WriteString(vm.err.Error() + "\n")
+	var ss []string
+	ss = append(ss, "Reparenting onto "+stackReparentFlags.Parent+"...")
+	if vm.restackModel != nil {
+		ss = append(ss, vm.restackModel.View())
 	}
-	return sb.String()
+
+	var ret string
+	if len(ss) != 0 {
+		ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
+			lipgloss.JoinVertical(0, ss...),
+		)
+	}
+	if vm.err != nil {
+		if len(ret) != 0 {
+			ret += "\n"
+		}
+		ret += renderError(vm.err)
+	}
+	return ret
 }
 
 func (vm *stackReparentViewModel) writeState(state *sequencerui.RestackState) error {
@@ -160,7 +181,7 @@ func (vm *stackReparentViewModel) createState() (*sequencerui.RestackState, erro
 	if len(ops) == 0 {
 		return nil, nothingToRestackError
 	}
-	state.Seq = sequencer.NewSequencer("origin", vm.db, ops)
+	state.Seq = sequencer.NewSequencer(vm.repo.GetRemoteName(), vm.db, ops)
 	return &state, nil
 }
 

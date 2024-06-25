@@ -10,7 +10,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
@@ -19,6 +18,7 @@ func NewRestackModel(repo *git.Repo, db meta.DB) *RestackModel {
 		repo:    repo,
 		db:      db,
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
+		Command: "av stack restack",
 	}
 }
 
@@ -44,6 +44,7 @@ type RestackModel struct {
 	Abort    bool
 	DryRun   bool
 	State    *RestackState
+	Command  string
 
 	repo *git.Repo
 	db   meta.DB
@@ -104,11 +105,11 @@ func (vm *RestackModel) View() string {
 	sb := strings.Builder{}
 	if vm.State != nil && vm.State.Seq != nil {
 		if vm.State.Seq.CurrentSyncRef != "" {
-			sb.WriteString("Restacking " + vm.State.Seq.CurrentSyncRef.Short() + "...\n")
+			sb.WriteString(colors.ProgressStyle.Render(vm.spinner.View() + "Restacking " + vm.State.Seq.CurrentSyncRef.Short() + "..."))
 		} else if vm.abortedBranch != "" {
-			sb.WriteString("Restack aborted\n")
+			sb.WriteString(colors.FailureStyle.Render("✗ Restack is aborted"))
 		} else {
-			sb.WriteString("Restack done\n")
+			sb.WriteString(colors.SuccessStyle.Render("✓ Restack is done"))
 		}
 		// The sequencer operates from top to bottom. The branches that are synced before
 		// the current branches are already synced. The branches that come after the current
@@ -134,35 +135,49 @@ func (vm *RestackModel) View() string {
 			nodes, err = stackutils.BuildStackTreeRelatedBranchStacks(vm.db.ReadTx(), vm.State.InitialBranch, true, vm.State.RelatedBranches)
 		}
 		if err != nil {
-			sb.WriteString("Failed to build stack tree: " + err.Error() + "\n")
-		} else {
+			sb.WriteString("\n")
+			sb.WriteString("Failed to build stack tree: " + err.Error())
+		} else if len(nodes) > 0 {
+			sb.WriteString("\n")
+			sb.WriteString("\n")
 			for _, node := range nodes {
 				sb.WriteString(stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
+					var suffix string
+					avbr, _ := vm.db.ReadTx().Branch(branchName)
+					if avbr.MergeCommit != "" {
+						suffix += " (merged)"
+					}
+					hash, err := vm.repo.GoGitRepo().ResolveRevision(plumbing.Revision(branchName))
+					if err == nil && hash != nil {
+						suffix += " " + hash.String()[:7]
+					}
+
 					bn := plumbing.NewBranchReferenceName(branchName)
 					if syncedBranches[bn] {
-						return colors.Success("✓ " + branchName)
+						return colors.SuccessStyle.Render("✓ " + branchName + suffix)
 					}
 					if pendingBranches[bn] {
-						return lipgloss.NewStyle().Foreground(colors.Amber500).Render(branchName)
+						return colors.ProgressStyle.Render(branchName + suffix)
 					}
 					if bn == vm.State.Seq.CurrentSyncRef {
-						return lipgloss.NewStyle().Foreground(colors.Amber500).Render(vm.spinner.View() + branchName)
+						return colors.ProgressStyle.Render(vm.spinner.View() + branchName + suffix)
 					}
 					if bn == vm.abortedBranch {
-						return colors.Failure("✗ " + branchName)
+						return colors.FailureStyle.Render("✗ " + branchName + suffix)
 					}
-					return branchName
+					return branchName + suffix
 				}))
 			}
+			sb.WriteString("\n")
 		}
 	}
 	if vm.rebaseConflictErrorHeadline != "" {
 		sb.WriteString("\n")
-		sb.WriteString(colors.Failure("Rebase conflict while rebasing ", vm.State.Seq.CurrentSyncRef.Short()) + "\n")
+		sb.WriteString(colors.FailureStyle.Render("Rebase conflict while rebasing ", vm.State.Seq.CurrentSyncRef.Short()) + "\n")
 		sb.WriteString(vm.rebaseConflictErrorHeadline + "\n")
 		sb.WriteString(vm.rebaseConflictHint + "\n")
 		sb.WriteString("\n")
-		sb.WriteString("Resolve the conflicts and continue the restack with " + colors.CliCmd("av stack restack --continue") + "\n")
+		sb.WriteString("Resolve the conflicts and continue the restack with " + colors.CliCmd(vm.Command+" --continue"))
 	}
 	return sb.String()
 }
