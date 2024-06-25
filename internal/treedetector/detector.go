@@ -157,10 +157,6 @@ func (d *detector) detectBranchTree(ref *plumbing.Reference) (*BranchPiece, erro
 	// Do a commit traversal. We can stop the traversal when we hit the trunk or if we find a
 	// commit that has multiple parents.
 	err = object.NewCommitPreorderIter(commit, nil, nil).ForEach(func(c *object.Commit) error {
-		if c.NumParents() > 1 {
-			ret.ContainsMergeCommit = true
-			return iterStopErr
-		}
 		if trunkBranchNames, ok := trunkBases[c.Hash]; ok {
 			if len(trunkBranchNames) > 1 {
 				ret.PossibleParents = trunkBranchNames
@@ -169,6 +165,10 @@ func (d *detector) detectBranchTree(ref *plumbing.Reference) (*BranchPiece, erro
 			ret.Parent = trunkBranchNames[0]
 			ret.ParentIsTrunk = true
 			ret.ParentMergeBase = c.Hash
+			return iterStopErr
+		}
+		if c.NumParents() > 1 {
+			ret.ContainsMergeCommit = true
 			return iterStopErr
 		}
 		if c.Hash != commit.Hash {
