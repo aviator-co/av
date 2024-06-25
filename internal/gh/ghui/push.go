@@ -250,10 +250,10 @@ func (vm *GitHubPushModel) runUpdate() (ret tea.Msg) {
 			}
 		}
 	}()
-	if err := vm.runGitPush(); err != nil {
+	if err := vm.updatePRs(ghPRs); err != nil {
 		return err
 	}
-	if err := vm.updatePRs(ghPRs); err != nil {
+	if err := vm.runGitPush(); err != nil {
 		return err
 	}
 	return &GitHubPushProgress{gitPushDone: true}
