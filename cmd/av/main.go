@@ -172,8 +172,6 @@ func discoverGitHubAPIToken() string {
 	return ""
 }
 
-var errNoGitHubToken = errors.Sentinel("No GitHub token is set (do you need to configure one?).")
-
 func getGitHubClient() (*gh.Client, error) {
 	token := discoverGitHubAPIToken()
 	if token == "" {

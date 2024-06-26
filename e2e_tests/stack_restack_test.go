@@ -24,7 +24,7 @@ func TestStackRestack(t *testing.T) {
 	//     stack-4:           \ -> 4a
 	// Note: we create the first branch with a "vanilla" git checkout just to
 	// make sure that's working as intended.
-	repo.Git(t, "checkout", "-b", "stack-1")
+	RequireAv(t, "stack", "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	RequireAv(t, "stack", "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
@@ -155,7 +155,7 @@ func TestStackRestackAbort(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create a two stack...
-	repo.Git(t, "checkout", "-b", "stack-1")
+	RequireAv(t, "stack", "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	RequireAv(t, "stack", "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
@@ -212,7 +212,7 @@ func TestStackRestackWithLotsOfConflicts(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create a three stack...
-	repo.Git(t, "checkout", "-b", "stack-1")
+	RequireAv(t, "stack", "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	RequireAv(t, "stack", "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
@@ -278,7 +278,7 @@ func TestStackRestackAfterAmendingCommit(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create a three stack...
-	repo.Git(t, "checkout", "-b", "stack-1")
+	RequireAv(t, "stack", "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 	RequireAv(t, "stack", "branch", "stack-2")
