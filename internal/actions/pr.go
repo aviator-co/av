@@ -265,6 +265,11 @@ func CreatePullRequest(
 		return nil, errors.Errorf("no commits between %q and %q", prCompareRef, opts.BranchName)
 	}
 
+	// Check if a parent branch has already been merged or not
+	if parentMeta.MergeCommit != "" {
+		return nil, errors.Errorf("failed to create a pull request. The parent branch %q has already been merged\nPlease run av stack sync to rebase the branch first.", parentMeta.Name)
+	}
+
 	if existingPR != nil {
 		// If there's an existing PR, use that as the new PR title and body. If --edit is
 		// used, an editor is opened later.
