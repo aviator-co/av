@@ -36,6 +36,7 @@ const (
 	reasonPRIsMerged        = "PR is already merged."
 	reasonPRIsClosed        = "PR is closed."
 	reasonParentNotPushed   = "Parent branch is not pushed to remote."
+	reasonNoPR              = "Some branches in a stack do not have a PR."
 )
 
 type pushCandidate struct {
@@ -249,10 +250,10 @@ func (vm *GitHubPushModel) runUpdate() (ret tea.Msg) {
 			}
 		}
 	}()
-	if err := vm.runGitPush(); err != nil {
+	if err := vm.updatePRs(ghPRs); err != nil {
 		return err
 	}
-	if err := vm.updatePRs(ghPRs); err != nil {
+	if err := vm.runGitPush(); err != nil {
 		return err
 	}
 	return &GitHubPushProgress{gitPushDone: true}
@@ -431,6 +432,15 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 			})
 			continue
 		}
+		if !vm.allBranchesOnStackHavePRs(br) {
+			// If an ancestor branch doesn't have a PR, the PR cannot be made with the
+			// right metadata.
+			noPushBranches = append(noPushBranches, noPushBranch{
+				branch: br,
+				reason: reasonNoPR,
+			})
+			continue
+		}
 
 		remoteRefCommit, err := repo.CommitObject(remoteRef.Hash())
 		if err != nil {
@@ -464,6 +474,19 @@ func (vm *GitHubPushModel) allParentsHaveRemoteTrackingBranch(remoteConfig *conf
 		parent = avbr.Parent
 	}
 	return true
+}
+
+func (vm *GitHubPushModel) allBranchesOnStackHavePRs(br plumbing.ReferenceName) bool {
+	avbr, _ := vm.db.ReadTx().Branch(br.Short())
+	for {
+		if avbr.PullRequest == nil {
+			return false
+		}
+		if avbr.Parent.Trunk {
+			return true
+		}
+		avbr, _ = vm.db.ReadTx().Branch(avbr.Parent.Name)
+	}
 }
 
 func getFirstLine(s string) string {

@@ -30,7 +30,7 @@ func TestStackSync(t *testing.T) {
 	//     stack-4:           \ -> 4a
 	// Note: we create the first branch with a "vanilla" git checkout just to
 	// make sure that's working as intended.
-	repo.Git(t, "checkout", "-b", "stack-1")
+	RequireAv(t, "stack", "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	RequireAv(t, "stack", "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
@@ -163,7 +163,7 @@ func TestStackSyncAbort(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create a two stack...
-	repo.Git(t, "checkout", "-b", "stack-1")
+	RequireAv(t, "stack", "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	RequireAv(t, "stack", "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
@@ -222,7 +222,7 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create a three stack...
-	repo.Git(t, "checkout", "-b", "stack-1")
+	RequireAv(t, "stack", "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
 	RequireAv(t, "stack", "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
