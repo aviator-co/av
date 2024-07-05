@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"net/url"
 	"os"
+	"regexp"
 	"strings"
 
 	"emperror.dev/errors"
@@ -21,6 +25,7 @@ import (
 var stackSwitchCmd = &cobra.Command{
 	Use:   "switch",
 	Short: "switch to a different branch",
+	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
 		if err != nil {
@@ -41,6 +46,15 @@ var stackSwitchCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
+		}
+
+		var branch string
+		if len(args) > 0 {
+			b, err := parseBranchName(args[0])
+			if err != nil {
+				return err
+			}
+			branch = b
 		}
 
 		rootNodes := stackutils.BuildStackTreeAllBranches(tx, currentBranch, true)
@@ -97,6 +111,45 @@ func stackSwitchBranchList(repo *git.Repo, tx meta.ReadTx, branches map[string]*
 		ret = append(ret, stbi)
 	}
 	return ret
+}
+
+var PULL_REQUEST_URL_REGEXP = regexp.MustCompile(`^/([^/]+)/([^/]+)/pull/(\d+)`)
+
+func parseBranchName(input string) (string, error) {
+	u, err := url.Parse(input)
+
+	// WHen cannot url parse, it seems like it's a branch name
+	if err != nil {
+		return input, nil
+	}
+
+	// input branch name isn't a URL, evaluated as branch name
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return input, nil
+	}
+
+	// WHen schema is empty, it seems like it's a branch name
+	if u.Scheme == "" {
+		return input, err
+	}
+
+	m := PULL_REQUEST_URL_REGEXP.FindStringSubmatch(u.Path)
+	if m == nil {
+		return "", errors.New(fmt.Sprintf("URL is not a pull request URL format:%s", input))
+	}
+
+	client, err := getGitHubClient()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get GitHub client")
+	}
+
+	prID := m[3]
+	pr, err := client.PullRequest(context.Background(), prID)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get pull request")
+	}
+
+	return pr.HeadBranchName(), nil
 }
 
 var stackSwitchStackBranchInfoStyles = stackBranchInfoStyles{
