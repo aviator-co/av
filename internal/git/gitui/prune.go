@@ -14,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/erikgeiser/promptkit/selection"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
@@ -223,16 +224,68 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 	}
 
 	// Restore the checked out state.
-	if initialHead.Type() == plumbing.SymbolicReference {
-		if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: initialHead.Name().Short()}); err != nil {
-			return err
-		}
-	} else if initialHead.Type() == plumbing.SymbolicReference {
+	if err := vm.CheckoutInitialState(initialHead); err != nil {
+		return err
+	}
+	return &PruneBranchProgress{deletionDone: true}
+}
+
+func (vm *PruneBranchModel) CheckoutInitialState(initialHead *plumbing.Reference) error {
+	if initialHead.Type() == plumbing.HashReference {
+		// If it's a hash reference (== detached HEAD), we can just checkout the commit
+		// hash and create a detached HEAD.
 		if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: initialHead.Hash().String()}); err != nil {
 			return err
 		}
+		return nil
 	}
-	return &PruneBranchProgress{deletionDone: true}
+
+	// If it's a branch, check if the branch still exists.
+	ref, err := vm.repo.GoGitRepo().Reference(initialHead.Name(), true)
+	if err == nil {
+		if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: ref.Name().Short()}); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if err != plumbing.ErrReferenceNotFound {
+		return err
+	}
+
+	// The branch is deleted. Let's checkout the default branch.
+	defaultBranch, err := vm.repo.DefaultBranch()
+	if err != nil {
+		return err
+	}
+	defaultBranchRef := plumbing.NewBranchReferenceName(defaultBranch)
+	ref, err = vm.repo.GoGitRepo().Reference(defaultBranchRef, true)
+	if err == nil {
+		if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: ref.Name().Short()}); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// The default branch doesn't exist. Check the remote tracking branch.
+	remote, err := vm.repo.GoGitRepo().Remote(vm.repo.GetRemoteName())
+	if err != nil {
+		return errors.Errorf("failed to get remote %s: %v", vm.repo.GetRemoteName(), err)
+	}
+	remoteConfig := remote.Config()
+	rtb := mapToRemoteTrackingBranch(remoteConfig, defaultBranchRef)
+	if rtb != nil {
+		ref, err = vm.repo.GoGitRepo().Reference(*rtb, true)
+		if err == nil {
+			if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: ref.Hash().String()}); err != nil {
+				return err
+			}
+			return nil
+		}
+	}
+
+	// No remote tracking branch. Skip.
+	return nil
 }
 
 func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
@@ -283,4 +336,14 @@ func (vm *PruneBranchModel) hasOpenChildren(br plumbing.ReferenceName) bool {
 		}
 	}
 	return false
+}
+
+func mapToRemoteTrackingBranch(remoteConfig *config.RemoteConfig, refName plumbing.ReferenceName) *plumbing.ReferenceName {
+	for _, fetch := range remoteConfig.Fetch {
+		if fetch.Match(refName) {
+			dst := fetch.Dst(refName)
+			return &dst
+		}
+	}
+	return nil
 }
