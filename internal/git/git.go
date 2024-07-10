@@ -345,6 +345,24 @@ func (r *Repo) CheckoutBranch(opts *CheckoutBranch) (string, error) {
 	return previousBranchName, nil
 }
 
+// Detach detaches to the detached HEAD.
+func (r *Repo) Detach() error {
+	res, err := r.Run(&RunOpts{
+		Args: []string{"switch", "--detach"},
+	})
+	if err != nil {
+		return err
+	}
+	if res.ExitCode != 0 {
+		logrus.WithFields(logrus.Fields{
+			"stdout": string(res.Stdout),
+			"stderr": string(res.Stderr),
+		}).Debug("git checkout failed")
+		return errors.Errorf("failed to switch to the detached HEAD: %s", string(res.Stderr))
+	}
+	return nil
+}
+
 type RevParse struct {
 	// The name of the branch to parse.
 	// If empty, the current branch is parsed.
