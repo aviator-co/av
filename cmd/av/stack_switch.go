@@ -25,7 +25,7 @@ import (
 )
 
 var stackSwitchCmd = &cobra.Command{
-	Use:   "switch",
+	Use:   "switch [<branch> | <url>]",
 	Short: "switch to a different branch",
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
