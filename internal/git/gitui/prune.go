@@ -202,13 +202,9 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 	if err != nil {
 		return err
 	}
-	// Checkout the default branch so that we can delete the branches. We cannot delete the
+	// Checkout the detached HEAD so that we can delete the branches. We cannot delete the
 	// branches that are checked out.
-	defaultBranch, err := vm.repo.DefaultBranch()
-	if err != nil {
-		return err
-	}
-	if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: defaultBranch}); err != nil {
+	if err := vm.repo.Detach(); err != nil {
 		return err
 	}
 
