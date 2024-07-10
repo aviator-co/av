@@ -117,29 +117,29 @@ func stackSwitchBranchList(repo *git.Repo, tx meta.ReadTx, branches map[string]*
 	return ret
 }
 
+func parseBranchName(input string) (string, error) {
+	if branch, err := parsePullRequestURL(input); err == nil {
+		return branch, nil
+	}
+
+	return input, nil
+}
+
 var PULL_REQUEST_URL_REGEXP = regexp.MustCompile(`^/([^/]+)/([^/]+)/pull/(\d+)`)
 
-func parseBranchName(input string) (string, error) {
-	u, err := url.Parse(input)
-
-	// WHen cannot url parse, it seems like it's a branch name
+func parsePullRequestURL(prURL string) (string, error) {
+	u, err := url.Parse(prURL)
 	if err != nil {
-		return input, nil
+		return "", errors.Wrap(err, "failed to parse URL")
 	}
 
-	// input branch name isn't a URL, evaluated as branch name
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return input, nil
-	}
-
-	// WHen schema is empty, it seems like it's a branch name
-	if u.Scheme == "" {
-		return input, err
+		return "", errors.New("URL is not a pull request URL")
 	}
 
 	m := PULL_REQUEST_URL_REGEXP.FindStringSubmatch(u.Path)
 	if m == nil {
-		return "", errors.New(fmt.Sprintf("URL is not a pull request URL format:%s", input))
+		return "", errors.New(fmt.Sprintf("URL is not a pull request URL format:%s", prURL))
 	}
 
 	client, err := getGitHubClient()
