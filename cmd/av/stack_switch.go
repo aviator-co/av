@@ -6,10 +6,12 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
@@ -48,13 +50,15 @@ var stackSwitchCmd = &cobra.Command{
 			}
 		}
 
-		var branch string
 		if len(args) > 0 {
-			b, err := parseBranchName(args[0])
+			branch, err := parseBranchName(args[0])
 			if err != nil {
 				return err
 			}
-			branch = b
+			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: branch}); err != nil {
+				return err
+			}
+			return nil
 		}
 
 		rootNodes := stackutils.BuildStackTreeAllBranches(tx, currentBranch, true)
@@ -143,8 +147,15 @@ func parseBranchName(input string) (string, error) {
 		return "", errors.Wrap(err, "failed to get GitHub client")
 	}
 
-	prID := m[3]
-	pr, err := client.PullRequest(context.Background(), prID)
+	prID, err := strconv.Atoi(m[3])
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse pull request ID")
+	}
+	pr, err := client.GetPullRequest(context.Background(), gh.PullRequestOpts{
+		Owner:  m[1],
+		Repo:   m[2],
+		Number: int64(prID),
+	})
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get pull request")
 	}
