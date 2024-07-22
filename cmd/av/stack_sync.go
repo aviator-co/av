@@ -515,7 +515,7 @@ func (vm *stackSyncViewModel) initPushBranches() tea.Cmd {
 }
 
 func (vm *stackSyncViewModel) initPruneBranches() tea.Cmd {
-	vm.pruneBranchModel = gitui.NewPruneBranchModel(vm.repo, vm.db, vm.state.Prune, vm.state.TargetBranches)
+	vm.pruneBranchModel = gitui.NewPruneBranchModel(vm.repo, vm.db, vm.state.Prune, vm.state.TargetBranches, vm.restackModel.State.InitialBranch)
 	vm.pruningBranches = true
 	return vm.pruneBranchModel.Init()
 }
