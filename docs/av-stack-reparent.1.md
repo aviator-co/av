@@ -2,7 +2,7 @@
 
 ## NAME
 
-av-stack-reparent - Reparent a branch to a new parent
+av-stack-reparent - Change the parent of the current branch
 
 ## SYNOPSIS
 
@@ -13,7 +13,7 @@ av stack reparent [--parent=<parent>]
 ## DESCRIPTION
 
 This rebases the current branch onto the new parent and runs the restack
-operations on the children.
+operations on the children. It does not push the changes to the remote.
 
 ## OPTIONS
 
