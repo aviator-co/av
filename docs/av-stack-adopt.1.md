@@ -12,9 +12,9 @@ av stack adopt [--parent=<parent>]
 
 ## DESCRIPTION
 
-`av stack adopt` is a command to adopt branches that are not managed by `av`.
-This command is useful when you have branches that are created outside of `av`
-and want to manage them with `av`.
+`av stack adopt` is a command to adopt a branch or an entire stack that is not
+managed by `av`. This command is useful when you have branches that are created
+outside of `av` and want to manage them with `av`.
 
 When you run this command, it lists the branches that are not managed by `av`,
 automatically detecting the tree structure of the branches. You can choose which

@@ -15,7 +15,7 @@ av stack restack [--dry-run] [--continue | --abort | --skip]
 `av stack restack` is a command to re-align the stacked branches. When a parent
 branch is amended or has a new commit, the children branches need to be rebased
 on the new parent. This command does the rebase operation for all the branches
-in the current stack.
+in the current stack. This command does not push the changes to the remote.
 
 ## REBASE CONFLICT
 

@@ -24,7 +24,7 @@ var stackReparentFlags struct {
 
 var stackReparentCmd = &cobra.Command{
 	Use:   "reparent",
-	Short: "Reparent branches",
+	Short: "Change the parent of the current branch",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
 		if err != nil {

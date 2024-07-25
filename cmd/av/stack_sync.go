@@ -490,9 +490,7 @@ func (vm *stackSyncViewModel) createState() (*savedStackSyncState, error) {
 		if err != nil {
 			return nil, err
 		}
-		for _, b := range targetBranches {
-			state.RestackState.RelatedBranches = append(state.RestackState.RelatedBranches, b.Short())
-		}
+		state.RestackState.RelatedBranches = append(state.RestackState.RelatedBranches, currentBranch)
 	}
 	state.StackSyncState.TargetBranches = targetBranches
 
