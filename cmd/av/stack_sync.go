@@ -400,7 +400,7 @@ func (vm *stackSyncViewModel) initSync() tea.Cmd {
 	if err != nil {
 		return func() tea.Msg { return err }
 	}
-	if isTrunkBranch && stackSyncFlags.All == false {
+	if isTrunkBranch && !stackSyncFlags.All {
 		return func() tea.Msg {
 			return promptUserShouldSyncAllMsg{}
 		}
