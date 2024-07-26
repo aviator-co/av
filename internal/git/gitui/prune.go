@@ -38,12 +38,13 @@ type noDeleteBranch struct {
 	reason string
 }
 
-func NewPruneBranchModel(repo *git.Repo, db meta.DB, pruneFlag string, targetBranches []plumbing.ReferenceName) *PruneBranchModel {
+func NewPruneBranchModel(repo *git.Repo, db meta.DB, pruneFlag string, targetBranches []plumbing.ReferenceName, initialBranch string) *PruneBranchModel {
 	return &PruneBranchModel{
 		repo:           repo,
 		db:             db,
 		pruneFlag:      pruneFlag,
 		targetBranches: targetBranches,
+		initialBranch:  initialBranch,
 		spinner:        spinner.New(spinner.WithSpinner(spinner.Dot)),
 		help:           help.New(),
 		chooseNoPrune:  pruneFlag == "no",
@@ -55,6 +56,7 @@ type PruneBranchModel struct {
 	db             meta.DB
 	pruneFlag      string
 	targetBranches []plumbing.ReferenceName
+	initialBranch  string
 	spinner        spinner.Model
 	help           help.Model
 
@@ -199,10 +201,6 @@ func (vm *PruneBranchModel) viewNoDeleteBranches() string {
 }
 
 func (vm *PruneBranchModel) runDelete() tea.Msg {
-	initialHead, err := vm.repo.GoGitRepo().Head()
-	if err != nil {
-		return err
-	}
 	// Checkout the detached HEAD so that we can delete the branches. We cannot delete the
 	// branches that are checked out.
 	if err := vm.repo.Detach(); err != nil {
@@ -224,33 +222,26 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 	}
 
 	// Restore the checked out state.
-	if err := vm.CheckoutInitialState(initialHead); err != nil {
+	if err := vm.CheckoutInitialState(); err != nil {
 		return err
 	}
 	return &PruneBranchProgress{deletionDone: true}
 }
 
-func (vm *PruneBranchModel) CheckoutInitialState(initialHead *plumbing.Reference) error {
-	if initialHead.Type() == plumbing.HashReference {
-		// If it's a hash reference (== detached HEAD), we can just checkout the commit
-		// hash and create a detached HEAD.
-		if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: initialHead.Hash().String()}); err != nil {
+func (vm *PruneBranchModel) CheckoutInitialState() error {
+	if vm.initialBranch != "" {
+		initialHead, err := vm.repo.GoGitRepo().Reference(plumbing.NewBranchReferenceName(vm.initialBranch), true)
+		if err == nil {
+			if initialHead.Type() == plumbing.HashReference {
+				// Normal reference that points to a commit. Checking out.
+				if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: initialHead.Name().Short()}); err != nil {
+					return err
+				}
+				return nil
+			}
+		} else if err != plumbing.ErrReferenceNotFound {
 			return err
 		}
-		return nil
-	}
-
-	// If it's a branch, check if the branch still exists.
-	ref, err := vm.repo.GoGitRepo().Reference(initialHead.Name(), true)
-	if err == nil {
-		if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: ref.Name().Short()}); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	if err != plumbing.ErrReferenceNotFound {
-		return err
 	}
 
 	// The branch is deleted. Let's checkout the default branch.
@@ -259,7 +250,7 @@ func (vm *PruneBranchModel) CheckoutInitialState(initialHead *plumbing.Reference
 		return err
 	}
 	defaultBranchRef := plumbing.NewBranchReferenceName(defaultBranch)
-	ref, err = vm.repo.GoGitRepo().Reference(defaultBranchRef, true)
+	ref, err := vm.repo.GoGitRepo().Reference(defaultBranchRef, true)
 	if err == nil {
 		if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: ref.Name().Short()}); err != nil {
 			return err
