@@ -144,6 +144,7 @@ type stackSyncViewModel struct {
 
 	state              *stackSyncState
 	changeNoticePrompt *selection.Model[string]
+	syncAllPrompt      *selection.Model[string]
 	githubFetchModel   *ghui.GitHubFetchModel
 	restackModel       *sequencerui.RestackModel
 	githubPushModel    *ghui.GitHubPushModel
@@ -236,8 +237,35 @@ func (vm *stackSyncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		vm.pruningBranches = false
 		return vm, tea.Quit
 
+	case promptUserShouldSyncAllMsg:
+		vm.syncAllPrompt = uiutils.NewPromptModel("You are on the trunk, do you want to sync all stacks?", []string{"Yes", "No"})
+		return vm, vm.syncAllPrompt.Init()
+
 	case tea.KeyMsg:
-		if vm.askingStackSyncChange {
+		if vm.syncAllPrompt != nil {
+			switch msg.String() {
+			case " ", "enter":
+				c, err := vm.syncAllPrompt.Value()
+				if err != nil {
+					vm.err = err
+					return vm, tea.Quit
+				}
+				vm.syncAllPrompt = nil
+				if c == "Yes" {
+					stackSyncFlags.All = true
+				}
+				if c == "No" {
+					return vm, tea.Quit
+				}
+				return vm, vm.initSync()
+			case "ctrl+c":
+				return vm, tea.Quit
+			default:
+				_, cmd := vm.syncAllPrompt.Update(msg)
+				return vm, cmd
+			}
+		} else if vm.askingStackSyncChange {
+
 			switch msg.String() {
 			case " ", "enter":
 				c, err := vm.changeNoticePrompt.Value()
@@ -294,6 +322,10 @@ func (vm *stackSyncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (vm *stackSyncViewModel) View() string {
 	var ss []string
+	if vm.syncAllPrompt != nil {
+		ss = append(ss, vm.syncAllPrompt.View())
+		ss = append(ss, vm.help.ShortHelpView(uiutils.PromptKeys))
+	}
 	if vm.changeNoticePrompt != nil {
 		ss = append(ss, vm.viewChangeNotice())
 	}
@@ -349,6 +381,9 @@ func (vm *stackSyncViewModel) viewChangeNotice() string {
 	return sb.String()
 }
 
+type promptUserShouldSyncAllMsg struct {
+}
+
 func (vm *stackSyncViewModel) initSync() tea.Cmd {
 	state, err := vm.readState()
 	if err != nil {
@@ -359,6 +394,16 @@ func (vm *stackSyncViewModel) initSync() tea.Cmd {
 	}
 	if stackSyncFlags.Abort || stackSyncFlags.Continue || stackSyncFlags.Skip {
 		return func() tea.Msg { return errors.New("no restack in progress") }
+	}
+
+	isTrunkBranch, err := vm.repo.IsCurrentBranchTrunk()
+	if err != nil {
+		return func() tea.Msg { return err }
+	}
+	if isTrunkBranch && !stackSyncFlags.All {
+		return func() tea.Msg {
+			return promptUserShouldSyncAllMsg{}
+		}
 	}
 	vm.githubFetchModel, err = vm.createGitHubFetchModel()
 	if err != nil {
