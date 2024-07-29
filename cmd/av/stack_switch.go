@@ -1,7 +1,11 @@
 package main
 
 import (
+	"fmt"
+	"net/url"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"emperror.dev/errors"
@@ -19,8 +23,9 @@ import (
 )
 
 var stackSwitchCmd = &cobra.Command{
-	Use:   "switch",
+	Use:   "switch [<branch> | <url>]",
 	Short: "switch to a different branch",
+	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
 		if err != nil {
@@ -41,6 +46,17 @@ var stackSwitchCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
+		}
+
+		if len(args) > 0 {
+			branch, err := parseBranchName(tx, args[0])
+			if err != nil {
+				return err
+			}
+			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: branch}); err != nil {
+				return err
+			}
+			return nil
 		}
 
 		rootNodes := stackutils.BuildStackTreeAllBranches(tx, currentBranch, true)
@@ -97,6 +113,46 @@ func stackSwitchBranchList(repo *git.Repo, tx meta.ReadTx, branches map[string]*
 		ret = append(ret, stbi)
 	}
 	return ret
+}
+
+func parseBranchName(tx meta.ReadTx, input string) (string, error) {
+	if branch, err := parsePullRequestURL(tx, input); err == nil {
+		return branch, nil
+	}
+
+	return input, nil
+}
+
+var PULL_REQUEST_URL_REGEXP = regexp.MustCompile(`^/([^/]+)/([^/]+)/pull/(\d+)`)
+
+func parsePullRequestURL(tx meta.ReadTx, prURL string) (string, error) {
+	u, err := url.Parse(prURL)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse URL")
+	}
+
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return "", errors.New("URL is not a pull request URL")
+	}
+
+	m := PULL_REQUEST_URL_REGEXP.FindStringSubmatch(u.Path)
+	if m == nil {
+		return "", errors.New(fmt.Sprintf("URL is not a pull request URL format:%s", prURL))
+	}
+
+	prNumber, err := strconv.Atoi(m[3])
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse pull request ID")
+	}
+
+	branches := tx.AllBranches()
+	for _, branch := range branches {
+		if branch.PullRequest != nil && branch.PullRequest.GetNumber() == int64(prNumber) {
+			return branch.Name, nil
+		}
+	}
+
+	return "", fmt.Errorf("failed to detect branch from pull request URL:%s", prURL)
 }
 
 var stackSwitchStackBranchInfoStyles = stackBranchInfoStyles{
