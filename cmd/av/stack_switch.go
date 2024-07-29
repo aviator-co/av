@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -11,7 +10,6 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
-	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
@@ -51,7 +49,7 @@ var stackSwitchCmd = &cobra.Command{
 		}
 
 		if len(args) > 0 {
-			branch, err := parseBranchName(args[0])
+			branch, err := parseBranchName(tx, args[0])
 			if err != nil {
 				return err
 			}
@@ -117,8 +115,8 @@ func stackSwitchBranchList(repo *git.Repo, tx meta.ReadTx, branches map[string]*
 	return ret
 }
 
-func parseBranchName(input string) (string, error) {
-	if branch, err := parsePullRequestURL(input); err == nil {
+func parseBranchName(tx meta.ReadTx, input string) (string, error) {
+	if branch, err := parsePullRequestURL(tx, input); err == nil {
 		return branch, nil
 	}
 
@@ -127,7 +125,7 @@ func parseBranchName(input string) (string, error) {
 
 var PULL_REQUEST_URL_REGEXP = regexp.MustCompile(`^/([^/]+)/([^/]+)/pull/(\d+)`)
 
-func parsePullRequestURL(prURL string) (string, error) {
+func parsePullRequestURL(tx meta.ReadTx, prURL string) (string, error) {
 	u, err := url.Parse(prURL)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to parse URL")
@@ -142,25 +140,19 @@ func parsePullRequestURL(prURL string) (string, error) {
 		return "", errors.New(fmt.Sprintf("URL is not a pull request URL format:%s", prURL))
 	}
 
-	client, err := getGitHubClient()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get GitHub client")
-	}
-
-	prID, err := strconv.Atoi(m[3])
+	prNumber, err := strconv.Atoi(m[3])
 	if err != nil {
 		return "", errors.Wrap(err, "failed to parse pull request ID")
 	}
-	pr, err := client.GetPullRequest(context.Background(), gh.PullRequestOpts{
-		Owner:  m[1],
-		Repo:   m[2],
-		Number: int64(prID),
-	})
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get pull request")
+
+	branches := tx.AllBranches()
+	for _, branch := range branches {
+		if branch.PullRequest != nil && branch.PullRequest.GetNumber() == int64(prNumber) {
+			return branch.Name, nil
+		}
 	}
 
-	return pr.HeadBranchName(), nil
+	return "", fmt.Errorf("failed to detect branch from pull request URL:%s", prURL)
 }
 
 var stackSwitchStackBranchInfoStyles = stackBranchInfoStyles{

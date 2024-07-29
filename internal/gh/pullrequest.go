@@ -80,22 +80,6 @@ func (c *Client) PullRequest(ctx context.Context, id string) (*PullRequest, erro
 	return &query.Node.PullRequest, nil
 }
 
-func (c *Client) GetPullRequest(ctx context.Context, opts PullRequestOpts) (*PullRequest, error) {
-	var query struct {
-		Repository struct {
-			PullRequest PullRequest `graphql:"pullRequest(number: $number)"`
-		} `graphql:"repository(owner:$owner, name:$repo)"`
-	}
-	if err := c.query(ctx, &query, map[string]interface{}{
-		"owner":  githubv4.String(opts.Owner),
-		"repo":   githubv4.String(opts.Repo),
-		"number": githubv4.Int(opts.Number),
-	}); err != nil {
-		return nil, errors.WrapIff(err, "failed to query pull request #%d", opts.Number)
-	}
-	return &query.Repository.PullRequest, nil
-}
-
 type GetPullRequestsInput struct {
 	// REQUIRED
 	Owner string
