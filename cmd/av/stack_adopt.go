@@ -197,7 +197,7 @@ func (vm stackAdoptViewModel) initCmd() tea.Msg {
 	for _, branch := range trunkBranches {
 		refs = append(refs, plumbing.NewBranchReferenceName(branch))
 	}
-	allBranches, err := treedetector.DetectBranchTree(vm.repo.GoGitRepo(), vm.repo.GetRemoteName(), refs)
+	allBranches, err := treedetector.DetectBranchTree(vm.repo, vm.repo.GetRemoteName(), refs)
 	if err != nil {
 		return err
 	}
