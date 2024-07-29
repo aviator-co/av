@@ -75,10 +75,75 @@ func TestStackSyncDeleteMerged(t *testing.T) {
 	tx.SetBranch(stack1Meta)
 	require.NoError(t, tx.Commit())
 
+	repo.Git(t, "switch", "stack-1")
 	RequireAv(t, "stack", "sync", "--prune=yes")
 
 	require.Equal(t, 1,
 		Cmd(t, "git", "show-ref", "refs/heads/stack-1").ExitCode,
 		"stack-1 should be deleted after merge",
+	)
+	require.Equal(t, "refs/heads/main\n",
+		repo.Git(t, "rev-parse", "--symbolic-full-name", "HEAD"),
+		"HEAD should be on main after stack-1 is deleted",
+	)
+}
+
+func TestStackSyncDeleteMerged_NoMain(t *testing.T) {
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
+	Chdir(t, repo.RepoDir)
+
+	RequireAv(t, "stack", "branch", "stack-1")
+	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
+	repo.Git(t, "push", "origin", "stack-1:refs/pull/42/head")
+
+	var squashCommit plumbing.Hash
+	repo.WithCheckoutBranch(t, "refs/heads/main", func() {
+		repo.Git(t, "merge", "--squash", "stack-1")
+		// `git merge --squash` doesn't actually create the commit, so we have to
+		// do that separately.
+		repo.Git(t, "commit", "--no-edit")
+
+		squashCommit = repo.GetCommitAtRef(t, plumbing.HEAD)
+
+		repo.Git(t, "push", "origin", "main")
+	})
+
+	server.pulls = append(server.pulls, mockPR{
+		ID:             "nodeid-42",
+		Number:         42,
+		State:          "MERGED",
+		HeadRefName:    "stack-1",
+		MergeCommitOID: squashCommit.String(),
+	})
+
+	// We shouldn't do this as part of an E2E test since it depends on internal
+	// knowledge of the codebase, but :shrug:. We need to set the merge commit
+	// manually since we can't actually communicate with the GitHub API as part
+	// of this test.
+	db := repo.OpenDB(t)
+	tx := db.WriteTx()
+	stack1Meta, _ := tx.Branch("stack-1")
+	stack1Meta.PullRequest = &meta.PullRequest{ID: "nodeid-42", Number: 42}
+	tx.SetBranch(stack1Meta)
+	require.NoError(t, tx.Commit())
+
+	repo.Git(t, "switch", "stack-1")
+	repo.Git(t, "branch", "-D", "main")
+	RequireAv(t, "stack", "sync", "--prune=yes")
+
+	require.Equal(t, 1,
+		Cmd(t, "git", "show-ref", "refs/heads/stack-1").ExitCode,
+		"stack-1 should be deleted after merge",
+	)
+	require.Equal(t, "HEAD\n",
+		repo.Git(t, "rev-parse", "--symbolic-full-name", "HEAD"),
+		"HEAD should be on a detached HEAD after stack-1 is deleted",
+	)
+	require.Equal(t,
+		repo.Git(t, "rev-parse", "HEAD"),
+		repo.Git(t, "rev-parse", "origin/main"),
+		"HEAD should be on origin/main",
 	)
 }

@@ -12,7 +12,7 @@ import (
 
 var stackOrphanCmd = &cobra.Command{
 	Use:   "orphan",
-	Short: "Current branch and the child branches will be orphaned",
+	Short: "Orphan branches that are managed by av",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		repo, err := getRepo()

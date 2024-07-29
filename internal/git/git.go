@@ -98,6 +98,14 @@ func (r *Repo) IsTrunkBranch(name string) (bool, error) {
 	return false, nil
 }
 
+func (r *Repo) IsCurrentBranchTrunk() (bool, error) {
+	currentBranch, err := r.CurrentBranchName()
+	if err != nil {
+		return false, err
+	}
+	return r.IsTrunkBranch(currentBranch)
+}
+
 func (r *Repo) TrunkBranches() ([]string, error) {
 	defaultBranch, err := r.DefaultBranch()
 	if err != nil {
