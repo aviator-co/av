@@ -397,6 +397,16 @@ func (r *Repo) MergeBase(mb *MergeBase) (string, error) {
 	return r.Git(args...)
 }
 
+func (r *Repo) MergeBases(commitishes ...string) ([]string, error) {
+	args := []string{"merge-base"}
+	args = append(args, commitishes...)
+	ret, err := r.Git(args...)
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(strings.TrimSpace(ret), "\n"), nil
+}
+
 type UpdateRef struct {
 	// The name of the ref (e.g., refs/heads/my-branch).
 	Ref string

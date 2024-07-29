@@ -2,6 +2,7 @@ package treedetector
 
 import (
 	"emperror.dev/errors"
+	avgit "github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -23,12 +24,12 @@ type BranchPiece struct {
 	IncludedCommits []*object.Commit
 }
 
-func DetectBranchTree(repo *git.Repository, remoteName string, trunkBranches []plumbing.ReferenceName) (map[plumbing.ReferenceName]*BranchPiece, error) {
-	trunkCommits, err := getTrunkCommits(repo, remoteName, trunkBranches)
+func DetectBranchTree(repo *avgit.Repo, remoteName string, trunkBranches []plumbing.ReferenceName) (map[plumbing.ReferenceName]*BranchPiece, error) {
+	trunkCommits, err := getTrunkCommits(repo.GoGitRepo(), remoteName, trunkBranches)
 	if err != nil {
 		return nil, err
 	}
-	branches, err := getBranchHashes(repo)
+	branches, err := getBranchHashes(repo.GoGitRepo())
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +41,7 @@ func DetectBranchTree(repo *git.Repository, remoteName string, trunkBranches []p
 	}
 
 	ret := map[plumbing.ReferenceName]*BranchPiece{}
-	brs, err := repo.Branches()
+	brs, err := repo.GoGitRepo().Branches()
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +115,7 @@ func getBranchHashes(repo *git.Repository) (map[plumbing.Hash][]plumbing.Referen
 }
 
 type detector struct {
-	repo *git.Repository
+	repo *avgit.Repo
 	// trunkCommits is a map from trunk branch name to the commits on the trunk branch.
 	// Each trunk branch has at most two commits: the commit on the trunk branch itself and the
 	// commit on the remote tracking branch.
@@ -126,7 +127,7 @@ type detector struct {
 const iterStopErr = errors.Sentinel("stop")
 
 func (d *detector) detectBranchTree(ref *plumbing.Reference) (*BranchPiece, error) {
-	commit, err := d.repo.CommitObject(ref.Hash())
+	commit, err := d.repo.GoGitRepo().CommitObject(ref.Hash())
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +136,7 @@ func (d *detector) detectBranchTree(ref *plumbing.Reference) (*BranchPiece, erro
 	trunkBases := map[plumbing.Hash][]plumbing.ReferenceName{}
 	for trunkBranchName, commits := range d.trunkCommits {
 		for _, trunkCommit := range commits {
-			bases, err := trunkCommit.MergeBase(commit)
+			bases, err := d.repo.MergeBases(trunkCommit.Hash.String(), commit.Hash.String())
 			if err != nil {
 				return nil, err
 			}
@@ -147,7 +148,8 @@ func (d *detector) detectBranchTree(ref *plumbing.Reference) (*BranchPiece, erro
 				}, nil
 			}
 			if len(bases) == 1 {
-				trunkBases[bases[0].Hash] = sliceutils.AppendIfNotContains(trunkBases[bases[0].Hash], trunkBranchName)
+				hash := plumbing.NewHash(bases[0])
+				trunkBases[hash] = sliceutils.AppendIfNotContains(trunkBases[hash], trunkBranchName)
 			}
 		}
 	}
