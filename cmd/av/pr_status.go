@@ -16,7 +16,7 @@ import (
 
 var prStatusCmd = &cobra.Command{
 	Use:          "status",
-	Short:        "check pr status",
+	Short:        "Get the status of the associated pull request",
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {

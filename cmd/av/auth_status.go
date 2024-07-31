@@ -16,7 +16,7 @@ import (
 
 var authStatusCmd = &cobra.Command{
 	Use:          "status",
-	Short:        "check auth status",
+	Short:        "Show info about the logged in user",
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {

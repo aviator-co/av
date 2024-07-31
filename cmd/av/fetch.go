@@ -18,7 +18,7 @@ import (
 
 var fetchCmd = &cobra.Command{
 	Use:   "fetch",
-	Short: "fetch latest state from GitHub",
+	Short: "Fetch latest repository state from GitHub",
 	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
 		repo, err := getRepo()
 		if err != nil {

@@ -23,7 +23,7 @@ var commitAmendFlags struct {
 
 var commitAmendCmd = &cobra.Command{
 	Use:   "amend",
-	Short: "amend a commit",
+	Short: "Amend a commit",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
 		if err != nil {

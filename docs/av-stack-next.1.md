@@ -2,7 +2,7 @@
 
 ## NAME
 
-av-stack-next - Checkout a later branch in the stack
+av-stack-next - Checkout the next branch in the stack
 
 ## SYNOPSIS
 
@@ -18,11 +18,11 @@ checking out the next branch in the stack.
 ## OPTIONS
 
 `<n>`
-: Checkout to the branch that is `<n>` branches after the current branch in the
+: Checkout the branch that is `<n>` branches after the current branch in the
   stack.
 
-`--first`
-: Checkout to the last branch in the stack.
+`--last`
+: Checkout the last branch in the stack.
 
 ## SEE ALSO
 

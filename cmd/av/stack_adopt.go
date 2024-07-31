@@ -26,7 +26,7 @@ var stackAdoptFlags struct {
 
 var stackAdoptCmd = &cobra.Command{
 	Use:   "adopt",
-	Short: "Adopt branches",
+	Short: "Adopt branches that are not managed by av",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()

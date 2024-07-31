@@ -2,7 +2,7 @@
 
 ## NAME
 
-av-stack-tidy - Tidy stacked branches by removing deleted or merged branches
+av-stack-tidy - Tidy stacked branches
 
 ## SYNOPSIS
 

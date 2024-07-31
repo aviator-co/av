@@ -11,7 +11,8 @@ import (
 )
 
 var initCmd = &cobra.Command{
-	Use: "init",
+	Use:   "init",
+	Short: "Initialize the repository for Aviator CLI",
 	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
 		repo, err := getRepo()
 		if err != nil {

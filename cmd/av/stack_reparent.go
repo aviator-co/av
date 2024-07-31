@@ -193,7 +193,7 @@ func (vm *stackReparentViewModel) createState() (*sequencerui.RestackState, erro
 func init() {
 	stackReparentCmd.Flags().StringVar(
 		&stackReparentFlags.Parent, "parent", "",
-		"new parent branch name",
+		"parent branch to rebase onto",
 	)
 
 	_ = stackReparentCmd.RegisterFlagCompletionFunc(

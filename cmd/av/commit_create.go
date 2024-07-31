@@ -23,7 +23,7 @@ var commitCreateFlags struct {
 
 var commitCreateCmd = &cobra.Command{
 	Use:   "create",
-	Short: "create a commit",
+	Short: "Record changes to the repository with commits",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
 		if err != nil {

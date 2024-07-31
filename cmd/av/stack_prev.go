@@ -20,7 +20,7 @@ var stackPrevFlags struct {
 var stackPrevCmd = &cobra.Command{
 	Use:     "prev [<n>|--first]",
 	Aliases: []string{"p"},
-	Short:   "checkout the previous branch in the stack",
+	Short:   "Checkout the previous branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get the previous branches so we can checkout the nth one
 		repo, err := getRepo()
@@ -94,6 +94,6 @@ var stackPrevCmd = &cobra.Command{
 func init() {
 	stackPrevCmd.Flags().BoolVar(
 		&stackPrevFlags.First, "first", false,
-		"go to the first branch in the current stack",
+		"checkout the first branch in the stack",
 	)
 }

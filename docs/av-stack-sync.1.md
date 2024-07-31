@@ -8,7 +8,7 @@ av-stack-sync - Synchronize stacked branches with GitHub
 
 ```synopsis
 av stack sync [--all | --current] [--push=(yes|no|ask)] [--prune=(yes|no|ask)]
-              [--continue | --abort | --skip]
+              [--rebase-to-trunk] [--continue | --abort | --skip]
 ```
 
 ## DESCRIPTION
@@ -79,6 +79,6 @@ branch to delete. Default is `ask`.
 
 ## SEE ALSO
 
-`av-stack-restack`(1) for restacking the branches locally.
+`av-stack-restack`(1) for rebasing the branches locally.
 `av-stack-adopt`(1) for adopting a new branch.
 `av-stack-reparent`(1) for changing the parent of a branch.

@@ -2,7 +2,7 @@
 
 ## NAME
 
-av-stack-prev - Checkout a previous branch in the stack
+av-stack-prev - Checkout the previous branch in the stack
 
 ## SYNOPSIS
 
@@ -18,11 +18,11 @@ to checking out the previous branch in the stack.
 ## OPTIONS
 
 `<n>`
-: Checkout to the branch that is `<n>` branches before the current branch in the
+: Checkout the branch that is `<n>` branches before the current branch in the
   stack.
 
 `--first`
-: Checkout to the first branch in the stack.
+: Checkout the first branch in the stack.
 
 ## SEE ALSO
 

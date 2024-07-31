@@ -46,7 +46,7 @@ const (
 
 var stackSyncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "Synchronize stacked branches",
+	Short: "Synchronize stacked branches with GitHub",
 	Long: strings.TrimSpace(`
 Synchronize stacked branches to be up-to-date with their parent branches.
 

@@ -52,10 +52,9 @@ var stackBranchCommitFlags struct {
 }
 
 var stackBranchCommitCmd = &cobra.Command{
-	Use:          "branch-commit [flags]",
+	Use:          "branch-commit",
 	Aliases:      []string{"branchcommit", "bc"},
-	Short:        "create a new stacked branch and commit staged changes to it",
-	Long:         "Create a new branch that is stacked on the current branch and commit all staged changes with the specified arguments.",
+	Short:        "Create a new branch in the stack with the staged changes",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
 		branchName := stackBranchCommitFlags.BranchName
