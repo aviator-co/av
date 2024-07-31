@@ -2,7 +2,7 @@
 
 ## NAME
 
-av-stack-tree - Shows the tree of stacked branches
+av-stack-tree - Show the tree of stacked branches
 
 ## SYNOPSIS
 

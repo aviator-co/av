@@ -12,7 +12,7 @@ import (
 
 var commitSplitCmd = &cobra.Command{
 	Use:          "split",
-	Short:        "split a commit into multiple commits",
+	Short:        "Split a commit into multiple commits",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()

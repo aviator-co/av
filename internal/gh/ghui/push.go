@@ -50,7 +50,13 @@ type noPushBranch struct {
 	reason string
 }
 
-func NewGitHubPushModel(repo *git.Repo, db meta.DB, client *gh.Client, pushFlag string, targetBranches []plumbing.ReferenceName) *GitHubPushModel {
+func NewGitHubPushModel(
+	repo *git.Repo,
+	db meta.DB,
+	client *gh.Client,
+	pushFlag string,
+	targetBranches []plumbing.ReferenceName,
+) *GitHubPushModel {
 	var makeDraftBeforePush bool
 	if avconfig.Av.PullRequest.RebaseWithDraft != nil {
 		makeDraftBeforePush = *avconfig.Av.PullRequest.RebaseWithDraft
@@ -215,8 +221,20 @@ func (vm *GitHubPushModel) viewPushCandidates() string {
 			sb.WriteString("\n")
 		}
 		sb.WriteString(branch.branch.Short() + "\n")
-		sb.WriteString("  Remote: " + branch.remoteCommit.Hash.String()[:7] + " " + getFirstLine(branch.remoteCommit.Message) + " " + branch.remoteCommit.Committer.When.String() + " (" + humanize.Time(branch.remoteCommit.Committer.When) + ")\n")
-		sb.WriteString("  Local:  " + branch.localCommit.Hash.String()[:7] + " " + getFirstLine(branch.localCommit.Message) + " " + branch.localCommit.Committer.When.String() + " (" + humanize.Time(branch.localCommit.Committer.When) + ")\n")
+		sb.WriteString(
+			"  Remote: " + branch.remoteCommit.Hash.String()[:7] + " " + getFirstLine(
+				branch.remoteCommit.Message,
+			) + " " + branch.remoteCommit.Committer.When.String() + " (" + humanize.Time(
+				branch.remoteCommit.Committer.When,
+			) + ")\n",
+		)
+		sb.WriteString(
+			"  Local:  " + branch.localCommit.Hash.String()[:7] + " " + getFirstLine(
+				branch.localCommit.Message,
+			) + " " + branch.localCommit.Committer.When.String() + " (" + humanize.Time(
+				branch.localCommit.Committer.When,
+			) + ")\n",
+		)
 		avbr, _ := vm.db.ReadTx().Branch(branch.branch.Short())
 		if avbr.PullRequest != nil && avbr.PullRequest.Permalink != "" {
 			sb.WriteString("  PR:     " + avbr.PullRequest.Permalink + "\n")
@@ -263,8 +281,13 @@ func (vm *GitHubPushModel) runGitPush() error {
 	pushArgs := []string{"push", vm.repo.GetRemoteName(), "--atomic"}
 	for _, branch := range vm.pushCandidates {
 		// Do a compare-and-swap to be strict on what we show as a difference.
-		pushArgs = append(pushArgs,
-			fmt.Sprintf("--force-with-lease=%s:%s", branch.branch.String(), branch.remoteCommit.Hash.String()),
+		pushArgs = append(
+			pushArgs,
+			fmt.Sprintf(
+				"--force-with-lease=%s:%s",
+				branch.branch.String(),
+				branch.remoteCommit.Hash.String(),
+			),
 		)
 	}
 	for _, branch := range vm.pushCandidates {
@@ -346,7 +369,13 @@ func (vm *GitHubPushModel) updatePRs(ghPRs map[plumbing.ReferenceName]*gh.PullRe
 				return err
 			}
 		}
-		prBody := actions.AddPRMetadataAndStack(pr.Body, prMeta, avbr.Name, stackToWrite, vm.db.ReadTx())
+		prBody := actions.AddPRMetadataAndStack(
+			pr.Body,
+			prMeta,
+			avbr.Name,
+			stackToWrite,
+			vm.db.ReadTx(),
+		)
 		if _, err := vm.client.UpdatePullRequest(context.Background(), githubv4.UpdatePullRequestInput{
 			PullRequestID: pr.ID,
 			BaseRefName:   githubv4.NewString(githubv4.String(avbr.Parent.Name)),
@@ -381,7 +410,8 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 	var pushCandidates []pushCandidate
 	for _, br := range vm.targetBranches {
 		avbr, _ := vm.db.ReadTx().Branch(br.Short())
-		if avbr.MergeCommit != "" || (avbr.PullRequest != nil && avbr.PullRequest.State == "MERGED") {
+		if avbr.MergeCommit != "" ||
+			(avbr.PullRequest != nil && avbr.PullRequest.State == "MERGED") {
 			noPushBranches = append(noPushBranches, noPushBranch{
 				branch: br,
 				reason: reasonPRIsMerged,
@@ -462,7 +492,10 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 	return &GitHubPushProgress{candidateCalculationDone: true}
 }
 
-func (vm *GitHubPushModel) allParentsHaveRemoteTrackingBranch(remoteConfig *config.RemoteConfig, br plumbing.ReferenceName) bool {
+func (vm *GitHubPushModel) allParentsHaveRemoteTrackingBranch(
+	remoteConfig *config.RemoteConfig,
+	br plumbing.ReferenceName,
+) bool {
 	avbr, _ := vm.db.ReadTx().Branch(br.Short())
 	parent := avbr.Parent
 	for !parent.Trunk {

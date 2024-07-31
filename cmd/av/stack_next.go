@@ -27,7 +27,7 @@ var stackNextFlags struct {
 var stackNextCmd = &cobra.Command{
 	Use:     "next [<n>|--last]",
 	Aliases: []string{"n"},
-	Short:   "checkout the next branch in the stack",
+	Short:   "Checkout the next branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var n int = 1
 		if len(args) == 1 {
@@ -72,7 +72,7 @@ var stackNextCmd = &cobra.Command{
 func init() {
 	stackNextCmd.Flags().BoolVar(
 		&stackNextFlags.Last, "last", false,
-		"go to the last branch in the current stack",
+		"checkout the last branch in the stack",
 	)
 }
 

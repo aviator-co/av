@@ -46,7 +46,11 @@ var stackOrphanCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Fprintf(os.Stderr, "These branched are orphaned: %s\n", strings.Join(branchesToOrphan, ", "))
+		fmt.Fprintf(
+			os.Stderr,
+			"These branched are orphaned: %s\n",
+			strings.Join(branchesToOrphan, ", "),
+		)
 
 		return nil
 	},

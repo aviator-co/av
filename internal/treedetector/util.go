@@ -8,7 +8,10 @@ import (
 
 // GetStackRoot returns the root of the stack of branches from the given branch. It returns an empty
 // string if the stack root cannot be detected.
-func GetStackRoot(pieces map[plumbing.ReferenceName]*BranchPiece, branch plumbing.ReferenceName) plumbing.ReferenceName {
+func GetStackRoot(
+	pieces map[plumbing.ReferenceName]*BranchPiece,
+	branch plumbing.ReferenceName,
+) plumbing.ReferenceName {
 	stackRoot := branch
 	for {
 		piece, ok := pieces[stackRoot]
@@ -25,7 +28,10 @@ func GetStackRoot(pieces map[plumbing.ReferenceName]*BranchPiece, branch plumbin
 }
 
 // GetChildren returns the children of the given branch.
-func GetChildren(pieces map[plumbing.ReferenceName]*BranchPiece, branch plumbing.ReferenceName) map[plumbing.ReferenceName]*BranchPiece {
+func GetChildren(
+	pieces map[plumbing.ReferenceName]*BranchPiece,
+	branch plumbing.ReferenceName,
+) map[plumbing.ReferenceName]*BranchPiece {
 	ret := map[plumbing.ReferenceName]*BranchPiece{}
 	var childFn func(plumbing.ReferenceName)
 	childFn = func(branch plumbing.ReferenceName) {
@@ -41,7 +47,10 @@ func GetChildren(pieces map[plumbing.ReferenceName]*BranchPiece, branch plumbing
 }
 
 // GetPossibleChildren returns the possible children of the given branch.
-func GetPossibleChildren(pieces map[plumbing.ReferenceName]*BranchPiece, branch plumbing.ReferenceName) []*BranchPiece {
+func GetPossibleChildren(
+	pieces map[plumbing.ReferenceName]*BranchPiece,
+	branch plumbing.ReferenceName,
+) []*BranchPiece {
 	var ret []*BranchPiece
 	var allChildFn func(plumbing.ReferenceName)
 	var mpChildFn func(plumbing.ReferenceName)
@@ -66,7 +75,11 @@ func GetPossibleChildren(pieces map[plumbing.ReferenceName]*BranchPiece, branch 
 }
 
 // ConvertToStackTree converts the branch pieces to a tree structure.
-func ConvertToStackTree(pieces map[plumbing.ReferenceName]*BranchPiece, currentBranch plumbing.ReferenceName, sortCurrent bool) []*stackutils.StackTreeNode {
+func ConvertToStackTree(
+	pieces map[plumbing.ReferenceName]*BranchPiece,
+	currentBranch plumbing.ReferenceName,
+	sortCurrent bool,
+) []*stackutils.StackTreeNode {
 	trunks := map[string]bool{}
 	var branches []*stackutils.StackTreeBranchInfo
 	for bn, piece := range pieces {

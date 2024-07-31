@@ -13,8 +13,8 @@ av commit create [-m <msg>| --message=<msg>] [-a | --all]
 ## DESCRIPTION
 
 Create a new commit containing the current contents of the index and the given
-log message describing the changes, then run **av stack sync** on all subsequent
-child branches with the new commit.
+log message describing the changes, then run **av stack restack** on all
+subsequent child branches with the new commit.
 
 Previous to running **av commit-create**, add changes to the index via
 git-add(1) to incrementally "add" changes to the index.

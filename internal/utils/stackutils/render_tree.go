@@ -6,11 +6,19 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func RenderTree(node *StackTreeNode, branchDataFn func(branchName string, isTrunk bool) string) string {
+func RenderTree(
+	node *StackTreeNode,
+	branchDataFn func(branchName string, isTrunk bool) string,
+) string {
 	return strings.TrimSuffix(renderTreeInternal(0, node, true, branchDataFn), "\n")
 }
 
-func renderTreeInternal(columns int, node *StackTreeNode, isTrunk bool, branchDataFn func(branchName string, isTrunk bool) string) string {
+func renderTreeInternal(
+	columns int,
+	node *StackTreeNode,
+	isTrunk bool,
+	branchDataFn func(branchName string, isTrunk bool) string,
+) string {
 	sb := strings.Builder{}
 	for i, child := range node.Children {
 		sb.WriteString(renderTreeInternal(columns+i, child, false, branchDataFn))

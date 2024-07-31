@@ -43,7 +43,7 @@ the branches.
 : Skip the current commit and continue an in-progress rebase.
 
 `--dry-run`
-: Show the list of branches that will be rebased without actually rebasing.
+: Show the list of branches that will be rebased without actually rebasing them.
 
 ## SEE ALSO
 

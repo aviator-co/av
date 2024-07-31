@@ -112,10 +112,18 @@ func TestStackRestack(t *testing.T) {
 
 	// Make sure we've handled the rebase of stack-3 correctly (see the long
 	// comment above).
-	commits := repo.GetCommits(t, plumbing.NewBranchReferenceName("stack-3"), plumbing.NewBranchReferenceName("stack-2"))
+	commits := repo.GetCommits(
+		t,
+		plumbing.NewBranchReferenceName("stack-3"),
+		plumbing.NewBranchReferenceName("stack-2"),
+	)
 	require.Len(t, commits, 1)
 
-	mergeBases := repo.MergeBase(t, plumbing.NewBranchReferenceName("stack-1"), plumbing.NewBranchReferenceName("stack-2"))
+	mergeBases := repo.MergeBase(
+		t,
+		plumbing.NewBranchReferenceName("stack-1"),
+		plumbing.NewBranchReferenceName("stack-2"),
+	)
 	stack1Head := repo.GetCommitAtRef(t, plumbing.NewBranchReferenceName("stack-1"))
 	require.Equal(t, mergeBases[0], stack1Head, "stack-2 should be up-to-date with stack-1")
 
@@ -125,7 +133,11 @@ func TestStackRestack(t *testing.T) {
 
 	// Make sure we've not introduced any extra commits
 	// We should have 4 (corresponding to 1a, 1b, 2a, and 3a).
-	commits = repo.GetCommits(t, plumbing.NewBranchReferenceName("stack-3"), plumbing.NewBranchReferenceName("main"))
+	commits = repo.GetCommits(
+		t,
+		plumbing.NewBranchReferenceName("stack-3"),
+		plumbing.NewBranchReferenceName("main"),
+	)
 	require.NoError(t, err)
 	require.Len(t, commits, 4)
 

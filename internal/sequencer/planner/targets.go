@@ -23,7 +23,12 @@ const (
 //
 // If `includeStackRoots` is true, the stack root branches (the immediate children of the trunk
 // branches) are included in the result.
-func GetTargetBranches(tx meta.ReadTx, repo *git.Repo, includeStackRoots bool, mode TargetBranchMode) ([]plumbing.ReferenceName, error) {
+func GetTargetBranches(
+	tx meta.ReadTx,
+	repo *git.Repo,
+	includeStackRoots bool,
+	mode TargetBranchMode,
+) ([]plumbing.ReferenceName, error) {
 	var ret []plumbing.ReferenceName
 	if mode == AllBranches {
 		for _, br := range tx.AllBranches() {

@@ -21,7 +21,7 @@ var prQueueFlags struct {
 
 var prQueueCmd = &cobra.Command{
 	Use:          "queue",
-	Short:        "queue a pull request for the current branch",
+	Short:        "Queue an existing pull request for the current branch",
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
 	// error or reterr from emperror.dev/errors here?

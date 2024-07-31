@@ -257,7 +257,11 @@ func CreatePullRequest(
 		prCompareRef = fmt.Sprintf("%s/%s", repo.GetRemoteName(), parentState.Name)
 	}
 
-	commitsList, err := repo.Git("rev-list", "--reverse", fmt.Sprintf("%s..%s", prCompareRef, opts.BranchName))
+	commitsList, err := repo.Git(
+		"rev-list",
+		"--reverse",
+		fmt.Sprintf("%s..%s", prCompareRef, opts.BranchName),
+	)
 	if err != nil {
 		return nil, errors.WrapIf(err, "failed to determine commits to include in PR")
 	}
@@ -267,7 +271,10 @@ func CreatePullRequest(
 
 	// Check if a parent branch has already been merged or not
 	if parentMeta.MergeCommit != "" {
-		return nil, errors.Errorf("failed to create a pull request. The parent branch %q has already been merged\nPlease run av stack sync to rebase the branch first.", parentMeta.Name)
+		return nil, errors.Errorf(
+			"failed to create a pull request. The parent branch %q has already been merged\nPlease run av stack sync to rebase the branch first.",
+			parentMeta.Name,
+		)
 	}
 
 	if existingPR != nil {
@@ -534,8 +541,12 @@ func ensurePR(
 		BaseRefName:  githubv4.String(opts.baseRefName),
 		HeadRefName:  githubv4.String(opts.headRefName),
 		Title:        githubv4.String(opts.title),
-		Body:         gh.Ptr(githubv4.String(AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack, tx))),
-		Draft:        gh.Ptr(githubv4.Boolean(opts.draft)),
+		Body: gh.Ptr(
+			githubv4.String(
+				AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack, tx),
+			),
+		),
+		Draft: gh.Ptr(githubv4.Boolean(opts.draft)),
 	})
 	if err != nil {
 		return nil, false, errors.WithStack(err)
@@ -568,7 +579,10 @@ func UpdatePullRequestState(
 		HeadRefName: branchName,
 	})
 	if err != nil {
-		return nil, errors.WrapIf(err, "querying GitHub pull requests. Make sure GitHub token is set or refresh.\nSee: https://docs.aviator.co/aviator-cli#getting-started")
+		return nil, errors.WrapIf(
+			err,
+			"querying GitHub pull requests. Make sure GitHub token is set or refresh.\nSee: https://docs.aviator.co/aviator-cli#getting-started",
+		)
 	}
 
 	if len(page.PullRequests) == 0 {
@@ -821,7 +835,8 @@ func AddPRMetadataAndStack(
 	sb := strings.Builder{}
 
 	// Don't write out a stack unless there is more than one PR in it.
-	hasMultilevelStack := stack != nil && len(stack.Children) > 0 && len(stack.Children[0].Children) > 0
+	hasMultilevelStack := stack != nil && len(stack.Children) > 0 &&
+		len(stack.Children[0].Children) > 0
 	if hasMultilevelStack {
 		bi, _ := tx.Branch(branchName)
 		stackString := walkStack(tx, stack, branchName)
@@ -838,7 +853,9 @@ func AddPRMetadataAndStack(
 			sb.WriteString(strconv.FormatInt(parentBi.PullRequest.Number, 10))
 			sb.WriteString(".</b> ")
 		}
-		sb.WriteString("This PR is part of a stack created with <a href=\"https://github.com/aviator-co/av\">Aviator</a>.")
+		sb.WriteString(
+			"This PR is part of a stack created with <a href=\"https://github.com/aviator-co/av\">Aviator</a>.",
+		)
 		sb.WriteString("</summary>")
 		sb.WriteString("\n\n")
 		sb.WriteString(stackString)
@@ -879,7 +896,9 @@ func UpdatePullRequestWithStack(
 	branchName string,
 ) error {
 	branchMeta, _ := tx.Branch(branchName)
-	logrus.WithField("branch", branchName).WithField("pr", branchMeta.PullRequest.ID).Debug("Updating pull requests with stack")
+	logrus.WithField("branch", branchName).
+		WithField("pr", branchMeta.PullRequest.ID).
+		Debug("Updating pull requests with stack")
 
 	repoMeta := tx.Repository()
 

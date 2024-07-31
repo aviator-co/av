@@ -18,7 +18,13 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-func NewGitHubFetchModel(repo *git.Repo, db meta.DB, client *gh.Client, currentBranch plumbing.ReferenceName, targetBranches []plumbing.ReferenceName) *GitHubFetchModel {
+func NewGitHubFetchModel(
+	repo *git.Repo,
+	db meta.DB,
+	client *gh.Client,
+	currentBranch plumbing.ReferenceName,
+	targetBranches []plumbing.ReferenceName,
+) *GitHubFetchModel {
 	return &GitHubFetchModel{
 		repo:           repo,
 		db:             db,
@@ -131,7 +137,12 @@ func (vm *GitHubFetchModel) View() string {
 		}
 		var nodes []*stackutils.StackTreeNode
 		var err error
-		nodes, err = stackutils.BuildStackTreeRelatedBranchStacks(vm.db.ReadTx(), vm.currentBranch.Short(), true, brs)
+		nodes, err = stackutils.BuildStackTreeRelatedBranchStacks(
+			vm.db.ReadTx(),
+			vm.currentBranch.Short(),
+			true,
+			brs,
+		)
 		if err != nil {
 			sb.WriteString("Failed to build stack tree: " + err.Error())
 		} else {
@@ -293,7 +304,10 @@ func (vm *GitHubFetchModel) updateMergeCommitsFromChildren() tea.Msg {
 	return &GitHubFetchProgress{mergeCommitPropagationIsDone: true}
 }
 
-func mapToRemoteTrackingBranch(remoteConfig *config.RemoteConfig, refName plumbing.ReferenceName) *plumbing.ReferenceName {
+func mapToRemoteTrackingBranch(
+	remoteConfig *config.RemoteConfig,
+	refName plumbing.ReferenceName,
+) *plumbing.ReferenceName {
 	for _, fetch := range remoteConfig.Fetch {
 		if fetch.Match(refName) {
 			dst := fetch.Dst(refName)

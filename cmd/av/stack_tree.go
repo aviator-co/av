@@ -15,7 +15,7 @@ import (
 var stackTreeCmd = &cobra.Command{
 	Use:     "tree",
 	Aliases: []string{"t"},
-	Short:   "show the tree of stacked branches",
+	Short:   "Show the tree of stacked branches",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
 		if err != nil {
@@ -42,7 +42,13 @@ var stackTreeCmd = &cobra.Command{
 		for _, node := range rootNodes {
 			fmt.Println(stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
 				stbi := getStackTreeBranchInfo(repo, tx, branchName)
-				return renderStackTreeBranchInfo(stackTreeStackBranchInfoStyles, stbi, currentBranch, branchName, isTrunk)
+				return renderStackTreeBranchInfo(
+					stackTreeStackBranchInfoStyles,
+					stbi,
+					currentBranch,
+					branchName,
+					isTrunk,
+				)
 			}))
 		}
 		return nil
@@ -65,7 +71,13 @@ var stackTreeStackBranchInfoStyles = stackBranchInfoStyles{
 	PullRequestLink: lipgloss.NewStyle(),
 }
 
-func renderStackTreeBranchInfo(styles stackBranchInfoStyles, stbi *stackTreeBranchInfo, currentBranchName string, branchName string, isTrunk bool) string {
+func renderStackTreeBranchInfo(
+	styles stackBranchInfoStyles,
+	stbi *stackTreeBranchInfo,
+	currentBranchName string,
+	branchName string,
+	isTrunk bool,
+) string {
 	sb := strings.Builder{}
 	sb.WriteString(styles.BranchName.Render(branchName))
 	var stats []string
@@ -103,7 +115,11 @@ type stackTreeBranchInfo struct {
 	PullRequestLink string
 }
 
-func getStackTreeBranchInfo(repo *git.Repo, tx meta.ReadTx, branchName string) *stackTreeBranchInfo {
+func getStackTreeBranchInfo(
+	repo *git.Repo,
+	tx meta.ReadTx,
+	branchName string,
+) *stackTreeBranchInfo {
 	bi, _ := tx.Branch(branchName)
 	branchInfo := stackTreeBranchInfo{
 		BranchName: branchName,

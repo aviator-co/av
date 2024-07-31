@@ -24,7 +24,11 @@ type BranchPiece struct {
 	IncludedCommits []*object.Commit
 }
 
-func DetectBranchTree(repo *avgit.Repo, remoteName string, trunkBranches []plumbing.ReferenceName) (map[plumbing.ReferenceName]*BranchPiece, error) {
+func DetectBranchTree(
+	repo *avgit.Repo,
+	remoteName string,
+	trunkBranches []plumbing.ReferenceName,
+) (map[plumbing.ReferenceName]*BranchPiece, error) {
 	trunkCommits, err := getTrunkCommits(repo.GoGitRepo(), remoteName, trunkBranches)
 	if err != nil {
 		return nil, err
@@ -61,7 +65,11 @@ func DetectBranchTree(repo *avgit.Repo, remoteName string, trunkBranches []plumb
 	return ret, nil
 }
 
-func getTrunkCommits(repo *git.Repository, remoteName string, trunkBranches []plumbing.ReferenceName) (map[plumbing.ReferenceName][]*object.Commit, error) {
+func getTrunkCommits(
+	repo *git.Repository,
+	remoteName string,
+	trunkBranches []plumbing.ReferenceName,
+) (map[plumbing.ReferenceName][]*object.Commit, error) {
 	remote, err := repo.Remote(remoteName)
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote %q: %v", remoteName, err)
@@ -194,7 +202,10 @@ func (d *detector) detectBranchTree(ref *plumbing.Reference) (*BranchPiece, erro
 	return ret, nil
 }
 
-func mapToRemoteTrackingBranch(remoteConfig *config.RemoteConfig, refName plumbing.ReferenceName) *plumbing.ReferenceName {
+func mapToRemoteTrackingBranch(
+	remoteConfig *config.RemoteConfig,
+	refName plumbing.ReferenceName,
+) *plumbing.ReferenceName {
 	for _, fetch := range remoteConfig.Fetch {
 		if fetch.Match(refName) {
 			dst := fetch.Dst(refName)

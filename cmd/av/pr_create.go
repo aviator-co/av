@@ -24,7 +24,7 @@ var prCreateFlags struct {
 
 var prCreateCmd = &cobra.Command{
 	Use:   "create",
-	Short: "create a pull request for the current branch",
+	Short: "Create a pull request for the current branch",
 	Long: `Create a pull request for the current branch.
 
 Examples:
@@ -119,19 +119,17 @@ Examples:
 }
 
 func init() {
-
-	// av pr create
 	prCreateCmd.Flags().BoolVar(
 		&prCreateFlags.Draft, "draft", false,
 		"create the pull request in draft mode",
 	)
 	prCreateCmd.Flags().BoolVar(
 		&prCreateFlags.Force, "force", false,
-		"force creation of a pull request even if one already exists",
+		"force creation of a pull request even if there is already a pull request associated with this branch",
 	)
 	prCreateCmd.Flags().BoolVar(
 		&prCreateFlags.NoPush, "no-push", false,
-		"don't push the latest changes to the remote",
+		"don't push the branch to the remote repository before creating the pull request",
 	)
 	prCreateCmd.Flags().StringVarP(
 		&prCreateFlags.Title, "title", "t", "",
@@ -143,7 +141,7 @@ func init() {
 	)
 	prCreateCmd.Flags().BoolVar(
 		&prCreateFlags.Edit, "edit", false,
-		"always open an editor to edit the pull request title and description",
+		"edit the pull request title and description before submitting even if the pull request already exists",
 	)
 	prCreateCmd.Flags().StringSliceVar(
 		&prCreateFlags.Reviewers, "reviewers", nil,

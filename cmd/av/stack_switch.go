@@ -24,7 +24,7 @@ import (
 
 var stackSwitchCmd = &cobra.Command{
 	Use:   "switch [<branch> | <url>]",
-	Short: "switch to a different branch",
+	Short: "Interactively switch to a different branch",
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
@@ -102,7 +102,12 @@ func getInitialChoosenBranch(branchList []*stackTreeBranchInfo, currentBranch st
 	return branchList[0].BranchName
 }
 
-func stackSwitchBranchList(repo *git.Repo, tx meta.ReadTx, branches map[string]*stackTreeBranchInfo, node *stackutils.StackTreeNode) []*stackTreeBranchInfo {
+func stackSwitchBranchList(
+	repo *git.Repo,
+	tx meta.ReadTx,
+	branches map[string]*stackTreeBranchInfo,
+	node *stackutils.StackTreeNode,
+) []*stackTreeBranchInfo {
 	var ret []*stackTreeBranchInfo
 	for _, child := range node.Children {
 		ret = append(ret, stackSwitchBranchList(repo, tx, branches, child)...)
@@ -247,11 +252,26 @@ func (vm stackSwitchViewModel) View() string {
 		sb.WriteString(stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
 			stbi := vm.branches[branchName]
 			if branchName == vm.currentChoosenBranch {
-				out := strings.TrimSuffix(renderStackTreeBranchInfo(stackSwitchStackBranchInfoStyles, stbi, vm.currentHEADBranch, branchName, isTrunk), "\n")
+				out := strings.TrimSuffix(
+					renderStackTreeBranchInfo(
+						stackSwitchStackBranchInfoStyles,
+						stbi,
+						vm.currentHEADBranch,
+						branchName,
+						isTrunk,
+					),
+					"\n",
+				)
 				out = lipgloss.NewStyle().Background(colors.Slate300).Render(out)
 				return out
 			}
-			return renderStackTreeBranchInfo(stackTreeStackBranchInfoStyles, stbi, vm.currentHEADBranch, branchName, isTrunk)
+			return renderStackTreeBranchInfo(
+				stackTreeStackBranchInfoStyles,
+				stbi,
+				vm.currentHEADBranch,
+				branchName,
+				isTrunk,
+			)
 		}))
 	}
 	sb.WriteString("\n")

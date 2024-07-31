@@ -26,7 +26,7 @@ var stackAdoptFlags struct {
 
 var stackAdoptCmd = &cobra.Command{
 	Use:   "adopt",
-	Short: "Adopt branches",
+	Short: "Adopt branches that are not managed by av",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
@@ -223,7 +223,9 @@ func (vm stackAdoptViewModel) initCmd() tea.Msg {
 	}
 }
 
-func (vm stackAdoptViewModel) getAdoptionTargets(node *stackutils.StackTreeNode) []plumbing.ReferenceName {
+func (vm stackAdoptViewModel) getAdoptionTargets(
+	node *stackutils.StackTreeNode,
+) []plumbing.ReferenceName {
 	var ret []plumbing.ReferenceName
 	for _, child := range node.Children {
 		ret = append(ret, vm.getAdoptionTargets(child)...)
@@ -328,15 +330,20 @@ func (vm stackAdoptViewModel) View() string {
 		} else {
 			sb.WriteString("Choose which branches to adopt (Use space to select / deselect).\n")
 		}
-		sb.WriteString(stackutils.RenderTree(vm.treeInfo.rootNode, func(branchName string, isTrunk bool) string {
-			bn := plumbing.NewBranchReferenceName(branchName)
-			out := vm.renderBranch(bn, isTrunk)
-			if bn == vm.currentCursor {
-				out = strings.TrimSuffix(out, "\n")
-				out = lipgloss.NewStyle().Background(colors.Slate300).Render(out)
-			}
-			return out
-		}))
+		sb.WriteString(
+			stackutils.RenderTree(
+				vm.treeInfo.rootNode,
+				func(branchName string, isTrunk bool) string {
+					bn := plumbing.NewBranchReferenceName(branchName)
+					out := vm.renderBranch(bn, isTrunk)
+					if bn == vm.currentCursor {
+						out = strings.TrimSuffix(out, "\n")
+						out = lipgloss.NewStyle().Background(colors.Slate300).Render(out)
+					}
+					return out
+				},
+			),
+		)
 		if len(vm.treeInfo.possibleChildren) != 0 {
 			sb.WriteString("\n")
 			sb.WriteString("For the following branches we cannot detect the graph structure:\n")
@@ -419,8 +426,11 @@ func init() {
 		"force specifying the parent branch",
 	)
 
-	_ = stackSyncCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		branches, _ := allBranches()
-		return branches, cobra.ShellCompDirectiveDefault
-	})
+	_ = stackSyncCmd.RegisterFlagCompletionFunc(
+		"parent",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			branches, _ := allBranches()
+			return branches, cobra.ShellCompDirectiveDefault
+		},
+	)
 }

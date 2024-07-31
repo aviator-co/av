@@ -19,7 +19,13 @@ func TestReadPRMetadata(t *testing.T) {
 		ParentPull: 123,
 		Trunk:      "baz",
 	}
-	prBody := actions.AddPRMetadataAndStack("Hello! This is a cool PR that does some neat things.", prMeta, "foo", nil, tx)
+	prBody := actions.AddPRMetadataAndStack(
+		"Hello! This is a cool PR that does some neat things.",
+		prMeta,
+		"foo",
+		nil,
+		tx,
+	)
 	prMeta2, err := actions.ReadPRMetadata(prBody)
 	require.NoError(t, err)
 	assert.Equal(t, prMeta.Parent, prMeta2.Parent)

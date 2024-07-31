@@ -30,7 +30,7 @@ var stackBranchFlags struct {
 var stackBranchCmd = &cobra.Command{
 	Use:     "branch [flags] <branch-name> [<parent-branch>]",
 	Aliases: []string{"b", "br"},
-	Short:   "create a new stacked branch",
+	Short:   "Create or rename a branch in the stack",
 	Long: `Create a new branch that is stacked on the current branch.
 
 <parent-branch>. If omitted, the new branch bases off the current branch.
@@ -154,12 +154,15 @@ func init() {
 	stackBranchCmd.Flags().
 		BoolVarP(&stackBranchFlags.Rename, "rename", "m", false, "rename the current branch")
 	stackBranchCmd.Flags().
-		BoolVar(&stackBranchFlags.Force, "force", false, "force rename the current branch")
+		BoolVar(&stackBranchFlags.Force, "force", false, "force rename the current branch, even if a pull request exists")
 
-	_ = stackBranchCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		branches, _ := allBranches()
-		return branches, cobra.ShellCompDirectiveDefault
-	})
+	_ = stackBranchCmd.RegisterFlagCompletionFunc(
+		"parent",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			branches, _ := allBranches()
+			return branches, cobra.ShellCompDirectiveDefault
+		},
+	)
 }
 
 func stackBranchMove(

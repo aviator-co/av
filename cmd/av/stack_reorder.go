@@ -34,7 +34,7 @@ squashed, dropped, or moved within the stack.
 
 var stackReorderCmd = &cobra.Command{
 	Use:   "reorder",
-	Short: "reorder the stack",
+	Short: "Interactively reorder the stack",
 	Long:  strings.TrimSpace(stackReorderDoc),
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -152,9 +152,9 @@ var stackReorderCmd = &cobra.Command{
 
 func init() {
 	stackReorderCmd.Flags().
-		BoolVar(&stackReorderFlags.Continue, "continue", false, "continue a previous reorder")
+		BoolVar(&stackReorderFlags.Continue, "continue", false, "continue an in-progress reorder")
 	stackReorderCmd.Flags().
-		BoolVar(&stackReorderFlags.Abort, "abort", false, "abort a previous reorder")
+		BoolVar(&stackReorderFlags.Abort, "abort", false, "abort an in-progress reorder")
 	stackReorderCmd.MarkFlagsMutuallyExclusive("continue", "abort")
 }
 

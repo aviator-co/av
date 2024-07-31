@@ -8,7 +8,7 @@ av-pr-create - Create a pull request for the current branch
 
 ```synopsis
 av pr create [-t <title>| --title=<title>] [-b <body>| --body=<body>]
-    [--draft] [--edit] [--force] [--no-push]
+    [--draft] [--edit] [--force] [--no-push] [--reviewers=<reviewers>]
 ```
 
 ## DESCRIPTION
@@ -31,7 +31,7 @@ edit the pull-request description for the existing pull-request, use `--edit`.
 : Use the given `<body>` as the body for the pull request.
 
 `--draft`
-: Open the pull request as a draft.
+: Create the pull request as a draft.
 
 `--edit`
 : Edit the pull request title and description before submitting even if the
@@ -44,6 +44,10 @@ edit the pull-request description for the existing pull-request, use `--edit`.
 `--no-push`
 : Do not push the branch to the remote repository before creating the pull
   request.
+
+`--reviewers=<reviewers>`
+: Add reviewers to the pull request. The value should be a comma-separated list
+  of GitHub usernames or team names.
 
 ## EXAMPLES
 

@@ -29,7 +29,7 @@ var stackRestackFlags struct {
 
 var stackRestackCmd = &cobra.Command{
 	Use:   "restack",
-	Short: "Restack branches",
+	Short: "Rebase the stacked branches",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
@@ -154,7 +154,8 @@ func (vm *stackRestackViewModel) View() string {
 
 func (vm *stackRestackViewModel) readState() (*sequencerui.RestackState, error) {
 	var state sequencerui.RestackState
-	if err := vm.repo.ReadStateFile(git.StateFileKindRestack, &state); err != nil && os.IsNotExist(err) {
+	if err := vm.repo.ReadStateFile(git.StateFileKindRestack, &state); err != nil &&
+		os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
@@ -196,7 +197,13 @@ func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error
 		currentBranchRef = plumbing.NewBranchReferenceName(currentBranch)
 	}
 
-	ops, err := planner.PlanForRestack(vm.db.ReadTx(), vm.repo, currentBranchRef, stackRestackFlags.All, stackRestackFlags.Current)
+	ops, err := planner.PlanForRestack(
+		vm.db.ReadTx(),
+		vm.repo,
+		currentBranchRef,
+		stackRestackFlags.All,
+		stackRestackFlags.Current,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -207,27 +214,27 @@ func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error
 func init() {
 	stackRestackCmd.Flags().BoolVar(
 		&stackRestackFlags.All, "all", false,
-		"restack all branches",
+		"rebase all branches",
 	)
 	stackRestackCmd.Flags().BoolVar(
 		&stackRestackFlags.Current, "current", false,
-		"only restack up to the current branch\n(don't recurse into descendant branches)",
+		"only rebase up to the current branch\n(don't recurse into descendant branches)",
 	)
 	stackRestackCmd.Flags().BoolVar(
 		&stackRestackFlags.Continue, "continue", false,
-		"continue an in-progress restack",
+		"continue an in-progress rebase",
 	)
 	stackRestackCmd.Flags().BoolVar(
 		&stackRestackFlags.Abort, "abort", false,
-		"abort an in-progress restack",
+		"abort an in-progress rebase",
 	)
 	stackRestackCmd.Flags().BoolVar(
 		&stackRestackFlags.Skip, "skip", false,
-		"skip the current commit and continue an in-progress restack",
+		"skip the current commit and continue an in-progress rebase",
 	)
 	stackRestackCmd.Flags().BoolVar(
 		&stackRestackFlags.DryRun, "dry-run", false,
-		"dry-run the restack",
+		"show the list of branches that will be rebased without actually rebasing them",
 	)
 
 	stackRestackCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")

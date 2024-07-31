@@ -15,7 +15,7 @@ import (
 
 var stackDiffCmd = &cobra.Command{
 	Use:   "diff",
-	Short: "generate diff between working tree and the parent branch",
+	Short: "Show the diff between working tree and parent branch",
 	Long: strings.TrimSpace(`
 Generates the diff between the working tree and the parent branch 
 (i.e., the diff between the current branch and the previous branch in the stack).

@@ -11,10 +11,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func RequireCurrentBranchName(t *testing.T, repo *gittest.GitTestRepo, name plumbing.ReferenceName) {
+func RequireCurrentBranchName(
+	t *testing.T,
+	repo *gittest.GitTestRepo,
+	name plumbing.ReferenceName,
+) {
 	ref, err := repo.GoGit.Reference(plumbing.HEAD, false)
 	require.NoError(t, err, "failed to determine current branch name")
-	require.Equal(t, plumbing.SymbolicReference, ref.Type(), "expected HEAD to be a symbolic reference")
+	require.Equal(
+		t,
+		plumbing.SymbolicReference,
+		ref.Type(),
+		"expected HEAD to be a symbolic reference",
+	)
 	require.Equal(
 		t,
 		name,
@@ -31,7 +40,11 @@ func GetFetchHeadTimestamp(t *testing.T, repo *gittest.GitTestRepo) time.Time {
 	return fileInfo.ModTime()
 }
 
-func GetStoredParentBranchState(t *testing.T, repo *gittest.GitTestRepo, name string) meta.BranchState {
+func GetStoredParentBranchState(
+	t *testing.T,
+	repo *gittest.GitTestRepo,
+	name string,
+) meta.BranchState {
 	// We shouldn't do this as part of an E2E test, but it's hard to ensure otherwise.
 	db := repo.OpenDB(t)
 	br, _ := db.ReadTx().Branch(name)

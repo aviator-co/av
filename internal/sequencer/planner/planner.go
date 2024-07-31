@@ -8,7 +8,12 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
-func PlanForRestack(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.ReferenceName, restackAll, restackCurrent bool) ([]sequencer.RestackOp, error) {
+func PlanForRestack(
+	tx meta.ReadTx,
+	repo *git.Repo,
+	currentBranch plumbing.ReferenceName,
+	restackAll, restackCurrent bool,
+) ([]sequencer.RestackOp, error) {
 	var targetBranches []plumbing.ReferenceName
 	var err error
 	if restackAll {
@@ -42,7 +47,12 @@ func PlanForRestack(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.Refer
 	return ret, nil
 }
 
-func PlanForSync(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.ReferenceName, restackAll, restackCurrent, restackStackRoots bool) ([]sequencer.RestackOp, error) {
+func PlanForSync(
+	tx meta.ReadTx,
+	repo *git.Repo,
+	currentBranch plumbing.ReferenceName,
+	restackAll, restackCurrent, restackStackRoots bool,
+) ([]sequencer.RestackOp, error) {
 	var targetBranches []plumbing.ReferenceName
 	var err error
 	if restackAll {
@@ -92,7 +102,11 @@ func PlanForSync(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.Referenc
 	return ret, nil
 }
 
-func PlanForReparent(tx meta.ReadTx, repo *git.Repo, currentBranch, newParentBranch plumbing.ReferenceName) ([]sequencer.RestackOp, error) {
+func PlanForReparent(
+	tx meta.ReadTx,
+	repo *git.Repo,
+	currentBranch, newParentBranch plumbing.ReferenceName,
+) ([]sequencer.RestackOp, error) {
 	if newParentBranch == currentBranch {
 		return nil, errors.New("cannot re-parent to self")
 	}
@@ -127,7 +141,11 @@ func PlanForReparent(tx meta.ReadTx, repo *git.Repo, currentBranch, newParentBra
 	return ret, nil
 }
 
-func PlanForAmend(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.ReferenceName) ([]sequencer.RestackOp, error) {
+func PlanForAmend(
+	tx meta.ReadTx,
+	repo *git.Repo,
+	currentBranch plumbing.ReferenceName,
+) ([]sequencer.RestackOp, error) {
 	var ret []sequencer.RestackOp
 	for _, child := range meta.SubsequentBranches(tx, currentBranch.Short()) {
 		avbr, _ := tx.Branch(child)

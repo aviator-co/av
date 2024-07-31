@@ -23,7 +23,8 @@ func TestRepo_Log(t *testing.T) {
 		gittest.WithMessage("commit 2\n\ncommit 2 body"),
 	)
 
-	cis, err := repo.AsAvGitRepo().Log(git.LogOpts{RevisionRange: []string{c2.String(), "^" + c1.String() + "^1"}})
+	cis, err := repo.AsAvGitRepo().
+		Log(git.LogOpts{RevisionRange: []string{c2.String(), "^" + c1.String() + "^1"}})
 	assert.NoError(t, err)
 	assert.Equal(t, []*git.CommitInfo{
 		{

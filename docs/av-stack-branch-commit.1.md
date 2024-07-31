@@ -19,8 +19,11 @@ required to create the branch.
 
 ## OPTIONS
 
-`-a, --all`
-: Automatically stage all modified/deleted files, (same as `git commit --all`)
+`-A, --all`
+: Automatically stage all files (same as `git commit --all`)
+
+`-a, --all-modified`
+: Automatically stage all modified and deleted files (ignore untracked files)
 
 `-b <branch_name>, --branch-name <branch_name>`
 : The branch name to create. If empty, automatically generate from the message.

@@ -6,7 +6,7 @@ av-stack-branch - Create or rename a branch in the stack
 
 ## SYNOPSIS
 
-`av stack branch [-m | --rename] [--force] [--parent <parent_branch>] <branch-name>`
+`av stack branch [-m | --rename] [--force] [--parent <parent_branch>] <branch-name> [<parent_branch>]`
 
 ## DESCRIPTION
 
