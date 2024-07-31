@@ -17,12 +17,19 @@ type StackTreeNode struct {
 	Children []*StackTreeNode
 }
 
-func BuildTree(currentBranchName string, branches []*StackTreeBranchInfo, sortCurrent bool) []*StackTreeNode {
+func BuildTree(
+	currentBranchName string,
+	branches []*StackTreeBranchInfo,
+	sortCurrent bool,
+) []*StackTreeNode {
 	childBranches := make(map[string][]string)
 	branchMap := make(map[string]*StackTreeNode)
 	for _, branch := range branches {
 		branchMap[branch.BranchName] = &StackTreeNode{Branch: branch}
-		childBranches[branch.ParentBranchName] = append(childBranches[branch.ParentBranchName], branch.BranchName)
+		childBranches[branch.ParentBranchName] = append(
+			childBranches[branch.ParentBranchName],
+			branch.BranchName,
+		)
 	}
 	for _, branch := range branches {
 		node := branchMap[branch.BranchName]
@@ -84,12 +91,25 @@ func BuildTree(currentBranchName string, branches []*StackTreeBranchInfo, sortCu
 	return rootBranches
 }
 
-func BuildStackTreeAllBranches(tx meta.ReadTx, currentBranch string, sortCurrent bool) []*StackTreeNode {
+func BuildStackTreeAllBranches(
+	tx meta.ReadTx,
+	currentBranch string,
+	sortCurrent bool,
+) []*StackTreeNode {
 	return buildStackTree(currentBranch, tx.AllBranches(), sortCurrent)
 }
 
-func BuildStackTreeCurrentStack(tx meta.ReadTx, currentBranch string, sortCurrent bool) (*StackTreeNode, error) {
-	nodes, err := BuildStackTreeRelatedBranchStacks(tx, currentBranch, sortCurrent, []string{currentBranch})
+func BuildStackTreeCurrentStack(
+	tx meta.ReadTx,
+	currentBranch string,
+	sortCurrent bool,
+) (*StackTreeNode, error) {
+	nodes, err := BuildStackTreeRelatedBranchStacks(
+		tx,
+		currentBranch,
+		sortCurrent,
+		[]string{currentBranch},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +119,12 @@ func BuildStackTreeCurrentStack(tx meta.ReadTx, currentBranch string, sortCurren
 	return nodes[0], nil
 }
 
-func BuildStackTreeRelatedBranchStacks(tx meta.ReadTx, currentBranch string, sortCurrent bool, relatedBranches []string) ([]*StackTreeNode, error) {
+func BuildStackTreeRelatedBranchStacks(
+	tx meta.ReadTx,
+	currentBranch string,
+	sortCurrent bool,
+	relatedBranches []string,
+) ([]*StackTreeNode, error) {
 	branches := map[string]bool{}
 	for _, branch := range relatedBranches {
 		stack, err := meta.StackBranches(tx, branch)
@@ -123,7 +148,11 @@ func BuildStackTreeRelatedBranchStacks(tx meta.ReadTx, currentBranch string, sor
 	return buildStackTree(currentBranch, branchesToInclude, sortCurrent), nil
 }
 
-func buildStackTree(currentBranch string, branchesToInclude map[string]meta.Branch, sortCurrent bool) []*StackTreeNode {
+func buildStackTree(
+	currentBranch string,
+	branchesToInclude map[string]meta.Branch,
+	sortCurrent bool,
+) []*StackTreeNode {
 	trunks := map[string]bool{}
 	var branches []*StackTreeBranchInfo
 	for _, branch := range branchesToInclude {

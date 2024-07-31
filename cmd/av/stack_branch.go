@@ -156,10 +156,13 @@ func init() {
 	stackBranchCmd.Flags().
 		BoolVar(&stackBranchFlags.Force, "force", false, "force rename the current branch")
 
-	_ = stackBranchCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		branches, _ := allBranches()
-		return branches, cobra.ShellCompDirectiveDefault
-	})
+	_ = stackBranchCmd.RegisterFlagCompletionFunc(
+		"parent",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			branches, _ := allBranches()
+			return branches, cobra.ShellCompDirectiveDefault
+		},
+	)
 }
 
 func stackBranchMove(

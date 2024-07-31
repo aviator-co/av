@@ -31,7 +31,12 @@ func TestPickCmd_Execute(t *testing.T) {
 			PickCmd{Commit: next.String()}.Execute(ctx),
 			"PickCmd.Execute should succeed with a fast-forward",
 		)
-		require.Equal(t, next.String(), ctx.State.Head, "PickCmd.Execute should update the state's head")
+		require.Equal(
+			t,
+			next.String(),
+			ctx.State.Head,
+			"PickCmd.Execute should update the state's head",
+		)
 	})
 
 	t.Run("conflicting commit", func(t *testing.T) {

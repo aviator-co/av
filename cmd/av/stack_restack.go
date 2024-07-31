@@ -154,7 +154,8 @@ func (vm *stackRestackViewModel) View() string {
 
 func (vm *stackRestackViewModel) readState() (*sequencerui.RestackState, error) {
 	var state sequencerui.RestackState
-	if err := vm.repo.ReadStateFile(git.StateFileKindRestack, &state); err != nil && os.IsNotExist(err) {
+	if err := vm.repo.ReadStateFile(git.StateFileKindRestack, &state); err != nil &&
+		os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
@@ -196,7 +197,13 @@ func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error
 		currentBranchRef = plumbing.NewBranchReferenceName(currentBranch)
 	}
 
-	ops, err := planner.PlanForRestack(vm.db.ReadTx(), vm.repo, currentBranchRef, stackRestackFlags.All, stackRestackFlags.Current)
+	ops, err := planner.PlanForRestack(
+		vm.db.ReadTx(),
+		vm.repo,
+		currentBranchRef,
+		stackRestackFlags.All,
+		stackRestackFlags.Current,
+	)
 	if err != nil {
 		return nil, err
 	}

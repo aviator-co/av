@@ -233,7 +233,10 @@ func (r *GitTestRepo) CreateRef(t *testing.T, ref plumbing.ReferenceName) {
 }
 
 // CheckoutBranch checks out the specified branch and returns the original branch.
-func (r *GitTestRepo) CheckoutBranch(t *testing.T, branch plumbing.ReferenceName) plumbing.ReferenceName {
+func (r *GitTestRepo) CheckoutBranch(
+	t *testing.T,
+	branch plumbing.ReferenceName,
+) plumbing.ReferenceName {
 	original := r.CurrentBranch(t)
 	wt, err := r.GoGit.Worktree()
 	require.NoError(t, err, "failed to get worktree")
@@ -257,7 +260,10 @@ func (r *GitTestRepo) WithCheckoutBranch(t *testing.T, branch plumbing.Reference
 	f()
 }
 
-func (r *GitTestRepo) GetCommits(t *testing.T, includedFromRef, excludedFromRef plumbing.ReferenceName) []plumbing.Hash {
+func (r *GitTestRepo) GetCommits(
+	t *testing.T,
+	includedFromRef, excludedFromRef plumbing.ReferenceName,
+) []plumbing.Hash {
 	from := r.GetCommitAtRef(t, includedFromRef)
 	excluded := r.GetCommitAtRef(t, excludedFromRef)
 

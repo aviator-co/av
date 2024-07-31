@@ -90,7 +90,10 @@ If the --current flag is given, this command will create pull requests up to the
 				return err
 			}
 			if result.Created {
-				createdPullRequestPermalinks = append(createdPullRequestPermalinks, result.Branch.PullRequest.Permalink)
+				createdPullRequestPermalinks = append(
+					createdPullRequestPermalinks,
+					result.Branch.PullRequest.Permalink,
+				)
 			}
 			// make sure the base branch of the PR is up to date if it already exists
 			if !result.Created && result.Pull.BaseRefName != result.Branch.Parent.Name {

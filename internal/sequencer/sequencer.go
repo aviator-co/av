@@ -87,7 +87,11 @@ func getBranchSnapshots(db meta.DB) map[plumbing.ReferenceName]*branchSnapshot {
 	return ret
 }
 
-func (seq *Sequencer) Run(repo *git.Repo, db meta.DB, seqAbort, seqContinue, seqSkip bool) (*git.RebaseResult, error) {
+func (seq *Sequencer) Run(
+	repo *git.Repo,
+	db meta.DB,
+	seqAbort, seqContinue, seqSkip bool,
+) (*git.RebaseResult, error) {
 	if seqAbort || seqContinue || seqSkip {
 		return seq.runFromInterruptedState(repo, db, seqAbort, seqContinue, seqSkip)
 	}
@@ -98,7 +102,11 @@ func (seq *Sequencer) Run(repo *git.Repo, db meta.DB, seqAbort, seqContinue, seq
 	return seq.rebaseBranch(repo, db)
 }
 
-func (seq *Sequencer) runFromInterruptedState(repo *git.Repo, db meta.DB, seqAbort, seqContinue, seqSkip bool) (*git.RebaseResult, error) {
+func (seq *Sequencer) runFromInterruptedState(
+	repo *git.Repo,
+	db meta.DB,
+	seqAbort, seqContinue, seqSkip bool,
+) (*git.RebaseResult, error) {
 	if seq.CurrentSyncRef == "" {
 		return nil, errors.New("no sync in progress")
 	}
@@ -197,7 +205,12 @@ func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB) (*git.RebaseResul
 		return nil, err
 	}
 	if result.Status == git.RebaseConflict {
-		result.ErrorHeadline = fmt.Sprintf("Failed to rebase %q onto %q (merge base is %q)\n", op.Name, op.NewParent, previousParentHash.String()[:7]) + result.ErrorHeadline
+		result.ErrorHeadline = fmt.Sprintf(
+			"Failed to rebase %q onto %q (merge base is %q)\n",
+			op.Name,
+			op.NewParent,
+			previousParentHash.String()[:7],
+		) + result.ErrorHeadline
 		seq.SequenceInterruptedNewParentHash = newParentHash
 		return result, nil
 	}
@@ -260,30 +273,47 @@ func (seq *Sequencer) getCurrentOp() RestackOp {
 	panic(fmt.Sprintf("op not found for ref %q", seq.CurrentSyncRef))
 }
 
-func (seq *Sequencer) getRemoteTrackingBranchCommit(repo *git.Repo, ref plumbing.ReferenceName) (plumbing.Hash, error) {
+func (seq *Sequencer) getRemoteTrackingBranchCommit(
+	repo *git.Repo,
+	ref plumbing.ReferenceName,
+) (plumbing.Hash, error) {
 	remote, err := repo.GoGitRepo().Remote(seq.RemoteName)
 	if err != nil {
 		return plumbing.ZeroHash, errors.Errorf("failed to get remote %q: %v", seq.RemoteName, err)
 	}
 	rtb := mapToRemoteTrackingBranch(remote.Config(), ref)
 	if rtb == nil {
-		return plumbing.ZeroHash, errors.Errorf("failed to get remote tracking branch in %q for %q", seq.RemoteName, ref)
+		return plumbing.ZeroHash, errors.Errorf(
+			"failed to get remote tracking branch in %q for %q",
+			seq.RemoteName,
+			ref,
+		)
 	}
 	return seq.getBranchCommit(repo, *rtb)
 }
 
-func (seq *Sequencer) getBranchCommit(repo *git.Repo, ref plumbing.ReferenceName) (plumbing.Hash, error) {
+func (seq *Sequencer) getBranchCommit(
+	repo *git.Repo,
+	ref plumbing.ReferenceName,
+) (plumbing.Hash, error) {
 	refObj, err := repo.GoGitRepo().Reference(ref, false)
 	if err != nil {
 		return plumbing.ZeroHash, errors.Errorf("failed to get branch %q: %v", ref, err)
 	}
 	if refObj.Type() != plumbing.HashReference {
-		return plumbing.ZeroHash, errors.Errorf("unexpected reference type for branch %q: %v", ref, refObj.Type())
+		return plumbing.ZeroHash, errors.Errorf(
+			"unexpected reference type for branch %q: %v",
+			ref,
+			refObj.Type(),
+		)
 	}
 	return refObj.Hash(), nil
 }
 
-func mapToRemoteTrackingBranch(remoteConfig *config.RemoteConfig, refName plumbing.ReferenceName) *plumbing.ReferenceName {
+func mapToRemoteTrackingBranch(
+	remoteConfig *config.RemoteConfig,
+	refName plumbing.ReferenceName,
+) *plumbing.ReferenceName {
 	for _, fetch := range remoteConfig.Fetch {
 		if fetch.Match(refName) {
 			dst := fetch.Dst(refName)

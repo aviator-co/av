@@ -65,7 +65,11 @@ func runCreate(repo *git.Repo, db meta.DB) error {
 
 	branch, _ := tx.Branch(currentBranch)
 	if branch.PullRequest != nil && branch.PullRequest.State == githubv4.PullRequestStateMerged {
-		fmt.Fprint(os.Stderr, colors.Failure("This branch has already been merged, commit is not allowed"), "\n")
+		fmt.Fprint(
+			os.Stderr,
+			colors.Failure("This branch has already been merged, commit is not allowed"),
+			"\n",
+		)
 		return errors.New("this branch has already been merged, commit is not allowed")
 	}
 

@@ -105,7 +105,11 @@ func (vm *RestackModel) View() string {
 	sb := strings.Builder{}
 	if vm.State != nil && vm.State.Seq != nil {
 		if vm.State.Seq.CurrentSyncRef != "" {
-			sb.WriteString(colors.ProgressStyle.Render(vm.spinner.View() + "Restacking " + vm.State.Seq.CurrentSyncRef.Short() + "..."))
+			sb.WriteString(
+				colors.ProgressStyle.Render(
+					vm.spinner.View() + "Restacking " + vm.State.Seq.CurrentSyncRef.Short() + "...",
+				),
+			)
 		} else if vm.abortedBranch != "" {
 			sb.WriteString(colors.FailureStyle.Render("✗ Restack is aborted"))
 		} else {
@@ -130,7 +134,11 @@ func (vm *RestackModel) View() string {
 		var nodes []*stackutils.StackTreeNode
 		var err error
 		if vm.State.RestackingAll {
-			nodes = stackutils.BuildStackTreeAllBranches(vm.db.ReadTx(), vm.State.InitialBranch, true)
+			nodes = stackutils.BuildStackTreeAllBranches(
+				vm.db.ReadTx(),
+				vm.State.InitialBranch,
+				true,
+			)
 		} else {
 			nodes, err = stackutils.BuildStackTreeRelatedBranchStacks(vm.db.ReadTx(), vm.State.InitialBranch, true, vm.State.RelatedBranches)
 		}
@@ -173,11 +181,20 @@ func (vm *RestackModel) View() string {
 	}
 	if vm.rebaseConflictErrorHeadline != "" {
 		sb.WriteString("\n")
-		sb.WriteString(colors.FailureStyle.Render("Rebase conflict while rebasing ", vm.State.Seq.CurrentSyncRef.Short()) + "\n")
+		sb.WriteString(
+			colors.FailureStyle.Render(
+				"Rebase conflict while rebasing ",
+				vm.State.Seq.CurrentSyncRef.Short(),
+			) + "\n",
+		)
 		sb.WriteString(vm.rebaseConflictErrorHeadline + "\n")
 		sb.WriteString(vm.rebaseConflictHint + "\n")
 		sb.WriteString("\n")
-		sb.WriteString("Resolve the conflicts and continue the restack with " + colors.CliCmd(vm.Command+" --continue"))
+		sb.WriteString(
+			"Resolve the conflicts and continue the restack with " + colors.CliCmd(
+				vm.Command+" --continue",
+			),
+		)
 	}
 	return sb.String()
 }

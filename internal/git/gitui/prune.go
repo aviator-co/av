@@ -38,7 +38,13 @@ type noDeleteBranch struct {
 	reason string
 }
 
-func NewPruneBranchModel(repo *git.Repo, db meta.DB, pruneFlag string, targetBranches []plumbing.ReferenceName, initialBranch string) *PruneBranchModel {
+func NewPruneBranchModel(
+	repo *git.Repo,
+	db meta.DB,
+	pruneFlag string,
+	targetBranches []plumbing.ReferenceName,
+	initialBranch string,
+) *PruneBranchModel {
 	return &PruneBranchModel{
 		repo:           repo,
 		db:             db,
@@ -230,7 +236,8 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 
 func (vm *PruneBranchModel) CheckoutInitialState() error {
 	if vm.initialBranch != "" {
-		initialHead, err := vm.repo.GoGitRepo().Reference(plumbing.NewBranchReferenceName(vm.initialBranch), true)
+		initialHead, err := vm.repo.GoGitRepo().
+			Reference(plumbing.NewBranchReferenceName(vm.initialBranch), true)
 		if err == nil {
 			if initialHead.Type() == plumbing.HashReference {
 				// Normal reference that points to a commit. Checking out.
@@ -292,16 +299,25 @@ func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
 			continue
 		}
 		if vm.hasOpenChildren(br) {
-			noDeleteBranches = append(noDeleteBranches, noDeleteBranch{branch: br, reason: reasonHasChild})
+			noDeleteBranches = append(
+				noDeleteBranches,
+				noDeleteBranch{branch: br, reason: reasonHasChild},
+			)
 			continue
 		}
 		if avbr.PullRequest == nil {
-			noDeleteBranches = append(noDeleteBranches, noDeleteBranch{branch: br, reason: reasonNoPullRequest})
+			noDeleteBranches = append(
+				noDeleteBranches,
+				noDeleteBranch{branch: br, reason: reasonNoPullRequest},
+			)
 			continue
 		}
 		remoteHash, ok := remoteBranches[fmt.Sprintf("refs/pull/%d/head", avbr.PullRequest.Number)]
 		if !ok {
-			noDeleteBranches = append(noDeleteBranches, noDeleteBranch{branch: br, reason: reasonPRHeadNotFound})
+			noDeleteBranches = append(
+				noDeleteBranches,
+				noDeleteBranch{branch: br, reason: reasonPRHeadNotFound},
+			)
 			continue
 		}
 		ref, err := vm.repo.GoGitRepo().Reference(plumbing.ReferenceName(br), true)
@@ -309,7 +325,10 @@ func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
 			return err
 		}
 		if ref.Hash().String() != remoteHash {
-			noDeleteBranches = append(noDeleteBranches, noDeleteBranch{branch: br, reason: reasonPRHeadIsDifferent})
+			noDeleteBranches = append(
+				noDeleteBranches,
+				noDeleteBranch{branch: br, reason: reasonPRHeadIsDifferent},
+			)
 			continue
 		}
 		deleteCandidates = append(deleteCandidates, deleteCandidate{branch: br, commit: ref.Hash()})
@@ -329,7 +348,10 @@ func (vm *PruneBranchModel) hasOpenChildren(br plumbing.ReferenceName) bool {
 	return false
 }
 
-func mapToRemoteTrackingBranch(remoteConfig *config.RemoteConfig, refName plumbing.ReferenceName) *plumbing.ReferenceName {
+func mapToRemoteTrackingBranch(
+	remoteConfig *config.RemoteConfig,
+	refName plumbing.ReferenceName,
+) *plumbing.ReferenceName {
 	for _, fetch := range remoteConfig.Fetch {
 		if fetch.Match(refName) {
 			dst := fetch.Dst(refName)

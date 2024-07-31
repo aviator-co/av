@@ -121,7 +121,11 @@ func (vm *postCommitRestackViewModel) createState() (*sequencerui.RestackState, 
 	var state sequencerui.RestackState
 	state.InitialBranch = currentBranch
 	state.RelatedBranches = []string{currentBranch}
-	ops, err := planner.PlanForAmend(vm.db.ReadTx(), vm.repo, plumbing.NewBranchReferenceName(currentBranch))
+	ops, err := planner.PlanForAmend(
+		vm.db.ReadTx(),
+		vm.repo,
+		plumbing.NewBranchReferenceName(currentBranch),
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -20,14 +20,21 @@ func TestRepo_CherryPick(t *testing.T) {
 
 	// Switch back to c1 and test that we can cherry-pick c2 on top of it
 	repo.CheckoutCommit(t, c1)
-	require.NoError(t, repo.AsAvGitRepo().CherryPick(git.CherryPick{Commits: []string{c2.String()}}))
+	require.NoError(
+		t,
+		repo.AsAvGitRepo().CherryPick(git.CherryPick{Commits: []string{c2.String()}}),
+	)
 	contents, err := os.ReadFile(filepath.Join(repo.RepoDir, "file"))
 	require.NoError(t, err)
 	assert.Equal(t, "first commit\nsecond commit\n", string(contents))
 
 	// Switch back to c1 and check that we can fast-forward to c2
 	repo.CheckoutCommit(t, c1)
-	require.NoError(t, repo.AsAvGitRepo().CherryPick(git.CherryPick{Commits: []string{c2.String()}, FastForward: true}))
+	require.NoError(
+		t,
+		repo.AsAvGitRepo().
+			CherryPick(git.CherryPick{Commits: []string{c2.String()}, FastForward: true}),
+	)
 	_, err = os.ReadFile(filepath.Join(repo.RepoDir, "file"))
 	require.NoError(t, err)
 

@@ -25,7 +25,8 @@ func (r *Repo) ReadStateFile(kind StateFileKind, msg any) error {
 
 func (r *Repo) WriteStateFile(kind StateFileKind, msg any) error {
 	if msg == nil {
-		if err := os.Remove(filepath.Join(r.AvDir(), string(kind))); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(filepath.Join(r.AvDir(), string(kind))); err != nil &&
+			!os.IsNotExist(err) {
 			return err
 		}
 		return nil

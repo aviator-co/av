@@ -174,7 +174,12 @@ func (vm *stackReparentViewModel) createState() (*sequencerui.RestackState, erro
 	var state sequencerui.RestackState
 	state.InitialBranch = currentBranch
 	state.RelatedBranches = []string{currentBranch, stackReparentFlags.Parent}
-	ops, err := planner.PlanForReparent(vm.db.ReadTx(), vm.repo, plumbing.NewBranchReferenceName(currentBranch), plumbing.NewBranchReferenceName(stackReparentFlags.Parent))
+	ops, err := planner.PlanForReparent(
+		vm.db.ReadTx(),
+		vm.repo,
+		plumbing.NewBranchReferenceName(currentBranch),
+		plumbing.NewBranchReferenceName(stackReparentFlags.Parent),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -191,8 +196,11 @@ func init() {
 		"new parent branch name",
 	)
 
-	_ = stackReparentCmd.RegisterFlagCompletionFunc("parent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		branches, _ := allBranches()
-		return branches, cobra.ShellCompDirectiveDefault
-	})
+	_ = stackReparentCmd.RegisterFlagCompletionFunc(
+		"parent",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			branches, _ := allBranches()
+			return branches, cobra.ShellCompDirectiveDefault
+		},
+	)
 }
