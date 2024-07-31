@@ -29,6 +29,10 @@ func PlanForRestack(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.Refer
 			// Skip rebasing branches that have merge commits.
 			continue
 		}
+		if avbr.Parent.Trunk {
+			// Skip rebasing the stack roots.
+			continue
+		}
 		ret = append(ret, sequencer.RestackOp{
 			Name:             br,
 			NewParent:        plumbing.NewBranchReferenceName(avbr.Parent.Name),
@@ -38,7 +42,7 @@ func PlanForRestack(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.Refer
 	return ret, nil
 }
 
-func PlanForSync(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.ReferenceName, restackAll, restackCurrent bool) ([]sequencer.RestackOp, error) {
+func PlanForSync(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.ReferenceName, restackAll, restackCurrent, restackStackRoots bool) ([]sequencer.RestackOp, error) {
 	var targetBranches []plumbing.ReferenceName
 	var err error
 	if restackAll {
@@ -59,7 +63,13 @@ func PlanForSync(tx meta.ReadTx, repo *git.Repo, currentBranch plumbing.Referenc
 			// Skip rebasing branches that have merge commits.
 			continue
 		}
-		if !avbr.Parent.Trunk {
+
+		if avbr.Parent.Trunk {
+			if !restackStackRoots {
+				// Skip rebasing the stack roots.
+				continue
+			}
+		} else {
 			// Check if the parent branch is merged.
 			avpbr, _ := tx.Branch(avbr.Parent.Name)
 			if avpbr.MergeCommit != "" {

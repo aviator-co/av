@@ -28,13 +28,14 @@ import (
 )
 
 var stackSyncFlags struct {
-	All      bool
-	Current  bool
-	Abort    bool
-	Continue bool
-	Skip     bool
-	Push     string
-	Prune    string
+	All           bool
+	RebaseToTrunk bool
+	Current       bool
+	Abort         bool
+	Continue      bool
+	Skip          bool
+	Push          string
+	Prune         string
 }
 
 const (
@@ -543,7 +544,7 @@ func (vm *stackSyncViewModel) createState() (*savedStackSyncState, error) {
 	if currentBranch != "" {
 		currentBranchRef = plumbing.NewBranchReferenceName(currentBranch)
 	}
-	ops, err := planner.PlanForSync(vm.db.ReadTx(), vm.repo, currentBranchRef, stackSyncFlags.All, stackSyncFlags.Current)
+	ops, err := planner.PlanForSync(vm.db.ReadTx(), vm.repo, currentBranchRef, stackSyncFlags.All, stackSyncFlags.Current, stackSyncFlags.RebaseToTrunk)
 	if err != nil {
 		return nil, err
 	}
@@ -581,6 +582,10 @@ func init() {
 		"delete branches that have been merged into the parent branch\n(ask|yes|no)",
 	)
 	stackSyncCmd.Flags().Lookup("prune").NoOptDefVal = "ask"
+	stackSyncCmd.Flags().BoolVar(
+		&stackSyncFlags.RebaseToTrunk, "rebase-to-trunk", false,
+		"rebase the branches to the latest trunk always",
+	)
 
 	stackSyncCmd.Flags().BoolVar(
 		&stackSyncFlags.Continue, "continue", false,

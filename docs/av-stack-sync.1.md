@@ -31,6 +31,23 @@ resolve the conflict, and continue with `av stack sync --continue`. This is
 similar to `git rebase --continue`, but it continues with syncing the rest of
 the branches.
 
+## REBASING THE STACK ROOT TO TRUNK
+
+By default, the branches are conditionally rebased if needed:
+
+* If a part of the stack is merged, the rest of the stack is rebased to the
+  latest trunk commit.
+* If a branch is a stack root (the first topic branch next to trunk), it's
+  rebased if `--rebase-to-trunk` option is specified.
+* If a branch is not a stack root, it's rebased to the parent branch.
+
+While you are developing in a topic branch, it's possible that the trunk branch
+is updated by somebody else. In some cases, you may need to rebase onto that
+latest trunk branch to resolve the conflicts. For example, if somebody else
+updates the same file you are working on, you need to rebase your branch onto
+the latest trunk branch. In this case, you can use `--rebase-to-trunk` option to
+rebase the stacks to the latest trunk branch.
+
 ## OPTIONS
 
 `--all`
@@ -39,6 +56,9 @@ the branches.
 `--current`
 : Only sync changes to the current branch. (Don't recurse into descendant
 branches.)
+
+`--rebase-to-trunk`
+: Rebase the branches to trunk.
 
 `--push=(yes|no|ask)`
 : Push the changes to the remote. If `ask`, it prompts to you when push is
