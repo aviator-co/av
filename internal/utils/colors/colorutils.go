@@ -29,4 +29,8 @@ var (
 	ProgressStyle = lipgloss.NewStyle().Foreground(Amber600)
 	SuccessStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color('2'))
 	FailureStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color('1'))
+
+	// Aligned with promptkit
+	// https://github.com/erikgeiser/promptkit/blob/main/selection/prompt.go#L62
+	PromptChoice = lipgloss.NewStyle().Foreground(lipgloss.Color("32")).Bold(true)
 )
