@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"strings"
 
 	"emperror.dev/errors"
@@ -11,36 +10,16 @@ import (
 	"github.com/aviator-co/av/internal/sequencer"
 	"github.com/aviator-co/av/internal/sequencer/planner"
 	"github.com/aviator-co/av/internal/sequencer/sequencerui"
+	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/mattn/go-isatty"
 )
 
 var nothingToRestackError = errors.Sentinel("nothing to restack")
 
 func runPostCommitRestack(repo *git.Repo, db meta.DB) error {
-	var opts []tea.ProgramOption
-	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		opts = []tea.ProgramOption{
-			tea.WithInput(nil),
-		}
-	}
-	p := tea.NewProgram(&postCommitRestackViewModel{repo: repo, db: db}, opts...)
-	model, err := p.Run()
-	if err != nil {
-		return err
-	}
-	if err := model.(*postCommitRestackViewModel).err; err != nil {
-		if errors.Is(err, nothingToRestackError) {
-			return nil
-		}
-		return actions.ErrExitSilently{ExitCode: 1}
-	}
-	if model.(*postCommitRestackViewModel).quitWithConflict {
-		return actions.ErrExitSilently{ExitCode: 1}
-	}
-	return nil
+	return uiutils.RunBubbleTea(&postCommitRestackViewModel{repo: repo, db: db})
 }
 
 type postCommitRestackViewModel struct {
@@ -101,6 +80,19 @@ func (vm *postCommitRestackViewModel) View() string {
 		sb.WriteString(vm.err.Error() + "\n")
 	}
 	return sb.String()
+}
+
+func (vm *postCommitRestackViewModel) ExitError() error {
+	if errors.Is(vm.err, nothingToRestackError) {
+		return nil
+	}
+	if vm.err != nil {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	if vm.quitWithConflict {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	return nil
 }
 
 func (vm *postCommitRestackViewModel) writeState(state *sequencerui.RestackState) error {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	"emperror.dev/errors"
@@ -15,7 +14,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/erikgeiser/promptkit/selection"
-	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -44,28 +42,11 @@ var stackNextCmd = &cobra.Command{
 			return errors.New("invalid number (must be >= 1)")
 		}
 
-		var opts []tea.ProgramOption
-		if !isatty.IsTerminal(os.Stdout.Fd()) {
-			opts = []tea.ProgramOption{
-				tea.WithInput(nil),
-			}
-		}
 		stackNext, err := newStackNextModel(stackNextFlags.Last, n)
 		if err != nil {
 			return err
 		}
-
-		p := tea.NewProgram(stackNext, opts...)
-		model, err := p.Run()
-		if err != nil {
-			return err
-		}
-
-		if err := model.(stackNextModel).err; err != nil {
-			return actions.ErrExitSilently{ExitCode: 1}
-		}
-		return nil
-
+		return uiutils.RunBubbleTea(&stackNext)
 	},
 }
 
@@ -166,8 +147,6 @@ func (m stackNextModel) nextBranch() tea.Msg {
 	return showSelectionMsg{}
 }
 
-var _ tea.Model = &stackNextModel{}
-
 func (m stackNextModel) Init() tea.Cmd {
 	return m.nextBranch
 }
@@ -234,4 +213,11 @@ func (m stackNextModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+func (m stackNextModel) ExitError() error {
+	if m.err != nil {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	return nil
 }
