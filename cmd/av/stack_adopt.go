@@ -13,6 +13,8 @@ import (
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/stackutils"
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -22,6 +24,7 @@ import (
 
 var stackAdoptFlags struct {
 	Parent string
+	DryRun bool
 }
 
 var stackAdoptCmd = &cobra.Command{
@@ -65,6 +68,7 @@ var stackAdoptCmd = &cobra.Command{
 			currentHEADBranch: plumbing.NewBranchReferenceName(currentBranch),
 			currentCursor:     plumbing.NewBranchReferenceName(currentBranch),
 			chosenTargets:     make(map[plumbing.ReferenceName]bool),
+			help:              help.New(),
 		}, opts...)
 		model, err := p.Run()
 		if err != nil {
@@ -121,6 +125,9 @@ func stackAdoptForceAdoption(repo *git.Repo, db meta.DB, currentBranch, parent s
 		}
 		tx.SetBranch(branch)
 	}
+	if stackAdoptFlags.DryRun {
+		return nil
+	}
 	return tx.Commit()
 }
 
@@ -136,6 +143,7 @@ type stackAdoptViewModel struct {
 	db                meta.DB
 	currentHEADBranch plumbing.ReferenceName
 
+	help               help.Model
 	currentCursor      plumbing.ReferenceName
 	chosenTargets      map[plumbing.ReferenceName]bool
 	treeInfo           *stackAdoptTreeInfo
@@ -162,6 +170,10 @@ func (vm stackAdoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for _, branch := range vm.treeInfo.adoptionTargets {
 			// By default choose everything.
 			vm.chosenTargets[branch] = true
+		}
+		vm.currentCursor = vm.treeInfo.adoptionTargets[0]
+		if stackAdoptFlags.DryRun {
+			return vm, tea.Quit
 		}
 	case adoptionCompleteMsg:
 		vm.adoptionComplete = true
@@ -319,49 +331,59 @@ func (vm stackAdoptViewModel) adoptBranches() tea.Msg {
 }
 
 func (vm stackAdoptViewModel) View() string {
-	sb := strings.Builder{}
+	var ss []string
 	if vm.treeInfo != nil {
+		choosing := false
 		if len(vm.treeInfo.adoptionTargets) == 0 {
-			sb.WriteString("No branch to adopt\n")
+			ss = append(ss, "No branch to adopt")
 		} else if vm.adoptionComplete {
-			sb.WriteString("Adoption complete\n")
+			ss = append(ss, "Adoption complete")
 		} else if vm.adoptionInProgress {
-			sb.WriteString("Adoption in progress...\n")
+			ss = append(ss, "Adoption in progress...")
 		} else {
-			sb.WriteString("Choose which branches to adopt (Use space to select / deselect).\n")
+			choosing = true
+			ss = append(ss, "Choose which branches to adopt")
 		}
-		sb.WriteString(
+		ss = append(ss, "")
+		ss = append(
+			ss,
 			stackutils.RenderTree(
 				vm.treeInfo.rootNode,
 				func(branchName string, isTrunk bool) string {
 					bn := plumbing.NewBranchReferenceName(branchName)
 					out := vm.renderBranch(bn, isTrunk)
-					if bn == vm.currentCursor {
+					if choosing && bn == vm.currentCursor {
 						out = strings.TrimSuffix(out, "\n")
-						out = lipgloss.NewStyle().Background(colors.Slate300).Render(out)
+						out = colors.PromptChoice.Render(out)
 					}
 					return out
 				},
 			),
 		)
+		if choosing {
+			ss = append(ss, "")
+			ss = append(ss, vm.help.ShortHelpView(promptKeys))
+		}
+
 		if len(vm.treeInfo.possibleChildren) != 0 {
-			sb.WriteString("\n")
-			sb.WriteString("For the following branches we cannot detect the graph structure:\n")
+			ss = append(ss, "")
+			ss = append(ss, "For the following branches we cannot detect the graph structure:")
 			for _, piece := range vm.treeInfo.possibleChildren {
-				sb.WriteString(piece.Name.Short() + "\n")
+				ss = append(ss, piece.Name.Short())
 				if piece.ContainsMergeCommit {
-					sb.WriteString("  Contains a merge commit\n")
+					ss = append(ss, "  Contains a merge commit")
 				}
 				if len(piece.PossibleParents) != 0 {
-					sb.WriteString("  Multiple possible parents:\n")
+					ss = append(ss, "  Multiple possible parents:")
 					for _, p := range piece.PossibleParents {
-						sb.WriteString("    " + p.Short() + "\n")
+						ss = append(ss, "    "+p.Short())
 					}
 				}
 			}
 		}
 	}
 	if vm.adoptionInProgress || vm.adoptionComplete {
+		ss = append(ss, "")
 		var branches []plumbing.ReferenceName
 		for branch := range vm.chosenTargets {
 			branches = append(branches, branch)
@@ -369,25 +391,35 @@ func (vm stackAdoptViewModel) View() string {
 		sort.Slice(branches, func(i, j int) bool {
 			return branches[i] < branches[j]
 		})
-		if vm.adoptionComplete {
-			sb.WriteString("Adopted the following branches:\n")
+		if len(branches) == 0 {
+			ss = append(ss, "No branch is adopted")
+		} else if vm.adoptionComplete {
+			ss = append(ss, "Adopted the following branches:")
+			ss = append(ss, "")
 		} else if vm.adoptionInProgress {
-			sb.WriteString("Adopting the following branches:\n")
+			ss = append(ss, "Adopting the following branches:")
+			ss = append(ss, "")
 		}
 		for _, branch := range branches {
-			sb.WriteString("  " + branch.Short() + "\n")
+			ss = append(ss, "  "+branch.Short())
 			piece := vm.treeInfo.branches[branch]
 			for _, c := range piece.IncludedCommits {
 				title, _, _ := strings.Cut(c.Message, "\n")
-				sb.WriteString("    " + title + "\n")
+				ss = append(ss, "    "+title)
 			}
 		}
 	}
 
-	if vm.err != nil {
-		sb.WriteString(vm.err.Error() + "\n")
+	var ret string
+	if len(ss) != 0 {
+		ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
+			lipgloss.JoinVertical(0, ss...),
+		) + "\n"
 	}
-	return sb.String()
+	if vm.err != nil {
+		ret += renderError(vm.err)
+	}
+	return ret
 }
 
 func (vm stackAdoptViewModel) renderBranch(branch plumbing.ReferenceName, isTrunk bool) string {
@@ -395,27 +427,30 @@ func (vm stackAdoptViewModel) renderBranch(branch plumbing.ReferenceName, isTrun
 		return branch.Short()
 	}
 	_, adopted := vm.db.ReadTx().Branch(branch.Short())
-	if adopted {
-		return branch.Short() + " (already adopted)"
-	}
 
 	sb := strings.Builder{}
-	sb.WriteString(branch.Short())
+	if adopted && !vm.chosenTargets[branch] {
+		sb.WriteString(branch.Short())
+	} else if vm.chosenTargets[branch] {
+		sb.WriteString("[x] " + branch.Short())
+	} else {
+		sb.WriteString("[ ] " + branch.Short())
+	}
+
 	var status []string
 	if vm.currentHEADBranch == branch {
 		status = append(status, "HEAD")
 	}
-	if vm.chosenTargets[branch] {
-		status = append(status, "chosen for adoption")
-	}
 	if len(status) != 0 {
 		sb.WriteString(" (" + strings.Join(status, ", ") + ")")
 	}
-	sb.WriteString("\n")
-	piece := vm.treeInfo.branches[branch]
-	for _, c := range piece.IncludedCommits {
-		title, _, _ := strings.Cut(c.Message, "\n")
-		sb.WriteString("  " + title + "\n")
+	if !adopted || vm.chosenTargets[branch] {
+		sb.WriteString("\n")
+		piece := vm.treeInfo.branches[branch]
+		for _, c := range piece.IncludedCommits {
+			title, _, _ := strings.Cut(c.Message, "\n")
+			sb.WriteString("  " + title + "\n")
+		}
 	}
 	return sb.String()
 }
@@ -425,6 +460,10 @@ func init() {
 		&stackAdoptFlags.Parent, "parent", "",
 		"force specifying the parent branch",
 	)
+	stackAdoptCmd.Flags().BoolVar(
+		&stackAdoptFlags.DryRun, "dry-run", false,
+		"dry-run adoption",
+	)
 
 	_ = stackSyncCmd.RegisterFlagCompletionFunc(
 		"parent",
@@ -433,4 +472,27 @@ func init() {
 			return branches, cobra.ShellCompDirectiveDefault
 		},
 	)
+}
+
+var promptKeys = []key.Binding{
+	key.NewBinding(
+		key.WithKeys("up", "k"),
+		key.WithHelp("↑/k", "move up"),
+	),
+	key.NewBinding(
+		key.WithKeys("down", "j"),
+		key.WithHelp("↓/j", "move down"),
+	),
+	key.NewBinding(
+		key.WithKeys("space"),
+		key.WithHelp("space", "select / unselect"),
+	),
+	key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "adopt selected branches"),
+	),
+	key.NewBinding(
+		key.WithKeys("ctrl+c"),
+		key.WithHelp("ctrl+c", "cancel"),
+	),
 }
