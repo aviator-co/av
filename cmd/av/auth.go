@@ -6,7 +6,7 @@ import (
 
 var authCmd = &cobra.Command{
 	Use:   "auth",
-	Short: "manage authentication",
+	Short: "Manage authentication",
 }
 
 func init() {

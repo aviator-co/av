@@ -6,7 +6,7 @@ import (
 
 var commitCmd = &cobra.Command{
 	Use:   "commit",
-	Short: "operate on commits",
+	Short: "Operate on commits",
 }
 
 func init() {
