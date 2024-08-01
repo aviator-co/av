@@ -38,3 +38,6 @@ Sleep 3
 
 Type 'av stack adopt' Enter
 Sleep 3
+
+Enter
+Sleep 3

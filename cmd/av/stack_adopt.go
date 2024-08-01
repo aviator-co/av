@@ -15,6 +15,7 @@ import (
 	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -62,6 +63,7 @@ var stackAdoptCmd = &cobra.Command{
 			currentCursor:     plumbing.NewBranchReferenceName(currentBranch),
 			chosenTargets:     make(map[plumbing.ReferenceName]bool),
 			help:              help.New(),
+			spinner:           spinner.New(spinner.WithSpinner(spinner.Dot)),
 		})
 	},
 }
@@ -129,6 +131,7 @@ type stackAdoptViewModel struct {
 	currentHEADBranch plumbing.ReferenceName
 
 	help               help.Model
+	spinner            spinner.Model
 	currentCursor      plumbing.ReferenceName
 	chosenTargets      map[plumbing.ReferenceName]bool
 	treeInfo           *stackAdoptTreeInfo
@@ -139,7 +142,7 @@ type stackAdoptViewModel struct {
 }
 
 func (vm stackAdoptViewModel) Init() tea.Cmd {
-	return vm.initCmd
+	return tea.Batch(vm.spinner.Tick, vm.initCmd)
 }
 
 func (vm stackAdoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -181,6 +184,10 @@ func (vm stackAdoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return vm, vm.adoptBranches
 			}
 		}
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		vm.spinner, cmd = vm.spinner.Update(msg)
+		return vm, cmd
 	}
 	return vm, nil
 }
@@ -320,14 +327,14 @@ func (vm stackAdoptViewModel) View() string {
 	if vm.treeInfo != nil {
 		choosing := false
 		if len(vm.treeInfo.adoptionTargets) == 0 {
-			ss = append(ss, "No branch to adopt")
+			ss = append(ss, colors.SuccessStyle.Render("✓ No branch to adopt"))
 		} else if vm.adoptionComplete {
-			ss = append(ss, "Adoption complete")
+			ss = append(ss, colors.SuccessStyle.Render("✓ Adoption complete"))
 		} else if vm.adoptionInProgress {
-			ss = append(ss, "Adoption in progress...")
+			ss = append(ss, colors.ProgressStyle.Render(vm.spinner.View()+"Adopting the chosen branches..."))
 		} else {
 			choosing = true
-			ss = append(ss, "Choose which branches to adopt")
+			ss = append(ss, colors.QuestionStyle.Render("Choose which branches to adopt"))
 		}
 		ss = append(ss, "")
 		ss = append(
