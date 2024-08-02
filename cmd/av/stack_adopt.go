@@ -101,7 +101,7 @@ func stackAdoptForceAdoption(repo *git.Repo, db meta.DB, currentBranch, parent s
 		if !exist {
 			return errors.New("parent branch is not adopted yet")
 		}
-		mergeBase, err := repo.MergeBase(&git.MergeBase{Revs: []string{parent, currentBranch}})
+		mergeBase, err := repo.MergeBase(parent, currentBranch)
 		if err != nil {
 			return err
 		}
@@ -119,10 +119,9 @@ func stackAdoptForceAdoption(repo *git.Repo, db meta.DB, currentBranch, parent s
 }
 
 type stackAdoptTreeInfo struct {
-	branches         map[plumbing.ReferenceName]*treedetector.BranchPiece
-	rootNode         *stackutils.StackTreeNode
-	adoptionTargets  []plumbing.ReferenceName
-	possibleChildren []*treedetector.BranchPiece
+	branches        map[plumbing.ReferenceName]*treedetector.BranchPiece
+	rootNodes       []*stackutils.StackTreeNode
+	adoptionTargets []plumbing.ReferenceName
 }
 
 type stackAdoptViewModel struct {
@@ -193,38 +192,42 @@ func (vm stackAdoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (vm stackAdoptViewModel) initCmd() tea.Msg {
-	trunkBranches, err := vm.repo.TrunkBranches()
+	unmanagedBranches, err := vm.getUnmanagedBranches()
 	if err != nil {
 		return err
 	}
-	var refs []plumbing.ReferenceName
-	for _, branch := range trunkBranches {
-		refs = append(refs, plumbing.NewBranchReferenceName(branch))
-	}
-	allBranches, err := treedetector.DetectBranchTree(vm.repo, vm.repo.GetRemoteName(), refs)
+	pieces, err := treedetector.DetectBranches(vm.repo, unmanagedBranches)
 	if err != nil {
 		return err
 	}
-	stackRoot := treedetector.GetStackRoot(allBranches, vm.currentHEADBranch)
-	if stackRoot == "" {
-		return errors.New("cannot detect the stack root from the current branch")
-	}
-	branches := treedetector.GetChildren(allBranches, stackRoot)
-	branches[stackRoot] = allBranches[stackRoot]
-	nodes := treedetector.ConvertToStackTree(branches, stackRoot, true)
-	if len(nodes) != 1 {
-		panic("unexpected number of root nodes")
-	}
-	possibleChildren := treedetector.GetPossibleChildren(allBranches, stackRoot)
-	sort.Slice(possibleChildren, func(i, j int) bool {
-		return possibleChildren[i].Name < possibleChildren[j].Name
-	})
+	nodes := treedetector.ConvertToStackTree(vm.db, pieces, plumbing.HEAD, false)
 	return &stackAdoptTreeInfo{
-		branches:         branches,
-		rootNode:         nodes[0],
-		adoptionTargets:  vm.getAdoptionTargets(nodes[0]),
-		possibleChildren: possibleChildren,
+		branches:        pieces,
+		rootNodes:       nodes,
+		adoptionTargets: vm.getAdoptionTargets(nodes[0]),
 	}
+}
+
+func (vm *stackAdoptViewModel) getUnmanagedBranches() ([]plumbing.ReferenceName, error) {
+	tx := vm.db.ReadTx()
+	adoptedBranches := tx.AllBranches()
+	branches, err := vm.repo.GoGitRepo().Branches()
+	if err != nil {
+		return nil, err
+	}
+	var ret []plumbing.ReferenceName
+	if err := branches.ForEach(func(ref *plumbing.Reference) error {
+		if ref.Type() != plumbing.HashReference {
+			return nil
+		}
+		if _, adopted := adoptedBranches[ref.Name().Short()]; !adopted {
+			ret = append(ret, ref.Name())
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 func (vm stackAdoptViewModel) getAdoptionTargets(
@@ -336,42 +339,27 @@ func (vm stackAdoptViewModel) View() string {
 			choosing = true
 			ss = append(ss, colors.QuestionStyle.Render("Choose which branches to adopt"))
 		}
-		ss = append(ss, "")
-		ss = append(
-			ss,
-			stackutils.RenderTree(
-				vm.treeInfo.rootNode,
-				func(branchName string, isTrunk bool) string {
-					bn := plumbing.NewBranchReferenceName(branchName)
-					out := vm.renderBranch(bn, isTrunk)
-					if choosing && bn == vm.currentCursor {
-						out = strings.TrimSuffix(out, "\n")
-						out = colors.PromptChoice.Render(out)
-					}
-					return out
-				},
-			),
-		)
+		for _, rootNode := range vm.treeInfo.rootNodes {
+			ss = append(ss, "")
+			ss = append(
+				ss,
+				stackutils.RenderTree(
+					rootNode,
+					func(branchName string, isTrunk bool) string {
+						bn := plumbing.NewBranchReferenceName(branchName)
+						out := vm.renderBranch(bn, isTrunk)
+						if choosing && bn == vm.currentCursor {
+							out = strings.TrimSuffix(out, "\n")
+							out = colors.PromptChoice.Render(out)
+						}
+						return out
+					},
+				),
+			)
+		}
 		if choosing {
 			ss = append(ss, "")
 			ss = append(ss, vm.help.ShortHelpView(promptKeys))
-		}
-
-		if len(vm.treeInfo.possibleChildren) != 0 {
-			ss = append(ss, "")
-			ss = append(ss, "For the following branches we cannot detect the graph structure:")
-			for _, piece := range vm.treeInfo.possibleChildren {
-				ss = append(ss, piece.Name.Short())
-				if piece.ContainsMergeCommit {
-					ss = append(ss, "  Contains a merge commit")
-				}
-				if len(piece.PossibleParents) != 0 {
-					ss = append(ss, "  Multiple possible parents:")
-					for _, p := range piece.PossibleParents {
-						ss = append(ss, "    "+p.Short())
-					}
-				}
-			}
 		}
 	}
 	if vm.adoptionInProgress || vm.adoptionComplete {

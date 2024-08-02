@@ -137,9 +137,7 @@ func getStackTreeBranchInfo(
 		// The parent branch doesn't exist.
 		branchInfo.NeedSync = true
 	} else {
-		mergeBase, err := repo.MergeBase(&git.MergeBase{
-			Revs: []string{parentHead, branchName},
-		})
+		mergeBase, err := repo.MergeBase(parentHead, branchName)
 		if err != nil {
 			// The merge base doesn't exist. This is odd. Mark the branch as needing
 			// sync to see if we can fix this.

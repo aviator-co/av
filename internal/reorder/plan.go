@@ -28,9 +28,7 @@ func CreatePlan(repo *git.Repo, tx meta.ReadTx, rootBranch string) ([]Cmd, error
 			branchCmd.Parent = branch.Parent.Name
 			upstreamCommit = branch.Parent.Head
 		} else {
-			trunkCommit, err := repo.MergeBase(&git.MergeBase{
-				Revs: []string{branchName, "origin/" + branch.Parent.Name},
-			})
+			trunkCommit, err := repo.MergeBase(branchName, "origin/"+branch.Parent.Name)
 			if err != nil {
 				return nil, err
 			}

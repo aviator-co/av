@@ -3,12 +3,12 @@ package treedetector
 import (
 	"emperror.dev/errors"
 	avgit "github.com/aviator-co/av/internal/git"
-	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
+
+const iterStopErr = errors.Sentinel("stop")
 
 type BranchPiece struct {
 	Name plumbing.ReferenceName
@@ -24,155 +24,59 @@ type BranchPiece struct {
 	IncludedCommits []*object.Commit
 }
 
-func DetectBranchTree(
+func DetectBranches(
 	repo *avgit.Repo,
-	remoteName string,
-	trunkBranches []plumbing.ReferenceName,
+	unmanagedBranches []plumbing.ReferenceName,
 ) (map[plumbing.ReferenceName]*BranchPiece, error) {
-	trunkCommits, err := getTrunkCommits(repo.GoGitRepo(), remoteName, trunkBranches)
+	hashToRefMap, refToHashMap, err := getBranchHashes(repo.GoGitRepo())
 	if err != nil {
 		return nil, err
-	}
-	branches, err := getBranchHashes(repo.GoGitRepo())
-	if err != nil {
-		return nil, err
-	}
-
-	d := &detector{
-		repo:         repo,
-		trunkCommits: trunkCommits,
-		branches:     branches,
 	}
 
 	ret := map[plumbing.ReferenceName]*BranchPiece{}
-	brs, err := repo.GoGitRepo().Branches()
-	if err != nil {
-		return nil, err
-	}
-	if err := brs.ForEach(func(ref *plumbing.Reference) error {
-		if sliceutils.Contains(trunkBranches, ref.Name()) {
-			return nil
-		}
-		bp, err := d.detectBranchTree(ref)
+	for _, bn := range unmanagedBranches {
+		currentHash := refToHashMap[bn]
+		nearestTrunkCommit, err := getNearestTrunkCommit(repo, bn)
 		if err != nil {
-			return err
-		}
-		ret[ref.Name()] = bp
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return ret, nil
-}
-
-func getTrunkCommits(
-	repo *git.Repository,
-	remoteName string,
-	trunkBranches []plumbing.ReferenceName,
-) (map[plumbing.ReferenceName][]*object.Commit, error) {
-	remote, err := repo.Remote(remoteName)
-	if err != nil {
-		return nil, errors.Errorf("failed to get remote %q: %v", remoteName, err)
-	}
-
-	ret := map[plumbing.ReferenceName][]*object.Commit{}
-	for _, bn := range trunkBranches {
-		ref, err := repo.Reference(bn, true)
-		if err != nil && err != plumbing.ErrReferenceNotFound {
 			return nil, err
 		}
-		if ref != nil {
-			commit, err := repo.CommitObject(ref.Hash())
-			if err != nil {
-				return nil, err
-			}
-			ret[bn] = append(ret[bn], commit)
+		if currentHash == nearestTrunkCommit {
+			// This branch is currently on the trunk or already merged to trunk. We
+			// don't have to adopt it.
+			continue
 		}
-
-		rtb := mapToRemoteTrackingBranch(remote.Config(), bn)
-		if rtb != nil {
-			ref, err = repo.Reference(*rtb, true)
-			if err != nil && err != plumbing.ErrReferenceNotFound {
-				return nil, err
-			}
-			if ref != nil {
-				commit, err := repo.CommitObject(ref.Hash())
-				if err != nil {
-					return nil, err
-				}
-				ret[bn] = append(ret[bn], commit)
-			}
+		bp, err := traverseUntilTrunk(repo, bn, nearestTrunkCommit, hashToRefMap, refToHashMap)
+		if err != nil {
+			return nil, err
 		}
+		ret[bn] = bp
 	}
 	return ret, nil
 }
 
-func getBranchHashes(repo *git.Repository) (map[plumbing.Hash][]plumbing.ReferenceName, error) {
-	ret := map[plumbing.Hash][]plumbing.ReferenceName{}
-	brs, err := repo.Branches()
+func traverseUntilTrunk(
+	repo *avgit.Repo,
+	branch plumbing.ReferenceName,
+	nearestTrunkCommit plumbing.Hash,
+	hashToRefMap map[plumbing.Hash][]plumbing.ReferenceName,
+	refToHashMap map[plumbing.ReferenceName]plumbing.Hash,
+) (*BranchPiece, error) {
+	commit, err := repo.GoGitRepo().CommitObject(refToHashMap[branch])
 	if err != nil {
 		return nil, err
-	}
-	if err := brs.ForEach(func(ref *plumbing.Reference) error {
-		ret[ref.Hash()] = append(ret[ref.Hash()], ref.Name())
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return ret, nil
-}
-
-type detector struct {
-	repo *avgit.Repo
-	// trunkCommits is a map from trunk branch name to the commits on the trunk branch.
-	// Each trunk branch has at most two commits: the commit on the trunk branch itself and the
-	// commit on the remote tracking branch.
-	trunkCommits map[plumbing.ReferenceName][]*object.Commit
-	// branches is a map from branch name to the hash of the commit on the branch.
-	branches map[plumbing.Hash][]plumbing.ReferenceName
-}
-
-const iterStopErr = errors.Sentinel("stop")
-
-func (d *detector) detectBranchTree(ref *plumbing.Reference) (*BranchPiece, error) {
-	commit, err := d.repo.GoGitRepo().CommitObject(ref.Hash())
-	if err != nil {
-		return nil, err
-	}
-	// Find the boundary of the search. We only need to search the commits until we hit the
-	// trunk.
-	trunkBases := map[plumbing.Hash][]plumbing.ReferenceName{}
-	for trunkBranchName, commits := range d.trunkCommits {
-		for _, trunkCommit := range commits {
-			bases, err := d.repo.MergeBases(trunkCommit.Hash.String(), commit.Hash.String())
-			if err != nil {
-				return nil, err
-			}
-			if len(bases) > 1 {
-				// The branch has a merge commit.
-				return &BranchPiece{
-					Name:                ref.Name(),
-					ContainsMergeCommit: true,
-				}, nil
-			}
-			if len(bases) == 1 {
-				hash := plumbing.NewHash(bases[0])
-				trunkBases[hash] = sliceutils.AppendIfNotContains(trunkBases[hash], trunkBranchName)
-			}
-		}
 	}
 	ret := &BranchPiece{
-		Name: ref.Name(),
+		Name: branch,
 	}
 	// Do a commit traversal. We can stop the traversal when we hit the trunk or if we find a
 	// commit that has multiple parents.
 	err = object.NewCommitPreorderIter(commit, nil, nil).ForEach(func(c *object.Commit) error {
-		if trunkBranchNames, ok := trunkBases[c.Hash]; ok {
-			if len(trunkBranchNames) > 1 {
-				ret.PossibleParents = trunkBranchNames
-				return iterStopErr
+		if c.Hash == nearestTrunkCommit {
+			trunk, err := repo.DefaultBranch()
+			if err != nil {
+				return err
 			}
-			ret.Parent = trunkBranchNames[0]
+			ret.Parent = plumbing.NewBranchReferenceName(trunk)
 			ret.ParentIsTrunk = true
 			ret.ParentMergeBase = c.Hash
 			return iterStopErr
@@ -182,7 +86,7 @@ func (d *detector) detectBranchTree(ref *plumbing.Reference) (*BranchPiece, erro
 			return iterStopErr
 		}
 		if c.Hash != commit.Hash {
-			if parents, ok := d.branches[c.Hash]; ok {
+			if parents, ok := hashToRefMap[c.Hash]; ok {
 				if len(parents) > 1 {
 					ret.PossibleParents = parents
 					return iterStopErr
@@ -202,15 +106,42 @@ func (d *detector) detectBranchTree(ref *plumbing.Reference) (*BranchPiece, erro
 	return ret, nil
 }
 
-func mapToRemoteTrackingBranch(
-	remoteConfig *config.RemoteConfig,
-	refName plumbing.ReferenceName,
-) *plumbing.ReferenceName {
-	for _, fetch := range remoteConfig.Fetch {
-		if fetch.Match(refName) {
-			dst := fetch.Dst(refName)
-			return &dst
-		}
+func getNearestTrunkCommit(
+	repo *avgit.Repo,
+	ref plumbing.ReferenceName,
+) (plumbing.Hash, error) {
+	trunk, err := repo.DefaultBranch()
+	if err != nil {
+		return plumbing.ZeroHash, err
 	}
-	return nil
+	// TODO(draftcode): Check if the branch exists. Use the rtb as well.
+
+	mbArgs := []string{ref.String(), trunk}
+	// Per git-merge-base(1), this should return the nearest commits from HEAD among the
+	// the trunk branches since we don't specify --octopus.
+	mb, err := repo.MergeBase(mbArgs...)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+	return plumbing.NewHash(mb), nil
+}
+
+func getBranchHashes(
+	repo *git.Repository,
+) (map[plumbing.Hash][]plumbing.ReferenceName, map[plumbing.ReferenceName]plumbing.Hash, error) {
+	hashToRefMap := map[plumbing.Hash][]plumbing.ReferenceName{}
+	refToHashMap := map[plumbing.ReferenceName]plumbing.Hash{}
+
+	brs, err := repo.Branches()
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := brs.ForEach(func(ref *plumbing.Reference) error {
+		hashToRefMap[ref.Hash()] = append(hashToRefMap[ref.Hash()], ref.Name())
+		refToHashMap[ref.Name()] = ref.Hash()
+		return nil
+	}); err != nil {
+		return nil, nil, err
+	}
+	return hashToRefMap, refToHashMap, nil
 }

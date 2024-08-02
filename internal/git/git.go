@@ -387,24 +387,41 @@ func (r *Repo) RevParse(rp *RevParse) (string, error) {
 	return r.Git(args...)
 }
 
-type MergeBase struct {
-	Revs []string
-}
-
-func (r *Repo) MergeBase(mb *MergeBase) (string, error) {
-	args := []string{"merge-base"}
-	args = append(args, mb.Revs...)
-	return r.Git(args...)
-}
-
-func (r *Repo) MergeBases(commitishes ...string) ([]string, error) {
+func (r *Repo) MergeBase(commitishes ...string) (string, error) {
 	args := []string{"merge-base"}
 	args = append(args, commitishes...)
-	ret, err := r.Git(args...)
+	str, err := r.Git(args...)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(str), nil
+}
+
+type BranchAndCommit struct {
+	Commit string
+	Branch string
+}
+
+func (r *Repo) BranchesContainCommitish(commitish string) ([]BranchAndCommit, error) {
+	lines, err := r.Git(
+		"for-each-ref",
+		"--contains",
+		commitish,
+		"--format=%(objectname) %(refname:short)",
+		"refs/heads",
+	)
 	if err != nil {
 		return nil, err
 	}
-	return strings.Split(strings.TrimSpace(ret), "\n"), nil
+	var ret []BranchAndCommit
+	for _, line := range strings.Split(strings.TrimSpace(lines), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		ret = append(ret, BranchAndCommit{fields[0], fields[1]})
+	}
+	return ret, nil
 }
 
 type UpdateRef struct {
