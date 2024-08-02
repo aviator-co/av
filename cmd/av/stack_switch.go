@@ -72,7 +72,7 @@ var stackSwitchCmd = &cobra.Command{
 		if !isatty.IsTerminal(os.Stdout.Fd()) {
 			return errors.New("stack switch command must be run in a terminal")
 		}
-		p := tea.NewProgram(stackSwitchViewModel{
+		return uiutils.RunBubbleTea(&stackSwitchViewModel{
 			repo:                 repo,
 			help:                 help.New(),
 			currentHEADBranch:    currentBranch,
@@ -81,14 +81,6 @@ var stackSwitchCmd = &cobra.Command{
 			branchList:           branchList,
 			branches:             branches,
 		})
-		model, err := p.Run()
-		if err != nil {
-			return err
-		}
-		if err := model.(stackSwitchViewModel).checkoutError; err != nil {
-			return actions.ErrExitSilently{ExitCode: 1}
-		}
-		return nil
 	},
 }
 
@@ -284,4 +276,11 @@ func (vm stackSwitchViewModel) View() string {
 		sb.WriteString(vm.checkoutError.Error() + "\n")
 	}
 	return sb.String()
+}
+
+func (vm stackSwitchViewModel) ExitError() error {
+	if vm.checkoutError != nil {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	return nil
 }

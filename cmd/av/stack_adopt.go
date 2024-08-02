@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"sort"
 	"strings"
 
@@ -13,12 +12,12 @@ import (
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/stackutils"
+	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -56,28 +55,14 @@ var stackAdoptCmd = &cobra.Command{
 			return stackAdoptForceAdoption(repo, db, currentBranch, stackAdoptFlags.Parent)
 		}
 
-		var opts []tea.ProgramOption
-		if !isatty.IsTerminal(os.Stdout.Fd()) {
-			opts = []tea.ProgramOption{
-				tea.WithInput(nil),
-			}
-		}
-		p := tea.NewProgram(stackAdoptViewModel{
+		return uiutils.RunBubbleTea(&stackAdoptViewModel{
 			repo:              repo,
 			db:                db,
 			currentHEADBranch: plumbing.NewBranchReferenceName(currentBranch),
 			currentCursor:     plumbing.NewBranchReferenceName(currentBranch),
 			chosenTargets:     make(map[plumbing.ReferenceName]bool),
 			help:              help.New(),
-		}, opts...)
-		model, err := p.Run()
-		if err != nil {
-			return err
-		}
-		if err := model.(stackAdoptViewModel).err; err != nil {
-			return actions.ErrExitSilently{ExitCode: 1}
-		}
-		return nil
+		})
 	},
 }
 
@@ -420,6 +405,13 @@ func (vm stackAdoptViewModel) View() string {
 		ret += renderError(vm.err)
 	}
 	return ret
+}
+
+func (vm stackAdoptViewModel) ExitError() error {
+	if vm.err != nil {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	return nil
 }
 
 func (vm stackAdoptViewModel) renderBranch(branch plumbing.ReferenceName, isTrunk bool) string {

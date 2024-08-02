@@ -1,8 +1,6 @@
 package main
 
 import (
-	"os"
-
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
@@ -10,11 +8,11 @@ import (
 	"github.com/aviator-co/av/internal/sequencer"
 	"github.com/aviator-co/av/internal/sequencer/planner"
 	"github.com/aviator-co/av/internal/sequencer/sequencerui"
+	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -48,27 +46,7 @@ var stackReparentCmd = &cobra.Command{
 			return errors.New("missing parent branch name")
 		}
 
-		var opts []tea.ProgramOption
-		if !isatty.IsTerminal(os.Stdout.Fd()) {
-			opts = []tea.ProgramOption{
-				tea.WithInput(nil),
-			}
-		}
-		p := tea.NewProgram(&stackReparentViewModel{repo: repo, db: db}, opts...)
-		model, err := p.Run()
-		if err != nil {
-			return err
-		}
-		if err := model.(*stackReparentViewModel).err; err != nil {
-			if errors.Is(err, nothingToRestackError) {
-				return nil
-			}
-			return actions.ErrExitSilently{ExitCode: 1}
-		}
-		if model.(*stackReparentViewModel).quitWithConflict {
-			return actions.ErrExitSilently{ExitCode: 1}
-		}
-		return nil
+		return uiutils.RunBubbleTea(&stackReparentViewModel{repo: repo, db: db})
 	},
 }
 
@@ -188,6 +166,19 @@ func (vm *stackReparentViewModel) createState() (*sequencerui.RestackState, erro
 	}
 	state.Seq = sequencer.NewSequencer(vm.repo.GetRemoteName(), vm.db, ops)
 	return &state, nil
+}
+
+func (vm *stackReparentViewModel) ExitError() error {
+	if errors.Is(vm.err, nothingToRestackError) {
+		return nil
+	}
+	if vm.err != nil {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	if vm.quitWithConflict {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	return nil
 }
 
 func init() {

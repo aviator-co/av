@@ -23,7 +23,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/erikgeiser/promptkit/selection"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -102,33 +101,13 @@ base branch.
 			return err
 		}
 
-		var opts []tea.ProgramOption
-		if !isatty.IsTerminal(os.Stdout.Fd()) {
-			opts = []tea.ProgramOption{
-				tea.WithInput(nil),
-			}
-		}
-		p := tea.NewProgram(&stackSyncViewModel{
+		return uiutils.RunBubbleTea(&stackSyncViewModel{
 			repo:                  repo,
 			db:                    db,
 			client:                client,
 			help:                  help.New(),
 			askingStackSyncChange: !config.UserState.NotifiedStackSyncChange,
-		}, opts...)
-		model, err := p.Run()
-		if err != nil {
-			return err
-		}
-		if err := model.(*stackSyncViewModel).err; err != nil {
-			if errors.Is(err, nothingToRestackError) {
-				return nil
-			}
-			return actions.ErrExitSilently{ExitCode: 1}
-		}
-		if model.(*stackSyncViewModel).quitWithConflict {
-			return actions.ErrExitSilently{ExitCode: 1}
-		}
-		return nil
+		})
 	},
 }
 
@@ -641,6 +620,19 @@ func (vm *stackSyncViewModel) initPruneBranches() tea.Cmd {
 	)
 	vm.pruningBranches = true
 	return vm.pruneBranchModel.Init()
+}
+
+func (vm *stackSyncViewModel) ExitError() error {
+	if errors.Is(vm.err, nothingToRestackError) {
+		return nil
+	}
+	if vm.err != nil {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	if vm.quitWithConflict {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	return nil
 }
 
 func init() {
