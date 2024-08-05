@@ -28,8 +28,8 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8
-	golang.org/x/mod v0.19.0
-	golang.org/x/oauth2 v0.21.0
+	golang.org/x/mod v0.20.0
+	golang.org/x/oauth2 v0.22.0
 )
 
 require (
