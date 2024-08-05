@@ -16,6 +16,7 @@ import (
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
@@ -80,6 +81,7 @@ var stackSwitchCmd = &cobra.Command{
 			rootNodes:            rootNodes,
 			branchList:           branchList,
 			branches:             branches,
+			spinner:              spinner.New(spinner.WithSpinner(spinner.Dot)),
 		})
 	},
 }
@@ -152,19 +154,13 @@ func parsePullRequestURL(tx meta.ReadTx, prURL string) (string, error) {
 	return "", fmt.Errorf("failed to detect branch from pull request URL:%s", prURL)
 }
 
-var stackSwitchStackBranchInfoStyles = stackBranchInfoStyles{
-	BranchName:      lipgloss.NewStyle().Bold(true).Foreground(colors.Green600),
-	HEAD:            lipgloss.NewStyle().Bold(true).Foreground(colors.Cyan600),
-	Deleted:         lipgloss.NewStyle().Bold(true).Foreground(colors.Red700),
-	NeedSync:        lipgloss.NewStyle().Bold(true).Foreground(colors.Red700),
-	PullRequestLink: lipgloss.NewStyle().Foreground(colors.Black),
-}
-
 type stackSwitchViewModel struct {
 	currentChoosenBranch string
 	checkingOut          bool
-	checkoutError        error
+	checkedOut           bool
+	err                  error
 	help                 help.Model
+	spinner              spinner.Model
 
 	repo              *git.Repo
 	currentHEADBranch string
@@ -174,28 +170,38 @@ type stackSwitchViewModel struct {
 }
 
 func (vm stackSwitchViewModel) Init() tea.Cmd {
-	return nil
+	return vm.spinner.Tick
 }
 
-type checkoutErrMsg error
+type checkoutDoneMsg struct{}
 
 func (vm stackSwitchViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case checkoutErrMsg:
-		vm.checkoutError = msg
+	case error:
+		vm.err = msg
+		return vm, tea.Quit
+	case checkoutDoneMsg:
+		vm.checkingOut = false
+		vm.checkedOut = true
 		return vm, tea.Quit
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c":
-			return vm, tea.Quit
-		case "up", "k":
-			vm.currentChoosenBranch = vm.getPreviousBranch()
-		case "down", "j":
-			vm.currentChoosenBranch = vm.getNextBranch()
-		case "enter", " ":
-			vm.checkingOut = true
-			return vm, vm.checkoutBranch
+		if !vm.checkingOut && !vm.checkedOut {
+			switch msg.String() {
+			case "ctrl+c":
+				return vm, tea.Quit
+			case "up", "k":
+				vm.currentChoosenBranch = vm.getPreviousBranch()
+			case "down", "j":
+				vm.currentChoosenBranch = vm.getNextBranch()
+			case "enter", " ":
+				vm.checkingOut = true
+				return vm, vm.checkoutBranch
+			}
 		}
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		vm.spinner, cmd = vm.spinner.Update(msg)
+		return vm, cmd
 	}
 
 	// Return the updated model to the Bubble Tea runtime for processing.
@@ -208,10 +214,10 @@ func (vm stackSwitchViewModel) checkoutBranch() tea.Msg {
 		if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{
 			Name: vm.currentChoosenBranch,
 		}); err != nil {
-			return checkoutErrMsg(err)
+			return err
 		}
 	}
-	return tea.QuitMsg{}
+	return checkoutDoneMsg{}
 }
 
 func (vm stackSwitchViewModel) getPreviousBranch() string {
@@ -239,47 +245,86 @@ func (vm stackSwitchViewModel) getNextBranch() string {
 }
 
 func (vm stackSwitchViewModel) View() string {
-	sb := strings.Builder{}
-	for _, node := range vm.rootNodes {
-		sb.WriteString(stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
-			stbi := vm.branches[branchName]
-			if branchName == vm.currentChoosenBranch {
-				out := strings.TrimSuffix(
-					renderStackTreeBranchInfo(
-						stackSwitchStackBranchInfoStyles,
-						stbi,
-						vm.currentHEADBranch,
-						branchName,
-						isTrunk,
-					),
-					"\n",
-				)
-				out = lipgloss.NewStyle().Background(colors.Slate300).Render(out)
-				return out
-			}
-			return renderStackTreeBranchInfo(
-				stackTreeStackBranchInfoStyles,
-				stbi,
-				vm.currentHEADBranch,
-				branchName,
-				isTrunk,
-			)
-		}))
-	}
-	sb.WriteString("\n")
-
-	sb.WriteString(vm.help.ShortHelpView(uiutils.PromptKeys) + "\n")
+	var ss []string
 	if vm.checkingOut {
-		sb.WriteString("Checking out branch " + vm.currentChoosenBranch + "...\n")
+		ss = append(
+			ss,
+			colors.ProgressStyle.Render(vm.spinner.View()+"Checking out the chosen branch..."),
+		)
+	} else if vm.checkedOut {
+		ss = append(ss, colors.SuccessStyle.Render("✓ Checked out branch"))
+	} else {
+		ss = append(ss, colors.QuestionStyle.Render("Choose which branch to check out"))
 	}
-	if vm.checkoutError != nil {
-		sb.WriteString(vm.checkoutError.Error() + "\n")
+	ss = append(ss, "")
+	for _, node := range vm.rootNodes {
+		ss = append(
+			ss,
+			stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
+				stbi := vm.branches[branchName]
+				out := vm.renderBranchInfo(
+					stbi,
+					vm.currentHEADBranch,
+					branchName,
+					isTrunk,
+				)
+				if branchName == vm.currentChoosenBranch {
+					out = colors.PromptChoice.Render(out)
+				}
+				return out
+			}),
+		)
 	}
-	return sb.String()
+	ss = append(ss, "")
+	if vm.checkingOut {
+		ss = append(ss, "Checking out branch "+vm.currentChoosenBranch+"...")
+	} else if vm.checkedOut {
+		ss = append(ss, "Checked out branch "+vm.currentChoosenBranch)
+	} else {
+		ss = append(ss, vm.help.ShortHelpView(uiutils.PromptKeys))
+	}
+
+	var ret string
+	if len(ss) != 0 {
+		ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
+			lipgloss.JoinVertical(0, ss...),
+		) + "\n"
+	}
+	if vm.err != nil {
+		ret += renderError(vm.err)
+	}
+	return ret
+}
+
+func (_ stackSwitchViewModel) renderBranchInfo(
+	stbi *stackTreeBranchInfo,
+	currentBranchName string,
+	branchName string,
+	isTrunk bool,
+) string {
+	var stats []string
+	if branchName == currentBranchName {
+		stats = append(stats, "HEAD")
+	}
+	line := branchName
+	if len(stats) > 0 {
+		line += " (" + strings.Join(stats, ", ") + ")"
+	}
+
+	var ss []string
+	ss = append(ss, line)
+	if !isTrunk {
+		if stbi.PullRequestLink != "" {
+			ss = append(ss, stbi.PullRequestLink)
+		} else {
+			ss = append(ss, "No pull request")
+		}
+	}
+	return strings.Join(ss, "\n")
 }
 
 func (vm stackSwitchViewModel) ExitError() error {
-	if vm.checkoutError != nil {
+	if vm.err != nil {
 		return actions.ErrExitSilently{ExitCode: 1}
 	}
 	return nil
