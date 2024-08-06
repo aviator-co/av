@@ -47,6 +47,8 @@ nfpms:
     contents:
       - src: "man/man1/*"
         dst: "/usr/share/man/man1"
+      - src: "man/man7/*"
+        dst: "/usr/share/man/man7"
     deb:
       lintian_overrides:
         - "statically-linked-binary"
