@@ -7,51 +7,11 @@ import (
 
 // TidyDB removes deleted branches from the metadata and returns number of branches removed from the
 // DB.
-func TidyDB(repo *git.Repo, db meta.DB) (int, error) {
+func TidyDB(repo *git.Repo, db meta.DB) (map[string]bool, map[string]bool, error) {
 	tx := db.WriteTx()
 	defer tx.Abort()
-	origBranches := tx.AllBranches()
-	branches := make(map[string]*meta.Branch)
-	for name, br := range origBranches {
-		// origBranches has values, not references. Convert to references so that we
-		// can modify them through references.
-		b := br
-		branches[name] = &b
-	}
+	branches := tx.AllBranches()
 
-	newParents := findNonDeletedParents(repo, branches)
-	for name, br := range branches {
-		if _, deleted := newParents[name]; deleted {
-			// This branch is merged/deleted. Do not have to change the parent.
-			continue
-		}
-		if newParent, ok := newParents[br.Parent.Name]; ok {
-			br.Parent.Name = newParent.Name
-			br.Parent.Trunk = newParent.Trunk
-		}
-	}
-
-	nDeleted := 0
-	for name, br := range branches {
-		if _, deleted := newParents[name]; deleted {
-			tx.DeleteBranch(name)
-			nDeleted += 1
-			continue
-		}
-		tx.SetBranch(*br)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return 0, err
-	}
-	return nDeleted, nil
-}
-
-// findNonDeletedParents finds the non-deleted/merged branch for each deleted/merged branches.
-func findNonDeletedParents(
-	repo *git.Repo,
-	branches map[string]*meta.Branch,
-) map[string]meta.BranchState {
 	deleted := make(map[string]bool)
 	for name := range branches {
 		if _, err := repo.Git("show-ref", "refs/heads/"+name); err != nil {
@@ -59,14 +19,36 @@ func findNonDeletedParents(
 			deleted[name] = true
 		}
 	}
-
-	liveParents := make(map[string]meta.BranchState)
-	for name := range deleted {
-		state := branches[name].Parent
-		for !state.Trunk && deleted[state.Name] {
-			state = branches[state.Name].Parent
+	orphaned := make(map[string]bool)
+	for name := range branches {
+		if deleted[name] {
+			continue
 		}
-		liveParents[name] = state
+		if isParentDeleted(branches, deleted, name) {
+			orphaned[name] = true
+		}
 	}
-	return liveParents
+
+	for name := range deleted {
+		tx.DeleteBranch(name)
+	}
+	for name := range orphaned {
+		tx.DeleteBranch(name)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, nil, err
+	}
+	return deleted, orphaned, nil
+}
+
+func isParentDeleted(branches map[string]meta.Branch, deleted map[string]bool, branch string) bool {
+	state := branches[branch].Parent
+	for !state.Trunk {
+		if deleted[state.Name] {
+			return true
+		}
+		state = branches[state.Name].Parent
+	}
+	return false
 }

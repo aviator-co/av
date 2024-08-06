@@ -2,12 +2,11 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/aviator-co/av/internal/utils/textutils"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -34,20 +33,51 @@ does not delete Git branches.
 			return err
 		}
 
-		nDeleted, err := actions.TidyDB(repo, db)
+		deleted, orphaned, err := actions.TidyDB(repo, db)
 		if err != nil {
 			return err
 		}
 
-		if nDeleted > 0 {
-			_, _ = fmt.Fprint(os.Stderr,
-				"Tidied ", colors.UserInput(nDeleted), " ",
-				textutils.Pluralize(nDeleted, "branch", "branches"),
-				".\n",
+		var ss []string
+		if len(deleted) > 0 {
+			ss = append(
+				ss,
+				colors.SuccessStyle.Render(
+					"✓ Updated the branch metadata for the deleted branches",
+				),
 			)
+			ss = append(ss, "")
+			ss = append(ss, "  Following branches no longer exist in the repository:")
+			ss = append(ss, "")
+			for name := range deleted {
+				ss = append(ss, "  * "+name)
+			}
+			if len(orphaned) > 0 {
+				ss = append(ss, "")
+				ss = append(
+					ss,
+					"  Following branches are orphaned since they have deleted parents:",
+				)
+				ss = append(ss, "")
+				for name := range orphaned {
+					ss = append(ss, "  * "+name)
+				}
+				ss = append(ss, "")
+				ss = append(ss, "  The orphaned branches still exist in the repository.")
+				ss = append(ss, "  You can re-adopt them to av by running av stack adopt.")
+			}
 		} else {
-			_, _ = fmt.Fprintln(os.Stderr, "No branches to tidy.")
+			ss = append(ss, colors.SuccessStyle.Render("✓ No branch to tidy"))
 		}
+
+		var ret string
+		if len(ss) != 0 {
+			ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
+				lipgloss.JoinVertical(0, ss...),
+			) + "\n"
+		}
+		fmt.Print(ret)
+
 		return nil
 	},
 }
