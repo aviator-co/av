@@ -163,15 +163,12 @@ func (vm *stackRestackViewModel) writeState(state *sequencerui.RestackState) err
 
 func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error) {
 	var state sequencerui.RestackState
-	var currentBranch string
-	if dh, err := vm.repo.DetachedHead(); err != nil {
+
+	status, err := vm.repo.Status()
+	if err != nil {
 		return nil, err
-	} else if !dh {
-		currentBranch, err = vm.repo.CurrentBranchName()
-		if err != nil {
-			return nil, err
-		}
 	}
+	currentBranch := status.CurrentBranch
 	state.InitialBranch = currentBranch
 
 	if stackRestackFlags.All {

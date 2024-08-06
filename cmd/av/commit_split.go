@@ -19,21 +19,29 @@ var commitSplitCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if clean, err := repo.CheckCleanWorkdir(); err != nil {
-			return err
-		} else if !clean {
-			_, _ = fmt.Fprint(
+		status, err := repo.Status()
+		if err != nil {
+			return errors.Errorf("cannot get the status of the repository: %v", err)
+		}
+		if !status.IsClean() {
+			fmt.Fprint(
 				os.Stderr,
-				colors.Failure("The working directory is not clean, please stash or commit them before running split command."),
+				colors.Failure(
+					"The working directory is not clean, please stash or commit them before running split command.",
+				),
 			)
 			return errors.New("the working directory is not clean")
 		}
 
 		// Ignore errors to support a detached HEAD.
-		currentBranchName, _ := repo.CurrentBranchName()
-		currentCommitOID, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
-		if err != nil {
-			return errors.Errorf("cannot get the current commit object: %v", err)
+		currentBranchName := status.CurrentBranch
+		currentCommitOID := status.OID
+		if currentCommitOID == "" {
+			fmt.Fprint(
+				os.Stderr,
+				colors.Failure("The repository is at the initial state."),
+			)
+			return errors.New("the repository is at the initial state")
 		}
 
 		// From here, we use detached HEAD, so that even if something goes wrong or user
@@ -58,9 +66,11 @@ func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) err
 	}
 
 	for {
-		if clean, err := repo.CheckCleanWorkdir(); err != nil {
-			return err
-		} else if clean {
+		status, err := repo.Status()
+		if err != nil {
+			return errors.Errorf("cannot get the status of the repository: %v", err)
+		}
+		if status.IsCleanIgnoringUntracked() {
 			break
 		}
 
@@ -72,9 +82,12 @@ func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) err
 			return err
 		}
 
-		if hasStagedChange, err := repo.HasChangesToBeCommitted(); err != nil {
-			return err
-		} else if !hasStagedChange {
+		status, err = repo.Status()
+		if err != nil {
+			return errors.Errorf("cannot get the status of the repository: %v", err)
+		}
+
+		if len(status.StagedTrackedFiles) == 0 {
 			return errors.New("nothing is selected to commit")
 		}
 

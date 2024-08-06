@@ -26,19 +26,15 @@ var stackTreeCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		tx := db.ReadTx()
 
-		var currentBranch string
-		if dh, err := repo.DetachedHead(); err != nil {
+		status, err := repo.Status()
+		if err != nil {
 			return err
-		} else if !dh {
-			currentBranch, err = repo.CurrentBranchName()
-			if err != nil {
-				return err
-			}
 		}
 
 		var ss []string
+		currentBranch := status.CurrentBranch
+		tx := db.ReadTx()
 		rootNodes := stackutils.BuildStackTreeAllBranches(tx, currentBranch, true)
 		for _, node := range rootNodes {
 			ss = append(

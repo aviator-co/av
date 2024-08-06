@@ -37,18 +37,15 @@ var stackSwitchCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		tx := db.ReadTx()
 
-		var currentBranch string
-		if dh, err := repo.DetachedHead(); err != nil {
+		status, err := repo.Status()
+		if err != nil {
 			return err
-		} else if !dh {
-			currentBranch, err = repo.CurrentBranchName()
-			if err != nil {
-				return err
-			}
 		}
 
+		currentBranch := status.CurrentBranch
+
+		tx := db.ReadTx()
 		if len(args) > 0 {
 			branch, err := parseBranchName(tx, args[0])
 			if err != nil {

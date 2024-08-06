@@ -476,15 +476,11 @@ func (vm *stackSyncViewModel) writeState(seqModel *sequencerui.RestackState) err
 }
 
 func (vm *stackSyncViewModel) createGitHubFetchModel() (*ghui.GitHubFetchModel, error) {
-	var currentBranch string
-	if dh, err := vm.repo.DetachedHead(); err != nil {
+	status, err := vm.repo.Status()
+	if err != nil {
 		return nil, err
-	} else if !dh {
-		currentBranch, err = vm.repo.CurrentBranchName()
-		if err != nil {
-			return nil, err
-		}
 	}
+	currentBranch := status.CurrentBranch
 
 	var targetBranches []plumbing.ReferenceName
 	if stackSyncFlags.All {
@@ -535,15 +531,11 @@ func (vm *stackSyncViewModel) createState() (*savedStackSyncState, error) {
 			Prune: stackSyncFlags.Prune,
 		},
 	}
-	var currentBranch string
-	if dh, err := vm.repo.DetachedHead(); err != nil {
+	status, err := vm.repo.Status()
+	if err != nil {
 		return nil, err
-	} else if !dh {
-		currentBranch, err = vm.repo.CurrentBranchName()
-		if err != nil {
-			return nil, err
-		}
 	}
+	currentBranch := status.CurrentBranch
 	state.RestackState.InitialBranch = currentBranch
 
 	var targetBranches []plumbing.ReferenceName

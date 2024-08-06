@@ -42,16 +42,12 @@ var stackAdoptCmd = &cobra.Command{
 			return err
 		}
 
-		var currentBranch string
-		if dh, err := repo.DetachedHead(); err != nil {
+		status, err := repo.Status()
+		if err != nil {
 			return err
-		} else if !dh {
-			currentBranch, err = repo.CurrentBranchName()
-			if err != nil {
-				return err
-			}
 		}
 
+		currentBranch := status.CurrentBranch
 		if stackAdoptFlags.Parent != "" {
 			return stackAdoptForceAdoption(repo, db, currentBranch, stackAdoptFlags.Parent)
 		}
@@ -69,6 +65,10 @@ var stackAdoptCmd = &cobra.Command{
 }
 
 func stackAdoptForceAdoption(repo *git.Repo, db meta.DB, currentBranch, parent string) error {
+	if currentBranch == "" {
+		return errors.New("the current repository state is at a detached HEAD")
+	}
+
 	tx := db.WriteTx()
 	branch, exists := tx.Branch(currentBranch)
 	if exists {
