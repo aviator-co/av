@@ -93,9 +93,6 @@ base branch.
 		if err != nil {
 			return err
 		}
-		if _, err = actions.TidyDB(repo, db); err != nil {
-			return err
-		}
 		client, err := getGitHubClient()
 		if err != nil {
 			return err
