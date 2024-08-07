@@ -38,19 +38,29 @@ var stackTreeCmd = &cobra.Command{
 			}
 		}
 
+		var ss []string
 		rootNodes := stackutils.BuildStackTreeAllBranches(tx, currentBranch, true)
 		for _, node := range rootNodes {
-			fmt.Println(stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
-				stbi := getStackTreeBranchInfo(repo, tx, branchName)
-				return renderStackTreeBranchInfo(
-					stackTreeStackBranchInfoStyles,
-					stbi,
-					currentBranch,
-					branchName,
-					isTrunk,
-				)
-			}))
+			ss = append(
+				ss,
+				stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
+					return renderStackTreeBranchInfo(
+						tx,
+						stackTreeStackBranchInfoStyles,
+						currentBranch,
+						branchName,
+						isTrunk,
+					)
+				}),
+			)
 		}
+		var ret string
+		if len(ss) != 0 {
+			ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).Render(
+				lipgloss.JoinVertical(0, ss...),
+			) + "\n"
+		}
+		fmt.Print(ret)
 		return nil
 	},
 }
@@ -58,52 +68,43 @@ var stackTreeCmd = &cobra.Command{
 type stackBranchInfoStyles struct {
 	BranchName      lipgloss.Style
 	HEAD            lipgloss.Style
-	Deleted         lipgloss.Style
-	NeedSync        lipgloss.Style
 	PullRequestLink lipgloss.Style
 }
 
 var stackTreeStackBranchInfoStyles = stackBranchInfoStyles{
 	BranchName:      lipgloss.NewStyle().Bold(true).Foreground(colors.Green600),
 	HEAD:            lipgloss.NewStyle().Bold(true).Foreground(colors.Cyan600),
-	Deleted:         lipgloss.NewStyle().Bold(true).Foreground(colors.Red700),
-	NeedSync:        lipgloss.NewStyle().Bold(true).Foreground(colors.Red700),
 	PullRequestLink: lipgloss.NewStyle(),
 }
 
 func renderStackTreeBranchInfo(
+	tx meta.ReadTx,
 	styles stackBranchInfoStyles,
-	stbi *stackTreeBranchInfo,
 	currentBranchName string,
 	branchName string,
 	isTrunk bool,
 ) string {
+	bi, _ := tx.Branch(branchName)
+
 	sb := strings.Builder{}
 	sb.WriteString(styles.BranchName.Render(branchName))
 	var stats []string
 	if branchName == currentBranchName {
 		stats = append(stats, styles.HEAD.Render("HEAD"))
 	}
-	if stbi.Deleted {
-		stats = append(stats, styles.Deleted.Render("deleted"))
-	}
-	if !isTrunk && stbi.NeedSync {
-		stats = append(stats, styles.NeedSync.Render("need sync"))
-	}
 	if len(stats) > 0 {
 		sb.WriteString(" (")
 		sb.WriteString(strings.Join(stats, ", "))
 		sb.WriteString(")")
 	}
-	sb.WriteString("\n")
 
 	if !isTrunk {
-		if stbi.PullRequestLink != "" {
-			sb.WriteString(styles.PullRequestLink.Render(stbi.PullRequestLink))
+		sb.WriteString("\n")
+		if bi.PullRequest != nil && bi.PullRequest.Permalink != "" {
+			sb.WriteString(styles.PullRequestLink.Render(bi.PullRequest.Permalink))
 		} else {
 			sb.WriteString(styles.PullRequestLink.Render("No pull request"))
 		}
-		sb.WriteString("\n")
 	}
 	return sb.String()
 }
