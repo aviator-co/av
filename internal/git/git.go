@@ -212,19 +212,6 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 	}, nil
 }
 
-// DetachedHead returns true if the repository is in the detached HEAD.
-func (r *Repo) DetachedHead() (bool, error) {
-	ret, err := r.Run(&RunOpts{
-		Args: []string{
-			"symbolic-ref", "--quiet", "HEAD",
-		},
-	})
-	if err != nil {
-		return false, err
-	}
-	return ret.ExitCode == 1, nil
-}
-
 // CurrentBranchName returns the name of the current branch.
 // The name is return in "short" format -- i.e., without the "refs/heads/" prefix.
 // IMPORTANT: This function will return an error if the repository is currently
@@ -238,32 +225,6 @@ func (r *Repo) CurrentBranchName() (string, error) {
 		)
 	}
 	return branch, nil
-}
-
-// CheckCleanWorkdir returns if the workdir is clean.
-func (r *Repo) CheckCleanWorkdir() (bool, error) {
-	out, err := r.Git("status", "--porcelain")
-	if err != nil {
-		return false, errors.Errorf("failed to check if the working directory is clean: %v", err)
-	}
-	return out == "", nil
-}
-
-// HasChangesToBeCommitted returns if there's a staged changes to be committed.
-func (r *Repo) HasChangesToBeCommitted() (bool, error) {
-	out, err := r.Run(&RunOpts{
-		Args: []string{"diff-index", "--quiet", "--cached", "HEAD"},
-	})
-	if err != nil {
-		return false, errors.Errorf("failed to check if there are changes to be committed: %v", err)
-	}
-	if out.ExitCode != 0 && out.ExitCode != 1 {
-		return false, errors.Errorf(
-			"failed to check if there are changes to be committed: exit code %d",
-			out.ExitCode,
-		)
-	}
-	return out.ExitCode == 1, nil
 }
 
 func (r *Repo) DoesBranchExist(branch string) (bool, error) {
@@ -387,24 +348,41 @@ func (r *Repo) RevParse(rp *RevParse) (string, error) {
 	return r.Git(args...)
 }
 
-type MergeBase struct {
-	Revs []string
-}
-
-func (r *Repo) MergeBase(mb *MergeBase) (string, error) {
-	args := []string{"merge-base"}
-	args = append(args, mb.Revs...)
-	return r.Git(args...)
-}
-
-func (r *Repo) MergeBases(commitishes ...string) ([]string, error) {
+func (r *Repo) MergeBase(commitishes ...string) (string, error) {
 	args := []string{"merge-base"}
 	args = append(args, commitishes...)
-	ret, err := r.Git(args...)
+	str, err := r.Git(args...)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(str), nil
+}
+
+type BranchAndCommit struct {
+	Commit string
+	Branch string
+}
+
+func (r *Repo) BranchesContainCommitish(commitish string) ([]BranchAndCommit, error) {
+	lines, err := r.Git(
+		"for-each-ref",
+		"--contains",
+		commitish,
+		"--format=%(objectname) %(refname:short)",
+		"refs/heads",
+	)
 	if err != nil {
 		return nil, err
 	}
-	return strings.Split(strings.TrimSpace(ret), "\n"), nil
+	var ret []BranchAndCommit
+	for _, line := range strings.Split(strings.TrimSpace(lines), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		ret = append(ret, BranchAndCommit{fields[0], fields[1]})
+	}
+	return ret, nil
 }
 
 type UpdateRef struct {

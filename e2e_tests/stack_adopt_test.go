@@ -7,8 +7,6 @@ import (
 )
 
 func TestStackAdopt_Success_NoStackRoot(t *testing.T) {
-	t.Skip("Known issue. Not fixed yet.")
-
 	repo := gittest.NewTempRepo(t)
 	Chdir(t, repo.RepoDir)
 

@@ -26,19 +26,15 @@ var stackTreeCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		tx := db.ReadTx()
 
-		var currentBranch string
-		if dh, err := repo.DetachedHead(); err != nil {
+		status, err := repo.Status()
+		if err != nil {
 			return err
-		} else if !dh {
-			currentBranch, err = repo.CurrentBranchName()
-			if err != nil {
-				return err
-			}
 		}
 
 		var ss []string
+		currentBranch := status.CurrentBranch
+		tx := db.ReadTx()
 		rootNodes := stackutils.BuildStackTreeAllBranches(tx, currentBranch, true)
 		for _, node := range rootNodes {
 			ss = append(
@@ -137,9 +133,7 @@ func getStackTreeBranchInfo(
 		// The parent branch doesn't exist.
 		branchInfo.NeedSync = true
 	} else {
-		mergeBase, err := repo.MergeBase(&git.MergeBase{
-			Revs: []string{parentHead, branchName},
-		})
+		mergeBase, err := repo.MergeBase(parentHead, branchName)
 		if err != nil {
 			// The merge base doesn't exist. This is odd. Mark the branch as needing
 			// sync to see if we can fix this.
