@@ -1,0 +1,7 @@
+#!/bin/bash -ex
+
+cd ${BASH_SOURCE%/*}
+for file in $(find . -name "*.tape"); do
+    echo "Running $file"
+    (cd $(dirname "$file") && vhs $(basename "$file"))
+done
