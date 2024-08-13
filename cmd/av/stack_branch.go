@@ -120,11 +120,27 @@ internal tracking metadata that defines the order of branches within a stack.`,
 			}
 		}
 
+		// Resolve to a commit hash for the starting point.
+		//
+		// Different people have different setups, and they affect how they use
+		// branch.<name>.merge. Different tools have different ways to interpret this
+		// config. Some people want to set it to the same name only when it's pushed. Some
+		// people want to set it to none. etc. etc.
+		//
+		// For this new ref creation specifically, git automatically guesses what to set for
+		// branch.<name>.merge. For now, by using a commit hash, we can suppress all of
+		// those behaviors. Later maybe we can add an av-cli config to control what to set
+		// for branch.<name>.merge at what timing.
+		startPointCommitHash, err := repo.RevParse(&git.RevParse{Rev: checkoutStartingPoint})
+		if err != nil {
+			return errors.WrapIf(err, "failed to determine commit hash of starting point")
+		}
+
 		// Create a new branch off of the parent
 		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
 			Name:       branchName,
 			NewBranch:  true,
-			NewHeadRef: checkoutStartingPoint,
+			NewHeadRef: startPointCommitHash,
 		}); err != nil {
 			return errors.WrapIff(err, "checkout error")
 		}
