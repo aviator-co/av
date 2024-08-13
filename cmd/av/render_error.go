@@ -5,6 +5,7 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glamour/styles"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -35,9 +36,9 @@ Please run ` + "`av stack adopt`" + ` to adopt the parent branch first.
 func renderError(err error) string {
 	var style string
 	if lipgloss.HasDarkBackground() {
-		style = glamour.DarkStyle
+		style = styles.DarkStyle
 	} else {
-		style = glamour.LightStyle
+		style = styles.LightStyle
 	}
 	var markdownText string
 	if errors.Is(err, errNoGitHubToken) {
