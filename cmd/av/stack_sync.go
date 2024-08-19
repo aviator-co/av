@@ -53,11 +53,13 @@ By default, this command will sync all branches starting at the root of the
 stack and recursively rebasing each branch based on the latest commit from the
 parent branch.
 
+If the --all flag is given, this command will sync all branches in the repository.
+
 If the --current flag is given, this command will not recursively sync dependent
 branches of the current branch within the stack. This allows you to make changes
 to the current branch before syncing the rest of the stack.
 
-If the --trunk flag is given, this command will synchronize changes from the
+If the --rebase-to-trunk flag is given, this command will synchronize changes from the
 latest commit to the repository base branch (e.g., main or master) into the
 stack. This is useful for rebasing a whole stack on the latest changes from the
 base branch.
@@ -669,10 +671,10 @@ func init() {
 	_ = stackSyncCmd.Flags().
 		MarkDeprecated("no-fetch", "please use av stack restack for offline restacking")
 	stackSyncCmd.Flags().Bool("trunk", false,
-		"(deprecated; now av stack sync automatically restacks on the trunk branch without this option. Use av stack restack for stacking without the trunk branch) rebase the stack on the trunk branch",
+		"(deprecated; use --rebase-to-trunk to rebase all branches to trunk) rebase the stack on the trunk branch",
 	)
 	_ = stackSyncCmd.Flags().
-		MarkDeprecated("trunk", "now av stack sync automatically restacks on the trunk branch without this option. Use av stack restack for restacking without the trunk branch")
+		MarkDeprecated("trunk", "please use --rebase-to-trunk to rebase all branches to trunk")
 	stackSyncCmd.Flags().String("parent", "",
 		"(deprecated; use av stack adopt or av stack reparent) parent branch to rebase onto",
 	)
