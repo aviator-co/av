@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -ex
-
 function new_temp_repo {
   cd "$(dirname -- "${BASH_SOURCE[0]}")"
   go build ../cmd/av
