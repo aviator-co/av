@@ -228,7 +228,7 @@ func getQueryVariables() (map[string]interface{}, error) {
 	var variables = map[string]interface{}{
 		"repoOwner": graphql.String(repository.Owner),
 		"repoName":  graphql.String(repository.Name),
-		"prNumber":  graphql.Int(prNumber),
+		"prNumber":  graphql.Int(prNumber), //nolint:gosec
 	}
 	return variables, nil
 }
