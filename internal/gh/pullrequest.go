@@ -88,7 +88,7 @@ type GetPullRequestsInput struct {
 	HeadRefName string
 	BaseRefName string
 	States      []githubv4.PullRequestState
-	First       int64
+	First       int32
 	After       string
 }
 
@@ -210,7 +210,7 @@ func (c *Client) MarkPullRequestReadyForReview(
 type RepoPullRequestOpts struct {
 	Owner  string
 	Repo   string
-	First  int64
+	First  int32
 	After  string
 	States []githubv4.PullRequestState
 }
