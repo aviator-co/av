@@ -31,12 +31,13 @@ const (
 	continuePush = "Yes. Push the branches to GitHub."
 	abortPush    = "No. Do not push the branches to GitHub."
 
-	reasonAlreadyUpToDate   = "Already up-to-date."
-	reasonNotPushedToRemote = "No remote branch yet."
-	reasonPRIsMerged        = "PR is already merged."
-	reasonPRIsClosed        = "PR is closed."
-	reasonParentNotPushed   = "Parent branch is not pushed to remote."
-	reasonNoPR              = "Some branches in a stack do not have a PR."
+	reasonAlreadyUpToDate    = "Already up-to-date."
+	reasonNotMetadataUpdated = "Metadata isn't updated."
+	reasonNotPushedToRemote  = "No remote branch yet."
+	reasonPRIsMerged         = "PR is already merged."
+	reasonPRIsClosed         = "PR is closed."
+	reasonParentNotPushed    = "Parent branch is not pushed to remote."
+	reasonNoPR               = "Some branches in a stack do not have a PR."
 )
 
 type pushCandidate struct {
@@ -453,6 +454,15 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 			})
 			continue
 		}
+
+		if !isDifferencePRMetadata(avbr, vm) {
+			noPushBranches = append(noPushBranches, noPushBranch{
+				branch: br,
+				reason: reasonNotMetadataUpdated,
+			})
+			continue
+		}
+
 		if !vm.allParentsHaveRemoteTrackingBranch(remoteConfig, br) {
 			// If a parent doesn't have a remote tracking branch, the PR cannot be made
 			// with that branch as the base. We cannot push this branch.
@@ -528,4 +538,46 @@ func getFirstLine(s string) string {
 		return s
 	}
 	return s[:idx]
+}
+
+// Compare local metadata with PR metadata for any changes
+func isDifferencePRMetadata(avbr meta.Branch, vm *GitHubPushModel) bool {
+	trunk, _ := meta.Trunk(vm.db.ReadTx(), avbr.Name)
+
+	local := actions.PRMetadata{
+		Parent:     avbr.Parent.Name,
+		ParentHead: avbr.Parent.Head,
+		Trunk:      trunk,
+	}
+
+	if !avbr.Parent.Trunk {
+		parentAvBr, _ := vm.db.ReadTx().Branch(avbr.Parent.Name)
+		if parentAvBr.PullRequest != nil {
+			local.ParentPull = parentAvBr.PullRequest.Number
+		}
+	}
+
+	prs, err := vm.getPRs()
+	if err != nil {
+		return true
+	}
+
+	var pr *gh.PullRequest
+	for _, p := range prs {
+		if avbr.PullRequest.ID == p.ID {
+			pr = p
+			break
+		}
+	}
+
+	if pr == nil {
+		return true
+	}
+
+	prMeta, err := actions.ReadPRMetadata(pr.Body)
+	if err != nil {
+		return true
+	}
+
+	return local == prMeta
 }
