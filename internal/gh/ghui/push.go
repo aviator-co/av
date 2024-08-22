@@ -350,18 +350,7 @@ func (vm *GitHubPushModel) makePRsDraft(ghPRs map[plumbing.ReferenceName]*gh.Pul
 func (vm *GitHubPushModel) updatePRs(ghPRs map[plumbing.ReferenceName]*gh.PullRequest) error {
 	for br, pr := range ghPRs {
 		avbr, _ := vm.db.ReadTx().Branch(br.Short())
-		trunk, _ := meta.Trunk(vm.db.ReadTx(), avbr.Name)
-		prMeta := actions.PRMetadata{
-			Parent:     avbr.Parent.Name,
-			ParentHead: avbr.Parent.Head,
-			Trunk:      trunk,
-		}
-		if !avbr.Parent.Trunk {
-			parentAvBr, _ := vm.db.ReadTx().Branch(avbr.Parent.Name)
-			if parentAvBr.PullRequest != nil {
-				prMeta.ParentPull = parentAvBr.PullRequest.Number
-			}
-		}
+		prMeta := createPRMetadata(avbr, vm)
 
 		var stackToWrite *stackutils.StackTreeNode
 		if avconfig.Av.PullRequest.WriteStack {
@@ -540,22 +529,28 @@ func getFirstLine(s string) string {
 	return s[:idx]
 }
 
-// Compare local metadata with PR metadata for any changes
-func isDifferencePRMetadata(avbr meta.Branch, vm *GitHubPushModel) bool {
-	trunk, _ := meta.Trunk(vm.db.ReadTx(), avbr.Name)
+func createPRMetadata(branch meta.Branch, vm *GitHubPushModel) actions.PRMetadata {
+	trunk, _ := meta.Trunk(vm.db.ReadTx(), branch.Name)
 
-	local := actions.PRMetadata{
-		Parent:     avbr.Parent.Name,
-		ParentHead: avbr.Parent.Head,
+	metadata := actions.PRMetadata{
+		Parent:     branch.Parent.Name,
+		ParentHead: branch.Parent.Head,
 		Trunk:      trunk,
 	}
 
-	if !avbr.Parent.Trunk {
-		parentAvBr, _ := vm.db.ReadTx().Branch(avbr.Parent.Name)
-		if parentAvBr.PullRequest != nil {
-			local.ParentPull = parentAvBr.PullRequest.Number
+	if !branch.Parent.Trunk {
+		parent, _ := vm.db.ReadTx().Branch(branch.Parent.Name)
+		if parent.PullRequest != nil {
+			metadata.ParentPull = parent.PullRequest.Number
 		}
 	}
+
+	return metadata
+}
+
+// Compare local metadata with PR metadata for any changes
+func isDifferencePRMetadata(avbr meta.Branch, vm *GitHubPushModel) bool {
+	local := createPRMetadata(avbr, vm)
 
 	prs, err := vm.getPRs()
 	if err != nil {
