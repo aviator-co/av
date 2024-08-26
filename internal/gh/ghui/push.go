@@ -31,13 +31,12 @@ const (
 	continuePush = "Yes. Push the branches to GitHub."
 	abortPush    = "No. Do not push the branches to GitHub."
 
-	reasonAlreadyUpToDate    = "Already up-to-date."
-	reasonNotMetadataUpdated = "Metadata isn't updated."
-	reasonNotPushedToRemote  = "No remote branch yet."
-	reasonPRIsMerged         = "PR is already merged."
-	reasonPRIsClosed         = "PR is closed."
-	reasonParentNotPushed    = "Parent branch is not pushed to remote."
-	reasonNoPR               = "Some branches in a stack do not have a PR."
+	reasonAlreadyUpToDate   = "Already up-to-date."
+	reasonNotPushedToRemote = "No remote branch yet."
+	reasonPRIsMerged        = "PR is already merged."
+	reasonPRIsClosed        = "PR is closed."
+	reasonParentNotPushed   = "Parent branch is not pushed to remote."
+	reasonNoPR              = "Some branches in a stack do not have a PR."
 )
 
 type pushCandidate struct {
@@ -424,6 +423,7 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 			})
 			continue
 		}
+
 		remoteRef, err := repo.Reference(*rtb, true)
 		if err != nil {
 			noPushBranches = append(noPushBranches, noPushBranch{
@@ -432,22 +432,16 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 			})
 			continue
 		}
+
 		localRef, err := repo.Reference(br, true)
 		if err != nil {
 			return err
 		}
-		if localRef.Hash() == remoteRef.Hash() {
+
+		if localRef.Hash() == remoteRef.Hash() && !isDifferencePRMetadata(avbr, vm) {
 			noPushBranches = append(noPushBranches, noPushBranch{
 				branch: br,
 				reason: reasonAlreadyUpToDate,
-			})
-			continue
-		}
-
-		if !isDifferencePRMetadata(avbr, vm) {
-			noPushBranches = append(noPushBranches, noPushBranch{
-				branch: br,
-				reason: reasonNotMetadataUpdated,
 			})
 			continue
 		}
