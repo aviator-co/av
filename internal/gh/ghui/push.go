@@ -349,18 +349,7 @@ func (vm *GitHubPushModel) makePRsDraft(ghPRs map[plumbing.ReferenceName]*gh.Pul
 func (vm *GitHubPushModel) updatePRs(ghPRs map[plumbing.ReferenceName]*gh.PullRequest) error {
 	for br, pr := range ghPRs {
 		avbr, _ := vm.db.ReadTx().Branch(br.Short())
-		trunk, _ := meta.Trunk(vm.db.ReadTx(), avbr.Name)
-		prMeta := actions.PRMetadata{
-			Parent:     avbr.Parent.Name,
-			ParentHead: avbr.Parent.Head,
-			Trunk:      trunk,
-		}
-		if !avbr.Parent.Trunk {
-			parentAvBr, _ := vm.db.ReadTx().Branch(avbr.Parent.Name)
-			if parentAvBr.PullRequest != nil {
-				prMeta.ParentPull = parentAvBr.PullRequest.Number
-			}
-		}
+		prMeta := createPRMetadata(avbr, vm)
 
 		var stackToWrite *stackutils.StackTreeNode
 		if avconfig.Av.PullRequest.WriteStack {
@@ -434,6 +423,7 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 			})
 			continue
 		}
+
 		remoteRef, err := repo.Reference(*rtb, true)
 		if err != nil {
 			noPushBranches = append(noPushBranches, noPushBranch{
@@ -442,17 +432,20 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 			})
 			continue
 		}
+
 		localRef, err := repo.Reference(br, true)
 		if err != nil {
 			return err
 		}
-		if localRef.Hash() == remoteRef.Hash() {
+
+		if localRef.Hash() == remoteRef.Hash() && !isDifferencePRMetadata(avbr, vm) {
 			noPushBranches = append(noPushBranches, noPushBranch{
 				branch: br,
 				reason: reasonAlreadyUpToDate,
 			})
 			continue
 		}
+
 		if !vm.allParentsHaveRemoteTrackingBranch(remoteConfig, br) {
 			// If a parent doesn't have a remote tracking branch, the PR cannot be made
 			// with that branch as the base. We cannot push this branch.
@@ -528,4 +521,52 @@ func getFirstLine(s string) string {
 		return s
 	}
 	return s[:idx]
+}
+
+func createPRMetadata(branch meta.Branch, vm *GitHubPushModel) actions.PRMetadata {
+	trunk, _ := meta.Trunk(vm.db.ReadTx(), branch.Name)
+
+	metadata := actions.PRMetadata{
+		Parent:     branch.Parent.Name,
+		ParentHead: branch.Parent.Head,
+		Trunk:      trunk,
+	}
+
+	if !branch.Parent.Trunk {
+		parent, _ := vm.db.ReadTx().Branch(branch.Parent.Name)
+		if parent.PullRequest != nil {
+			metadata.ParentPull = parent.PullRequest.Number
+		}
+	}
+
+	return metadata
+}
+
+// Compare local metadata with PR metadata for any changes
+func isDifferencePRMetadata(avbr meta.Branch, vm *GitHubPushModel) bool {
+	local := createPRMetadata(avbr, vm)
+
+	prs, err := vm.getPRs()
+	if err != nil {
+		return true
+	}
+
+	var pr *gh.PullRequest
+	for _, p := range prs {
+		if avbr.PullRequest.ID == p.ID {
+			pr = p
+			break
+		}
+	}
+
+	if pr == nil {
+		return true
+	}
+
+	prMeta, err := actions.ReadPRMetadata(pr.Body)
+	if err != nil {
+		return true
+	}
+
+	return local == prMeta
 }
