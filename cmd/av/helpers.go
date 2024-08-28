@@ -103,3 +103,16 @@ func allBranches() ([]string, error) {
 
 	return branches, nil
 }
+
+// stripRemoteRefPrefixes removes the "refs/heads/", "refs/remotes/<remote>/", "<remote>/" prefix
+// from a ref name if it exists.
+func stripRemoteRefPrefixes(repo *git.Repo, possibleRefName string) string {
+	ret := possibleRefName
+	if strings.HasPrefix(ret, "refs/heads/") {
+		ret = strings.TrimPrefix(ret, "refs/heads/")
+	} else {
+		ret = strings.TrimPrefix(ret, "refs/remotes/")
+		ret = strings.TrimPrefix(ret, repo.GetRemoteName()+"/")
+	}
+	return ret
+}

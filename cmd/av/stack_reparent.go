@@ -45,6 +45,7 @@ var stackReparentCmd = &cobra.Command{
 		if stackReparentFlags.Parent == "" {
 			return errors.New("missing parent branch name")
 		}
+		stackReparentFlags.Parent = stripRemoteRefPrefixes(repo, stackReparentFlags.Parent)
 
 		return uiutils.RunBubbleTea(&stackReparentViewModel{repo: repo, db: db})
 	},

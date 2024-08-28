@@ -75,7 +75,7 @@ func stackAdoptForceAdoption(repo *git.Repo, db meta.DB, currentBranch, parent s
 		return errors.New("branch is already adopted")
 	}
 
-	parent = strings.TrimPrefix(parent, "refs/heads/")
+	parent = stripRemoteRefPrefixes(repo, parent)
 	if currentBranch == parent {
 		return errors.New("cannot adopt the current branch as its parent")
 	}
