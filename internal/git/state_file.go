@@ -2,6 +2,7 @@ package git
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -32,9 +33,15 @@ func (r *Repo) WriteStateFile(kind StateFileKind, msg any) error {
 		return nil
 	}
 
+	file := filepath.Join(r.AvDir(), string(kind))
+	if _, err := os.Stat(file); err == nil {
+		// When the state file already exists, it means that during fixing conflicts
+		return fmt.Errorf("Please execute the command after fixing the conflict")
+	}
+
 	bs, err := json.MarshalIndent(msg, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(r.AvDir(), string(kind)), bs, 0644)
+	return os.WriteFile(file, bs, 0644)
 }
