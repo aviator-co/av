@@ -1,11 +1,17 @@
 package git
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 )
+
+// ref: https://git-scm.com/docs/git-rev-parse#Documentation/git-rev-parse.txt-codeREBASEHEADcode
+const REBASE_STATE_FILE = "REBASE_HEAD"
 
 type RebaseOpts struct {
 	// Required (unless Continue is true)
@@ -55,6 +61,10 @@ func (r *Repo) Rebase(opts RebaseOpts) (*Output, error) {
 	args = append(args, opts.Upstream)
 	if opts.Branch != "" {
 		args = append(args, opts.Branch)
+	}
+
+	if _, err := os.Stat(filepath.Join(r.GitDir(), REBASE_STATE_FILE)); err == nil {
+		return nil, fmt.Errorf("failed to start rebase: rebase in progress")
 	}
 
 	return r.Run(&RunOpts{Args: args})
