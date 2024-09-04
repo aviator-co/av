@@ -127,7 +127,7 @@ func TestStackRestack(t *testing.T) {
 	stack1Head := repo.GetCommitAtRef(t, plumbing.NewBranchReferenceName("stack-1"))
 	require.Equal(t, mergeBases[0], stack1Head, "stack-2 should be up-to-date with stack-1")
 
-	// Further sync attemps should yield no-ops
+	// Further sync attempts should yield no-ops
 	syncNoop := RequireAv(t, "stack", "restack")
 	require.Contains(t, syncNoop.Stdout, "Restack is done")
 
