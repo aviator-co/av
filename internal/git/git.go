@@ -348,9 +348,9 @@ func (r *Repo) RevParse(rp *RevParse) (string, error) {
 	return r.Git(args...)
 }
 
-func (r *Repo) MergeBase(commitishes ...string) (string, error) {
+func (r *Repo) MergeBase(committishes ...string) (string, error) {
 	args := []string{"merge-base"}
-	args = append(args, commitishes...)
+	args = append(args, committishes...)
 	str, err := r.Git(args...)
 	if err != nil {
 		return "", err
@@ -363,11 +363,11 @@ type BranchAndCommit struct {
 	Branch string
 }
 
-func (r *Repo) BranchesContainCommitish(commitish string) ([]BranchAndCommit, error) {
+func (r *Repo) BranchesContainCommittish(committish string) ([]BranchAndCommit, error) {
 	lines, err := r.Git(
 		"for-each-ref",
 		"--contains",
-		commitish,
+		committish,
 		"--format=%(objectname) %(refname:short)",
 		"refs/heads",
 	)

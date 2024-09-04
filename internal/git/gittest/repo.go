@@ -63,7 +63,7 @@ func NewTempRepoWithGitHubServer(t *testing.T, serverURL string) *GitTestRepo {
 
 	settings := map[string]string{
 		"user.name":  "av-test",
-		"user.email": "av-test@nonexistant",
+		"user.email": "av-test@nonexistent",
 	}
 	for k, v := range settings {
 		repo.Git(t, "config", k, v)
