@@ -419,7 +419,7 @@ func (vm stackAdoptViewModel) renderBranch(branch plumbing.ReferenceName, isTrun
 	if adopted && !vm.chosenTargets[branch] {
 		sb.WriteString(branch.Short())
 	} else if vm.chosenTargets[branch] {
-		sb.WriteString("[x] " + branch.Short())
+		sb.WriteString("[✓] " + branch.Short())
 	} else {
 		sb.WriteString("[ ] " + branch.Short())
 	}
