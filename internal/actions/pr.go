@@ -368,7 +368,7 @@ func CreatePullRequest(
 			}
 
 			// Otherwise, save what the user entered to a file so that it's not
-			// lost forever (and we can re-use it if they try again).
+			// lost forever (and we can reuse it if they try again).
 			savePRDescriptionToTemporaryFile(saveFile, res)
 		}()
 	}
