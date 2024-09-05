@@ -30,7 +30,15 @@ var stackAdoptFlags struct {
 var stackAdoptCmd = &cobra.Command{
 	Use:   "adopt",
 	Short: "Adopt branches that are not managed by av",
-	Args:  cobra.NoArgs,
+	Long: `Adopt branches that are not managed by av.
+
+This command will show a list of branches that are not managed by av. You can choose which branches
+should be adopted to av.
+
+If you want to adopt the current branch, you can use the --parent flag to specify the parent branch.
+For example, "av stack adopt --parent main" will adopt the current branch with the main branch as
+the parent.`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
 		if err != nil {
@@ -419,7 +427,7 @@ func (vm stackAdoptViewModel) renderBranch(branch plumbing.ReferenceName, isTrun
 	if adopted && !vm.chosenTargets[branch] {
 		sb.WriteString(branch.Short())
 	} else if vm.chosenTargets[branch] {
-		sb.WriteString("[x] " + branch.Short())
+		sb.WriteString("[✓] " + branch.Short())
 	} else {
 		sb.WriteString("[ ] " + branch.Short())
 	}
