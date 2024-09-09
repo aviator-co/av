@@ -7,7 +7,7 @@ toolchain go1.23.0
 require (
 	emperror.dev/errors v0.8.1
 	github.com/adrg/xdg v0.5.0
-	github.com/charmbracelet/bubbles v0.19.0
+	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.1.0
 	github.com/charmbracelet/lipgloss v0.13.0
 	github.com/dustin/go-humanize v1.0.1
@@ -28,8 +28,8 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
-	golang.org/x/mod v0.20.0
-	golang.org/x/oauth2 v0.22.0
+	golang.org/x/mod v0.21.0
+	golang.org/x/oauth2 v0.23.0
 )
 
 require (
