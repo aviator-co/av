@@ -71,19 +71,19 @@ var stackSwitchCmd = &cobra.Command{
 			return errors.New("stack switch command must be run in a terminal")
 		}
 		return uiutils.RunBubbleTea(&stackSwitchViewModel{
-			repo:                 repo,
-			help:                 help.New(),
-			currentHEADBranch:    currentBranch,
-			currentChoosenBranch: getInitialChoosenBranch(branchList, currentBranch),
-			rootNodes:            rootNodes,
-			branchList:           branchList,
-			branches:             branches,
-			spinner:              spinner.New(spinner.WithSpinner(spinner.Dot)),
+			repo:                repo,
+			help:                help.New(),
+			currentHEADBranch:   currentBranch,
+			currentChosenBranch: getInitialChosenBranch(branchList, currentBranch),
+			rootNodes:           rootNodes,
+			branchList:          branchList,
+			branches:            branches,
+			spinner:             spinner.New(spinner.WithSpinner(spinner.Dot)),
 		})
 	},
 }
 
-func getInitialChoosenBranch(branchList []*stackTreeBranchInfo, currentBranch string) string {
+func getInitialChosenBranch(branchList []*stackTreeBranchInfo, currentBranch string) string {
 	for _, branch := range branchList {
 		if branch.BranchName == currentBranch {
 			return currentBranch
@@ -152,12 +152,12 @@ func parsePullRequestURL(tx meta.ReadTx, prURL string) (string, error) {
 }
 
 type stackSwitchViewModel struct {
-	currentChoosenBranch string
-	checkingOut          bool
-	checkedOut           bool
-	err                  error
-	help                 help.Model
-	spinner              spinner.Model
+	currentChosenBranch string
+	checkingOut         bool
+	checkedOut          bool
+	err                 error
+	help                help.Model
+	spinner             spinner.Model
 
 	repo              *git.Repo
 	currentHEADBranch string
@@ -187,9 +187,9 @@ func (vm stackSwitchViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+c":
 				return vm, tea.Quit
 			case "up", "k":
-				vm.currentChoosenBranch = vm.getPreviousBranch()
+				vm.currentChosenBranch = vm.getPreviousBranch()
 			case "down", "j":
-				vm.currentChoosenBranch = vm.getNextBranch()
+				vm.currentChosenBranch = vm.getNextBranch()
 			case "enter", " ":
 				vm.checkingOut = true
 				return vm, vm.checkoutBranch
@@ -207,9 +207,9 @@ func (vm stackSwitchViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (vm stackSwitchViewModel) checkoutBranch() tea.Msg {
-	if vm.currentChoosenBranch != vm.currentHEADBranch {
+	if vm.currentChosenBranch != vm.currentHEADBranch {
 		if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{
-			Name: vm.currentChoosenBranch,
+			Name: vm.currentChosenBranch,
 		}); err != nil {
 			return err
 		}
@@ -219,26 +219,26 @@ func (vm stackSwitchViewModel) checkoutBranch() tea.Msg {
 
 func (vm stackSwitchViewModel) getPreviousBranch() string {
 	for i, branch := range vm.branchList {
-		if branch.BranchName == vm.currentChoosenBranch {
+		if branch.BranchName == vm.currentChosenBranch {
 			if i == 0 {
-				return vm.currentChoosenBranch
+				return vm.currentChosenBranch
 			}
 			return vm.branchList[i-1].BranchName
 		}
 	}
-	return vm.currentChoosenBranch
+	return vm.currentChosenBranch
 }
 
 func (vm stackSwitchViewModel) getNextBranch() string {
 	for i, branch := range vm.branchList {
-		if branch.BranchName == vm.currentChoosenBranch {
+		if branch.BranchName == vm.currentChosenBranch {
 			if i == len(vm.branchList)-1 {
-				return vm.currentChoosenBranch
+				return vm.currentChosenBranch
 			}
 			return vm.branchList[i+1].BranchName
 		}
 	}
-	return vm.currentChoosenBranch
+	return vm.currentChosenBranch
 }
 
 func (vm stackSwitchViewModel) View() string {
@@ -265,7 +265,7 @@ func (vm stackSwitchViewModel) View() string {
 					branchName,
 					isTrunk,
 				)
-				if branchName == vm.currentChoosenBranch {
+				if branchName == vm.currentChosenBranch {
 					out = colors.PromptChoice.Render(out)
 				}
 				return out
@@ -274,9 +274,9 @@ func (vm stackSwitchViewModel) View() string {
 	}
 	ss = append(ss, "")
 	if vm.checkingOut {
-		ss = append(ss, "Checking out branch "+vm.currentChoosenBranch+"...")
+		ss = append(ss, "Checking out branch "+vm.currentChosenBranch+"...")
 	} else if vm.checkedOut {
-		ss = append(ss, "Checked out branch "+vm.currentChoosenBranch)
+		ss = append(ss, "Checked out branch "+vm.currentChosenBranch)
 	} else {
 		ss = append(ss, vm.help.ShortHelpView(uiutils.PromptKeys))
 	}
