@@ -130,8 +130,17 @@ func main() {
 
 func checkCliVersion() {
 	if config.Version == config.VersionDev {
-		logrus.Debug("skipping CLI version check (development version)")
+		logrus.Debug("Skipping CLI version check (development version)")
 		return
+	}
+	for _, arg := range os.Args {
+		if arg == "completion" {
+			// Skip the update check as it can slow down the shell initialization on a
+			// slow network connection. This can have a false positive, but this is
+			// anyway an optional check.
+			logrus.Debug("Skipping CLI version check (shell completion)")
+			return
+		}
 	}
 	latest, err := config.FetchLatestVersion()
 	if err != nil {
