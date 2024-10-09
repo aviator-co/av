@@ -180,9 +180,9 @@ func (vm stackAdoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if vm.treeInfo != nil {
 			switch msg.String() {
-			case "up", "k":
+			case "up", "k", "ctrl+p":
 				vm.currentCursor = vm.getPreviousBranch()
-			case "down", "j":
+			case "down", "j", "ctrl+n":
 				vm.currentCursor = vm.getNextBranch()
 			case " ":
 				vm.toggleAdoption(vm.currentCursor)

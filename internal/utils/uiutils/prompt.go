@@ -8,18 +8,18 @@ import (
 func NewPromptModel(title string, items []string) *selection.Model[string] {
 	ret := selection.NewModel(selection.New(title, items))
 	ret.Filter = nil
-	ret.KeyMap.Up = append(ret.KeyMap.Up, "k")
-	ret.KeyMap.Down = append(ret.KeyMap.Down, "j")
+	ret.KeyMap.Up = append(ret.KeyMap.Up, "k", "ctrl+p")
+	ret.KeyMap.Down = append(ret.KeyMap.Down, "j", "ctrl+n")
 	return ret
 }
 
 var PromptKeys = []key.Binding{
 	key.NewBinding(
-		key.WithKeys("up", "k"),
+		key.WithKeys("up", "k", "ctrl+p"),
 		key.WithHelp("↑/k", "move up"),
 	),
 	key.NewBinding(
-		key.WithKeys("down", "j"),
+		key.WithKeys("down", "j", "ctrl+n"),
 		key.WithHelp("↓/j", "move down"),
 	),
 	key.NewBinding(
