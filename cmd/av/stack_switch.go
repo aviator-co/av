@@ -186,9 +186,9 @@ func (vm stackSwitchViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "ctrl+c":
 				return vm, tea.Quit
-			case "up", "k":
+			case "up", "k", "ctrl+p":
 				vm.currentChosenBranch = vm.getPreviousBranch()
-			case "down", "j":
+			case "down", "j", "ctrl+n":
 				vm.currentChosenBranch = vm.getNextBranch()
 			case "enter", " ":
 				vm.checkingOut = true
