@@ -6,7 +6,7 @@ toolchain go1.23.0
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/adrg/xdg v0.5.0
+	github.com/adrg/xdg v0.5.1
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.1.1
 	github.com/charmbracelet/lipgloss v0.13.0
@@ -242,7 +242,7 @@ require (
 	golang.org/x/exp/typeparams v0.0.0-20240808152545-0cdaa3abc0fa // indirect
 	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/term v0.24.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
 	golang.org/x/tools v0.25.0 // indirect
