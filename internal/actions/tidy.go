@@ -45,7 +45,7 @@ func TidyDB(repo *git.Repo, db meta.DB) (map[string]bool, map[string]bool, error
 func isParentDeleted(branches map[string]meta.Branch, deleted map[string]bool, branch string) bool {
 	state := branches[branch].Parent
 	for !state.Trunk {
-		if deleted[state.Name] {
+		if deleted, exist := deleted[state.Name]; deleted || !exist {
 			return true
 		}
 		state = branches[state.Name].Parent

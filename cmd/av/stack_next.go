@@ -194,22 +194,24 @@ func (m stackNextModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.selection.Init()
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "enter":
-			currentBranch, err := m.selection.Value()
-			if err != nil {
-				m.err = err
-				return m, tea.Quit
-			}
-			m.currentBranch = currentBranch
-			m.nInStack--
+		if m.selection != nil {
+			switch msg.String() {
+			case "enter":
+				currentBranch, err := m.selection.Value()
+				if err != nil {
+					m.err = err
+					return m, tea.Quit
+				}
+				m.currentBranch = currentBranch
+				m.nInStack--
 
-			return m, m.nextBranch
-		case "ctrl+c":
-			return m, tea.Quit
-		default:
-			_, cmd := m.selection.Update(msg)
-			return m, cmd
+				return m, m.nextBranch
+			case "ctrl+c":
+				return m, tea.Quit
+			default:
+				_, cmd := m.selection.Update(msg)
+				return m, cmd
+			}
 		}
 	}
 	return m, nil
