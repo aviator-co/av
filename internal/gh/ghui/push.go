@@ -37,6 +37,8 @@ const (
 	reasonPRIsClosed        = "PR is closed."
 	reasonParentNotPushed   = "Parent branch is not pushed to remote."
 	reasonNoPR              = "Some branches in a stack do not have a PR."
+
+	ghErrorResponseNoNewCommits = "There are no new commits between base branch"
 )
 
 type pushCandidate struct {
@@ -101,6 +103,7 @@ type GitHubPushModel struct {
 	calculatingCandidates bool
 	askingForConfirmation bool
 	runningGitPush        bool
+	reRunPRUpdate         bool
 	done                  bool
 }
 
@@ -274,6 +277,11 @@ func (vm *GitHubPushModel) runUpdate() (ret tea.Msg) {
 	if err := vm.runGitPush(); err != nil {
 		return err
 	}
+	if vm.reRunPRUpdate {
+		if err := vm.updatePRs(ghPRs); err != nil {
+			return err
+		}
+	}
 	return &GitHubPushProgress{gitPushDone: true}
 }
 
@@ -370,6 +378,11 @@ func (vm *GitHubPushModel) updatePRs(ghPRs map[plumbing.ReferenceName]*gh.PullRe
 			BaseRefName:   githubv4.NewString(githubv4.String(avbr.Parent.Name)),
 			Body:          githubv4.NewString(githubv4.String(prBody)),
 		}); err != nil {
+			if strings.Contains(err.Error(), ghErrorResponseNoNewCommits) {
+				vm.reRunPRUpdate = true
+				continue
+			}
+
 			return err
 		}
 	}
