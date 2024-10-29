@@ -1,6 +1,7 @@
 package sequencerui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -39,12 +40,13 @@ type RestackAbort struct{}
 type RestackDone struct{}
 
 type RestackModel struct {
-	Skip     bool
-	Continue bool
-	Abort    bool
-	DryRun   bool
-	State    *RestackState
-	Command  string
+	Skip       bool
+	Continue   bool
+	Abort      bool
+	DryRun     bool
+	Autosquash bool
+	State      *RestackState
+	Command    string
 
 	repo *git.Repo
 	db   meta.DB
@@ -60,9 +62,23 @@ func (vm *RestackModel) Init() tea.Cmd {
 }
 
 func (vm *RestackModel) initCmd() tea.Msg {
-	if vm.Skip || vm.Continue || vm.Abort {
+	if vm.Skip || vm.Continue || vm.Abort ||vm.Autosquash {
 		if vm.Abort {
 			vm.abortedBranch = vm.State.Seq.CurrentSyncRef
+		} else if vm.Autosquash {
+			fmt.Print("Do you want to autosquash these commits? [y/n]: ")
+			var response string
+			fmt.Scanln(&response)
+			response = strings.ToLower(strings.TrimSpace(response))
+		
+			switch response {
+			case "y", "yes":
+				fmt.Println("Autosquash enabled.")
+			case "n", "no":
+				fmt.Println("Autosquash disabled.")
+			default:
+				fmt.Println("Invalid response. Autosquash aborted.")
+			}
 		}
 		return vm.runSeqWithContinuationFlags()
 	}
@@ -104,7 +120,7 @@ func (vm *RestackModel) Update(msg tea.Msg) (*RestackModel, tea.Cmd) {
 func (vm *RestackModel) View() string {
 	sb := strings.Builder{}
 	if vm.State != nil && vm.State.Seq != nil {
-		if vm.State.Seq.CurrentSyncRef != "" {
+		if vm.State.Seq.CurrentSyncRef != "" && !vm.Autosquash {
 			sb.WriteString(
 				colors.ProgressStyle.Render(
 					vm.spinner.View() + "Restacking " + vm.State.Seq.CurrentSyncRef.Short() + "...",
@@ -112,7 +128,7 @@ func (vm *RestackModel) View() string {
 			)
 		} else if vm.abortedBranch != "" {
 			sb.WriteString(colors.FailureStyle.Render("✗ Restack is aborted"))
-		} else {
+		} else if (!vm.Autosquash) {
 			sb.WriteString(colors.SuccessStyle.Render("✓ Restack is done"))
 		}
 		// The sequencer operates from top to bottom. The branches that are synced before
@@ -139,7 +155,7 @@ func (vm *RestackModel) View() string {
 				vm.State.InitialBranch,
 				true,
 			)
-		} else {
+		} else if (!vm.Autosquash) {
 			nodes, err = stackutils.BuildStackTreeRelatedBranchStacks(vm.db.ReadTx(), vm.State.InitialBranch, true, vm.State.RelatedBranches)
 		}
 		if err != nil {
@@ -200,11 +216,13 @@ func (vm *RestackModel) View() string {
 }
 
 func (vm *RestackModel) runSeqWithContinuationFlags() tea.Msg {
-	result, err := vm.State.Seq.Run(vm.repo, vm.db, vm.Abort, vm.Continue, vm.Skip)
+
+	result, err := vm.State.Seq.Run(vm.repo, vm.db, vm.Abort, vm.Continue, vm.Skip,vm.Autosquash)
 	return &RestackProgress{result: result, err: err}
 }
 
 func (vm *RestackModel) runSeq() tea.Msg {
-	result, err := vm.State.Seq.Run(vm.repo, vm.db, false, false, false)
+
+	result, err := vm.State.Seq.Run(vm.repo, vm.db, false, false, false, false)
 	return &RestackProgress{result: result, err: err}
 }

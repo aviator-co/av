@@ -90,10 +90,10 @@ func getBranchSnapshots(db meta.DB) map[plumbing.ReferenceName]*branchSnapshot {
 func (seq *Sequencer) Run(
 	repo *git.Repo,
 	db meta.DB,
-	seqAbort, seqContinue, seqSkip bool,
+	seqAbort, seqContinue, seqSkip, seqAutosquash  bool,
 ) (*git.RebaseResult, error) {
-	if seqAbort || seqContinue || seqSkip {
-		return seq.runFromInterruptedState(repo, db, seqAbort, seqContinue, seqSkip)
+	if seqAbort || seqContinue || seqSkip || seqAutosquash {
+		return seq.runFromInterruptedState(repo, db, seqAbort, seqContinue, seqSkip, seqAutosquash )
 	}
 
 	if seq.CurrentSyncRef == "" {
@@ -105,8 +105,20 @@ func (seq *Sequencer) Run(
 func (seq *Sequencer) runFromInterruptedState(
 	repo *git.Repo,
 	db meta.DB,
-	seqAbort, seqContinue, seqSkip bool,
+	seqAbort, seqContinue, seqSkip, seqAutosquash bool,
 ) (*git.RebaseResult, error) {
+	if (seqAutosquash){
+		// Abort the rebase if we need to
+		if stat, _ := os.Stat(filepath.Join(repo.GitDir(), "REBASE_HEAD")); stat != nil {
+			if _, err := repo.Rebase(git.RebaseOpts{Abort: true}); err != nil {
+				return nil, errors.Errorf("failed to abort in-progress rebase: %v", err)
+			}
+		}
+		seq.CurrentSyncRef = ""
+		seq.SequenceInterruptedNewParentHash = plumbing.ZeroHash
+		return nil, nil
+	}
+
 	if seq.CurrentSyncRef == "" {
 		return nil, errors.New("no sync in progress")
 	}
