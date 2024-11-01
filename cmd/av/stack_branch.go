@@ -39,9 +39,14 @@ If the --rename/-m flag is given, the current branch is renamed to the name
 given as the first argument to the command. Branches should only be renamed
 with this command (not with git branch -m ...) because av needs to update
 internal tracking metadata that defines the order of branches within a stack.`,
-	SilenceUsage: true,
-	Args:         cobra.RangeArgs(1, 2),
+	Args: cobra.RangeArgs(0, 2),
 	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
+		if len(args) == 0 {
+			// The only time we don't want to suppress the usage message is when
+			// a user runs `av branch` with no arguments.
+			return cmd.Usage()
+		}
+
 		repo, err := getRepo()
 		if err != nil {
 			return err
