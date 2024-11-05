@@ -543,23 +543,12 @@ func createPRMetadata(branch meta.Branch, vm *GitHubPushModel) actions.PRMetadat
 }
 
 // Compare local metadata with PR metadata for any changes
+// If something error occurs, return true to be safe
 func isDifferencePRMetadata(avbr meta.Branch, vm *GitHubPushModel) bool {
 	local := createPRMetadata(avbr, vm)
 
-	prs, err := vm.getPRs()
+	pr, err := vm.client.PullRequest(context.Background(), avbr.PullRequest.ID)
 	if err != nil {
-		return true
-	}
-
-	var pr *gh.PullRequest
-	for _, p := range prs {
-		if avbr.PullRequest.ID == p.ID {
-			pr = p
-			break
-		}
-	}
-
-	if pr == nil {
 		return true
 	}
 
