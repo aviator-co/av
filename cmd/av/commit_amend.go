@@ -96,5 +96,5 @@ func init() {
 		BoolVar(&commitAmendFlags.NoEdit, "no-edit", false, "amend a commit without changing its commit message")
 	commitAmendCmd.MarkFlagsMutuallyExclusive("message", "no-edit")
 	commitAmendCmd.Flags().
-		BoolVarP(&commitCreateFlags.All, "all", "a", false, "automatically stage modified files (same as git commit --all)")
+		BoolVarP(&commitAmendFlags.All, "all", "a", false, "automatically stage modified files (same as git commit --all)")
 }
