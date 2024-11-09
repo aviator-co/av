@@ -59,7 +59,7 @@ func runAmend(repo *git.Repo, db meta.DB) error {
 	if commitAmendFlags.NoEdit {
 		commitArgs = append(commitArgs, "--no-edit")
 	}
-	if commitCreateFlags.All {
+	if commitAmendFlags.All {
 		commitArgs = append(commitArgs, "--all")
 	}
 	if commitAmendFlags.Message != "" {
@@ -95,6 +95,6 @@ func init() {
 	commitAmendCmd.Flags().
 		BoolVar(&commitAmendFlags.NoEdit, "no-edit", false, "amend a commit without changing its commit message")
 	commitAmendCmd.MarkFlagsMutuallyExclusive("message", "no-edit")
-	commitCreateCmd.Flags().
+	commitAmendCmd.Flags().
 		BoolVarP(&commitCreateFlags.All, "all", "a", false, "automatically stage modified files (same as git commit --all)")
 }
