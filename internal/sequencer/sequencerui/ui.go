@@ -1,6 +1,7 @@
 package sequencerui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -39,12 +40,13 @@ type RestackAbort struct{}
 type RestackDone struct{}
 
 type RestackModel struct {
-	Skip     bool
-	Continue bool
-	Abort    bool
-	DryRun   bool
-	State    *RestackState
-	Command  string
+	Skip        bool
+	Continue    bool
+	Abort       bool
+	DryRun      bool
+	Interactive bool
+	State       *RestackState
+	Command     string
 
 	repo *git.Repo
 	db   meta.DB
@@ -200,11 +202,13 @@ func (vm *RestackModel) View() string {
 }
 
 func (vm *RestackModel) runSeqWithContinuationFlags() tea.Msg {
-	result, err := vm.State.Seq.Run(vm.repo, vm.db, vm.Abort, vm.Continue, vm.Skip)
+	result, err := vm.State.Seq.Run(vm.repo, vm.db, vm.Abort, vm.Continue, vm.Skip, false)
 	return &RestackProgress{result: result, err: err}
 }
 
 func (vm *RestackModel) runSeq() tea.Msg {
-	result, err := vm.State.Seq.Run(vm.repo, vm.db, false, false, false)
+	fmt.Print("interactive ")
+	fmt.Print(vm.Interactive)
+	result, err := vm.State.Seq.Run(vm.repo, vm.db, false, false, false, vm.Interactive)
 	return &RestackProgress{result: result, err: err}
 }

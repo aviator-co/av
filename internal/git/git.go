@@ -176,6 +176,9 @@ func (o Output) Lines() []string {
 }
 
 func (r *Repo) Run(opts *RunOpts) (*Output, error) {
+	fmt.Println("git rebase with option ")
+	fmt.Println(opts.Args)
+	fmt.Println(opts.Interactive)
 	cmd := exec.Command("git", opts.Args...)
 	cmd.Dir = r.repoDir
 	r.log.Debugf("git %s", opts.Args)

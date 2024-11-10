@@ -19,6 +19,9 @@ type RebaseOpts struct {
 	// Optional (mutually exclusive with all other options)
 	Skip bool
 	// Optional
+	// If set, this is the rebase will be run with interactive option
+	Interactive bool
+	// Optional
 	// If set, use `git rebase --onto <upstream> ...`
 	Onto string
 	// Optional
@@ -47,6 +50,15 @@ func (r *Repo) Rebase(opts RebaseOpts) (*Output, error) {
 	} else if opts.Skip {
 		return r.Run(&RunOpts{
 			Args: []string{"rebase", "--skip"},
+		})
+	}
+
+	if opts.Interactive {
+		args = append(args, "-i")
+		args = append(args, "master")
+		return r.Run(&RunOpts{
+			Args:        args,
+			Interactive: true,
 		})
 	}
 	if opts.Onto != "" {

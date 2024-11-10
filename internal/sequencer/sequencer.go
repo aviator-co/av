@@ -90,7 +90,7 @@ func getBranchSnapshots(db meta.DB) map[plumbing.ReferenceName]*branchSnapshot {
 func (seq *Sequencer) Run(
 	repo *git.Repo,
 	db meta.DB,
-	seqAbort, seqContinue, seqSkip bool,
+	seqAbort, seqContinue, seqSkip, seqInteractive bool,
 ) (*git.RebaseResult, error) {
 	if seqAbort || seqContinue || seqSkip {
 		return seq.runFromInterruptedState(repo, db, seqAbort, seqContinue, seqSkip)
@@ -99,7 +99,7 @@ func (seq *Sequencer) Run(
 	if seq.CurrentSyncRef == "" {
 		return nil, nil
 	}
-	return seq.rebaseBranch(repo, db)
+	return seq.rebaseBranch(repo, db, seqInteractive)
 }
 
 func (seq *Sequencer) runFromInterruptedState(
@@ -156,7 +156,7 @@ func (seq *Sequencer) runFromInterruptedState(
 	panic("unreachable")
 }
 
-func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB) (*git.RebaseResult, error) {
+func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB, interactive bool) (*git.RebaseResult, error) {
 	op := seq.getCurrentOp()
 	snapshot, ok := seq.OriginalBranchSnapshots[op.Name]
 	if !ok {
@@ -196,10 +196,12 @@ func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB) (*git.RebaseResul
 
 	// The commits from `rebaseFrom` to `snapshot.Name` should be rebased onto `rebaseOnto`.
 	opts := git.RebaseOpts{
-		Branch:   op.Name.Short(),
-		Upstream: previousParentHash.String(),
-		Onto:     newParentHash.String(),
+		Branch:      op.Name.Short(),
+		Upstream:    previousParentHash.String(),
+		Onto:        newParentHash.String(),
+		Interactive: interactive,
 	}
+
 	result, err := repo.RebaseParse(opts)
 	if err != nil {
 		return nil, err

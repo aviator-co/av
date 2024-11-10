@@ -19,12 +19,13 @@ import (
 )
 
 var stackRestackFlags struct {
-	All      bool
-	Current  bool
-	Abort    bool
-	Continue bool
-	Skip     bool
-	DryRun   bool
+	All         bool
+	Current     bool
+	Abort       bool
+	Continue    bool
+	Skip        bool
+	DryRun      bool
+	Interactive bool
 }
 
 var stackRestackCmd = &cobra.Command{
@@ -77,6 +78,7 @@ func (vm *stackRestackViewModel) Init() tea.Cmd {
 	vm.restackModel.Continue = stackRestackFlags.Continue
 	vm.restackModel.Skip = stackRestackFlags.Skip
 	vm.restackModel.DryRun = stackRestackFlags.DryRun
+	vm.restackModel.Interactive = stackRestackFlags.Interactive
 	return vm.restackModel.Init()
 }
 
@@ -191,6 +193,7 @@ func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error
 		currentBranchRef,
 		stackRestackFlags.All,
 		stackRestackFlags.Current,
+		stackRestackFlags.Interactive,
 	)
 	if err != nil {
 		return nil, err
@@ -224,6 +227,10 @@ func init() {
 		&stackRestackFlags.DryRun, "dry-run", false,
 		"show the list of branches that will be rebased without actually rebasing them",
 	)
+	stackRestackCmd.Flags().BoolVar(
+		&stackRestackFlags.Interactive, "interactive", false,
+		"run the rebase command with interactive option",
+	)
 
-	stackRestackCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
+	stackRestackCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip", "interactive")
 }
