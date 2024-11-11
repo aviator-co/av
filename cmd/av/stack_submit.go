@@ -140,6 +140,6 @@ func init() {
 	)
 	stackSubmitCmd.Flags().BoolVar(
 		&stackSubmitFlags.Draft, "draft", false,
-		"create pull requests as drafts",
+		"create pull requests in draft mode",
 	)
 }
