@@ -16,6 +16,7 @@ import (
 
 var stackSubmitFlags struct {
 	Current bool
+	Draft   bool
 }
 
 var stackSubmitCmd = &cobra.Command{
@@ -78,11 +79,14 @@ If the --current flag is given, this command will create pull requests up to the
 		for _, branchName := range branchesToSubmit {
 			// TODO: should probably commit database after every call to this
 			// since we're just syncing state from GitHub
+
+			draft := config.Av.PullRequest.Draft || stackSubmitFlags.Draft
+
 			result, err := actions.CreatePullRequest(
 				ctx, repo, client, tx,
 				actions.CreatePullRequestOpts{
 					BranchName:    branchName,
-					Draft:         config.Av.PullRequest.Draft,
+					Draft:         draft,
 					NoOpenBrowser: true,
 				},
 			)
@@ -133,5 +137,9 @@ func init() {
 	stackSubmitCmd.Flags().BoolVar(
 		&stackSubmitFlags.Current, "current", false,
 		"only create pull requests up to the current branch",
+	)
+	stackSubmitCmd.Flags().BoolVar(
+		&stackSubmitFlags.Draft, "draft", false,
+		"create pull requests as drafts",
 	)
 }
