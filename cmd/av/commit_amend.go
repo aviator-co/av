@@ -19,6 +19,9 @@ var commitAmendFlags struct {
 
 	// Same as `git commit --amend --no-edit`. Amends a commit without changing its commit message.
 	NoEdit bool
+
+	// Same as `git commit --all`.
+	All bool
 }
 
 var commitAmendCmd = &cobra.Command{
@@ -56,6 +59,9 @@ func runAmend(repo *git.Repo, db meta.DB) error {
 	if commitAmendFlags.NoEdit {
 		commitArgs = append(commitArgs, "--no-edit")
 	}
+	if commitAmendFlags.All {
+		commitArgs = append(commitArgs, "--all")
+	}
 	if commitAmendFlags.Message != "" {
 		commitArgs = append(commitArgs, "--message", commitAmendFlags.Message)
 	}
@@ -89,4 +95,6 @@ func init() {
 	commitAmendCmd.Flags().
 		BoolVar(&commitAmendFlags.NoEdit, "no-edit", false, "amend a commit without changing its commit message")
 	commitAmendCmd.MarkFlagsMutuallyExclusive("message", "no-edit")
+	commitAmendCmd.Flags().
+		BoolVarP(&commitAmendFlags.All, "all", "a", false, "automatically stage modified files (same as git commit --all)")
 }
