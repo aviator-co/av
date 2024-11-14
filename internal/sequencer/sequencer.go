@@ -201,7 +201,6 @@ func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB, interactive bool)
 		Onto:        newParentHash.String(),
 		Interactive: interactive,
 	}
-
 	result, err := repo.RebaseParse(opts)
 	if err != nil {
 		return nil, err

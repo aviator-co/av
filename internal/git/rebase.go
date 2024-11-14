@@ -32,7 +32,6 @@ type RebaseOpts struct {
 
 func (r *Repo) Rebase(opts RebaseOpts) (*Output, error) {
 	// TODO: probably move the parseRebaseOutput logic in sync to here
-
 	args := []string{"rebase"}
 	if opts.Continue {
 		return r.Run(&RunOpts{
@@ -55,11 +54,6 @@ func (r *Repo) Rebase(opts RebaseOpts) (*Output, error) {
 
 	if opts.Interactive {
 		args = append(args, "-i")
-		args = append(args, "master")
-		return r.Run(&RunOpts{
-			Args:        args,
-			Interactive: true,
-		})
 	}
 	if opts.Onto != "" {
 		args = append(args, "--onto", opts.Onto)
@@ -69,7 +63,10 @@ func (r *Repo) Rebase(opts RebaseOpts) (*Output, error) {
 		args = append(args, opts.Branch)
 	}
 
-	return r.Run(&RunOpts{Args: args})
+	return r.Run(&RunOpts{
+		Args:        args,
+		Interactive: opts.Interactive,
+	})
 }
 
 // RebaseParse runs a `git rebase` and parses the output into a RebaseResult.

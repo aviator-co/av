@@ -1,7 +1,6 @@
 package sequencerui
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -207,8 +206,6 @@ func (vm *RestackModel) runSeqWithContinuationFlags() tea.Msg {
 }
 
 func (vm *RestackModel) runSeq() tea.Msg {
-	fmt.Print("interactive ")
-	fmt.Print(vm.Interactive)
 	result, err := vm.State.Seq.Run(vm.repo, vm.db, false, false, false, vm.Interactive)
 	return &RestackProgress{result: result, err: err}
 }
