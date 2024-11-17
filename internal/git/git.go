@@ -13,6 +13,7 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
 	giturls "github.com/whilp/git-urls"
@@ -180,6 +181,7 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 	cmd.Dir = r.repoDir
 	r.log.Debugf("git %s", opts.Args)
 	var stdout, stderr bytes.Buffer
+	var err error
 	if opts.Interactive {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -192,7 +194,14 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 		cmd.Stdin = opts.Stdin
 	}
 	cmd.Env = append(os.Environ(), opts.Env...)
-	err := cmd.Run()
+	if opts.Interactive {
+		fmt.Println("Run rebase interactively")
+		tea.ExecProcess(cmd, nil)
+	} else {
+		fmt.Println(opts.Args)
+		err = cmd.Run()
+	}
+
 	var exitError *exec.ExitError
 	if err != nil && !errors.As(err, &exitError) {
 		return nil, errors.Wrapf(err, "git %s", opts.Args)
