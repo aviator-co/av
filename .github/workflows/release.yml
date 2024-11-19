@@ -30,3 +30,4 @@ jobs:
         env:
           AVIATOR_CO_HOMEBREW_REPO_SSH_KEY: ${{ secrets.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FURY_TOKEN: ${{ secrets.FURY_PUSH_TOKEN }}

@@ -36,7 +36,9 @@ archives:
       - "man"
 
 nfpms:
-  - vendor: "Aviator"
+  - id: packages
+    file_name_template: "{{ .ConventionalFileName }}"
+    vendor: "Aviator"
     homepage: "https://aviator.co"
     maintainer: "Masaya Suzuki <masaya@aviator.co>"
     description: "CLI tool to create, update, review and merge stacked PRs on GitHub."
@@ -91,6 +93,13 @@ aurs:
       for manpage in $(ls ./man/man1); do
         install -Dm644 "./man/man1/${manpage}" "${pkgdir}/usr/share/man/man1/${manpage}"
       done
+
+publishers:
+  - name: fury.io
+    ids:
+      - packages
+    dir: "{{ dir .ArtifactPath }}"
+    cmd: curl -F package=@{{ .ArtifactName }} https://{{ .Env.FURY_TOKEN }}@push.fury.io/aviator/
 
 checksum:
   name_template: "checksums.txt"
