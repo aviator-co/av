@@ -112,47 +112,77 @@ $ av stack sync
 
 ```
 
-# Installation
+# Installation & Upgrade
 
-`av` is available for macOS and Linux. In order to interact with GitHub, `av`
-uses the GitHub API token. If you have [GitHub CLI](https://cli.github.com/)
-installed, `av` will use the token automatically from the GitHub CLI. It is
-recommended to install both.
+`av` is available for macOS and Linux. You can install and upgrade it using the following methods:
 
 ## macOS
 
+Install via Homebrew:
 ```sh
 brew install gh aviator-co/tap/av
 ```
 
+Upgrade:
+```sh
+brew upgrade av
+```
+
 ## Arch Linux (AUR)
 
-Published as [`av-cli-bin`](https://aur.archlinux.org/packages/av-cli-bin) in
-AUR.
-
+Install via AUR (published as [`av-cli-bin`](https://aur.archlinux.org/packages/av-cli-bin)):
 ```sh
-yay av-cli
+yay -S av-cli-bin
+```
+
+Upgrade:
+```sh
+yay -S av-cli-bin
 ```
 
 ## Debian/Ubuntu
 
-Download the `.deb` file from the [releases page](https://github.com/aviator-co/av/releases).
-
+Download the `.deb` file from the [releases page](https://github.com/aviator-co/av/releases):
 ```sh
-apt install ./av_$VERSION_linux_$ARCH.deb
+# Install
+sudo dpkg -i ./av_$VERSION_linux_$ARCH.deb
+
+# Upgrade
+av upgrade   # or use dpkg -i with the new version
 ```
 
 ## RPM-based systems
 
-Download the `.rpm` file from the [releases page](https://github.com/aviator-co/av/releases).
-
+Download the `.rpm` file from the [releases page](https://github.com/aviator-co/av/releases):
 ```sh
-rpm -i ./av_$VERSION_linux_$ARCH.rpm
+# Install
+sudo rpm -i ./av_$VERSION_linux_$ARCH.rpm
+
+# Upgrade
+av upgrade   # or use rpm -U with the new version
 ```
 
-## Binary download
+## Binary installation
 
-Download the binary from the [releases page](https://github.com/aviator-co/av/releases).
+1. Download the binary for your system from the [releases page](https://github.com/aviator-co/av/releases)
+2. Extract and install the binary:
+```sh
+# Download and install
+curl -L -o av.tar.gz "https://github.com/aviator-co/av/releases/latest/download/av_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m).tar.gz"
+sudo tar xzf av.tar.gz -C /usr/local/bin
+
+# Upgrade
+av upgrade   # or repeat the installation steps with the new version
+```
+
+## Automatic upgrades
+
+Once installed, you can upgrade `av` using the built-in upgrade command:
+```sh
+av upgrade
+```
+
+This command will automatically detect how `av` was installed and perform the appropriate upgrade.
 
 # Setup
 

@@ -99,6 +99,7 @@ func init() {
 		stackCmd,
 		versionCmd,
 		authCmd,
+		upgradeCmd,
 	)
 }
 
@@ -109,7 +110,12 @@ func main() {
 	colors.SetupBackgroundColorTypeFromEnv()
 	err := rootCmd.Execute()
 	logrus.WithField("duration", time.Since(startTime)).Debug("command exited")
-	checkCliVersion()
+
+	// Skip version check if running the upgrade command
+	if len(os.Args) > 1 && os.Args[1] != "upgrade" {
+		checkCliVersion()
+	}
+
 	var exitSilently actions.ErrExitSilently
 	if errors.As(err, &exitSilently) {
 		os.Exit(exitSilently.ExitCode)
@@ -157,7 +163,7 @@ func checkCliVersion() {
 			c.Sprint(" => "),
 			color.GreenString(latest),
 			"\n",
-			c.Sprint(">> https://docs.aviator.co/reference/aviator-cli/installation#upgrade\n"),
+			c.Sprint(">> Run `av upgrade` or see https://docs.aviator.co/reference/aviator-cli/installation#upgrade for other methods\n"),
 		)
 	}
 }
