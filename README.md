@@ -136,15 +136,47 @@ yay av-cli
 
 ## Debian/Ubuntu
 
-Download the `.deb` file from the [releases page](https://github.com/aviator-co/av/releases).
+Add Aviator to your APT repositories.
+
+```sh
+echo "deb [trusted=yes] https://apt.fury.io/aviator/ /" > \
+/etc/apt/sources.list.d/fury.list
+```
+And then apt install.
+```sh
+sudo apt update
+sudo apt install av
+```
+
+### Alternatively
+If you'd prefer you can download the `.deb` file from the [releases page](https://github.com/aviator-co/av/releases).
 
 ```sh
 apt install ./av_$VERSION_linux_$ARCH.deb
 ```
 
 ## RPM-based systems
+Add the following file `/etc/yum.repos.d/fury.repo`.
+```conf
+[fury]
+name=Gemfury Private Repo
+baseurl=https://yum.fury.io/aviator/
+enabled=1
+gpgcheck=0
+```
 
-Download the `.rpm` file from the [releases page](https://github.com/aviator-co/av/releases).
+Run the following command to confirm the configuration is working.
+```sh
+yum --disablerepo=* --enablerepo=fury list available
+```
+
+And then run yum install.
+```sh
+sudo yum install av
+```
+
+### Alternatively
+If you'd prefer you can download the `.rpm` file from the [releases page](https://github.com/aviator-co/av/releases).
 
 ```sh
 rpm -i ./av_$VERSION_linux_$ARCH.rpm

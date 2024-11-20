@@ -37,7 +37,6 @@ archives:
 
 nfpms:
   - id: packages
-    file_name_template: "{{ .ConventionalFileName }}"
     vendor: "Aviator"
     homepage: "https://aviator.co"
     maintainer: "Masaya Suzuki <masaya@aviator.co>"
