@@ -97,6 +97,8 @@ type GitHubPushModel struct {
 	pushCandidates []pushCandidate
 	noPushBranches []noPushBranch
 	pushPrompt     *selection.Model[string]
+	// key is  internal/gh/pullrequest.PullRequest.ID
+	pullRequestsCache map[string]*gh.PullRequest
 
 	calculatingCandidates bool
 	askingForConfirmation bool
@@ -324,13 +326,23 @@ func (vm *GitHubPushModel) getPRs() (map[plumbing.ReferenceName]*gh.PullRequest,
 	prs := map[plumbing.ReferenceName]*gh.PullRequest{}
 	for _, branch := range vm.pushCandidates {
 		avbr, _ := vm.db.ReadTx().Branch(branch.branch.Short())
-		if avbr.PullRequest != nil {
-			pr, err := vm.client.PullRequest(context.Background(), avbr.PullRequest.ID)
-			if err != nil {
-				return nil, err
-			}
-			prs[branch.branch] = pr
+
+		if avbr.PullRequest == nil {
+			continue
 		}
+
+		if pr, ok := vm.pullRequestsCache[avbr.PullRequest.ID]; ok {
+			prs[branch.branch] = pr
+			continue
+		}
+
+		pr, err := vm.client.PullRequest(context.Background(), avbr.PullRequest.ID)
+		if err != nil {
+			return nil, err
+		}
+		prs[branch.branch] = pr
+		vm.pullRequestsCache[avbr.PullRequest.ID] = pr
+
 	}
 	return prs, nil
 }
@@ -397,6 +409,7 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 
 	var noPushBranches []noPushBranch
 	var pushCandidates []pushCandidate
+
 	for _, br := range vm.targetBranches {
 		avbr, _ := vm.db.ReadTx().Branch(br.Short())
 		if avbr.MergeCommit != "" ||
@@ -438,7 +451,7 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 			return err
 		}
 
-		if localRef.Hash() == remoteRef.Hash() && !isDifferencePRMetadata(avbr, vm) {
+		if localRef.Hash() == remoteRef.Hash() && !vm.isDifferencePRMetadata(avbr) {
 			noPushBranches = append(noPushBranches, noPushBranch{
 				branch: br,
 				reason: reasonAlreadyUpToDate,
@@ -515,6 +528,34 @@ func (vm *GitHubPushModel) allBranchesOnStackHavePRs(br plumbing.ReferenceName) 
 	}
 }
 
+// Compare local metadata with PR metadata for any changes
+// If something error occurs, return true to be safe
+func (vm *GitHubPushModel) isDifferencePRMetadata(avbr meta.Branch) bool {
+	local := createPRMetadata(avbr, vm)
+
+	var pr *gh.PullRequest
+	if _pr, ok := vm.pullRequestsCache[avbr.PullRequest.ID]; ok {
+		pr = _pr
+	} else {
+		_pr, err := vm.client.PullRequest(context.Background(), avbr.PullRequest.ID)
+		if err != nil {
+			return true
+		}
+		pr = _pr
+	}
+
+	if pr == nil {
+		return true
+	}
+
+	prMeta, err := actions.ReadPRMetadata(pr.Body)
+	if err != nil {
+		return true
+	}
+
+	return local == prMeta
+}
+
 func getFirstLine(s string) string {
 	idx := strings.Index(s, "\n")
 	if idx == -1 {
@@ -540,33 +581,4 @@ func createPRMetadata(branch meta.Branch, vm *GitHubPushModel) actions.PRMetadat
 	}
 
 	return metadata
-}
-
-// Compare local metadata with PR metadata for any changes
-func isDifferencePRMetadata(avbr meta.Branch, vm *GitHubPushModel) bool {
-	local := createPRMetadata(avbr, vm)
-
-	prs, err := vm.getPRs()
-	if err != nil {
-		return true
-	}
-
-	var pr *gh.PullRequest
-	for _, p := range prs {
-		if avbr.PullRequest.ID == p.ID {
-			pr = p
-			break
-		}
-	}
-
-	if pr == nil {
-		return true
-	}
-
-	prMeta, err := actions.ReadPRMetadata(pr.Body)
-	if err != nil {
-		return true
-	}
-
-	return local == prMeta
 }
