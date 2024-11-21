@@ -31,6 +31,7 @@ type RestackState struct {
 
 type RestackProgress struct {
 	result *git.RebaseResult
+	cmd    tea.Cmd
 	err    error
 }
 
@@ -73,6 +74,9 @@ func (vm *RestackModel) initCmd() tea.Msg {
 func (vm *RestackModel) Update(msg tea.Msg) (*RestackModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case *RestackProgress:
+		if msg.cmd != nil {
+			return vm, msg.cmd
+		}
 		if msg.err == nil && msg.result == nil {
 			// Finished the sequence.
 			if vm.State.InitialBranch != "" {
@@ -94,6 +98,8 @@ func (vm *RestackModel) Update(msg tea.Msg) (*RestackModel, tea.Cmd) {
 			return vm, func() tea.Msg { return msg.err }
 		}
 		return vm, vm.runSeq
+	case *git.RebaseResultMsg:
+		return vm, func() tea.Msg { return vm.processRebaseResult(msg) }
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		vm.spinner, cmd = vm.spinner.Update(msg)
@@ -201,11 +207,16 @@ func (vm *RestackModel) View() string {
 }
 
 func (vm *RestackModel) runSeqWithContinuationFlags() tea.Msg {
-	result, err := vm.State.Seq.Run(vm.repo, vm.db, vm.Abort, vm.Continue, vm.Skip, false)
-	return &RestackProgress{result: result, err: err}
+	result, cmd, err := vm.State.Seq.Run(vm.repo, vm.db, vm.Abort, vm.Continue, vm.Skip, false)
+	return &RestackProgress{result: result, cmd: cmd, err: err}
 }
 
 func (vm *RestackModel) runSeq() tea.Msg {
-	result, err := vm.State.Seq.Run(vm.repo, vm.db, false, false, false, vm.Interactive)
-	return &RestackProgress{result: result, err: err}
+	result, cmd, err := vm.State.Seq.Run(vm.repo, vm.db, false, false, false, vm.Interactive)
+	return &RestackProgress{result: result, cmd: cmd, err: err}
+}
+
+func (vm *RestackModel) processRebaseResult(msg *git.RebaseResultMsg) tea.Msg {
+	result, err := vm.State.Seq.ResumeFromInteractiveRebase(vm.repo, vm.db, msg)
+	return &RestackProgress{result: result, cmd: nil, err: err}
 }

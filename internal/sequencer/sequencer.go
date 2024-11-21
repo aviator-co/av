@@ -8,6 +8,7 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 )
@@ -91,24 +92,46 @@ func (seq *Sequencer) Run(
 	repo *git.Repo,
 	db meta.DB,
 	seqAbort, seqContinue, seqSkip, seqInteractive bool,
-) (*git.RebaseResult, error) {
+) (*git.RebaseResult, tea.Cmd, error) {
 	if seqAbort || seqContinue || seqSkip {
 		return seq.runFromInterruptedState(repo, db, seqAbort, seqContinue, seqSkip)
 	}
 
 	if seq.CurrentSyncRef == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	return seq.rebaseBranch(repo, db, seqInteractive)
+}
+
+func (seq *Sequencer) ResumeFromInteractiveRebase(
+	repo *git.Repo,
+	db meta.DB,
+	msg *git.RebaseResultMsg,
+) (*git.RebaseResult, error) {
+	result := repo.InteractiveRebaseParse(msg)
+	if result.Status == git.RebaseConflict {
+		result.ErrorHeadline = fmt.Sprintf(
+			"Failed to rebase %q onto %q (merge base is %q)\n",
+			msg.Branch,
+			msg.OnTo,
+			msg.Upstream[:7],
+		) + result.ErrorHeadline
+		seq.SequenceInterruptedNewParentHash = plumbing.NewHash(msg.OnTo)
+		return result, nil
+	}
+	if err := seq.postRebaseBranchUpdate(db, plumbing.NewHash(msg.OnTo)); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (seq *Sequencer) runFromInterruptedState(
 	repo *git.Repo,
 	db meta.DB,
 	seqAbort, seqContinue, seqSkip bool,
-) (*git.RebaseResult, error) {
+) (*git.RebaseResult, tea.Cmd, error) {
 	if seq.CurrentSyncRef == "" {
-		return nil, errors.New("no sync in progress")
+		return nil, nil, errors.New("no sync in progress")
 	}
 	if seq.SequenceInterruptedNewParentHash.IsZero() {
 		panic("broken interruption state: no new parent hash")
@@ -117,46 +140,50 @@ func (seq *Sequencer) runFromInterruptedState(
 		// Abort the rebase if we need to
 		if stat, _ := os.Stat(filepath.Join(repo.GitDir(), "REBASE_HEAD")); stat != nil {
 			if _, err := repo.Rebase(git.RebaseOpts{Abort: true}); err != nil {
-				return nil, errors.Errorf("failed to abort in-progress rebase: %v", err)
+				return nil, nil, errors.Errorf("failed to abort in-progress rebase: %v", err)
 			}
 		}
 		seq.CurrentSyncRef = ""
 		seq.SequenceInterruptedNewParentHash = plumbing.ZeroHash
-		return nil, nil
+		return nil, nil, nil
 	}
 	if seqContinue {
 		if err := seq.checkNoUnstagedChanges(repo); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		result, err := repo.RebaseParse(git.RebaseOpts{Continue: true})
 		if err != nil {
-			return nil, errors.Errorf("failed to continue in-progress rebase: %v", err)
+			return nil, nil, errors.Errorf("failed to continue in-progress rebase: %v", err)
 		}
 		if result.Status == git.RebaseConflict {
-			return result, nil
+			return result, nil, nil
 		}
 		if err := seq.postRebaseBranchUpdate(db, seq.SequenceInterruptedNewParentHash); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return result, nil
+		return result, nil, nil
 	}
 	if seqSkip {
 		result, err := repo.RebaseParse(git.RebaseOpts{Skip: true})
 		if err != nil {
-			return nil, errors.Errorf("failed to skip in-progress rebase: %v", err)
+			return nil, nil, errors.Errorf("failed to skip in-progress rebase: %v", err)
 		}
 		if result.Status == git.RebaseConflict {
-			return result, nil
+			return result, nil, nil
 		}
 		if err := seq.postRebaseBranchUpdate(db, seq.SequenceInterruptedNewParentHash); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return result, nil
+		return result, nil, nil
 	}
 	panic("unreachable")
 }
 
-func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB, interactive bool) (*git.RebaseResult, error) {
+func (seq *Sequencer) rebaseBranch(
+	repo *git.Repo,
+	db meta.DB,
+	interactive bool,
+) (*git.RebaseResult, tea.Cmd, error) {
 	op := seq.getCurrentOp()
 	snapshot, ok := seq.OriginalBranchSnapshots[op.Name]
 	if !ok {
@@ -169,7 +196,7 @@ func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB, interactive bool)
 		var err error
 		previousParentHash, err = seq.getRemoteTrackingBranchCommit(repo, snapshot.ParentBranch)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	} else {
 		previousParentHash = snapshot.PreviouslySyncedParentBranchHash
@@ -181,13 +208,13 @@ func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB, interactive bool)
 			var err error
 			newParentHash, err = seq.getRemoteTrackingBranchCommit(repo, op.NewParent)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		} else {
 			var err error
 			newParentHash, err = seq.getBranchCommit(repo, op.NewParent)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 	} else {
@@ -195,30 +222,37 @@ func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB, interactive bool)
 	}
 
 	// The commits from `rebaseFrom` to `snapshot.Name` should be rebased onto `rebaseOnto`.
-	opts := git.RebaseOpts{
-		Branch:      op.Name.Short(),
-		Upstream:    previousParentHash.String(),
-		Onto:        newParentHash.String(),
-		Interactive: interactive,
+	if interactive {
+		return nil, repo.RebaseInteractive(
+			previousParentHash.String(),
+			newParentHash.String(),
+			op.Name.Short(),
+		), nil
+	} else {
+		opts := git.RebaseOpts{
+			Branch:   op.Name.Short(),
+			Upstream: previousParentHash.String(),
+			Onto:     newParentHash.String(),
+		}
+		result, err := repo.RebaseParse(opts)
+		if err != nil {
+			return nil, nil, err
+		}
+		if result.Status == git.RebaseConflict {
+			result.ErrorHeadline = fmt.Sprintf(
+				"Failed to rebase %q onto %q (merge base is %q)\n",
+				op.Name,
+				op.NewParent,
+				previousParentHash.String()[:7],
+			) + result.ErrorHeadline
+			seq.SequenceInterruptedNewParentHash = newParentHash
+			return result, nil, nil
+		}
+		if err := seq.postRebaseBranchUpdate(db, newParentHash); err != nil {
+			return nil, nil, err
+		}
+		return result, nil, nil
 	}
-	result, err := repo.RebaseParse(opts)
-	if err != nil {
-		return nil, err
-	}
-	if result.Status == git.RebaseConflict {
-		result.ErrorHeadline = fmt.Sprintf(
-			"Failed to rebase %q onto %q (merge base is %q)\n",
-			op.Name,
-			op.NewParent,
-			previousParentHash.String()[:7],
-		) + result.ErrorHeadline
-		seq.SequenceInterruptedNewParentHash = newParentHash
-		return result, nil
-	}
-	if err := seq.postRebaseBranchUpdate(db, newParentHash); err != nil {
-		return nil, err
-	}
-	return result, nil
 }
 
 func (seq *Sequencer) checkNoUnstagedChanges(repo *git.Repo) error {

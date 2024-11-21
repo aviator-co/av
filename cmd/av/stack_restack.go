@@ -84,7 +84,7 @@ func (vm *stackRestackViewModel) Init() tea.Cmd {
 
 func (vm *stackRestackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case *sequencerui.RestackProgress, spinner.TickMsg:
+	case *git.RebaseResultMsg, *sequencerui.RestackProgress, spinner.TickMsg:
 		var cmd tea.Cmd
 		vm.restackModel, cmd = vm.restackModel.Update(msg)
 		return vm, cmd
