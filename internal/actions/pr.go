@@ -272,7 +272,7 @@ func CreatePullRequest(
 	// Check if a parent branch has already been merged or not
 	if parentMeta.MergeCommit != "" {
 		return nil, errors.Errorf(
-			"failed to create a pull request. The parent branch %q has already been merged\nPlease run av stack sync to rebase the branch first.",
+			"failed to create a pull request. The parent branch %q has already been merged\nPlease run av sync to rebase the branch first.",
 			parentMeta.Name,
 		)
 	}

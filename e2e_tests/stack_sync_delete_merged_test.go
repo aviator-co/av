@@ -33,7 +33,7 @@ func TestStackSyncDeleteMerged(t *testing.T) {
 	)
 
 	// Everything up to date now, so this should be a no-op.
-	RequireAv(t, "stack", "sync")
+	RequireAv(t, "sync")
 
 	// We simulate the pull branches on the remote.
 	repo.Git(t, "push", "origin", "stack-1:refs/pull/42/head")
@@ -76,7 +76,7 @@ func TestStackSyncDeleteMerged(t *testing.T) {
 	require.NoError(t, tx.Commit())
 
 	repo.Git(t, "switch", "stack-1")
-	RequireAv(t, "stack", "sync", "--prune=yes")
+	RequireAv(t, "sync", "--prune=yes")
 
 	require.Equal(t, 1,
 		Cmd(t, "git", "show-ref", "refs/heads/stack-1").ExitCode,
@@ -131,7 +131,7 @@ func TestStackSyncDeleteMerged_NoMain(t *testing.T) {
 
 	repo.Git(t, "switch", "stack-1")
 	repo.Git(t, "branch", "-D", "main")
-	RequireAv(t, "stack", "sync", "--prune=yes")
+	RequireAv(t, "sync", "--prune=yes")
 
 	require.Equal(t, 1,
 		Cmd(t, "git", "show-ref", "refs/heads/stack-1").ExitCode,

@@ -117,7 +117,7 @@ Generates the diff between the working tree and the parent branch
 				colors.Warning("\nWARNING: Branch "), colors.UserInput(currentBranchName),
 				colors.Warning(" is not up to date with parent branch "),
 				colors.UserInput(branch.Parent.Name), colors.Warning(". Run "),
-				colors.CliCmd("av stack sync"), colors.Warning(" to synchronize the branch.\n"),
+				colors.CliCmd("av sync"), colors.Warning(" to synchronize the branch.\n"),
 			)
 			return actions.ErrExitSilently{ExitCode: 1}
 		}

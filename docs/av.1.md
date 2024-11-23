@@ -20,8 +20,8 @@ av - Aviator CLI
 - av-pr-queue(1): Queue an existing pull request for the current branch
 - av-pr-status(1): Get the status of the associated pull request
 - av-stack-adopt(1): Adopt branches that are not managed by `av`
-- av-stack-branch(1): Create or rename a branch in the stack
 - av-stack-branch-commit(1): Create a new branch in the stack with the staged changes
+- av-stack-branch(1): Create or rename a branch in the stack
 - av-stack-diff(1): Show the diff between working tree and parent branch
 - av-stack-next(1): Checkout the next branch in the stack
 - av-stack-orphan(1): Orphan branches that are managed by `av`
@@ -31,9 +31,9 @@ av - Aviator CLI
 - av-stack-restack(1): Rebase the stacked branches
 - av-stack-submit(1): Create pull requests for every branch in the stack
 - av-stack-switch(1): Interactively switch to a different branch
-- av-stack-sync(1): Synchronize stacked branches with GitHub
 - av-stack-tidy(1): Tidy stacked branches
 - av-stack-tree(1): Show the tree of stacked branches
+- av-sync(1): Synchronize stacked branches with GitHub
 
 ## FURTHER DOCUMENTATION
 

@@ -20,7 +20,7 @@ There is a case where you created a branch without going through
 
 ## BRANCH DELETION
 
-When you merge a branch, `av-stack-sync`(1) will prompt you to delete the merged
+When you merge a branch, `av-sync`(1) will prompt you to delete the merged
 branches. However, there can be a case where you want to delete a branch that is
 not merged yet. In this case, you can delete the branch with `git branch -d|-D`.
 

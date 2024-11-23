@@ -99,6 +99,7 @@ func init() {
 		stackCmd,
 		versionCmd,
 		authCmd,
+		syncCmd,
 	)
 }
 
