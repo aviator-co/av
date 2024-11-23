@@ -47,7 +47,7 @@ func TestStackSync(t *testing.T) {
 	repo.Git(t, "checkout", "stack-3")
 
 	// Everything up to date now, so this should be a no-op.
-	RequireAv(t, "stack", "sync")
+	RequireAv(t, "sync")
 
 	// We're going to add a commit to the first branch in the stack.
 	// Our stack looks like:
@@ -88,7 +88,7 @@ func TestStackSync(t *testing.T) {
 
 	// Since both commits updated my-file in ways that conflict, we should get
 	// a merge/rebase conflict here.
-	syncConflict := Av(t, "stack", "sync")
+	syncConflict := Av(t, "sync")
 	require.NotEqual(
 		t, 0, syncConflict.ExitCode,
 		"stack sync should return non-zero exit code if conflicts",
@@ -98,15 +98,15 @@ func TestStackSync(t *testing.T) {
 		"error: could not apply", "stack sync should include error message on rebase",
 	)
 	require.Contains(
-		t, syncConflict.Stdout, "av stack sync --continue",
+		t, syncConflict.Stdout, "av sync --continue",
 		"stack sync should print a message with instructions to continue",
 	)
-	syncContinueWithoutResolving := Av(t, "stack", "sync", "--continue")
+	syncContinueWithoutResolving := Av(t, "sync", "--continue")
 	require.NotEqual(
 		t,
 		0,
 		syncContinueWithoutResolving.ExitCode,
-		"stack sync --continue should return non-zero exit code if conflicts have not been resolved",
+		"sync --continue should return non-zero exit code if conflicts have not been resolved",
 	)
 	// resolve the conflict
 	err := os.WriteFile(filepath.Join(repo.RepoDir, "my-file"), []byte("1a\n1b\n2a\n"), 0644)
@@ -114,7 +114,7 @@ func TestStackSync(t *testing.T) {
 	repo.Git(t, "add", "my-file")
 	require.NoError(t, err, "failed to stage file")
 	// stack sync --continue should return zero exit code after resolving conflicts
-	RequireAv(t, "stack", "sync", "--continue")
+	RequireAv(t, "sync", "--continue")
 
 	// Make sure we've handled the rebase of stack-3 correctly (see the long
 	// comment above).
@@ -134,7 +134,7 @@ func TestStackSync(t *testing.T) {
 	require.Equal(t, mergeBases[0], stack1Head, "stack-2 should be up-to-date with stack-1")
 
 	// Further sync attempts should yield no-ops
-	syncNoop := RequireAv(t, "stack", "sync")
+	syncNoop := RequireAv(t, "sync")
 	require.Contains(t, syncNoop.Stdout, "Restack is done")
 
 	// Make sure we've not introduced any extra commits
@@ -188,7 +188,7 @@ func TestStackSyncAbort(t *testing.T) {
 	repo.CommitFile(t, "my-file", "1a\n1b\n", gittest.WithMessage("Commit 1b"))
 
 	// ... and make sure we get a conflict on sync...
-	syncConflict := Av(t, "stack", "sync")
+	syncConflict := Av(t, "sync")
 	require.NotEqual(
 		t,
 		0,
@@ -202,7 +202,7 @@ func TestStackSyncAbort(t *testing.T) {
 	)
 
 	// ... and then abort the sync...
-	RequireAv(t, "stack", "sync", "--abort")
+	RequireAv(t, "sync", "--abort")
 	require.NoFileExists(
 		t,
 		filepath.Join(repo.GitDir, "REBASE_HEAD"),
@@ -266,7 +266,7 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 		)
 	})
 
-	sync := Av(t, "stack", "sync")
+	sync := Av(t, "sync")
 	require.NotEqual(
 		t,
 		0,
@@ -279,7 +279,7 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 
 	// Commit 2b should be able to be applied normally, then we should have a
 	// conflict with 3a
-	sync = Av(t, "stack", "sync", "--continue")
+	sync = Av(t, "sync", "--continue")
 	require.NotEqual(
 		t,
 		0,
@@ -292,5 +292,5 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 
 	// And finally, 3b should be able to be applied without conflict and our stack
 	// sync should be over.
-	RequireAv(t, "stack", "sync", "--continue")
+	RequireAv(t, "sync", "--continue")
 }

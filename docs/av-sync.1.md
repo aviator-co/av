@@ -1,19 +1,19 @@
-# av-stack-sync
+# av-sync
 
 ## NAME
 
-av-stack-sync - Synchronize stacked branches with GitHub
+av-sync - Synchronize stacked branches with GitHub
 
 ## SYNOPSIS
 
 ```synopsis
-av stack sync [--all | --current] [--push=(yes|no|ask)] [--prune=(yes|no|ask)]
-              [--rebase-to-trunk] [--continue | --abort | --skip]
+av sync [--all | --current] [--push=(yes|no|ask)] [--prune=(yes|no|ask)]
+        [--rebase-to-trunk] [--continue | --abort | --skip]
 ```
 
 ## DESCRIPTION
 
-`av stack sync` is a command to fetch and push the changes to the remote GitHub
+`av sync` is a command to fetch and push the changes to the remote GitHub
 repository. This command fetches from the remote, restacks the branches, and
 pushes the changes back to the remote.
 
@@ -27,19 +27,19 @@ command prompts you if the merged branches should be deleted.
 ## REBASE CONFLICT
 
 Rebasing can cause a conflict. When a conflict happens, it prompts you to
-resolve the conflict, and continue with `av stack sync --continue`. This is
-similar to `git rebase --continue`, but it continues with syncing the rest of
+resolve the conflict, and continue with `av sync --continue`. This is similar
+to `git rebase --continue`, but it continues with syncing the rest of
 the branches.
 
 ## REBASING THE STACK ROOT TO TRUNK
 
 By default, the branches are conditionally rebased if needed:
 
-* If a part of the stack is merged, the rest of the stack is rebased to the
+- If a part of the stack is merged, the rest of the stack is rebased to the
   latest trunk commit.
-* If a branch is a stack root (the first topic branch next to trunk), it's
+- If a branch is a stack root (the first topic branch next to trunk), it's
   rebased if `--rebase-to-trunk` option is specified.
-* If a branch is not a stack root, it's rebased to the parent branch.
+- If a branch is not a stack root, it's rebased to the parent branch.
 
 While you are developing in a topic branch, it's possible that the trunk branch
 is updated by somebody else. In some cases, you may need to rebase onto that

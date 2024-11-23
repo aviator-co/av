@@ -11,7 +11,10 @@ var stackCmd = &cobra.Command{
 }
 
 func init() {
+	deprecatedStackSyncCmd := deprecateCommand(*syncCmd, "av sync", "sync")
+
 	stackCmd.AddCommand(
+		deprecatedStackSyncCmd,
 		stackAdoptCmd,
 		stackBranchCmd,
 		stackBranchCommitCmd,
@@ -25,7 +28,6 @@ func init() {
 		stackRestackCmd,
 		stackSubmitCmd,
 		stackSwitchCmd,
-		stackSyncCmd,
 		stackTidyCmd,
 		stackTreeCmd,
 	)

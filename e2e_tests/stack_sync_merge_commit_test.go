@@ -47,7 +47,7 @@ func TestStackSyncMergeCommit(t *testing.T) {
 	)
 
 	// Everything up to date now, so this should be a no-op.
-	RequireAv(t, "stack", "sync")
+	RequireAv(t, "sync")
 
 	// We simulate a merge here so that our history looks like:
 	//     main:    X                         / -> 1S
@@ -99,7 +99,7 @@ func TestStackSyncMergeCommit(t *testing.T) {
 		"squash commit of stack-1 should not be an ancestor of HEAD of stack-1 before running sync",
 	)
 
-	RequireAv(t, "stack", "sync")
+	RequireAv(t, "sync")
 
 	repo.Git(t, "merge-base", "--is-ancestor", squashCommit.String(), "stack-3")
 	assert.Equal(t,

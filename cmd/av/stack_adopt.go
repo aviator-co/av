@@ -460,7 +460,7 @@ func init() {
 		"dry-run adoption",
 	)
 
-	_ = stackSyncCmd.RegisterFlagCompletionFunc(
+	_ = stackAdoptCmd.RegisterFlagCompletionFunc(
 		"parent",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			branches, _ := allBranches()

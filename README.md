@@ -12,6 +12,7 @@ automatically update the dependent PR when the base PR is updated. Read more at
 PRs](https://www.aviator.co/blog/rethinking-code-reviews-with-stacked-prs/).
 
 # Community
+
 Join our discord community: [https://discord.gg/TFgtZtN8](https://discord.gg/NFsYWNzXcH)
 
 # Features
@@ -82,7 +83,7 @@ $ gh pr merge feature-1
 Sync the stack:
 
 ```sh
-$ av stack sync
+$ av sync
 
   ✓ GitHub fetch is done
   ✓ Restack is done
@@ -142,13 +143,16 @@ Add Aviator to your APT repositories.
 echo "deb [trusted=yes] https://apt.fury.io/aviator/ /" > \
 /etc/apt/sources.list.d/fury.list
 ```
+
 And then apt install.
+
 ```sh
 sudo apt update
 sudo apt install av
 ```
 
 ### Alternatively
+
 If you'd prefer you can download the `.deb` file from the [releases page](https://github.com/aviator-co/av/releases).
 
 ```sh
@@ -156,7 +160,9 @@ apt install ./av_$VERSION_linux_$ARCH.deb
 ```
 
 ## RPM-based systems
+
 Add the following file `/etc/yum.repos.d/fury.repo`.
+
 ```conf
 [fury]
 name=Gemfury Private Repo
@@ -166,16 +172,19 @@ gpgcheck=0
 ```
 
 Run the following command to confirm the configuration is working.
+
 ```sh
 yum --disablerepo=* --enablerepo=fury list available
 ```
 
 And then run yum install.
+
 ```sh
 sudo yum install av
 ```
 
 ### Alternatively
+
 If you'd prefer you can download the `.rpm` file from the [releases page](https://github.com/aviator-co/av/releases).
 
 ```sh
@@ -215,19 +224,19 @@ Download the binary from the [releases page](https://github.com/aviator-co/av/re
 
 # Example commands
 
-| Command               | Description                                                |
-| --------------------- | ---------------------------------------------------------- |
-| `av stack branch`     | Create a new child branch from the current branch.         |
-| `av stack restack`    | Rebase the branches to their parents.                      |
-| `av pr create`        | Create or update a PR.                                     |
-| `av stack tree`       | Visualize the PRs.                                         |
-| `av stack sync --all` | Fetch and rebase all branches.                             |
-| `av stack adopt`      | Adopt a branch that is not created from `av stack branch`. |
-| `av stack reparent`   | Change the parent of the current branch.                   |
-| `av stack switch`     | Check out branches interactively.                          |
-| `av stack reorder`    | Reorder the branches.                                      |
-| `av commit amend`     | Amend the last commit and rebase the children.             |
-| `av commit split`     | Split the last commit.                                     |
+| Command             | Description                                                |
+| ------------------- | ---------------------------------------------------------- |
+| `av stack branch`   | Create a new child branch from the current branch.         |
+| `av stack restack`  | Rebase the branches to their parents.                      |
+| `av pr create`      | Create or update a PR.                                     |
+| `av stack tree`     | Visualize the PRs.                                         |
+| `av sync --all`     | Fetch and rebase all branches.                             |
+| `av stack adopt`    | Adopt a branch that is not created from `av stack branch`. |
+| `av stack reparent` | Change the parent of the current branch.                   |
+| `av stack switch`   | Check out branches interactively.                          |
+| `av stack reorder`  | Reorder the branches.                                      |
+| `av commit amend`   | Amend the last commit and rebase the children.             |
+| `av commit split`   | Split the last commit.                                     |
 
 # How it works
 
@@ -238,6 +247,6 @@ new base branch using the remembered starting point as the merge base.
 
 # Learn more
 
-* [Rethinking code reviews with stacked PRs](https://www.aviator.co/blog/rethinking-code-reviews-with-stacked-prs/)
-* [Issue Tracker](https://github.com/aviator-co/av/issues)
-* [Changelog](https://github.com/aviator-co/av/releases)
+- [Rethinking code reviews with stacked PRs](https://www.aviator.co/blog/rethinking-code-reviews-with-stacked-prs/)
+- [Issue Tracker](https://github.com/aviator-co/av/issues)
+- [Changelog](https://github.com/aviator-co/av/releases)

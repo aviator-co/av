@@ -131,7 +131,7 @@ func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) err
 		// TODO: We should rebase the stacks after split.
 		_, _ = fmt.Fprint(
 			os.Stderr,
-			"Run `av stack sync` to sync your stack if necessary.",
+			"Run 'av sync' to sync your stack if necessary.",
 		)
 
 	}

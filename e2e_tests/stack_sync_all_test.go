@@ -28,7 +28,7 @@ func TestStackSyncAll(t *testing.T) {
 	//     stack-1:  \ -> 1a
 	//     stack-2:  \ -> 2a
 
-	RequireAv(t, "stack", "sync", "--all")
+	RequireAv(t, "sync", "--all")
 
 	//     main:    X  -> X2
 	//     stack-1:        \ -> 1a

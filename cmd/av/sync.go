@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var stackSyncFlags struct {
+var syncFlags struct {
 	All           bool
 	RebaseToTrunk bool
 	Current       bool
@@ -39,11 +39,11 @@ var stackSyncFlags struct {
 
 const (
 	changeNoticePrompt     = "Are you OK to continue with the new behavior?"
-	continueWithSyncChoice = "OK! Continue with av stack sync, rebasing onto the latest trunk (we will not ask again)"
-	abortSyncChoice        = "Nope. Abort av stack sync (we will ask again next time)"
+	continueWithSyncChoice = "OK! Continue with av sync, rebasing onto the latest trunk (we will not ask again)"
+	abortSyncChoice        = "Nope. Abort av sync (we will ask again next time)"
 )
 
-var stackSyncCmd = &cobra.Command{
+var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Synchronize stacked branches with GitHub",
 	Long: strings.TrimSpace(`
@@ -68,13 +68,13 @@ base branch.
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !sliceutils.Contains(
 			[]string{"ask", "yes", "no"},
-			strings.ToLower(stackSyncFlags.Push),
+			strings.ToLower(syncFlags.Push),
 		) {
 			return errors.New("invalid value for --push; must be one of ask, yes, no")
 		}
 		if !sliceutils.Contains(
 			[]string{"ask", "yes", "no"},
-			strings.ToLower(stackSyncFlags.Prune),
+			strings.ToLower(syncFlags.Prune),
 		) {
 			return errors.New("invalid value for --prune; must be one of ask, yes, no")
 		}
@@ -100,34 +100,34 @@ base branch.
 			return err
 		}
 
-		return uiutils.RunBubbleTea(&stackSyncViewModel{
-			repo:                  repo,
-			db:                    db,
-			client:                client,
-			help:                  help.New(),
-			askingStackSyncChange: !config.UserState.NotifiedStackSyncChange,
+		return uiutils.RunBubbleTea(&syncViewModel{
+			repo:             repo,
+			db:               db,
+			client:           client,
+			help:             help.New(),
+			askingSyncChange: !config.UserState.NotifiedStackSyncChange,
 		})
 	},
 }
 
-type savedStackSyncState struct {
-	RestackState   *sequencerui.RestackState
-	StackSyncState *stackSyncState
+type savedSyncState struct {
+	RestackState *sequencerui.RestackState
+	SyncState    *syncState
 }
 
-type stackSyncState struct {
+type syncState struct {
 	TargetBranches []plumbing.ReferenceName
 	Prune          string
 	Push           string
 }
 
-type stackSyncViewModel struct {
+type syncViewModel struct {
 	repo   *git.Repo
 	db     meta.DB
 	client *gh.Client
 	help   help.Model
 
-	state              *stackSyncState
+	state              *syncState
 	changeNoticePrompt *selection.Model[string]
 	syncAllPrompt      *selection.Model[string]
 	githubFetchModel   *ghui.GitHubFetchModel
@@ -135,17 +135,17 @@ type stackSyncViewModel struct {
 	githubPushModel    *ghui.GitHubPushModel
 	pruneBranchModel   *gitui.PruneBranchModel
 
-	askingStackSyncChange bool
-	pushingToGitHub       bool
-	pruningBranches       bool
+	askingSyncChange bool
+	pushingToGitHub  bool
+	pruningBranches  bool
 
 	quitWithAbortChoice bool
 	quitWithConflict    bool
 	err                 error
 }
 
-func (vm *stackSyncViewModel) Init() tea.Cmd {
-	if vm.askingStackSyncChange && os.Getenv("AV_STACK_SYNC_CHANGE_NO_ASK") != "1" {
+func (vm *syncViewModel) Init() tea.Cmd {
+	if vm.askingSyncChange && os.Getenv("AV_STACK_SYNC_CHANGE_NO_ASK") != "1" {
 		vm.changeNoticePrompt = uiutils.NewPromptModel(
 			changeNoticePrompt,
 			[]string{continueWithSyncChoice, abortSyncChoice},
@@ -155,7 +155,7 @@ func (vm *stackSyncViewModel) Init() tea.Cmd {
 	return vm.initSync()
 }
 
-func (vm *stackSyncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case spinner.TickMsg:
 		var cmds []tea.Cmd
@@ -240,7 +240,7 @@ func (vm *stackSyncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				vm.syncAllPrompt = nil
 				if c == "Yes" {
-					stackSyncFlags.All = true
+					syncFlags.All = true
 				}
 				if c == "No" {
 					return vm, tea.Quit
@@ -252,7 +252,7 @@ func (vm *stackSyncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				_, cmd := vm.syncAllPrompt.Update(msg)
 				return vm, cmd
 			}
-		} else if vm.askingStackSyncChange {
+		} else if vm.askingSyncChange {
 
 			switch msg.String() {
 			case " ", "enter":
@@ -261,7 +261,7 @@ func (vm *stackSyncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					vm.err = err
 					return vm, tea.Quit
 				}
-				vm.askingStackSyncChange = false
+				vm.askingSyncChange = false
 				if c == continueWithSyncChoice {
 					config.UserState.NotifiedStackSyncChange = true
 					if err := config.SaveUserState(); err != nil {
@@ -308,7 +308,7 @@ func (vm *stackSyncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm *stackSyncViewModel) View() string {
+func (vm *syncViewModel) View() string {
 	var ss []string
 	if vm.syncAllPrompt != nil {
 		ss = append(ss, vm.syncAllPrompt.View())
@@ -347,20 +347,20 @@ func (vm *stackSyncViewModel) View() string {
 
 var commandStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
 
-func (vm *stackSyncViewModel) viewChangeNotice() string {
+func (vm *syncViewModel) viewChangeNotice() string {
 	boldStyle := lipgloss.NewStyle().Bold(true)
 	sb := strings.Builder{}
 	sb.WriteString(
 		boldStyle.Render(
 			"The behavior of ",
 		) + commandStyle.Bold(true).
-			Render("av stack sync") +
+			Render("av sync") +
 			boldStyle.Render(
 				" has changed. We will now ask for confirmation before syncing the stack.\n",
 			),
 	)
 	sb.WriteString("\n")
-	sb.WriteString("* " + commandStyle.Render("av stack sync") + " is split into four commands:\n")
+	sb.WriteString("* " + commandStyle.Render("av sync") + " is split into four commands:\n")
 	sb.WriteString(
 		"  * " + commandStyle.Render("av stack adopt") + " to adopt a new branch into the stack.\n",
 	)
@@ -372,23 +372,23 @@ func (vm *stackSyncViewModel) viewChangeNotice() string {
 	)
 	sb.WriteString(
 		"  * " + commandStyle.Render(
-			"av stack sync",
+			"av sync",
 		) + " to rebase the stack with the remote repository.\n",
 	)
 	sb.WriteString(
 		"* " + commandStyle.Render(
-			"av stack sync",
+			"av sync",
 		) + " will ask if you want to push to the remote repository.\n",
 	)
 	sb.WriteString(
 		"* " + commandStyle.Render(
-			"av stack sync",
+			"av sync",
 		) + " will ask if you want to delete the branches that have been merged.\n",
 	)
 	sb.WriteString("\n")
 	sb.WriteString(
 		"With this change, " + commandStyle.Render(
-			"av stack sync",
+			"av sync",
 		) + " will always rebase onto the remote trunk branch (e.g., main or\n",
 	)
 	sb.WriteString(
@@ -406,7 +406,7 @@ func (vm *stackSyncViewModel) viewChangeNotice() string {
 type promptUserShouldSyncAllMsg struct {
 }
 
-func (vm *stackSyncViewModel) initSync() tea.Cmd {
+func (vm *syncViewModel) initSync() tea.Cmd {
 	state, err := vm.readState()
 	if err != nil {
 		return func() tea.Msg { return err }
@@ -414,7 +414,7 @@ func (vm *stackSyncViewModel) initSync() tea.Cmd {
 	if state != nil {
 		return vm.continueWithState(state)
 	}
-	if stackSyncFlags.Abort || stackSyncFlags.Continue || stackSyncFlags.Skip {
+	if syncFlags.Abort || syncFlags.Continue || syncFlags.Skip {
 		return func() tea.Msg { return errors.New("no restack in progress") }
 	}
 
@@ -422,7 +422,7 @@ func (vm *stackSyncViewModel) initSync() tea.Cmd {
 	if err != nil {
 		return func() tea.Msg { return err }
 	}
-	if isTrunkBranch && !stackSyncFlags.All {
+	if isTrunkBranch && !syncFlags.All {
 		return func() tea.Msg {
 			return promptUserShouldSyncAllMsg{}
 		}
@@ -434,7 +434,7 @@ func (vm *stackSyncViewModel) initSync() tea.Cmd {
 	return vm.githubFetchModel.Init()
 }
 
-func (vm *stackSyncViewModel) initSequencerState() tea.Cmd {
+func (vm *syncViewModel) initSequencerState() tea.Cmd {
 	state, err := vm.createState()
 	if err != nil {
 		return func() tea.Msg { return err }
@@ -445,19 +445,19 @@ func (vm *stackSyncViewModel) initSequencerState() tea.Cmd {
 	return vm.continueWithState(state)
 }
 
-func (vm *stackSyncViewModel) continueWithState(state *savedStackSyncState) tea.Cmd {
-	vm.state = state.StackSyncState
+func (vm *syncViewModel) continueWithState(state *savedSyncState) tea.Cmd {
+	vm.state = state.SyncState
 	vm.restackModel = sequencerui.NewRestackModel(vm.repo, vm.db)
-	vm.restackModel.Command = "av stack sync"
+	vm.restackModel.Command = "av sync"
 	vm.restackModel.State = state.RestackState
-	vm.restackModel.Abort = stackSyncFlags.Abort
-	vm.restackModel.Continue = stackSyncFlags.Continue
-	vm.restackModel.Skip = stackSyncFlags.Skip
+	vm.restackModel.Abort = syncFlags.Abort
+	vm.restackModel.Continue = syncFlags.Continue
+	vm.restackModel.Skip = syncFlags.Skip
 	return vm.restackModel.Init()
 }
 
-func (vm *stackSyncViewModel) readState() (*savedStackSyncState, error) {
-	var state savedStackSyncState
+func (vm *syncViewModel) readState() (*savedSyncState, error) {
+	var state savedSyncState
 	if err := vm.repo.ReadStateFile(git.StateFileKindSyncV2, &state); err != nil &&
 		os.IsNotExist(err) {
 		return nil, nil
@@ -467,17 +467,17 @@ func (vm *stackSyncViewModel) readState() (*savedStackSyncState, error) {
 	return &state, nil
 }
 
-func (vm *stackSyncViewModel) writeState(seqModel *sequencerui.RestackState) error {
+func (vm *syncViewModel) writeState(seqModel *sequencerui.RestackState) error {
 	if seqModel == nil {
 		return vm.repo.WriteStateFile(git.StateFileKindSyncV2, nil)
 	}
-	var state savedStackSyncState
+	var state savedSyncState
 	state.RestackState = seqModel
-	state.StackSyncState = vm.state
+	state.SyncState = vm.state
 	return vm.repo.WriteStateFile(git.StateFileKindSyncV2, &state)
 }
 
-func (vm *stackSyncViewModel) createGitHubFetchModel() (*ghui.GitHubFetchModel, error) {
+func (vm *syncViewModel) createGitHubFetchModel() (*ghui.GitHubFetchModel, error) {
 	status, err := vm.repo.Status()
 	if err != nil {
 		return nil, err
@@ -485,7 +485,7 @@ func (vm *stackSyncViewModel) createGitHubFetchModel() (*ghui.GitHubFetchModel, 
 	currentBranch := status.CurrentBranch
 
 	var targetBranches []plumbing.ReferenceName
-	if stackSyncFlags.All {
+	if syncFlags.All {
 		var err error
 		targetBranches, err = planner.GetTargetBranches(
 			vm.db.ReadTx(),
@@ -501,7 +501,7 @@ func (vm *stackSyncViewModel) createGitHubFetchModel() (*ghui.GitHubFetchModel, 
 			return nil, errors.New("current branch is not adopted to av")
 		}
 		var err error
-		if stackSyncFlags.Current {
+		if syncFlags.Current {
 			targetBranches, err = planner.GetTargetBranches(vm.db.ReadTx(), vm.repo, true, planner.CurrentAndParents)
 		} else {
 			targetBranches, err = planner.GetTargetBranches(vm.db.ReadTx(), vm.repo, true, planner.CurrentStack)
@@ -525,12 +525,12 @@ func (vm *stackSyncViewModel) createGitHubFetchModel() (*ghui.GitHubFetchModel, 
 	), nil
 }
 
-func (vm *stackSyncViewModel) createState() (*savedStackSyncState, error) {
-	state := savedStackSyncState{
+func (vm *syncViewModel) createState() (*savedSyncState, error) {
+	state := savedSyncState{
 		RestackState: &sequencerui.RestackState{},
-		StackSyncState: &stackSyncState{
-			Push:  stackSyncFlags.Push,
-			Prune: stackSyncFlags.Prune,
+		SyncState: &syncState{
+			Push:  syncFlags.Push,
+			Prune: syncFlags.Prune,
 		},
 	}
 	status, err := vm.repo.Status()
@@ -541,7 +541,7 @@ func (vm *stackSyncViewModel) createState() (*savedStackSyncState, error) {
 	state.RestackState.InitialBranch = currentBranch
 
 	var targetBranches []plumbing.ReferenceName
-	if stackSyncFlags.All {
+	if syncFlags.All {
 		var err error
 		targetBranches, err = planner.GetTargetBranches(
 			vm.db.ReadTx(),
@@ -558,7 +558,7 @@ func (vm *stackSyncViewModel) createState() (*savedStackSyncState, error) {
 			return nil, errors.New("current branch is not adopted to av")
 		}
 		var err error
-		if stackSyncFlags.Current {
+		if syncFlags.Current {
 			targetBranches, err = planner.GetTargetBranches(vm.db.ReadTx(), vm.repo, true, planner.CurrentAndParents)
 		} else {
 			targetBranches, err = planner.GetTargetBranches(vm.db.ReadTx(), vm.repo, true, planner.CurrentStack)
@@ -568,7 +568,7 @@ func (vm *stackSyncViewModel) createState() (*savedStackSyncState, error) {
 		}
 		state.RestackState.RelatedBranches = append(state.RestackState.RelatedBranches, currentBranch)
 	}
-	state.StackSyncState.TargetBranches = targetBranches
+	state.SyncState.TargetBranches = targetBranches
 
 	var currentBranchRef plumbing.ReferenceName
 	if currentBranch != "" {
@@ -578,9 +578,9 @@ func (vm *stackSyncViewModel) createState() (*savedStackSyncState, error) {
 		vm.db.ReadTx(),
 		vm.repo,
 		currentBranchRef,
-		stackSyncFlags.All,
-		stackSyncFlags.Current,
-		stackSyncFlags.RebaseToTrunk,
+		syncFlags.All,
+		syncFlags.Current,
+		syncFlags.RebaseToTrunk,
 	)
 	if err != nil {
 		return nil, err
@@ -589,7 +589,7 @@ func (vm *stackSyncViewModel) createState() (*savedStackSyncState, error) {
 	return &state, nil
 }
 
-func (vm *stackSyncViewModel) initPushBranches() tea.Cmd {
+func (vm *syncViewModel) initPushBranches() tea.Cmd {
 	vm.githubPushModel = ghui.NewGitHubPushModel(
 		vm.repo,
 		vm.db,
@@ -601,7 +601,7 @@ func (vm *stackSyncViewModel) initPushBranches() tea.Cmd {
 	return vm.githubPushModel.Init()
 }
 
-func (vm *stackSyncViewModel) initPruneBranches() tea.Cmd {
+func (vm *syncViewModel) initPruneBranches() tea.Cmd {
 	vm.pruneBranchModel = gitui.NewPruneBranchModel(
 		vm.repo,
 		vm.db,
@@ -613,7 +613,7 @@ func (vm *stackSyncViewModel) initPruneBranches() tea.Cmd {
 	return vm.pruneBranchModel.Init()
 }
 
-func (vm *stackSyncViewModel) ExitError() error {
+func (vm *syncViewModel) ExitError() error {
 	if errors.Is(vm.err, nothingToRestackError) {
 		return nil
 	}
@@ -627,57 +627,59 @@ func (vm *stackSyncViewModel) ExitError() error {
 }
 
 func init() {
-	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.All, "all", false,
+	syncCmd.Flags().BoolVar(
+		&syncFlags.All, "all", false,
 		"synchronize all branches",
 	)
-	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.Current, "current", false,
+	syncCmd.Flags().BoolVar(
+		&syncFlags.Current, "current", false,
 		"only sync changes to the current branch\n(don't recurse into descendant branches)",
 	)
-	stackSyncCmd.Flags().StringVar(
-		&stackSyncFlags.Push, "push", "ask",
+	syncCmd.Flags().StringVar(
+		&syncFlags.Push, "push", "ask",
 		"push the rebased branches to the remote repository\n(ask|yes|no)",
 	)
-	stackSyncCmd.Flags().StringVar(
-		&stackSyncFlags.Prune, "prune", "ask",
+	syncCmd.Flags().StringVar(
+		&syncFlags.Prune, "prune", "ask",
 		"delete branches that have been merged into the parent branch\n(ask|yes|no)",
 	)
-	stackSyncCmd.Flags().Lookup("prune").NoOptDefVal = "ask"
-	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.RebaseToTrunk, "rebase-to-trunk", false,
+	syncCmd.Flags().Lookup("prune").NoOptDefVal = "ask"
+	syncCmd.Flags().BoolVar(
+		&syncFlags.RebaseToTrunk, "rebase-to-trunk", false,
 		"rebase the branches to the latest trunk always",
 	)
 
-	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.Continue, "continue", false,
+	syncCmd.Flags().BoolVar(
+		&syncFlags.Continue, "continue", false,
 		"continue an in-progress sync",
 	)
-	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.Abort, "abort", false,
+	syncCmd.Flags().BoolVar(
+		&syncFlags.Abort, "abort", false,
 		"abort an in-progress sync",
 	)
-	stackSyncCmd.Flags().BoolVar(
-		&stackSyncFlags.Skip, "skip", false,
+	syncCmd.Flags().BoolVar(
+		&syncFlags.Skip, "skip", false,
 		"skip the current commit and continue an in-progress sync",
 	)
-	stackSyncCmd.MarkFlagsMutuallyExclusive("current", "all")
-	stackSyncCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
+	syncCmd.MarkFlagsMutuallyExclusive("current", "all")
+	syncCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
 
 	// Deprecated flags
-	stackSyncCmd.Flags().Bool("no-fetch", false,
+	syncCmd.Flags().Bool("no-fetch", false,
 		"(deprecated; use av stack restack for offline restacking) do not fetch the latest status from GitHub",
 	)
-	_ = stackSyncCmd.Flags().
+	_ = syncCmd.Flags().
 		MarkDeprecated("no-fetch", "please use av stack restack for offline restacking")
-	stackSyncCmd.Flags().Bool("trunk", false,
+
+	syncCmd.Flags().Bool("trunk", false,
 		"(deprecated; use --rebase-to-trunk to rebase all branches to trunk) rebase the stack on the trunk branch",
 	)
-	_ = stackSyncCmd.Flags().
+	_ = syncCmd.Flags().
 		MarkDeprecated("trunk", "please use --rebase-to-trunk to rebase all branches to trunk")
-	stackSyncCmd.Flags().String("parent", "",
+
+	syncCmd.Flags().String("parent", "",
 		"(deprecated; use av stack adopt or av stack reparent) parent branch to rebase onto",
 	)
-	_ = stackSyncCmd.Flags().
+	_ = syncCmd.Flags().
 		MarkDeprecated("parent", "please use av stack adopt or av stack reparent")
 }

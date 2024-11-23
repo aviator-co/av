@@ -293,7 +293,7 @@ func (vm stackSwitchViewModel) View() string {
 	return ret
 }
 
-func (_ stackSwitchViewModel) renderBranchInfo(
+func (stackSwitchViewModel) renderBranchInfo(
 	stbi *stackTreeBranchInfo,
 	currentBranchName string,
 	branchName string,

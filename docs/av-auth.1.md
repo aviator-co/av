@@ -1,13 +1,13 @@
-# av-auth-status
+# av-auth
 
 ## NAME
 
-av-auth-status - Show info about the logged in user
+av-auth - Show info about the logged in user
 
 ## SYNOPSIS
 
 ```synopsis
-av auth status
+av auth
 ```
 
 ## DESCRIPTION

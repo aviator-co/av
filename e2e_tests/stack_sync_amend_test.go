@@ -43,7 +43,7 @@ func TestSyncAfterAmendingCommit(t *testing.T) {
 	// Now we amend commit 1b and make sure the sync after succeeds
 	repo.CheckoutBranch(t, "refs/heads/stack-1")
 	repo.CommitFile(t, "my-file", "1a\n1c\n1b\n", gittest.WithAmend())
-	RequireAv(t, "stack", "sync")
+	RequireAv(t, "sync")
 	repo.CheckoutBranch(t, "refs/heads/stack-3")
 	contents, err := os.ReadFile("my-file")
 	require.NoError(t, err)
