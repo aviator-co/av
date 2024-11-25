@@ -73,6 +73,7 @@ func NewGitHubPushModel(
 		spinner:             spinner.New(spinner.WithSpinner(spinner.Dot)),
 		help:                help.New(),
 		chooseNoPush:        pushFlag == "no",
+		pullRequestsCache:   map[string]*gh.PullRequest{},
 	}
 }
 
