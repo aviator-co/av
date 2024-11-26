@@ -30,11 +30,11 @@ func TestStackSync(t *testing.T) {
 	//     stack-4:           \ -> 4a
 	// Note: we create the first branch with a "vanilla" git checkout just to
 	// make sure that's working as intended.
-	RequireAv(t, "stack", "branch", "stack-1")
+	RequireAv(t, "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
-	RequireAv(t, "stack", "branch", "stack-2")
+	RequireAv(t, "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
-	RequireAv(t, "stack", "branch", "stack-3")
+	RequireAv(t, "branch", "stack-3")
 	repo.CommitFile(
 		t,
 		"different-file",
@@ -42,7 +42,7 @@ func TestStackSync(t *testing.T) {
 		gittest.WithMessage("Commit 3a"),
 	)
 	repo.Git(t, "checkout", "stack-1")
-	RequireAv(t, "stack", "branch", "stack-4")
+	RequireAv(t, "branch", "stack-4")
 	repo.CommitFile(t, "another-file", "1a\n4a\n", gittest.WithMessage("Commit 4a"))
 	repo.Git(t, "checkout", "stack-3")
 
@@ -175,9 +175,9 @@ func TestStackSyncAbort(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create a two stack...
-	RequireAv(t, "stack", "branch", "stack-1")
+	RequireAv(t, "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
-	RequireAv(t, "stack", "branch", "stack-2")
+	RequireAv(t, "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
 
 	// Save the original parent HEAD for stack-2, which is the stack-1's commit.
@@ -234,11 +234,11 @@ func TestStackSyncWithLotsOfConflicts(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create a three stack...
-	RequireAv(t, "stack", "branch", "stack-1")
+	RequireAv(t, "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
-	RequireAv(t, "stack", "branch", "stack-2")
+	RequireAv(t, "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "1a\n2a\n", gittest.WithMessage("Commit 2a"))
-	RequireAv(t, "stack", "branch", "stack-3")
+	RequireAv(t, "branch", "stack-3")
 	repo.CommitFile(t, "my-file", "1a\n2a\n3a\n", gittest.WithMessage("Commit 3a"))
 
 	// Go back to the first branch (to make sure that the sync constructs the

@@ -18,13 +18,13 @@ func TestCommitAmendInStack(t *testing.T) {
 	// Create a branch and commit a file.
 	filepath := repo.CreateFile(t, "one.txt", "one")
 	repo.AddFile(t, filepath)
-	RequireAv(t, "stack", "branch", "one")
+	RequireAv(t, "branch", "one")
 	RequireAv(t, "commit", "create", "-m", "one")
 
 	// Create another branch and commit a file.
 	filepath = repo.CreateFile(t, "two.txt", "two")
 	repo.AddFile(t, filepath)
-	RequireAv(t, "stack", "branch", "two")
+	RequireAv(t, "branch", "two")
 	RequireAv(t, "commit", "create", "-m", "two")
 
 	// Go back to the first branch and amend the commit with another file.
@@ -53,7 +53,7 @@ func TestCommitAmendOnMergedBranch(t *testing.T) {
 	repo.Git(t, "fetch")
 
 	// Create a branch with a commit
-	RequireAv(t, "stack", "branch", "one")
+	RequireAv(t, "stack", "one")
 	filepath := repo.CreateFile(t, "one.txt", "one")
 	repo.AddFile(t, filepath)
 	RequireAv(t, "commit", "create", "-m", "one")

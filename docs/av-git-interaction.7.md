@@ -8,14 +8,14 @@ av-git-interaction - av CLI Git Interaction
 
 Typically in Git, a branch is created with `git branch`, `git switch`, or `git
 checkout`. Since `av` needs to keep track of the extra information about
-branches such as the parent branch, we have `av-stack-branch`(1) to create a new
+branches such as the parent branch, we have `av-branch`(1) to create a new
 branch and track the necessary information. This metadata is stored in
 `.git/av/av.db`. We call the branches that `av` has metadata for as "managed
 branches", and the branches that av doesn't have metadata for as "unmanaged
 branches".
 
 There is a case where you created a branch without going through
-`av-stack-branch`(1). In this case, you can attach the branch metadata by using
+`av-branch`(1). In this case, you can attach the branch metadata by using
 `av-stack-adopt`(1). The opposite can be done with `av-stack-orphan`(1).
 
 ## BRANCH DELETION

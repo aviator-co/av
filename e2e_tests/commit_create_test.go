@@ -18,13 +18,13 @@ func TestCommitCreateInStack(t *testing.T) {
 	// Create a branch and commit a file.
 	filepath := repo.CreateFile(t, "one.txt", "one")
 	repo.AddFile(t, filepath)
-	RequireAv(t, "stack", "branch", "one")
+	RequireAv(t, "branch", "one")
 	RequireAv(t, "commit", "create", "-m", "one")
 
 	// Create another branch and commit a file.
 	filepath = repo.CreateFile(t, "two.txt", "two")
 	repo.AddFile(t, filepath)
-	RequireAv(t, "stack", "branch", "two")
+	RequireAv(t, "branch", "two")
 	RequireAv(t, "commit", "create", "-m", "two")
 
 	// Go back to the first branch and commit another file.
@@ -53,7 +53,7 @@ func TestCommitCreateOnMergedBranch(t *testing.T) {
 	repo.Git(t, "fetch")
 
 	// Create a branch
-	RequireAv(t, "stack", "branch", "one")
+	RequireAv(t, "branch", "one")
 
 	// Update the branch meta with the PR data
 	db := repo.OpenDB(t)

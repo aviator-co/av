@@ -38,7 +38,7 @@ Join our discord community: [https://discord.gg/TFgtZtN8](https://discord.gg/NFs
 Create a new branch and make some changes:
 
 ```sh
-$ av stack branch feature-1
+$ av branch feature-1
 $ echo "Hello, world!" > hello.txt
 $ git add hello.txt
 $ git commit -m "Add hello.txt"
@@ -54,7 +54,7 @@ Create a new branch and make some changes. Create another PR that depends on the
 previous PR:
 
 ```sh
-$ av stack branch feature-2
+$ av branch feature-2
 $ echo "Another feature" >> hello.txt
 $ git add hello.txt
 $ git commit -m "Update hello.txt"
@@ -224,19 +224,19 @@ Download the binary from the [releases page](https://github.com/aviator-co/av/re
 
 # Example commands
 
-| Command             | Description                                                |
-| ------------------- | ---------------------------------------------------------- |
-| `av stack branch`   | Create a new child branch from the current branch.         |
-| `av stack restack`  | Rebase the branches to their parents.                      |
-| `av pr create`      | Create or update a PR.                                     |
-| `av stack tree`     | Visualize the PRs.                                         |
-| `av sync --all`     | Fetch and rebase all branches.                             |
-| `av stack adopt`    | Adopt a branch that is not created from `av stack branch`. |
-| `av stack reparent` | Change the parent of the current branch.                   |
-| `av stack switch`   | Check out branches interactively.                          |
-| `av stack reorder`  | Reorder the branches.                                      |
-| `av commit amend`   | Amend the last commit and rebase the children.             |
-| `av commit split`   | Split the last commit.                                     |
+| Command             | Description                                          |
+| ------------------- | ---------------------------------------------------- |
+| `av branch`         | Create a new child branch from the current branch.   |
+| `av stack restack`  | Rebase the branches to their parents.                |
+| `av pr create`      | Create or update a PR.                               |
+| `av stack tree`     | Visualize the PRs.                                   |
+| `av sync --all`     | Fetch and rebase all branches.                       |
+| `av stack adopt`    | Adopt a branch that is not created from `av branch`. |
+| `av stack reparent` | Change the parent of the current branch.             |
+| `av stack switch`   | Check out branches interactively.                    |
+| `av stack reorder`  | Reorder the branches.                                |
+| `av commit amend`   | Amend the last commit and rebase the children.       |
+| `av commit split`   | Split the last commit.                               |
 
 # How it works
 
