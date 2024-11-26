@@ -11,7 +11,7 @@ Hide
 Type '. ../test_utils.sh' Enter
 Type 'new_temp_repo' Enter
 
-Type 'av stack branch stack-1' Enter
+Type 'av branch stack-1' Enter
 Type 'create_commit "my-file" "1a" "Commit 1a"' Enter
 Type 'create_commit "my-file" "1b" "Commit 1b"' Enter
 

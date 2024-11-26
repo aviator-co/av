@@ -11,6 +11,7 @@ av - Aviator CLI
 ## SUBCOMMANDS
 
 - av-auth(1): Show info about the logged in user
+- av-branch(1): Create or rename a branch in the stack
 - av-commit-amend(1): Amend a commit
 - av-commit-create(1): Record changes to the repository with commits
 - av-commit-split(1): Split a commit into multiple commits
@@ -21,7 +22,6 @@ av - Aviator CLI
 - av-pr-status(1): Get the status of the associated pull request
 - av-stack-adopt(1): Adopt branches that are not managed by `av`
 - av-stack-branch-commit(1): Create a new branch in the stack with the staged changes
-- av-stack-branch(1): Create or rename a branch in the stack
 - av-stack-diff(1): Show the diff between working tree and parent branch
 - av-stack-next(1): Checkout the next branch in the stack
 - av-stack-orphan(1): Orphan branches that are managed by `av`

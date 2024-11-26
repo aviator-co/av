@@ -11,8 +11,8 @@ Hide
 Type '. ../test_utils.sh' Enter
 Type 'new_temp_repo' Enter
 
-Type 'av stack branch stack-1' Enter
-Type 'av stack branch stack-2' Enter
+Type 'av branch stack-1' Enter
+Type 'av branch stack-2' Enter
 Type 'git switch main' Enter
 Type 'git branch -D stack-1' Enter
 Type 'clear' Enter

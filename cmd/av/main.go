@@ -92,6 +92,7 @@ func init() {
 	)
 	rootCmd.AddCommand(
 		branchMetaCmd,
+		branchCmd,
 		commitCmd,
 		fetchCmd,
 		initCmd,

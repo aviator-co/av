@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var stackBranchFlags struct {
+var branchFlags struct {
 	// The parent branch to base the new branch off.
 	// By default, this is the current branch.
 	Parent string
@@ -27,18 +27,18 @@ var stackBranchFlags struct {
 	// If true, rename the current branch even if a pull request exists.
 	Force bool
 }
-var stackBranchCmd = &cobra.Command{
-	Use:     "branch [flags] <branch-name> [<parent-branch>]",
-	Aliases: []string{"b", "br"},
-	Short:   "Create or rename a branch in the stack",
-	Long: `Create a new branch that is stacked on the current branch.
+var branchCmd = &cobra.Command{
+	Use:   "branch [flags] <branch-name> [<parent-branch>]",
+	Short: "Create or rename a branch in the stack",
+	Long: strings.TrimSpace(`
+Create a new branch that is stacked on the current branch.
 
 <parent-branch>. If omitted, the new branch bases off the current branch.
 
 If the --rename/-m flag is given, the current branch is renamed to the name
 given as the first argument to the command. Branches should only be renamed
 with this command (not with git branch -m ...) because av needs to update
-internal tracking metadata that defines the order of branches within a stack.`,
+internal tracking metadata that defines the order of branches within a stack.`),
 	Args: cobra.RangeArgs(0, 2),
 	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
 		if len(args) == 0 {
@@ -58,8 +58,8 @@ internal tracking metadata that defines the order of branches within a stack.`,
 		}
 
 		branchName := args[0]
-		if stackBranchFlags.Rename {
-			return stackBranchMove(repo, db, branchName, stackBranchFlags.Force)
+		if branchFlags.Rename {
+			return branchMove(repo, db, branchName, branchFlags.Force)
 		}
 
 		// Determine important contextual information from Git
@@ -70,7 +70,7 @@ internal tracking metadata that defines the order of branches within a stack.`,
 		}
 
 		if len(args) == 2 {
-			stackBranchFlags.Parent = args[1]
+			branchFlags.Parent = args[1]
 		}
 
 		tx := db.WriteTx()
@@ -82,8 +82,8 @@ internal tracking metadata that defines the order of branches within a stack.`,
 
 		// Determine the parent branch and make sure it's checked out
 		var parentBranchName string
-		if stackBranchFlags.Parent != "" {
-			parentBranchName = stackBranchFlags.Parent
+		if branchFlags.Parent != "" {
+			parentBranchName = branchFlags.Parent
 		} else {
 			var err error
 			parentBranchName, err = repo.CurrentBranchName()
@@ -168,16 +168,16 @@ internal tracking metadata that defines the order of branches within a stack.`,
 }
 
 func init() {
-	stackBranchCmd.Flags().
-		StringVar(&stackBranchFlags.Parent, "parent", "", "the parent branch to base the new branch off of")
+	branchCmd.Flags().
+		StringVar(&branchFlags.Parent, "parent", "", "the parent branch to base the new branch off of")
 	// NOTE: We use -m as the shorthand here to match `git branch -m ...`.
-	// See the comment on stackBranchFlags.Rename.
-	stackBranchCmd.Flags().
-		BoolVarP(&stackBranchFlags.Rename, "rename", "m", false, "rename the current branch")
-	stackBranchCmd.Flags().
-		BoolVar(&stackBranchFlags.Force, "force", false, "force rename the current branch, even if a pull request exists")
+	// See the comment on branchFlags.Rename.
+	branchCmd.Flags().
+		BoolVarP(&branchFlags.Rename, "rename", "m", false, "rename the current branch")
+	branchCmd.Flags().
+		BoolVar(&branchFlags.Force, "force", false, "force rename the current branch, even if a pull request exists")
 
-	_ = stackBranchCmd.RegisterFlagCompletionFunc(
+	_ = branchCmd.RegisterFlagCompletionFunc(
 		"parent",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			branches, _ := allBranches()
@@ -186,7 +186,7 @@ func init() {
 	)
 }
 
-func stackBranchMove(
+func branchMove(
 	repo *git.Repo,
 	db meta.DB,
 	newBranch string,
@@ -233,7 +233,7 @@ func stackBranchMove(
 
 	if !force {
 		if currentMeta.PullRequest != nil {
-			_, _ = fmt.Fprint(
+			fmt.Fprint(
 				os.Stderr,
 				colors.Failure(
 					"Cannot rename branch ",
@@ -272,7 +272,7 @@ func stackBranchMove(
 			return errors.WrapIff(err, "failed to rename Git branch")
 		}
 	} else {
-		_, _ = fmt.Fprint(
+		fmt.Fprint(
 			os.Stderr,
 			"Branch ",
 			colors.UserInput(oldBranch),

@@ -1,12 +1,12 @@
-# av-stack-branch
+# av-branch
 
 ## NAME
 
-av-stack-branch - Create or rename a branch in the stack
+av-branch - Create or rename a branch in the stack
 
 ## SYNOPSIS
 
-`av stack branch [-m | --rename] [--force] [--parent <parent_branch>] <branch-name> [<parent_branch>]`
+`av branch [-m | --rename] [--force] [--parent <parent_branch>] <branch-name> [<parent_branch>]`
 
 ## DESCRIPTION
 
@@ -17,7 +17,7 @@ instead of creating a new branch. Branches should only be renamed with this
 command (not with `git branch -m ...`) because av needs to update internal
 tracking metadata that defines the order of branches within a stack. If you
 renamed a branch with `git branch -m`, you can retroactively update the internal
-metadata with `av stack branch --rename <old-branch-name>:<new-branch-name>`.
+metadata with `av branch --rename <old-branch-name>:<new-branch-name>`.
 
 ## OPTIONS
 

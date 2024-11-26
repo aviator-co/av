@@ -13,16 +13,16 @@ func TestStackBranchMove(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create one -> two -> three stack
-	RequireAv(t, "stack", "branch", "one")
+	RequireAv(t, "branch", "one")
 	repo.CommitFile(t, "one.txt", "one")
-	RequireAv(t, "stack", "branch", "two")
+	RequireAv(t, "branch", "two")
 	repo.CommitFile(t, "two.txt", "two")
-	RequireAv(t, "stack", "branch", "three")
+	RequireAv(t, "branch", "three")
 	repo.CommitFile(t, "three.txt", "three")
 
 	// one -> un
 	repo.Git(t, "checkout", "one")
-	RequireAv(t, "stack", "branch", "-m", "un")
+	RequireAv(t, "branch", "-m", "un")
 	RequireCurrentBranchName(t, repo, "refs/heads/un")
 
 	// two -> deux
@@ -30,13 +30,13 @@ func TestStackBranchMove(t *testing.T) {
 	// correct
 	RequireAv(t, "stack", "next")
 	RequireCurrentBranchName(t, repo, "refs/heads/two")
-	RequireAv(t, "stack", "branch", "-m", "deux")
+	RequireAv(t, "branch", "-m", "deux")
 	RequireCurrentBranchName(t, repo, "refs/heads/deux")
 
 	// three -> trois
 	RequireAv(t, "stack", "next")
 	RequireCurrentBranchName(t, repo, "refs/heads/three")
-	RequireAv(t, "stack", "branch", "-m", "trois")
+	RequireAv(t, "branch", "-m", "trois")
 	RequireCurrentBranchName(t, repo, "refs/heads/trois")
 
 	// Make sure we've handled all the parent/child renames correctly
@@ -65,11 +65,11 @@ func TestStackBranchRetroactiveMove(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create one -> two -> three stack
-	RequireAv(t, "stack", "branch", "one")
+	RequireAv(t, "branch", "one")
 	repo.CommitFile(t, "one.txt", "one")
-	RequireAv(t, "stack", "branch", "two")
+	RequireAv(t, "branch", "two")
 	repo.CommitFile(t, "two.txt", "two")
-	RequireAv(t, "stack", "branch", "three")
+	RequireAv(t, "branch", "three")
 	repo.CommitFile(t, "three.txt", "three")
 
 	// one -> un without av
@@ -78,7 +78,7 @@ func TestStackBranchRetroactiveMove(t *testing.T) {
 	RequireCurrentBranchName(t, repo, "refs/heads/un")
 
 	// Retroactive rename with av
-	RequireAv(t, "stack", "branch", "--rename", "one:un")
+	RequireAv(t, "branch", "--rename", "one:un")
 
 	// Make sure we've handled all the parent/child renames correctly
 	db := repo.OpenDB(t)

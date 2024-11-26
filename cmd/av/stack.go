@@ -13,10 +13,13 @@ var stackCmd = &cobra.Command{
 func init() {
 	deprecatedStackSyncCmd := deprecateCommand(*syncCmd, "av sync", "sync")
 
+	deprecatedBranchCmd := deprecateCommand(*branchCmd, "av branch", "branch")
+	deprecatedBranchCmd.Aliases = []string{"b", "br"}
+
 	stackCmd.AddCommand(
+		deprecatedBranchCmd,
 		deprecatedStackSyncCmd,
 		stackAdoptCmd,
-		stackBranchCmd,
 		stackBranchCommitCmd,
 		stackDiffCmd,
 		stackForEachCmd,

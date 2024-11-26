@@ -15,16 +15,16 @@ func TestStackReparent(t *testing.T) {
 	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
 	Chdir(t, repo.RepoDir)
 
-	RequireAv(t, "stack", "branch", "foo")
+	RequireAv(t, "branch", "foo")
 	repo.CommitFile(t, "foo.txt", "foo")
 	requireFileContent(t, "foo.txt", "foo")
 
-	RequireAv(t, "stack", "branch", "bar")
+	RequireAv(t, "branch", "bar")
 	repo.CommitFile(t, "bar.txt", "bar")
 	requireFileContent(t, "bar.txt", "bar")
 	requireFileContent(t, "foo.txt", "foo")
 
-	RequireAv(t, "stack", "branch", "spam")
+	RequireAv(t, "branch", "spam")
 	repo.CommitFile(t, "spam.txt", "spam")
 	requireFileContent(t, "spam.txt", "spam")
 
@@ -63,10 +63,10 @@ func TestStackReparentTrunk(t *testing.T) {
 	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
 	Chdir(t, repo.RepoDir)
 
-	RequireAv(t, "stack", "branch", "foo")
+	RequireAv(t, "branch", "foo")
 	repo.CommitFile(t, "foo.txt", "foo")
 
-	RequireAv(t, "stack", "branch", "bar")
+	RequireAv(t, "branch", "bar")
 	repo.CommitFile(t, "bar.txt", "bar")
 
 	// Delete the local main. av should use the remote tracking branch.
