@@ -26,15 +26,15 @@ func TestStackBranchMove(t *testing.T) {
 	RequireCurrentBranchName(t, repo, "refs/heads/un")
 
 	// two -> deux
-	// use "av stack next" here to make sure the parent child relationship is
+	// use "av next" here to make sure the parent child relationship is
 	// correct
-	RequireAv(t, "stack", "next")
+	RequireAv(t, "next")
 	RequireCurrentBranchName(t, repo, "refs/heads/two")
 	RequireAv(t, "branch", "-m", "deux")
 	RequireCurrentBranchName(t, repo, "refs/heads/deux")
 
 	// three -> trois
-	RequireAv(t, "stack", "next")
+	RequireAv(t, "next")
 	RequireCurrentBranchName(t, repo, "refs/heads/three")
 	RequireAv(t, "branch", "-m", "trois")
 	RequireCurrentBranchName(t, repo, "refs/heads/trois")

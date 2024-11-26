@@ -1,13 +1,13 @@
-# av-stack-next
+# av-next
 
 ## NAME
 
-av-stack-next - Checkout the next branch in the stack
+av-next - Checkout the next branch in the stack
 
 ## SYNOPSIS
 
 ```synopsis
-av stack next [<n> | --last]
+av next [<n> | --last]
 ```
 
 ## DESCRIPTION
@@ -26,4 +26,4 @@ checking out the next branch in the stack.
 
 ## SEE ALSO
 
-`av-pr-prev`(1)
+`av-prev`(1)

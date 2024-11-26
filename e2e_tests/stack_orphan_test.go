@@ -44,7 +44,7 @@ func TestStackOrphan(t *testing.T) {
 		gittest.WithMessage("Commit 3b"),
 	)
 
-	RequireAv(t, "stack", "prev")
+	RequireAv(t, "prev")
 	tree := RequireAv(t, "stack", "tree")
 	require.Contains(t, tree.Stdout, "stack-2")
 	require.Contains(t, tree.Stdout, "stack-3")

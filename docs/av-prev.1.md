@@ -1,13 +1,13 @@
-# av-stack-prev
+# av-prev
 
 ## NAME
 
-av-stack-prev - Checkout the previous branch in the stack
+av-prev - Checkout the previous branch in the stack
 
 ## SYNOPSIS
 
 ```synopsis
-av stack prev [<n> | --first]
+av prev [<n> | --first]
 ```
 
 ## DESCRIPTION
@@ -26,4 +26,4 @@ to checking out the previous branch in the stack.
 
 ## SEE ALSO
 
-`av-pr-next`(1)
+`av-next`(1)

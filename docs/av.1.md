@@ -17,15 +17,15 @@ av - Aviator CLI
 - av-commit-split(1): Split a commit into multiple commits
 - av-fetch(1): Fetch latest repository state from GitHub
 - av-init(1): Initialize the repository for `av`
+- av-next(1): Checkout the next branch in the stack
 - av-pr-create(1): Create a pull request for the current branch
 - av-pr-queue(1): Queue an existing pull request for the current branch
 - av-pr-status(1): Get the status of the associated pull request
+- av-prev(1): Checkout the previous branch in the stack
 - av-stack-adopt(1): Adopt branches that are not managed by `av`
 - av-stack-branch-commit(1): Create a new branch in the stack with the staged changes
 - av-stack-diff(1): Show the diff between working tree and parent branch
-- av-stack-next(1): Checkout the next branch in the stack
 - av-stack-orphan(1): Orphan branches that are managed by `av`
-- av-stack-prev(1): Checkout the previous branch in the stack
 - av-stack-reorder(1): Interactively reorder the stack
 - av-stack-reparent(1): Change the parent of the current branch
 - av-stack-restack(1): Rebase the stacked branches

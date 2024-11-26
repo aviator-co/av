@@ -17,15 +17,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var stackNextFlags struct {
+var nextFlags struct {
 	// should we go to the last
 	Last bool
 }
 
-var stackNextCmd = &cobra.Command{
-	Use:     "next [<n>|--last]",
-	Aliases: []string{"n"},
-	Short:   "Checkout the next branch in the stack",
+var nextCmd = &cobra.Command{
+	Use:   "next [<n>|--last]",
+	Short: "Checkout the next branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var n int = 1
 		if len(args) == 1 {
@@ -42,7 +41,7 @@ var stackNextCmd = &cobra.Command{
 			return errors.New("invalid number (must be >= 1)")
 		}
 
-		stackNext, err := newStackNextModel(stackNextFlags.Last, n)
+		stackNext, err := newNextModel(nextFlags.Last, n)
 		if err != nil {
 			return err
 		}
@@ -51,8 +50,8 @@ var stackNextCmd = &cobra.Command{
 }
 
 func init() {
-	stackNextCmd.Flags().BoolVar(
-		&stackNextFlags.Last, "last", false,
+	nextCmd.Flags().BoolVar(
+		&nextFlags.Last, "last", false,
 		"checkout the last branch in the stack",
 	)
 }
@@ -69,7 +68,7 @@ type stackNextModel struct {
 	err         error
 }
 
-func newStackNextModel(lastInStack bool, nInStack int) (stackNextModel, error) {
+func newNextModel(lastInStack bool, nInStack int) (stackNextModel, error) {
 	repo, err := getRepo()
 	if err != nil {
 		return stackNextModel{}, err

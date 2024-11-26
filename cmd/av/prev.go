@@ -12,15 +12,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var stackPrevFlags struct {
+var prevFlags struct {
 	// should we go to the first
 	First bool
 }
 
-var stackPrevCmd = &cobra.Command{
-	Use:     "prev [<n>|--first]",
-	Aliases: []string{"p"},
-	Short:   "Checkout the previous branch in the stack",
+var prevCmd = &cobra.Command{
+	Use:   "prev [<n>|--first]",
+	Short: "Checkout the previous branch in the stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get the previous branches so we can checkout the nth one
 		repo, err := getRepo()
@@ -42,7 +41,7 @@ var stackPrevCmd = &cobra.Command{
 		}
 
 		var branchToCheckout string
-		if stackPrevFlags.First {
+		if prevFlags.First {
 			if len(previousBranches) == 0 {
 				_, _ = fmt.Fprint(os.Stderr, "already on first branch in stack\n")
 				return nil
@@ -92,8 +91,8 @@ var stackPrevCmd = &cobra.Command{
 }
 
 func init() {
-	stackPrevCmd.Flags().BoolVar(
-		&stackPrevFlags.First, "first", false,
+	prevCmd.Flags().BoolVar(
+		&prevFlags.First, "first", false,
 		"checkout the first branch in the stack",
 	)
 }
