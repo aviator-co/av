@@ -126,7 +126,7 @@ var stackBranchCommitCmd = &cobra.Command{
 		// On failure, we want to delete the branch we created so that the user
 		// can try again (e.g., to fix issues surfaced by a pre-commit hook).
 		cu.Add(func() {
-			_, _ = fmt.Fprint(os.Stderr,
+			fmt.Fprint(os.Stderr,
 				colors.Faint("  - Cleaning up branch "),
 				colors.UserInput(branchName),
 				colors.Faint(" because commit was not successful."),
@@ -166,7 +166,7 @@ var stackBranchCommitCmd = &cobra.Command{
 				ExitError: true,
 			})
 			if err != nil {
-				_, _ = fmt.Fprint(os.Stderr,
+				fmt.Fprint(os.Stderr,
 					"\n", colors.Failure("Failed to stage files: ", err.Error()), "\n",
 				)
 				return actions.ErrExitSilently{ExitCode: 1}
@@ -183,7 +183,7 @@ var stackBranchCommitCmd = &cobra.Command{
 			ExitError:   true,
 			Interactive: true,
 		}); err != nil {
-			_, _ = fmt.Fprint(os.Stderr,
+			fmt.Fprint(os.Stderr,
 				"\n", colors.Failure("Failed to create commit."), "\n",
 			)
 			return actions.ErrExitSilently{ExitCode: 1}
@@ -204,11 +204,13 @@ func init() {
 	stackBranchCommitCmd.Flags().
 		StringVarP(&stackBranchCommitFlags.Message, "message", "m", "", "the commit message")
 	stackBranchCommitCmd.Flags().
-		StringVarP(&stackBranchCommitFlags.BranchName, "branch-name", "b", "", "the branch name to create (if empty, automatically generated from the message)")
+		StringVarP(&stackBranchCommitFlags.BranchName, "branch-name", "b", "",
+			"the branch name to create (if empty, automatically generated from the message)")
 	stackBranchCommitCmd.Flags().
 		BoolVarP(&stackBranchCommitFlags.All, "all", "A", false, "automatically stage all files")
 	stackBranchCommitCmd.Flags().
-		BoolVarP(&stackBranchCommitFlags.AllModified, "all-modified", "a", false, "automatically stage modified and deleted files (ignore untracked files)")
+		BoolVarP(&stackBranchCommitFlags.AllModified, "all-modified", "a", false,
+			"automatically stage modified and deleted files (ignore untracked files)")
 
 	stackBranchCommitCmd.MarkFlagsMutuallyExclusive("all", "all-modified")
 }

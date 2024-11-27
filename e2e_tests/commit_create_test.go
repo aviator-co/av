@@ -19,19 +19,19 @@ func TestCommitCreateInStack(t *testing.T) {
 	filepath := repo.CreateFile(t, "one.txt", "one")
 	repo.AddFile(t, filepath)
 	RequireAv(t, "branch", "one")
-	RequireAv(t, "commit", "create", "-m", "one")
+	RequireAv(t, "commit", "-m", "one")
 
 	// Create another branch and commit a file.
 	filepath = repo.CreateFile(t, "two.txt", "two")
 	repo.AddFile(t, filepath)
 	RequireAv(t, "branch", "two")
-	RequireAv(t, "commit", "create", "-m", "two")
+	RequireAv(t, "commit", "-m", "two")
 
 	// Go back to the first branch and commit another file.
 	repo.Git(t, "checkout", "one")
 	filepath = repo.CreateFile(t, "one-b.txt", "one-b")
 	repo.AddFile(t, filepath)
-	RequireAv(t, "commit", "create", "-m", "one-b")
+	RequireAv(t, "commit", "-m", "one-b")
 
 	// Verify that the branches are still there.
 	db := repo.OpenDB(t)
@@ -66,6 +66,6 @@ func TestCommitCreateOnMergedBranch(t *testing.T) {
 	// Attempt to commit to the "merged" branch
 	filepath := repo.CreateFile(t, "one.txt", "one")
 	repo.AddFile(t, filepath)
-	output := Av(t, "commit", "create", "-m", "two")
+	output := Av(t, "commit", "-m", "two")
 	require.Equal(t, 1, output.ExitCode, "expected exit code 1")
 }

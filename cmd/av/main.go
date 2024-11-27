@@ -103,12 +103,13 @@ func init() {
 		prevCmd,
 		reorderCmd,
 		reparentCmd,
+		splitCommitCmd,
 		stackCmd,
+		switchCmd,
 		syncCmd,
+		tidyCmd,
 		treeCmd,
 		versionCmd,
-		switchCmd,
-		tidyCmd,
 	)
 }
 

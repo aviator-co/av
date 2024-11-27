@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var commitSplitCmd = &cobra.Command{
-	Use:          "split",
+var splitCommitCmd = &cobra.Command{
+	Use:          "split-commit",
 	Short:        "Split a commit into multiple commits",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -47,7 +47,7 @@ var commitSplitCmd = &cobra.Command{
 		// From here, we use detached HEAD, so that even if something goes wrong or user
 		// aborts the operation in the middle, the original branch is intact.
 		if err := splitCommit(repo, currentBranchName, currentCommitOID); err != nil {
-			commitSplitAbortMessage(currentBranchName, currentCommitOID)
+			splitCommitAbortMessage(currentBranchName, currentCommitOID)
 			return err
 		}
 		return nil
@@ -129,7 +129,7 @@ func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) err
 		}
 
 		// TODO: We should rebase the stacks after split.
-		_, _ = fmt.Fprint(
+		fmt.Fprint(
 			os.Stderr,
 			"Run 'av sync' to sync your stack if necessary.",
 		)
@@ -139,17 +139,17 @@ func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) err
 	return nil
 }
 
-func commitSplitAbortMessage(branchName, commitOID string) {
+func splitCommitAbortMessage(branchName, commitOID string) {
 	if branchName == "" {
 		// We started from a detached HEAD.
-		_, _ = fmt.Fprint(
+		fmt.Fprint(
 			os.Stderr,
 			colors.Failure("===================================================="),
 			"\n",
 			colors.Failure("DETACHED HEAD"),
 			"\n",
 			"\n",
-			"The commit split command aborted.\n",
+			"The split-commit command aborted.\n",
 			"The HEAD is moved to a different commit than the original commit ",
 			colors.UserInput(commitOID),
 			"\n",
@@ -166,12 +166,12 @@ func commitSplitAbortMessage(branchName, commitOID string) {
 		)
 		return
 	}
-	_, _ = fmt.Fprint(
+	fmt.Fprint(
 		os.Stderr,
 		colors.Failure("===================================================="), "\n",
 		colors.Failure("DETACHED HEAD"), "\n",
 		"\n",
-		"The commit split command aborted.\n",
+		"The split-commit command aborted.\n",
 		"Your original branch ", colors.UserInput(branchName), " was not modified.\n",
 		"\n",
 		"Your Git repository is now in a detached HEAD state.\n",

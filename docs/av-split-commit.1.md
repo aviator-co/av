@@ -1,8 +1,8 @@
-# av-commit-split
+# av-split-commit
 
 ## NAME
 
-av-commit-split - Split a commit into multiple commits
+av-split-commit - Split a commit into multiple commits
 
 ## DESCRIPTION
 

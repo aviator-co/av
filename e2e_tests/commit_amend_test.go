@@ -19,19 +19,19 @@ func TestCommitAmendInStack(t *testing.T) {
 	filepath := repo.CreateFile(t, "one.txt", "one")
 	repo.AddFile(t, filepath)
 	RequireAv(t, "branch", "one")
-	RequireAv(t, "commit", "create", "-m", "one")
+	RequireAv(t, "commit", "-m", "one")
 
 	// Create another branch and commit a file.
 	filepath = repo.CreateFile(t, "two.txt", "two")
 	repo.AddFile(t, filepath)
 	RequireAv(t, "branch", "two")
-	RequireAv(t, "commit", "create", "-m", "two")
+	RequireAv(t, "commit", "-m", "two")
 
 	// Go back to the first branch and amend the commit with another file.
 	repo.Git(t, "checkout", "one")
 	filepath = repo.CreateFile(t, "one-b.txt", "one-b")
 	repo.AddFile(t, filepath)
-	RequireAv(t, "commit", "amend", "--no-edit")
+	RequireAv(t, "commit", "--amend", "--no-edit")
 
 	// Verify that the branches are still there.
 	db := repo.OpenDB(t)
@@ -56,7 +56,7 @@ func TestCommitAmendOnMergedBranch(t *testing.T) {
 	RequireAv(t, "branch", "one")
 	filepath := repo.CreateFile(t, "one.txt", "one")
 	repo.AddFile(t, filepath)
-	RequireAv(t, "commit", "create", "-m", "one")
+	RequireAv(t, "commit", "-m", "one")
 
 	// Update the branch meta with the PR data
 	db := repo.OpenDB(t)
@@ -69,6 +69,6 @@ func TestCommitAmendOnMergedBranch(t *testing.T) {
 	// Attempt to commit to the "merged" branch
 	filepath = repo.CreateFile(t, "oneA.txt", "one")
 	repo.AddFile(t, filepath)
-	output := Av(t, "commit", "amend")
+	output := Av(t, "commit", "--amend")
 	require.Equal(t, 1, output.ExitCode, "expected exit code 1")
 }

@@ -121,6 +121,7 @@ installed, `av` will use the token automatically from the GitHub CLI. It is
 recommended to install both.
 
 ## macOS (Homebrew)
+
 First, if not already done, [install Homebrew](https://brew.sh).
 
 Then install using Homebrew tap.
@@ -229,37 +230,40 @@ Extract the archive and add the executable to your PATH.
 # Upgrade
 
 ## macOS (Homebrew)
+
 ```sh
 brew update
 brew upgrade av
 ```
 
 ## Debian/Ubuntu
+
 ```sh
 sudo apt update
 sudo apt upgrade
 ```
 
 ## RPM-based systems
+
 ```sh
 yum update
 ```
 
 # Example commands
 
-| Command            | Description                                          |
-| ------------------ | ---------------------------------------------------- |
-| `av branch`        | Create a new child branch from the current branch.   |
-| `av commit amend`  | Amend the last commit and rebase the children.       |
-| `av commit split`  | Split the last commit.                               |
-| `av pr`            | Create or update a PR.                               |
-| `av reorder`       | Reorder the branches.                                |
-| `av reparent`      | Change the parent of the current branch.             |
-| `av stack adopt`   | Adopt a branch that is not created from `av branch`. |
-| `av stack restack` | Rebase the branches to their parents.                |
-| `av switch`        | Check out branches interactively.                    |
-| `av sync --all`    | Fetch and rebase all branches.                       |
-| `av tree`          | Visualize the PRs.                                   |
+| Command             | Description                                          |
+| ------------------- | ---------------------------------------------------- |
+| `av branch`         | Create a new child branch from the current branch.   |
+| `av commit --amend` | Amend the last commit and rebase the children.       |
+| `av pr`             | Create or update a PR.                               |
+| `av reorder`        | Reorder the branches.                                |
+| `av reparent`       | Change the parent of the current branch.             |
+| `av split-commit`   | Split the last commit.                               |
+| `av stack adopt`    | Adopt a branch that is not created from `av branch`. |
+| `av stack restack`  | Rebase the branches to their parents.                |
+| `av switch`         | Check out branches interactively.                    |
+| `av sync --all`     | Fetch and rebase all branches.                       |
+| `av tree`           | Visualize the PRs.                                   |
 
 # How it works
 
