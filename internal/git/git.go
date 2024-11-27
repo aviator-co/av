@@ -180,6 +180,7 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 	cmd.Dir = r.repoDir
 	r.log.Debugf("git %s", opts.Args)
 	var stdout, stderr bytes.Buffer
+	var err error
 	if opts.Interactive {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -192,7 +193,8 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 		cmd.Stdin = opts.Stdin
 	}
 	cmd.Env = append(os.Environ(), opts.Env...)
-	err := cmd.Run()
+	err = cmd.Run()
+
 	var exitError *exec.ExitError
 	if err != nil && !errors.As(err, &exitError) {
 		return nil, errors.Wrapf(err, "git %s", opts.Args)

@@ -12,7 +12,7 @@ func PlanForRestack(
 	tx meta.ReadTx,
 	repo *git.Repo,
 	currentBranch plumbing.ReferenceName,
-	restackAll, restackCurrent bool,
+	restackAll, restackCurrent, restackInteractive bool,
 ) ([]sequencer.RestackOp, error) {
 	var targetBranches []plumbing.ReferenceName
 	var err error
