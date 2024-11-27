@@ -17,12 +17,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var stackReorderFlags struct {
+var reorderFlags struct {
 	Continue bool
 	Abort    bool
 }
 
-const stackReorderDoc = `
+var reorderCmd = &cobra.Command{
+	Use:   "reorder",
+	Short: "Interactively reorder the stack",
+	Long: strings.TrimSpace(`
 Interactively reorder the stack.
 
 This is analogous to git rebase --interactive but operates across all branches
@@ -30,13 +33,8 @@ in the stack.
 
 Branches can be re-arranged within the stack and commits can be edited,
 squashed, dropped, or moved within the stack.
-`
-
-var stackReorderCmd = &cobra.Command{
-	Use:   "reorder",
-	Short: "Interactively reorder the stack",
-	Long:  strings.TrimSpace(stackReorderDoc),
-	Args:  cobra.NoArgs,
+`),
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
 		if err != nil {
@@ -49,8 +47,8 @@ var stackReorderCmd = &cobra.Command{
 
 		var continuation reorder.Continuation
 		if err := repo.ReadStateFile(git.StateFileKindReorder, &continuation); os.IsNotExist(err) {
-			if stackReorderFlags.Continue || stackReorderFlags.Abort {
-				_, _ = fmt.Fprint(os.Stderr,
+			if reorderFlags.Continue || reorderFlags.Abort {
+				fmt.Fprint(os.Stderr,
 					colors.Failure("ERROR: no reorder in progress\n"),
 				)
 				return actions.ErrExitSilently{ExitCode: 127}
@@ -60,7 +58,7 @@ var stackReorderCmd = &cobra.Command{
 		}
 
 		var state *reorder.State
-		if stackReorderFlags.Abort {
+		if reorderFlags.Abort {
 			if continuation.State == nil {
 				_ = repo.WriteStateFile(git.StateFileKindReorder, nil)
 				return errors.New("no reorder in progress")
@@ -76,11 +74,11 @@ var stackReorderCmd = &cobra.Command{
 			//   storing some history and allow the user to do --undo to restore
 			//   their Git state to the state before the reorder.
 			return repo.WriteStateFile(git.StateFileKindReorder, nil)
-		} else if stackReorderFlags.Continue {
+		} else if reorderFlags.Continue {
 			state = continuation.State
 		} else {
 			if continuation.State != nil {
-				_, _ = fmt.Fprint(os.Stderr,
+				fmt.Fprint(os.Stderr,
 					colors.Failure("ERROR: reorder already in progress\n"),
 					colors.Failure("	   use --continue or --abort to continue or abort the reorder\n"),
 				)
@@ -93,7 +91,7 @@ var stackReorderCmd = &cobra.Command{
 			}
 			root, ok := meta.Root(tx, currentBranch)
 			if !ok {
-				_, _ = fmt.Fprint(os.Stderr,
+				fmt.Fprint(os.Stderr,
 					colors.Failure("ERROR: branch "), colors.UserInput(currentBranch),
 					colors.Failure(" is not part of a stack\n"),
 				)
@@ -104,7 +102,7 @@ var stackReorderCmd = &cobra.Command{
 				return err
 			}
 
-			plan, err := stackReorderEditPlan(repo, initialPlan)
+			plan, err := reorderEditPlan(repo, initialPlan)
 			if err != nil {
 				return err
 			}
@@ -130,7 +128,7 @@ var stackReorderCmd = &cobra.Command{
 			if err := repo.WriteStateFile(git.StateFileKindReorder, nil); err != nil {
 				return err
 			}
-			_, _ = fmt.Fprint(os.Stderr,
+			fmt.Fprint(os.Stderr,
 				colors.Success("\nThe stack was reordered successfully.\n"),
 			)
 			return nil
@@ -140,10 +138,10 @@ var stackReorderCmd = &cobra.Command{
 		if err := repo.WriteStateFile(git.StateFileKindReorder, &continuation); err != nil {
 			return err
 		}
-		_, _ = fmt.Fprint(os.Stderr,
+		fmt.Fprint(os.Stderr,
 			colors.Warning("\nThe reorder was interrupted by a conflict.\n"),
 			colors.Warning("Resolve the conflict and run "),
-			colors.CliCmd("av stack reorder --continue"),
+			colors.CliCmd("av reorder --continue"),
 			colors.Warning(" to continue.\n"),
 		)
 		return actions.ErrExitSilently{ExitCode: 1}
@@ -151,14 +149,14 @@ var stackReorderCmd = &cobra.Command{
 }
 
 func init() {
-	stackReorderCmd.Flags().
-		BoolVar(&stackReorderFlags.Continue, "continue", false, "continue an in-progress reorder")
-	stackReorderCmd.Flags().
-		BoolVar(&stackReorderFlags.Abort, "abort", false, "abort an in-progress reorder")
-	stackReorderCmd.MarkFlagsMutuallyExclusive("continue", "abort")
+	reorderCmd.Flags().
+		BoolVar(&reorderFlags.Continue, "continue", false, "continue an in-progress reorder")
+	reorderCmd.Flags().
+		BoolVar(&reorderFlags.Abort, "abort", false, "abort an in-progress reorder")
+	reorderCmd.MarkFlagsMutuallyExclusive("continue", "abort")
 }
 
-func stackReorderEditPlan(repo *git.Repo, initialPlan []reorder.Cmd) ([]reorder.Cmd, error) {
+func reorderEditPlan(repo *git.Repo, initialPlan []reorder.Cmd) ([]reorder.Cmd, error) {
 	plan := initialPlan
 edit:
 	plan, err := reorder.EditPlan(repo, plan)
@@ -166,7 +164,7 @@ edit:
 		return nil, err
 	}
 	if len(plan) == 0 {
-		_, _ = fmt.Fprint(os.Stderr,
+		fmt.Fprint(os.Stderr,
 			colors.Failure("ERROR: reorder plan is empty\n"),
 		)
 		return nil, actions.ErrExitSilently{ExitCode: 127}
@@ -174,16 +172,16 @@ edit:
 
 	diff := reorder.Diff(initialPlan, plan)
 	if len(diff.RemovedBranches) > 0 {
-		_, _ = fmt.Fprint(
+		fmt.Fprint(
 			os.Stderr,
 			colors.Warning("\nWARNING: the following branches were removed from the reorder:\n"),
 		)
 		for _, branch := range diff.RemovedBranches {
-			_, _ = fmt.Fprint(os.Stderr, "  - ", colors.UserInput(branch), "\n")
+			fmt.Fprint(os.Stderr, "  - ", colors.UserInput(branch), "\n")
 		}
 
 	promptDeletionBehavior:
-		_, _ = fmt.Fprint(os.Stderr, "\n",
+		fmt.Fprint(os.Stderr, "\n",
 			`What would you like to do?
     [a] Abort the reorder
     [d] Delete the branches
@@ -201,7 +199,7 @@ edit:
 		// never panic even if the user just hits enter.
 		switch strings.ToLower(string(choice[0])) {
 		case "a":
-			_, _ = fmt.Fprint(os.Stderr, colors.Failure("\nAborting reorder.\n"))
+			fmt.Fprint(os.Stderr, colors.Failure("\nAborting reorder.\n"))
 			return nil, actions.ErrExitSilently{ExitCode: 127}
 		case "d":
 			deleteRefs = true
@@ -210,7 +208,7 @@ edit:
 		case "o":
 			deleteRefs = false
 		default:
-			_, _ = fmt.Fprint(os.Stderr, colors.Failure("\nInvalid choice.\n"))
+			fmt.Fprint(os.Stderr, colors.Failure("\nInvalid choice.\n"))
 			goto promptDeletionBehavior
 		}
 

@@ -1,13 +1,13 @@
-# av-stack-tree
+# av-tree
 
 ## NAME
 
-av-stack-tree - Show the tree of stacked branches
+av-tree - Show the tree of stacked branches
 
 ## SYNOPSIS
 
 ```synopsis
-av stack tree
+av tree
 ```
 
 ## DESCRIPTION

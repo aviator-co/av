@@ -45,13 +45,13 @@ func TestStackOrphan(t *testing.T) {
 	)
 
 	RequireAv(t, "prev")
-	tree := RequireAv(t, "stack", "tree")
+	tree := RequireAv(t, "tree")
 	require.Contains(t, tree.Stdout, "stack-2")
 	require.Contains(t, tree.Stdout, "stack-3")
 
 	RequireAv(t, "stack", "orphan")
 
-	tree = RequireAv(t, "stack", "tree")
+	tree = RequireAv(t, "tree")
 	require.NotContains(t, tree.Stdout, "stack-2")
 	require.NotContains(t, tree.Stdout, "stack-3")
 }

@@ -16,11 +16,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var stackReparentFlags struct {
+var reparentFlags struct {
 	Parent string
 }
 
-var stackReparentCmd = &cobra.Command{
+var reparentCmd = &cobra.Command{
 	Use:   "reparent",
 	Short: "Change the parent of the current branch",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -34,24 +34,24 @@ var stackReparentCmd = &cobra.Command{
 			return err
 		}
 
-		if stackReparentFlags.Parent != "" && len(args) > 0 && args[0] != "" {
-			if stackReparentFlags.Parent != args[0] {
+		if reparentFlags.Parent != "" && len(args) > 0 && args[0] != "" {
+			if reparentFlags.Parent != args[0] {
 				return errors.New("conflicting parent branch names")
 			}
 		}
 		if len(args) > 0 && args[0] != "" {
-			stackReparentFlags.Parent = args[0]
+			reparentFlags.Parent = args[0]
 		}
-		if stackReparentFlags.Parent == "" {
+		if reparentFlags.Parent == "" {
 			return errors.New("missing parent branch name")
 		}
-		stackReparentFlags.Parent = stripRemoteRefPrefixes(repo, stackReparentFlags.Parent)
+		reparentFlags.Parent = stripRemoteRefPrefixes(repo, reparentFlags.Parent)
 
-		return uiutils.RunBubbleTea(&stackReparentViewModel{repo: repo, db: db})
+		return uiutils.RunBubbleTea(&reparentViewModel{repo: repo, db: db})
 	},
 }
 
-type stackReparentViewModel struct {
+type reparentViewModel struct {
 	repo *git.Repo
 	db   meta.DB
 
@@ -61,7 +61,7 @@ type stackReparentViewModel struct {
 	err              error
 }
 
-func (vm *stackReparentViewModel) Init() tea.Cmd {
+func (vm *reparentViewModel) Init() tea.Cmd {
 	state, err := vm.createState()
 	if err != nil {
 		return func() tea.Msg { return err }
@@ -71,7 +71,7 @@ func (vm *stackReparentViewModel) Init() tea.Cmd {
 	return vm.restackModel.Init()
 }
 
-func (vm *stackReparentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (vm *reparentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case *sequencerui.RestackProgress, spinner.TickMsg:
 		var cmd tea.Cmd
@@ -100,9 +100,9 @@ func (vm *stackReparentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm *stackReparentViewModel) View() string {
+func (vm *reparentViewModel) View() string {
 	var ss []string
-	ss = append(ss, "Reparenting onto "+stackReparentFlags.Parent+"...")
+	ss = append(ss, "Reparenting onto "+reparentFlags.Parent+"...")
 	if vm.restackModel != nil {
 		ss = append(ss, vm.restackModel.View())
 	}
@@ -122,14 +122,14 @@ func (vm *stackReparentViewModel) View() string {
 	return ret
 }
 
-func (vm *stackReparentViewModel) writeState(state *sequencerui.RestackState) error {
+func (vm *reparentViewModel) writeState(state *sequencerui.RestackState) error {
 	if state == nil {
 		return vm.repo.WriteStateFile(git.StateFileKindRestack, nil)
 	}
 	return vm.repo.WriteStateFile(git.StateFileKindRestack, state)
 }
 
-func (vm *stackReparentViewModel) createState() (*sequencerui.RestackState, error) {
+func (vm *reparentViewModel) createState() (*sequencerui.RestackState, error) {
 	currentBranch, err := vm.repo.CurrentBranchName()
 	if err != nil {
 		return nil, err
@@ -143,21 +143,21 @@ func (vm *stackReparentViewModel) createState() (*sequencerui.RestackState, erro
 		return nil, errors.New("current branch is not adopted to av")
 	}
 
-	if isParentBranchTrunk, err := vm.repo.IsTrunkBranch(stackReparentFlags.Parent); err != nil {
+	if isParentBranchTrunk, err := vm.repo.IsTrunkBranch(reparentFlags.Parent); err != nil {
 		return nil, err
 	} else if !isParentBranchTrunk {
-		if _, exist := vm.db.ReadTx().Branch(stackReparentFlags.Parent); !exist {
+		if _, exist := vm.db.ReadTx().Branch(reparentFlags.Parent); !exist {
 			return nil, errors.New("parent branch is not adopted to av")
 		}
 	}
 	var state sequencerui.RestackState
 	state.InitialBranch = currentBranch
-	state.RelatedBranches = []string{currentBranch, stackReparentFlags.Parent}
+	state.RelatedBranches = []string{currentBranch, reparentFlags.Parent}
 	ops, err := planner.PlanForReparent(
 		vm.db.ReadTx(),
 		vm.repo,
 		plumbing.NewBranchReferenceName(currentBranch),
-		plumbing.NewBranchReferenceName(stackReparentFlags.Parent),
+		plumbing.NewBranchReferenceName(reparentFlags.Parent),
 	)
 	if err != nil {
 		return nil, err
@@ -169,7 +169,7 @@ func (vm *stackReparentViewModel) createState() (*sequencerui.RestackState, erro
 	return &state, nil
 }
 
-func (vm *stackReparentViewModel) ExitError() error {
+func (vm *reparentViewModel) ExitError() error {
 	if errors.Is(vm.err, nothingToRestackError) {
 		return nil
 	}
@@ -183,12 +183,12 @@ func (vm *stackReparentViewModel) ExitError() error {
 }
 
 func init() {
-	stackReparentCmd.Flags().StringVar(
-		&stackReparentFlags.Parent, "parent", "",
+	reparentCmd.Flags().StringVar(
+		&reparentFlags.Parent, "parent", "",
 		"parent branch to rebase onto",
 	)
 
-	_ = stackReparentCmd.RegisterFlagCompletionFunc(
+	_ = reparentCmd.RegisterFlagCompletionFunc(
 		"parent",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			branches, _ := allBranches()

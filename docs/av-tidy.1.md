@@ -1,13 +1,13 @@
-# av-stack-tidy
+# av-tidy
 
 ## NAME
 
-av-stack-tidy - Tidy stacked branches
+av-tidy - Tidy stacked branches
 
 ## SYNOPSIS
 
 ```synopsis
-av stack tidy
+av tidy
 ```
 
 ## DESCRIPTION

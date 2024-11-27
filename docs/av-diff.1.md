@@ -1,13 +1,13 @@
-# av-stack-diff
+# av-diff
 
 ## NAME
 
-av-stack-diff - Show the diff between working tree and parent branch
+av-diff - Show the diff between working tree and parent branch
 
 ## SYNOPSIS
 
 ```synopsis
-av stack diff
+av diff
 ```
 
 ## DESCRIPTION

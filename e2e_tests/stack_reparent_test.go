@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStackReparent(t *testing.T) {
+func TestReparent(t *testing.T) {
 	server := RunMockGitHubServer(t)
 	defer server.Close()
 	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
@@ -29,7 +29,7 @@ func TestStackReparent(t *testing.T) {
 	requireFileContent(t, "spam.txt", "spam")
 
 	// Now, re-parent spam on top of bar (should be relatively a no-op)
-	RequireAv(t, "stack", "reparent", "--parent", "bar")
+	RequireAv(t, "reparent", "--parent", "bar")
 	requireFileContent(t, "spam.txt", "spam")
 	requireFileContent(
 		t,
@@ -39,7 +39,7 @@ func TestStackReparent(t *testing.T) {
 	)
 
 	// Now, re-parent spam on top of foo
-	RequireAv(t, "stack", "reparent", "--parent", "foo")
+	RequireAv(t, "reparent", "--parent", "foo")
 	currentBranch := repo.CurrentBranch(t)
 	require.Equal(
 		t,
@@ -57,7 +57,7 @@ func TestStackReparent(t *testing.T) {
 	require.NoFileExists(t, "bar.txt", "bar.txt should not exist after reparenting onto foo branch")
 }
 
-func TestStackReparentTrunk(t *testing.T) {
+func TestReparentTrunk(t *testing.T) {
 	server := RunMockGitHubServer(t)
 	defer server.Close()
 	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
@@ -72,7 +72,7 @@ func TestStackReparentTrunk(t *testing.T) {
 	// Delete the local main. av should use the remote tracking branch.
 	repo.Git(t, "branch", "-D", "main")
 
-	RequireAv(t, "stack", "reparent", "--parent", "main")
+	RequireAv(t, "reparent", "--parent", "main")
 }
 
 func requireFileContent(t *testing.T, file string, expected string, args ...any) {

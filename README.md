@@ -64,7 +64,7 @@ $ av pr create
 Visualize the PR stack:
 
 ```sh
-$ av stack tree
+$ av tree
   * feature-2 (HEAD)
   │ https://github.com/octocat/Hello-World/pull/2
   │
@@ -224,19 +224,19 @@ Download the binary from the [releases page](https://github.com/aviator-co/av/re
 
 # Example commands
 
-| Command             | Description                                          |
-| ------------------- | ---------------------------------------------------- |
-| `av branch`         | Create a new child branch from the current branch.   |
-| `av stack restack`  | Rebase the branches to their parents.                |
-| `av pr create`      | Create or update a PR.                               |
-| `av stack tree`     | Visualize the PRs.                                   |
-| `av sync --all`     | Fetch and rebase all branches.                       |
-| `av stack adopt`    | Adopt a branch that is not created from `av branch`. |
-| `av stack reparent` | Change the parent of the current branch.             |
-| `av stack switch`   | Check out branches interactively.                    |
-| `av stack reorder`  | Reorder the branches.                                |
-| `av commit amend`   | Amend the last commit and rebase the children.       |
-| `av commit split`   | Split the last commit.                               |
+| Command            | Description                                          |
+| ------------------ | ---------------------------------------------------- |
+| `av branch`        | Create a new child branch from the current branch.   |
+| `av commit amend`  | Amend the last commit and rebase the children.       |
+| `av commit split`  | Split the last commit.                               |
+| `av pr create`     | Create or update a PR.                               |
+| `av reorder`       | Reorder the branches.                                |
+| `av reparent`      | Change the parent of the current branch.             |
+| `av stack adopt`   | Adopt a branch that is not created from `av branch`. |
+| `av stack restack` | Rebase the branches to their parents.                |
+| `av switch`        | Check out branches interactively.                    |
+| `av sync --all`    | Fetch and rebase all branches.                       |
+| `av tree`          | Visualize the PRs.                                   |
 
 # How it works
 

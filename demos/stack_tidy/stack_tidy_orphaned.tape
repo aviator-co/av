@@ -18,5 +18,5 @@ Type 'git branch -D stack-1' Enter
 Type 'clear' Enter
 Show
 
-Type 'av stack tidy' Enter
+Type 'av tidy' Enter
 Sleep 3

@@ -1,13 +1,13 @@
-# av-stack-reparent
+# av-reparent
 
 ## NAME
 
-av-stack-reparent - Change the parent of the current branch
+av-reparent - Change the parent of the current branch
 
 ## SYNOPSIS
 
 ```synopsis
-av stack reparent [--parent=<parent>]
+av reparent [--parent=<parent>]
 ```
 
 ## DESCRIPTION

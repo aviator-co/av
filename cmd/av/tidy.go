@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var stackTidyCmd = &cobra.Command{
+var tidyCmd = &cobra.Command{
 	Use:   "tidy",
 	Short: "Tidy stacked branches",
 	Long: strings.TrimSpace(`

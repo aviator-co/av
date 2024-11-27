@@ -1,13 +1,13 @@
-# av-stack-reorder
+# av-reorder
 
 ## NAME
 
-av-stack-reorder - Interactively reorder the stack
+av-reorder - Interactively reorder the stack
 
 ## SYNOPSIS
 
 ```synopsis
-av stack reorder [--continue | --abort]
+av reorder [--continue | --abort]
 ```
 
 ## DESCRIPTION

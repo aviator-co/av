@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var stackSwitchCmd = &cobra.Command{
+var switchCmd = &cobra.Command{
 	Use:   "switch [<branch> | <url>]",
 	Short: "Interactively switch to a different branch",
 	Args:  cobra.RangeArgs(0, 1),
@@ -61,16 +61,16 @@ var stackSwitchCmd = &cobra.Command{
 		var branchList []*stackTreeBranchInfo
 		branches := map[string]*stackTreeBranchInfo{}
 		for _, node := range rootNodes {
-			branchList = append(branchList, stackSwitchBranchList(repo, tx, branches, node)...)
+			branchList = append(branchList, switchBranchList(repo, tx, branches, node)...)
 		}
 		if len(branchList) == 0 {
 			return errors.New("no branches found")
 		}
 
 		if !isatty.IsTerminal(os.Stdout.Fd()) {
-			return errors.New("stack switch command must be run in a terminal")
+			return errors.New("switch command must be run in a terminal")
 		}
-		return uiutils.RunBubbleTea(&stackSwitchViewModel{
+		return uiutils.RunBubbleTea(&switchViewModel{
 			repo:                repo,
 			help:                help.New(),
 			currentHEADBranch:   currentBranch,
@@ -93,7 +93,7 @@ func getInitialChosenBranch(branchList []*stackTreeBranchInfo, currentBranch str
 	return branchList[0].BranchName
 }
 
-func stackSwitchBranchList(
+func switchBranchList(
 	repo *git.Repo,
 	tx meta.ReadTx,
 	branches map[string]*stackTreeBranchInfo,
@@ -101,7 +101,7 @@ func stackSwitchBranchList(
 ) []*stackTreeBranchInfo {
 	var ret []*stackTreeBranchInfo
 	for _, child := range node.Children {
-		ret = append(ret, stackSwitchBranchList(repo, tx, branches, child)...)
+		ret = append(ret, switchBranchList(repo, tx, branches, child)...)
 	}
 	stbi := getStackTreeBranchInfo(repo, tx, node.Branch.BranchName)
 	branches[node.Branch.BranchName] = stbi
@@ -151,7 +151,7 @@ func parsePullRequestURL(tx meta.ReadTx, prURL string) (string, error) {
 	return "", fmt.Errorf("failed to detect branch from pull request URL:%s", prURL)
 }
 
-type stackSwitchViewModel struct {
+type switchViewModel struct {
 	currentChosenBranch string
 	checkingOut         bool
 	checkedOut          bool
@@ -166,13 +166,13 @@ type stackSwitchViewModel struct {
 	branches          map[string]*stackTreeBranchInfo
 }
 
-func (vm stackSwitchViewModel) Init() tea.Cmd {
+func (vm switchViewModel) Init() tea.Cmd {
 	return vm.spinner.Tick
 }
 
 type checkoutDoneMsg struct{}
 
-func (vm stackSwitchViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (vm switchViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case error:
 		vm.err = msg
@@ -206,7 +206,7 @@ func (vm stackSwitchViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm stackSwitchViewModel) checkoutBranch() tea.Msg {
+func (vm switchViewModel) checkoutBranch() tea.Msg {
 	if vm.currentChosenBranch != vm.currentHEADBranch {
 		if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{
 			Name: vm.currentChosenBranch,
@@ -217,7 +217,7 @@ func (vm stackSwitchViewModel) checkoutBranch() tea.Msg {
 	return checkoutDoneMsg{}
 }
 
-func (vm stackSwitchViewModel) getPreviousBranch() string {
+func (vm switchViewModel) getPreviousBranch() string {
 	for i, branch := range vm.branchList {
 		if branch.BranchName == vm.currentChosenBranch {
 			if i == 0 {
@@ -229,7 +229,7 @@ func (vm stackSwitchViewModel) getPreviousBranch() string {
 	return vm.currentChosenBranch
 }
 
-func (vm stackSwitchViewModel) getNextBranch() string {
+func (vm switchViewModel) getNextBranch() string {
 	for i, branch := range vm.branchList {
 		if branch.BranchName == vm.currentChosenBranch {
 			if i == len(vm.branchList)-1 {
@@ -241,7 +241,7 @@ func (vm stackSwitchViewModel) getNextBranch() string {
 	return vm.currentChosenBranch
 }
 
-func (vm stackSwitchViewModel) View() string {
+func (vm switchViewModel) View() string {
 	var ss []string
 	if vm.checkingOut {
 		ss = append(
@@ -293,7 +293,7 @@ func (vm stackSwitchViewModel) View() string {
 	return ret
 }
 
-func (stackSwitchViewModel) renderBranchInfo(
+func (switchViewModel) renderBranchInfo(
 	stbi *stackTreeBranchInfo,
 	currentBranchName string,
 	branchName string,
@@ -320,7 +320,7 @@ func (stackSwitchViewModel) renderBranchInfo(
 	return strings.Join(ss, "\n")
 }
 
-func (vm stackSwitchViewModel) ExitError() error {
+func (vm switchViewModel) ExitError() error {
 	if vm.err != nil {
 		return actions.ErrExitSilently{ExitCode: 1}
 	}

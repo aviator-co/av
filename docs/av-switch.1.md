@@ -1,13 +1,13 @@
-# av-stack-switch
+# av-switch
 
 ## NAME
 
-av-stack-switch - Interactively switch to a different branch
+av-switch - Interactively switch to a different branch
 
 ## SYNOPSIS
 
 ```synopsis
-av stack switch [<branch> | <url>]
+av switch [<branch> | <url>]
 ```
 
 ## DESCRIPTION

@@ -29,7 +29,7 @@ Type 'git switch --detach stack-1' Enter
 Type 'clear' Enter
 Show
 
-Type 'av stack switch' Enter
+Type 'av switch' Enter
 Sleep 2
 
 Down

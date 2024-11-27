@@ -20,5 +20,5 @@ func TestStackTree(t *testing.T) {
 	RequireAv(t, "branch", "spam")
 	repo.CommitFile(t, "spam", "spam")
 
-	RequireAv(t, "stack", "tree")
+	RequireAv(t, "tree")
 }

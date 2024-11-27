@@ -365,7 +365,7 @@ func (vm *syncViewModel) viewChangeNotice() string {
 		"  * " + commandStyle.Render("av stack adopt") + " to adopt a new branch into the stack.\n",
 	)
 	sb.WriteString(
-		"  * " + commandStyle.Render("av stack reparent") + " to change the parent branch.\n",
+		"  * " + commandStyle.Render("av reparent") + " to change the parent branch.\n",
 	)
 	sb.WriteString(
 		"  * " + commandStyle.Render("av stack restack") + " to rebase the stack locally.\n",
@@ -678,8 +678,8 @@ func init() {
 		MarkDeprecated("trunk", "please use --rebase-to-trunk to rebase all branches to trunk")
 
 	syncCmd.Flags().String("parent", "",
-		"(deprecated; use av stack adopt or av stack reparent) parent branch to rebase onto",
+		"(deprecated; use av stack adopt or av reparent) parent branch to rebase onto",
 	)
 	_ = syncCmd.Flags().
-		MarkDeprecated("parent", "please use av stack adopt or av stack reparent")
+		MarkDeprecated("parent", "please use av stack adopt or av reparent")
 }

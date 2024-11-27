@@ -12,10 +12,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var stackTreeCmd = &cobra.Command{
-	Use:     "tree",
-	Aliases: []string{"t"},
-	Short:   "Show the tree of stacked branches",
+var treeCmd = &cobra.Command{
+	Use:   "tree",
+	Short: "Show the tree of stacked branches",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
 		if err != nil {

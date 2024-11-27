@@ -95,14 +95,20 @@ func init() {
 		branchCmd,
 		branchMetaCmd,
 		commitCmd,
+		diffCmd,
 		fetchCmd,
 		initCmd,
 		nextCmd,
 		prCmd,
 		prevCmd,
+		reorderCmd,
+		reparentCmd,
 		stackCmd,
 		syncCmd,
+		treeCmd,
 		versionCmd,
+		switchCmd,
+		tidyCmd,
 	)
 }
 

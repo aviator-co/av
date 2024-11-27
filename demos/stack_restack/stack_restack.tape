@@ -24,7 +24,7 @@ Type 'git switch stack-1' Enter
 Type 'clear' Enter
 Show
 
-Type 'av stack tree' Enter
+Type 'av tree' Enter
 Sleep 2
 
 Type 'git commit --amend -m "Commit 1a (amended)"' Enter

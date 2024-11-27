@@ -13,31 +13,35 @@ var stackCmd = &cobra.Command{
 func init() {
 	deprecatedBranchCmd := deprecateCommand(*branchCmd, "av branch", "branch")
 	deprecatedBranchCmd.Aliases = []string{"b", "br"}
-
+	deprecatedDiffCmd := deprecateCommand(*diffCmd, "av diff", "diff")
 	deprecatedNextCmd := deprecateCommand(*nextCmd, "av next", "next")
 	deprecatedNextCmd.Aliases = []string{"n"}
-
 	deprecatedPrevCmd := deprecateCommand(*prevCmd, "av prev", "prev")
 	deprecatedPrevCmd.Aliases = []string{"p"}
-
+	deprecatedReorderCmd := deprecateCommand(*reorderCmd, "av reorder", "reorder")
+	deprecatedReparentCmd := deprecateCommand(*reparentCmd, "av reparent", "reparent")
 	deprecatedStackSyncCmd := deprecateCommand(*syncCmd, "av sync", "sync")
+	deprecatedSwitchCmd := deprecateCommand(*switchCmd, "av switch", "switch")
+	deprecatedTidyCmd := deprecateCommand(*tidyCmd, "av tidy", "tidy")
+	deprecatedTreeCmd := deprecateCommand(*treeCmd, "av tree", "tree")
+	deprecatedTreeCmd.Aliases = []string{"t"}
 
 	stackCmd.AddCommand(
 		deprecatedBranchCmd,
+		deprecatedDiffCmd,
 		deprecatedNextCmd,
 		deprecatedPrevCmd,
+		deprecatedReorderCmd,
+		deprecatedReparentCmd,
 		deprecatedStackSyncCmd,
+		deprecatedSwitchCmd,
+		deprecatedTidyCmd,
+		deprecatedTreeCmd,
 		stackAdoptCmd,
 		stackBranchCommitCmd,
-		stackDiffCmd,
 		stackForEachCmd,
 		stackOrphanCmd,
-		stackReorderCmd,
-		stackReparentCmd,
 		stackRestackCmd,
 		stackSubmitCmd,
-		stackSwitchCmd,
-		stackTidyCmd,
-		stackTreeCmd,
 	)
 }

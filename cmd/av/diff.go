@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var stackDiffCmd = &cobra.Command{
+var diffCmd = &cobra.Command{
 	Use:   "diff",
 	Short: "Show the diff between working tree and parent branch",
 	Long: strings.TrimSpace(`
@@ -113,7 +113,7 @@ Generates the diff between the working tree and the parent branch
 		// We need to display this **after** the diff to ensure that the diff
 		// output pager doesn't eat this message.
 		if notUpToDate {
-			_, _ = fmt.Fprint(os.Stderr,
+			fmt.Fprint(os.Stderr,
 				colors.Warning("\nWARNING: Branch "), colors.UserInput(currentBranchName),
 				colors.Warning(" is not up to date with parent branch "),
 				colors.UserInput(branch.Parent.Name), colors.Warning(". Run "),
