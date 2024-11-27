@@ -219,7 +219,7 @@ func getQueryVariables() (map[string]interface{}, error) {
 
 	if branch.PullRequest == nil {
 		return nil, errors.New(
-			"this branch has no associated pull request (run `av pr create` to create one)",
+			"this branch has no associated pull request (run 'av pr' to create one)",
 		)
 	}
 

@@ -47,7 +47,7 @@ $ git commit -m "Add hello.txt"
 Create a PR:
 
 ```sh
-$ av pr create
+$ av pr
 ```
 
 Create a new branch and make some changes. Create another PR that depends on the
@@ -58,7 +58,7 @@ $ av branch feature-2
 $ echo "Another feature" >> hello.txt
 $ git add hello.txt
 $ git commit -m "Update hello.txt"
-$ av pr create
+$ av pr
 ```
 
 Visualize the PR stack:
@@ -229,7 +229,7 @@ Download the binary from the [releases page](https://github.com/aviator-co/av/re
 | `av branch`        | Create a new child branch from the current branch.   |
 | `av commit amend`  | Amend the last commit and rebase the children.       |
 | `av commit split`  | Split the last commit.                               |
-| `av pr create`     | Create or update a PR.                               |
+| `av pr`     | Create or update a PR.                               |
 | `av reorder`       | Reorder the branches.                                |
 | `av reparent`      | Change the parent of the current branch.             |
 | `av stack adopt`   | Adopt a branch that is not created from `av branch`. |

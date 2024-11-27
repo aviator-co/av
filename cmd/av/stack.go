@@ -21,10 +21,20 @@ func init() {
 	deprecatedReorderCmd := deprecateCommand(*reorderCmd, "av reorder", "reorder")
 	deprecatedReparentCmd := deprecateCommand(*reparentCmd, "av reparent", "reparent")
 	deprecatedStackSyncCmd := deprecateCommand(*syncCmd, "av sync", "sync")
+	deprecatedSubmitCmd := deprecateCommand(*stackSubmitCmd, "av pr --all", "submit")
 	deprecatedSwitchCmd := deprecateCommand(*switchCmd, "av switch", "switch")
 	deprecatedTidyCmd := deprecateCommand(*tidyCmd, "av tidy", "tidy")
 	deprecatedTreeCmd := deprecateCommand(*treeCmd, "av tree", "tree")
 	deprecatedTreeCmd.Aliases = []string{"t"}
+
+	deprecatedSubmitCmd.Flags().BoolVar(
+		&stackSubmitFlags.Current, "current", false,
+		"only create pull requests up to the current branch",
+	)
+	deprecatedSubmitCmd.Flags().BoolVar(
+		&stackSubmitFlags.Draft, "draft", false,
+		"create pull requests in draft mode",
+	)
 
 	stackCmd.AddCommand(
 		deprecatedBranchCmd,
@@ -34,6 +44,7 @@ func init() {
 		deprecatedReorderCmd,
 		deprecatedReparentCmd,
 		deprecatedStackSyncCmd,
+		deprecatedSubmitCmd,
 		deprecatedSwitchCmd,
 		deprecatedTidyCmd,
 		deprecatedTreeCmd,
@@ -42,6 +53,5 @@ func init() {
 		stackForEachCmd,
 		stackOrphanCmd,
 		stackRestackCmd,
-		stackSubmitCmd,
 	)
 }

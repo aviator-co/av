@@ -19,8 +19,7 @@ av - Aviator CLI
 - av-fetch(1): Fetch latest repository state from GitHub
 - av-init(1): Initialize the repository for `av`
 - av-next(1): Checkout the next branch in the stack
-- av-pr-create(1): Create a pull request for the current branch
-- av-pr-queue(1): Queue an existing pull request for the current branch
+- av-pr(1): Create a pull request for the current branch
 - av-pr-status(1): Get the status of the associated pull request
 - av-prev(1): Checkout the previous branch in the stack
 - av-reorder(1): Interactively reorder the stack
@@ -29,7 +28,6 @@ av - Aviator CLI
 - av-stack-branch-commit(1): Create a new branch in the stack with the staged changes
 - av-stack-orphan(1): Orphan branches that are managed by `av`
 - av-stack-restack(1): Rebase the stacked branches
-- av-stack-submit(1): Create pull requests for every branch in the stack
 - av-switch(1): Interactively switch to a different branch
 - av-sync(1): Synchronize stacked branches with GitHub
 - av-tidy(1): Tidy stacked branches

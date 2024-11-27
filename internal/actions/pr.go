@@ -163,7 +163,7 @@ func CreatePullRequest(
 				"\n",
 			)
 			_, _ = fmt.Fprint(os.Stderr,
-				colors.Faint("  - use "), colors.CliCmd("av pr create --force"),
+				colors.Faint("  - use "), colors.CliCmd("av pr --force"),
 				colors.Faint(" to create a new pull request for this branch\n"),
 			)
 			return nil, err
@@ -248,7 +248,7 @@ func CreatePullRequest(
 			//     We should automagically create PRs for every branch in the stack
 			return nil, errors.Errorf(
 				"base branch %q does not have an associated pull request "+
-					"(create one by checking out the branch and running `av pr create`)",
+					"(create one by checking out the branch and running 'av pr')",
 				parentState.Name,
 			)
 		}
