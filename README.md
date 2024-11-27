@@ -120,7 +120,10 @@ uses the GitHub API token. If you have [GitHub CLI](https://cli.github.com/)
 installed, `av` will use the token automatically from the GitHub CLI. It is
 recommended to install both.
 
-## macOS
+## macOS (Homebrew)
+First, if not already done, [install Homebrew](https://brew.sh).
+
+Then install using Homebrew tap.
 
 ```sh
 brew install gh aviator-co/tap/av
@@ -194,6 +197,7 @@ rpm -i ./av_$VERSION_linux_$ARCH.rpm
 ## Binary download
 
 Download the binary from the [releases page](https://github.com/aviator-co/av/releases).
+Extract the archive and add the executable to your PATH.
 
 # Setup
 
@@ -222,6 +226,25 @@ Download the binary from the [releases page](https://github.com/aviator-co/av/re
    av init
    ```
 
+# Upgrade
+
+## macOS (Homebrew)
+```sh
+brew update
+brew upgrade av
+```
+
+## Debian/Ubuntu
+```sh
+sudo apt update
+sudo apt upgrade
+```
+
+## RPM-based systems
+```sh
+yum update
+```
+
 # Example commands
 
 | Command            | Description                                          |
@@ -229,7 +252,7 @@ Download the binary from the [releases page](https://github.com/aviator-co/av/re
 | `av branch`        | Create a new child branch from the current branch.   |
 | `av commit amend`  | Amend the last commit and rebase the children.       |
 | `av commit split`  | Split the last commit.                               |
-| `av pr`     | Create or update a PR.                               |
+| `av pr`            | Create or update a PR.                               |
 | `av reorder`       | Reorder the branches.                                |
 | `av reparent`      | Change the parent of the current branch.             |
 | `av stack adopt`   | Adopt a branch that is not created from `av branch`. |
