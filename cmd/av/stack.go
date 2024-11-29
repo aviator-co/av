@@ -28,5 +28,6 @@ func init() {
 		stackSyncCmd,
 		stackTidyCmd,
 		stackTreeCmd,
+		stackSplitCmd,
 	)
 }
