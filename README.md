@@ -5,7 +5,7 @@
 
 ---
 
-3332`av`tis a command-lite test  tool that helps you manage your stacked PRs on GitHub. It
+43332`av`tis a command-lite test  tool that helps you manage your stacked PRs on GitHub. It
 allows you to create a PR stacked on top of another PR, and it will
 automatically update the dependent PR when the base PR is updated. Read more at
 [Rethinking code reviews with stacked
