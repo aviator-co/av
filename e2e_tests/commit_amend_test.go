@@ -31,7 +31,7 @@ func TestCommitAmendInStack(t *testing.T) {
 	repo.Git(t, "checkout", "one")
 	filepath = repo.CreateFile(t, "one-b.txt", "one-b")
 	repo.AddFile(t, filepath)
-	RequireAv(t, "commit", "--amend", "--no-edit")
+	RequireAv(t, "commit", "--amend")
 
 	// Verify that the branches are still there.
 	db := repo.OpenDB(t)

@@ -8,6 +8,7 @@ av-create - Record changes to the repository with commits
 
 ```synopsis
 av commit [-m <msg>| --message=<msg>] [-a | --all] [--amend] [--edit]
+    [-b | -b <branch_name> | --branch-name <branch_name>] [-A | --all-changes]
 ```
 
 ## DESCRIPTION
@@ -34,3 +35,6 @@ git-add(1) to incrementally "add" changes to the index.
 `--edit`
 : When amending a commit, open the default git `$EDITOR` for modifying the
   commit message
+
+`-b, -b <branch_name>, --branch-name <branch_name>`
+: The branch name to create. If empty, automatically generate from the message.

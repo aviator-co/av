@@ -14,14 +14,14 @@ func TestStackBranchCommit(t *testing.T) {
 
 	t.Run("FlagAll", func(t *testing.T) {
 		require.NoError(t, os.WriteFile("myfile.txt", []byte("hello\n"), 0644))
-		RequireAv(t, "stack", "branch-commit", "--all", "-m", "branch one")
+		RequireAv(t, "commit", "-b", "--all-changes", "-m", "branch one")
 		require.True(t, repo.IsWorkdirClean(t))
 	})
 
 	t.Run("FlagAllModified", func(t *testing.T) {
 		require.NoError(t, os.WriteFile("myfile.txt", []byte("hello\nworld\n"), 0644))
 		require.NoError(t, os.WriteFile("yourfile.txt", []byte("bonjour\n"), 0644))
-		RequireAv(t, "stack", "branch-commit", "--all-modified", "-m", "branch two")
+		RequireAv(t, "commit", "-b", "--all", "-m", "branch two")
 
 		require.False(
 			t,

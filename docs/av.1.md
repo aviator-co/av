@@ -24,7 +24,6 @@ av - Aviator CLI
 - av-reparent(1): Change the parent of the current branch
 - av-split-commit(1): Split a commit into multiple commits
 - av-stack-adopt(1): Adopt branches that are not managed by `av`
-- av-stack-branch-commit(1): Create a new branch in the stack with the staged changes
 - av-stack-orphan(1): Orphan branches that are managed by `av`
 - av-stack-restack(1): Rebase the stacked branches
 - av-switch(1): Interactively switch to a different branch
