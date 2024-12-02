@@ -8,6 +8,7 @@ av-create - Record changes to the repository with commits
 
 ```synopsis
 av commit [-m <msg>| --message=<msg>] [-a | --all] [--amend] [--edit]
+    [-b | --branch] [-A | --all-changes] [--branch-name <name>]
 ```
 
 ## DESCRIPTION
@@ -28,9 +29,18 @@ git-add(1) to incrementally "add" changes to the index.
 : Automatically stage modified/deleted files, but new files you have not told
   Git about are not affected. (Same as git commit --all)
 
+`-A, --all-changes`
+: Automatically stage all files, including untracked files
+
 `--amend`
 : Amend the last commit, using the same message as last commit by default
 
 `--edit`
 : When amending a commit, open the default git `$EDITOR` for modifying the
   commit message
+
+`-b, --branch`
+: Create a new branch with an automatically generated name and commit to it
+
+`--branch-name <name>`
+: Create a new branch with the given name and commit to it

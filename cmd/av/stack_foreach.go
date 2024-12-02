@@ -21,6 +21,7 @@ var stackForEachFlags struct {
 var stackForEachCmd = &cobra.Command{
 	Use:     "for-each [flags] -- <command> [args...] ggit ",
 	Aliases: []string{"foreach", "fe"},
+	Hidden:  true,
 	Short:   "execute a command for each branch in the current stack",
 	Long: `Execute a command for each branch in the current stack.
 

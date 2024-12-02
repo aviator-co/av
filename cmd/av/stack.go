@@ -21,11 +21,30 @@ func init() {
 	deprecatedReorderCmd := deprecateCommand(*reorderCmd, "av reorder", "reorder")
 	deprecatedReparentCmd := deprecateCommand(*reparentCmd, "av reparent", "reparent")
 	deprecatedStackSyncCmd := deprecateCommand(*syncCmd, "av sync", "sync")
+	deprecatedStackBranchCommitCmd := deprecateCommand(
+		*stackBranchCommitCmd,
+		"av commit -b",
+		"branch-commit",
+	)
+	deprecatedStackBranchCommitCmd.Aliases = []string{"branchcommit", "bc"}
 	deprecatedSubmitCmd := deprecateCommand(*stackSubmitCmd, "av pr --all", "submit")
 	deprecatedSwitchCmd := deprecateCommand(*switchCmd, "av switch", "switch")
 	deprecatedTidyCmd := deprecateCommand(*tidyCmd, "av tidy", "tidy")
 	deprecatedTreeCmd := deprecateCommand(*treeCmd, "av tree", "tree")
 	deprecatedTreeCmd.Aliases = []string{"t"}
+
+	deprecatedStackBranchCommitCmd.Flags().
+		StringVarP(&stackBranchCommitFlags.Message, "message", "m", "", "the commit message")
+	deprecatedStackBranchCommitCmd.Flags().
+		StringVarP(&stackBranchCommitFlags.BranchName, "branch-name", "b", "",
+			"the branch name to create (if empty, automatically generated from the message)")
+	deprecatedStackBranchCommitCmd.Flags().
+		BoolVarP(&stackBranchCommitFlags.All, "all", "A", false, "automatically stage all files")
+	deprecatedStackBranchCommitCmd.Flags().
+		BoolVarP(&stackBranchCommitFlags.AllModified, "all-modified", "a", false,
+			"automatically stage modified and deleted files (ignore untracked files)")
+
+	deprecatedStackBranchCommitCmd.MarkFlagsMutuallyExclusive("all", "all-modified")
 
 	deprecatedSubmitCmd.Flags().BoolVar(
 		&stackSubmitFlags.Current, "current", false,
@@ -43,13 +62,13 @@ func init() {
 		deprecatedPrevCmd,
 		deprecatedReorderCmd,
 		deprecatedReparentCmd,
+		deprecatedStackBranchCommitCmd,
 		deprecatedStackSyncCmd,
 		deprecatedSubmitCmd,
 		deprecatedSwitchCmd,
 		deprecatedTidyCmd,
 		deprecatedTreeCmd,
 		stackAdoptCmd,
-		stackBranchCommitCmd,
 		stackForEachCmd,
 		stackOrphanCmd,
 		stackRestackCmd,

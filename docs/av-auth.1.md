@@ -12,4 +12,4 @@ av auth
 
 ## DESCRIPTION
 
-Shows information about the logged in user using their access token.
+Verifies that GitHub and/or Aviator credentials are valid.
