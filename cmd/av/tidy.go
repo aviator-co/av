@@ -64,7 +64,7 @@ does not delete Git branches.
 				}
 				ss = append(ss, "")
 				ss = append(ss, "  The orphaned branches still exist in the repository.")
-				ss = append(ss, "  You can re-adopt them to av by running av stack adopt.")
+				ss = append(ss, "  You can re-adopt them to av by running 'av adopt'.")
 			}
 		} else {
 			ss = append(ss, colors.SuccessStyle.Render("✓ No branch to tidy"))

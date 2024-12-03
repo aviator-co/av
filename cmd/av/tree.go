@@ -15,7 +15,8 @@ import (
 var treeCmd = &cobra.Command{
 	Use:   "tree",
 	Short: "Show the tree of stacked branches",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		repo, err := getRepo()
 		if err != nil {
 			return err

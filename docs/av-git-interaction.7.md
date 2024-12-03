@@ -16,7 +16,7 @@ branches".
 
 There is a case where you created a branch without going through
 `av-branch`(1). In this case, you can attach the branch metadata by using
-`av-stack-adopt`(1). The opposite can be done with `av-stack-orphan`(1).
+`av-adopt`(1). The opposite can be done with `av-orphan`(1).
 
 ## BRANCH DELETION
 
@@ -30,4 +30,4 @@ removed.
 
 If a deleted branch has a child branch, the child branch will be orphaned. This
 means that the child branch still exists in the Git repository, but `av` will
-not manage it. In order to add it back to `av`, you can use `av-stack-adopt`(1).
+not manage it. In order to add it back to `av`, you can use `av-adopt`(1).

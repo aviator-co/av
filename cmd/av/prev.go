@@ -20,6 +20,7 @@ var prevFlags struct {
 var prevCmd = &cobra.Command{
 	Use:   "prev [<n>|--first]",
 	Short: "Checkout the previous branch in the stack",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get the previous branches so we can checkout the nth one
 		repo, err := getRepo()
@@ -35,6 +36,13 @@ var prevCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		isCurrentBranchTrunk, err := repo.IsTrunkBranch(currentBranch)
+		if err != nil {
+			return err
+		} else if isCurrentBranchTrunk {
+			fmt.Fprint(os.Stderr, "already on trunk branch (", colors.UserInput(currentBranch), ")\n")
+			return nil
+		}
 		previousBranches, err := meta.PreviousBranches(tx, currentBranch)
 		if err != nil {
 			return err
@@ -43,7 +51,7 @@ var prevCmd = &cobra.Command{
 		var branchToCheckout string
 		if prevFlags.First {
 			if len(previousBranches) == 0 {
-				_, _ = fmt.Fprint(os.Stderr, "already on first branch in stack\n")
+				fmt.Fprint(os.Stderr, "already on first branch in stack\n")
 				return nil
 			}
 			branchToCheckout = previousBranches[0]
@@ -53,22 +61,21 @@ var prevCmd = &cobra.Command{
 			if len(previousBranches) == 0 {
 				return errors.New("there are no previous branches in the stack")
 			}
-			var n int = 1
+			n := 1
 			if len(args) == 1 {
 				var err error
 				n, err = strconv.Atoi(args[0])
 				if err != nil {
 					return errors.New("invalid number (unable to parse)")
 				}
-			} else if len(args) > 1 {
-				_ = cmd.Usage()
-				return errors.New("too many arguments")
+
+				if n <= 0 {
+					return errors.New("invalid number (must be >= 1)")
+				}
 			}
-			if n <= 0 {
-				return errors.New("invalid number (must be >= 1)")
-			}
+
 			if n > len(previousBranches) {
-				return fmt.Errorf("invalid number (there are only %d previous branches in the stack)", len(previousBranches))
+				return fmt.Errorf("invalid number (there are only %d previous branches in the stack, you can use '--first' to get to first branch in stack)", len(previousBranches))
 			}
 			branchToCheckout = previousBranches[len(previousBranches)-n]
 		}
@@ -79,7 +86,7 @@ var prevCmd = &cobra.Command{
 			return err
 		}
 
-		_, _ = fmt.Fprint(
+		fmt.Fprint(
 			os.Stderr,
 			"Checked out branch ",
 			colors.UserInput(branchToCheckout),

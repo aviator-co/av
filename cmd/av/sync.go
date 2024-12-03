@@ -65,7 +65,7 @@ stack. This is useful for rebasing a whole stack on the latest changes from the
 base branch.
 `),
 	Args: cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		if !sliceutils.Contains(
 			[]string{"ask", "yes", "no"},
 			strings.ToLower(syncFlags.Push),
@@ -362,7 +362,7 @@ func (vm *syncViewModel) viewChangeNotice() string {
 	sb.WriteString("\n")
 	sb.WriteString("* " + commandStyle.Render("av sync") + " is split into four commands:\n")
 	sb.WriteString(
-		"  * " + commandStyle.Render("av stack adopt") + " to adopt a new branch into the stack.\n",
+		"  * " + commandStyle.Render("av adopt") + " to adopt a new branch into the stack.\n",
 	)
 	sb.WriteString(
 		"  * " + commandStyle.Render("av reparent") + " to change the parent branch.\n",
@@ -678,8 +678,8 @@ func init() {
 		MarkDeprecated("trunk", "please use --rebase-to-trunk to rebase all branches to trunk")
 
 	syncCmd.Flags().String("parent", "",
-		"(deprecated; use av stack adopt or av reparent) parent branch to rebase onto",
+		"(deprecated; use 'av adopt' or 'av reparent') parent branch to rebase onto",
 	)
 	_ = syncCmd.Flags().
-		MarkDeprecated("parent", "please use av stack adopt or av reparent")
+		MarkDeprecated("parent", "please use 'av adopt' or 'av reparent'")
 }

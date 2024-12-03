@@ -18,7 +18,7 @@ var authCmd = &cobra.Command{
 	Short:        "Check user authentication status",
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		if err := checkAviatorAuthStatus(); err != nil {
 			fmt.Fprintln(os.Stderr, colors.Warning(err.Error()))
 		}
@@ -36,10 +36,12 @@ func checkAviatorAuthStatus() error {
 
 	var query struct{ avgql.ViewerSubquery }
 	if err := avClient.Query(context.Background(), &query, nil); err != nil {
-		return err
-	}
-	if err := query.CheckViewer(); err != nil {
-		return err
+		if avgql.IsHTTPUnauthorized(err) {
+			return errors.New(
+				"You are not logged in to Aviator. Please verify that your API token is correct.",
+			)
+		}
+		return errors.Wrap(err, "Failed to query Aviator")
 	}
 
 	fmt.Fprint(os.Stderr,

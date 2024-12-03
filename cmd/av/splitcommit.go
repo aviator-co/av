@@ -14,7 +14,8 @@ var splitCommitCmd = &cobra.Command{
 	Use:          "split-commit",
 	Short:        "Split a commit into multiple commits",
 	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Args:         cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		repo, err := getRepo()
 		if err != nil {
 			return err

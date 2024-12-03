@@ -218,7 +218,9 @@ func runAmend(repo *git.Repo, db meta.DB, message string, edit bool, all bool) e
 func branchAndCommit(branchName string, message string, all bool, allModified bool) (reterr error) {
 	if branchName == "" {
 		if message == "" {
-			return errors.New("Need a branch name or a commit message")
+			return errors.New(
+				"Need a branch name (--branch-name <name>) or a commit message (-m <message>)",
+			)
 		}
 		branchName = branchNameFromMessage(message)
 		if branchName == "" {

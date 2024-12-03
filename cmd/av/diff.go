@@ -21,7 +21,8 @@ Generates the diff between the working tree and the parent branch
 (i.e., the diff between the current branch and the previous branch in the stack).
 `),
 	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Args:         cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		repo, err := getRepo()
 		if err != nil {
 			return err

@@ -25,20 +25,19 @@ var nextFlags struct {
 var nextCmd = &cobra.Command{
 	Use:   "next [<n>|--last]",
 	Short: "Checkout the next branch in the stack",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var n int = 1
+		n := 1
 		if len(args) == 1 {
 			var err error
 			n, err = strconv.Atoi(args[0])
 			if err != nil {
 				return errors.New("invalid number (unable to parse)")
 			}
-		} else if len(args) > 1 {
-			_ = cmd.Usage()
-			return errors.New("too many arguments")
-		}
-		if n <= 0 {
-			return errors.New("invalid number (must be >= 1)")
+
+			if n <= 0 {
+				return errors.New("invalid number (must be >= 1)")
+			}
 		}
 
 		stackNext, err := newNextModel(nextFlags.Last, n)
@@ -132,7 +131,7 @@ func (m stackNextModel) nextBranch() tea.Msg {
 	}
 
 	if m.nInStack > 0 && len(currentBranchChildren) == 0 {
-		return errors.New("invalid number (there are not enough subsequent branches in the stack)")
+		return errors.New("invalid number, already on last branch in the stack")
 	}
 
 	if len(currentBranchChildren) == 0 {

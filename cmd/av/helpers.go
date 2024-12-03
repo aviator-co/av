@@ -12,6 +12,7 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/aviator-co/av/internal/meta/refmeta"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/spf13/cobra"
 )
 
@@ -139,7 +140,11 @@ func deprecateCommand(
 	}
 
 	deprecatedCommand.PreRun = func(cmd *cobra.Command, args []string) {
-		fmt.Printf("This command is deprecated. Please use '%s' instead.\n", newCmd)
+		fmt.Print(
+			colors.Warning("This command is deprecated. Please use "),
+			colors.CliCmd("'", newCmd, "'"),
+			colors.Warning(" instead.\n"),
+		)
 	}
 
 	return &deprecatedCommand

@@ -19,10 +19,11 @@ var stackForEachFlags struct {
 }
 
 var stackForEachCmd = &cobra.Command{
-	Use:     "for-each [flags] -- <command> [args...] ggit ",
-	Aliases: []string{"foreach", "fe"},
-	Hidden:  true,
-	Short:   "execute a command for each branch in the current stack",
+	Use:        "for-each [flags] -- <command> [args...] ggit ",
+	Aliases:    []string{"foreach", "fe"},
+	Hidden:     true,
+	Deprecated: "this command has been deprecated and will be removed in a future release",
+	Short:      "execute a command for each branch in the current stack",
 	Long: `Execute a command for each branch in the current stack.
 
 To prevent flags for the command to be executed from being parsed as flags for

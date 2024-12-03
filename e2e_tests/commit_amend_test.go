@@ -9,7 +9,7 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func TestCommitAmendInStack(t *testing.T) {
+func TestAmendInStack(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
 	Chdir(t, repo.RepoDir)
 	repo.Git(t, "fetch")
@@ -47,7 +47,7 @@ func TestCommitAmendInStack(t *testing.T) {
 	// validate that a push didn't happen.
 }
 
-func TestCommitAmendOnMergedBranch(t *testing.T) {
+func TestAmendOnMergedBranch(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
 	Chdir(t, repo.RepoDir)
 	repo.Git(t, "fetch")

@@ -35,7 +35,7 @@ Branches can be re-arranged within the stack and commits can be edited,
 squashed, dropped, or moved within the stack.
 `),
 	Args: cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		repo, err := getRepo()
 		if err != nil {
 			return err

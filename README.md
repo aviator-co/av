@@ -40,8 +40,7 @@ Create a new branch and make some changes:
 ```sh
 $ av branch feature-1
 $ echo "Hello, world!" > hello.txt
-$ git add hello.txt
-$ git commit -m "Add hello.txt"
+$ av commit -A -m "Add hello.txt"
 ```
 
 Create a PR:
@@ -56,8 +55,7 @@ previous PR:
 ```sh
 $ av branch feature-2
 $ echo "Another feature" >> hello.txt
-$ git add hello.txt
-$ git commit -m "Update hello.txt"
+$ av commit -a -m "Update hello.txt"
 $ av pr
 ```
 
@@ -253,14 +251,14 @@ yum update
 
 | Command             | Description                                          |
 | ------------------- | ---------------------------------------------------- |
+| `av adopt`          | Adopt a branch that is not created from `av branch`. |
 | `av branch`         | Create a new child branch from the current branch.   |
 | `av commit --amend` | Amend the last commit and rebase the children.       |
 | `av pr`             | Create or update a PR.                               |
 | `av reorder`        | Reorder the branches.                                |
 | `av reparent`       | Change the parent of the current branch.             |
+| `av restack`        | Rebase the branches to their parents.                |
 | `av split-commit`   | Split the last commit.                               |
-| `av stack adopt`    | Adopt a branch that is not created from `av branch`. |
-| `av stack restack`  | Rebase the branches to their parents.                |
 | `av switch`         | Check out branches interactively.                    |
 | `av sync --all`     | Fetch and rebase all branches.                       |
 | `av tree`           | Visualize the PRs.                                   |

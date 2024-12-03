@@ -91,6 +91,7 @@ func init() {
 		"directory to use for git repository",
 	)
 	rootCmd.AddCommand(
+		adoptCmd,
 		authCmd,
 		branchCmd,
 		branchMetaCmd,
@@ -99,6 +100,7 @@ func init() {
 		fetchCmd,
 		initCmd,
 		nextCmd,
+		orphanCmd,
 		prCmd,
 		prevCmd,
 		reorderCmd,
@@ -161,7 +163,7 @@ func checkCliVersion() {
 	logrus.WithField("latest", latest).Debug("fetched latest released version")
 	if semver.Compare(config.Version, latest) < 0 {
 		c := color.New(color.Faint, color.Bold)
-		_, _ = fmt.Fprint(
+		fmt.Fprint(
 			os.Stderr,
 			c.Sprint(">> A new version of av is available: "),
 			color.RedString(config.Version),

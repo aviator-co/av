@@ -79,6 +79,6 @@ branch to delete. Default is `ask`.
 
 ## SEE ALSO
 
-`av-stack-restack`(1) for rebasing the branches locally.
-`av-stack-adopt`(1) for adopting a new branch.
+`av-restack`(1) for rebasing the branches locally.
+`av-adopt`(1) for adopting a new branch.
 `av-reparent`(1) for changing the parent of a branch.

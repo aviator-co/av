@@ -26,7 +26,7 @@ import (
 var switchCmd = &cobra.Command{
 	Use:   "switch [<branch> | <url>]",
 	Short: "Interactively switch to a different branch",
-	Args:  cobra.RangeArgs(0, 1),
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
 		if err != nil {

@@ -11,7 +11,7 @@ var prQueueCmd = &cobra.Command{
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
 	// error or reterr from emperror.dev/errors here?
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		return queue()
 	},
 }

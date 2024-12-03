@@ -2,7 +2,7 @@
 
 ## NAME
 
-av-create - Record changes to the repository with commits
+av-commit - Record changes to the repository with commits
 
 ## SYNOPSIS
 
