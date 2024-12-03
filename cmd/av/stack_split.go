@@ -7,6 +7,7 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 )
 
@@ -59,34 +60,57 @@ func splitLastCommit(repo *git.Repo, currentBranchName string, newBranchName str
 		return errors.New("new branch name must be provided")
 	}
 
-	if _, err := repo.Git("switch", "-c", newBranchName); err != nil {
-		return errors.Errorf("failed to create a new branch %s: %v", newBranchName, err)
-	}
-
-	// Reset the current branch to HEAD~1
-	if _, err := repo.Git("switch", currentBranchName); err != nil {
-		return errors.Errorf("failed to switch to the current branch %s: %v", currentBranchName, err)
-	}
-	if _, err := repo.Git("reset", "--hard", "HEAD~1"); err != nil {
-		return errors.Errorf("failed to reset the branch to the previous commit: %v", err)
-	}
-
-	// Show all branches after successful split
-	branchesOutput, err := repo.Git("branch", "--list")
+	// Get the current branch reference
+	currentBranchRefName := plumbing.NewBranchReferenceName(currentBranchName)
+	currentBranchRef, err := repo.GoGitRepo().Reference(currentBranchRefName, true)
 	if err != nil {
-		return errors.Errorf("failed to list branches: %v", err)
+		return fmt.Errorf("failed to get reference for current branch %s: %w", currentBranchName, err)
+	}
+
+	lastCommitHash := currentBranchRef.Hash()
+	// Get the last commit object
+	lastCommit, err := repo.GoGitRepo().CommitObject(lastCommitHash)
+	if err != nil {
+		return fmt.Errorf("failed to get last commit: %w", err)
+	}
+	// Get the parent of the last commit (HEAD~1)
+	parentCommitIter := lastCommit.Parents()
+	parentCommit, err := parentCommitIter.Next()
+	if err != nil {
+		return fmt.Errorf("failed to get parent commit: %w", err)
+	}
+
+	// Create a new branch pointing to the last commit
+	newBranchRefName := plumbing.NewBranchReferenceName(newBranchName)
+	newBranchRef := plumbing.NewHashReference(newBranchRefName, lastCommitHash)
+	if err := repo.GoGitRepo().Storer.SetReference(newBranchRef); err != nil {
+		return fmt.Errorf("failed to create new branch: %w", err)
+	}
+
+	updatedCurrentBranchRef := plumbing.NewHashReference(currentBranchRefName, parentCommit.Hash)
+	if err := repo.GoGitRepo().Storer.SetReference(updatedCurrentBranchRef); err != nil {
+		return fmt.Errorf("failed to update current branch: %w", err)
 	}
 
 	fmt.Fprint(
 		os.Stdout,
 		colors.Success(fmt.Sprintf("Successfully split the last commit into a new branch %s.\n", newBranchName)),
 	)
-	fmt.Fprint(
-		os.Stdout,
-		colors.Success("Current branches in the repository:\n"),
-		branchesOutput,
-		"\n",
-	)
+
+	// List branches
+	branchesIter, err := repo.GoGitRepo().Branches()
+	if err != nil {
+		return fmt.Errorf("failed to list branches: %w", err)
+	}
+
+	fmt.Println("Current branches in the repository:")
+	err = branchesIter.ForEach(func(branchRef *plumbing.Reference) error {
+		fmt.Printf("  %s\n", branchRef.Name().Short())
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error iterating branches: %w", err)
+	}
 	return nil
 }
 
