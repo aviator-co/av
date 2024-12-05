@@ -18,7 +18,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var stackRestackFlags struct {
+var restackFlags struct {
 	All      bool
 	Current  bool
 	Abort    bool
@@ -27,7 +27,7 @@ var stackRestackFlags struct {
 	DryRun   bool
 }
 
-var stackRestackCmd = &cobra.Command{
+var restackCmd = &cobra.Command{
 	Use:   "restack",
 	Short: "Rebase the stacked branches",
 	Args:  cobra.NoArgs,
@@ -40,11 +40,11 @@ var stackRestackCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return uiutils.RunBubbleTea(&stackRestackViewModel{repo: repo, db: db})
+		return uiutils.RunBubbleTea(&restackViewModel{repo: repo, db: db})
 	},
 }
 
-type stackRestackViewModel struct {
+type restackViewModel struct {
 	repo *git.Repo
 	db   meta.DB
 
@@ -54,13 +54,13 @@ type stackRestackViewModel struct {
 	err              error
 }
 
-func (vm *stackRestackViewModel) Init() tea.Cmd {
+func (vm *restackViewModel) Init() tea.Cmd {
 	state, err := vm.readState()
 	if err != nil {
 		return func() tea.Msg { return err }
 	}
 	if state == nil {
-		if stackRestackFlags.Abort || stackRestackFlags.Continue || stackRestackFlags.Skip {
+		if restackFlags.Abort || restackFlags.Continue || restackFlags.Skip {
 			return func() tea.Msg { return errors.New("no restack in progress") }
 		}
 		state, err = vm.createState()
@@ -73,14 +73,14 @@ func (vm *stackRestackViewModel) Init() tea.Cmd {
 	}
 	vm.restackModel = sequencerui.NewRestackModel(vm.repo, vm.db)
 	vm.restackModel.State = state
-	vm.restackModel.Abort = stackRestackFlags.Abort
-	vm.restackModel.Continue = stackRestackFlags.Continue
-	vm.restackModel.Skip = stackRestackFlags.Skip
-	vm.restackModel.DryRun = stackRestackFlags.DryRun
+	vm.restackModel.Abort = restackFlags.Abort
+	vm.restackModel.Continue = restackFlags.Continue
+	vm.restackModel.Skip = restackFlags.Skip
+	vm.restackModel.DryRun = restackFlags.DryRun
 	return vm.restackModel.Init()
 }
 
-func (vm *stackRestackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (vm *restackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case *sequencerui.RestackProgress, spinner.TickMsg:
 		var cmd tea.Cmd
@@ -109,7 +109,7 @@ func (vm *stackRestackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm *stackRestackViewModel) View() string {
+func (vm *restackViewModel) View() string {
 	var ss []string
 	if vm.restackModel != nil {
 		ss = append(ss, vm.restackModel.View())
@@ -130,7 +130,7 @@ func (vm *stackRestackViewModel) View() string {
 	return ret
 }
 
-func (vm *stackRestackViewModel) ExitError() error {
+func (vm *restackViewModel) ExitError() error {
 	if errors.Is(vm.err, nothingToRestackError) {
 		return nil
 	}
@@ -143,7 +143,7 @@ func (vm *stackRestackViewModel) ExitError() error {
 	return nil
 }
 
-func (vm *stackRestackViewModel) readState() (*sequencerui.RestackState, error) {
+func (vm *restackViewModel) readState() (*sequencerui.RestackState, error) {
 	var state sequencerui.RestackState
 	if err := vm.repo.ReadStateFile(git.StateFileKindRestack, &state); err != nil &&
 		os.IsNotExist(err) {
@@ -154,14 +154,14 @@ func (vm *stackRestackViewModel) readState() (*sequencerui.RestackState, error) 
 	return &state, nil
 }
 
-func (vm *stackRestackViewModel) writeState(state *sequencerui.RestackState) error {
+func (vm *restackViewModel) writeState(state *sequencerui.RestackState) error {
 	if state == nil {
 		return vm.repo.WriteStateFile(git.StateFileKindRestack, nil)
 	}
 	return vm.repo.WriteStateFile(git.StateFileKindRestack, state)
 }
 
-func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error) {
+func (vm *restackViewModel) createState() (*sequencerui.RestackState, error) {
 	var state sequencerui.RestackState
 
 	status, err := vm.repo.Status()
@@ -171,7 +171,7 @@ func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error
 	currentBranch := status.CurrentBranch
 	state.InitialBranch = currentBranch
 
-	if stackRestackFlags.All {
+	if restackFlags.All {
 		state.RestackingAll = true
 	} else {
 		if _, exist := vm.db.ReadTx().Branch(currentBranch); !exist {
@@ -189,8 +189,8 @@ func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error
 		vm.db.ReadTx(),
 		vm.repo,
 		currentBranchRef,
-		stackRestackFlags.All,
-		stackRestackFlags.Current,
+		restackFlags.All,
+		restackFlags.Current,
 	)
 	if err != nil {
 		return nil, err
@@ -200,30 +200,30 @@ func (vm *stackRestackViewModel) createState() (*sequencerui.RestackState, error
 }
 
 func init() {
-	stackRestackCmd.Flags().BoolVar(
-		&stackRestackFlags.All, "all", false,
+	restackCmd.Flags().BoolVar(
+		&restackFlags.All, "all", false,
 		"rebase all branches",
 	)
-	stackRestackCmd.Flags().BoolVar(
-		&stackRestackFlags.Current, "current", false,
+	restackCmd.Flags().BoolVar(
+		&restackFlags.Current, "current", false,
 		"only rebase up to the current branch\n(don't recurse into descendant branches)",
 	)
-	stackRestackCmd.Flags().BoolVar(
-		&stackRestackFlags.Continue, "continue", false,
+	restackCmd.Flags().BoolVar(
+		&restackFlags.Continue, "continue", false,
 		"continue an in-progress rebase",
 	)
-	stackRestackCmd.Flags().BoolVar(
-		&stackRestackFlags.Abort, "abort", false,
+	restackCmd.Flags().BoolVar(
+		&restackFlags.Abort, "abort", false,
 		"abort an in-progress rebase",
 	)
-	stackRestackCmd.Flags().BoolVar(
-		&stackRestackFlags.Skip, "skip", false,
+	restackCmd.Flags().BoolVar(
+		&restackFlags.Skip, "skip", false,
 		"skip the current commit and continue an in-progress rebase",
 	)
-	stackRestackCmd.Flags().BoolVar(
-		&stackRestackFlags.DryRun, "dry-run", false,
+	restackCmd.Flags().BoolVar(
+		&restackFlags.DryRun, "dry-run", false,
 		"show the list of branches that will be rebased without actually rebasing them",
 	)
 
-	stackRestackCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
+	restackCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
 }

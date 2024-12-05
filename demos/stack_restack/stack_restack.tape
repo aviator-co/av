@@ -33,7 +33,7 @@ Sleep 2
 Type 'git --no-pager log --graph --all' Enter
 Sleep 2
 
-Type 'av stack restack' Enter
+Type 'av restack' Enter
 Sleep 3
 
 Type 'git --no-pager log --graph --all' Enter
