@@ -97,20 +97,6 @@ func splitLastCommit(repo *git.Repo, currentBranchName string, newBranchName str
 		colors.Success(fmt.Sprintf("Successfully split the last commit into a new branch %s.\n", newBranchName)),
 	)
 
-	// List branches
-	branchesIter, err := repo.GoGitRepo().Branches()
-	if err != nil {
-		return fmt.Errorf("failed to list branches: %w", err)
-	}
-
-	fmt.Println("Current branches in the repository:")
-	err = branchesIter.ForEach(func(branchRef *plumbing.Reference) error {
-		fmt.Printf("  %s\n", branchRef.Name().Short())
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("error iterating branches: %w", err)
-	}
 	return nil
 }
 
