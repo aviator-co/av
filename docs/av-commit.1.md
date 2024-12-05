@@ -14,7 +14,7 @@ av commit [-m <msg>| --message=<msg>] [-a | --all] [--amend] [--edit]
 ## DESCRIPTION
 
 Create a new commit containing the current contents of the index and the given
-log message describing the changes, then run **av stack restack** on all
+log message describing the changes, then run **av restack** on all
 subsequent child branches with the new commit.
 
 Previous to running **av commit**, add changes to the index via

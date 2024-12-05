@@ -368,7 +368,7 @@ func (vm *syncViewModel) viewChangeNotice() string {
 		"  * " + commandStyle.Render("av reparent") + " to change the parent branch.\n",
 	)
 	sb.WriteString(
-		"  * " + commandStyle.Render("av stack restack") + " to rebase the stack locally.\n",
+		"  * " + commandStyle.Render("av restack") + " to rebase the stack locally.\n",
 	)
 	sb.WriteString(
 		"  * " + commandStyle.Render(
@@ -393,7 +393,7 @@ func (vm *syncViewModel) viewChangeNotice() string {
 	)
 	sb.WriteString(
 		"master). If you do not want to rebase onto the remote trunk branch, please use " + commandStyle.Render(
-			"av stack restack",
+			"av restack",
 		) + ".\n",
 	)
 	sb.WriteString("\n")
@@ -666,10 +666,10 @@ func init() {
 
 	// Deprecated flags
 	syncCmd.Flags().Bool("no-fetch", false,
-		"(deprecated; use av stack restack for offline restacking) do not fetch the latest status from GitHub",
+		"(deprecated; use av restack for offline restacking) do not fetch the latest status from GitHub",
 	)
 	_ = syncCmd.Flags().
-		MarkDeprecated("no-fetch", "please use av stack restack for offline restacking")
+		MarkDeprecated("no-fetch", "please use av restack for offline restacking")
 
 	syncCmd.Flags().Bool("trunk", false,
 		"(deprecated; use --rebase-to-trunk to rebase all branches to trunk) rebase the stack on the trunk branch",
