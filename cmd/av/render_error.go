@@ -29,8 +29,8 @@ const parentNotAdopted = `# ERROR: Parent branch is not adopted to ` + "`av`" + 
 ` + "`av`" + ` keeps metadata internally to keep track of branch relationships. If a branch is
 created via ` + "`git`" + ` command, ` + "`av`" + ` doesn't have such metadata for that branch.
 
-` + "`av stack adopt`" + ` is a command to adopt a ` + "`git`" + ` created branch to ` + "`av`" + `.
-Please run ` + "`av stack adopt`" + ` to adopt the parent branch first.
+` + "`av adopt`" + ` is a command to adopt a ` + "`git`" + ` created branch to ` + "`av`" + `.
+Please run ` + "`av adopt`" + ` to adopt the parent branch first.
 `
 
 func renderError(err error) string {

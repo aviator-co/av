@@ -47,4 +47,4 @@ the branches.
 
 ## SEE ALSO
 
-`av-stack-sync`(1) for syncing with the remote repository.
+`av-sync`(1) for syncing with the remote repository.

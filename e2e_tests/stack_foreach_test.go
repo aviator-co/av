@@ -13,11 +13,11 @@ func TestStackForEach(t *testing.T) {
 	Chdir(t, repo.RepoDir)
 
 	// Create a stack of three branches
-	RequireAv(t, "stack", "branch", "stack-1")
+	RequireAv(t, "branch", "stack-1")
 	repo.CommitFile(t, "my-file", "1a\n", gittest.WithMessage("Commit 1a"))
-	RequireAv(t, "stack", "branch", "stack-2")
+	RequireAv(t, "branch", "stack-2")
 	repo.CommitFile(t, "my-file", "2a\n", gittest.WithMessage("Commit 2a"))
-	RequireAv(t, "stack", "branch", "stack-3")
+	RequireAv(t, "branch", "stack-3")
 	repo.CommitFile(t, "my-file", "3a\n", gittest.WithMessage("Commit 3a"))
 
 	out := RequireAv(t,

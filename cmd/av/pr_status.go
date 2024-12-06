@@ -19,7 +19,7 @@ var prStatusCmd = &cobra.Command{
 	Short:        "Get the status of the associated pull request",
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		variables, err := getQueryVariables()
 		if err != nil {
 			return err
@@ -79,7 +79,7 @@ var prStatusCmd = &cobra.Command{
 
 		// Print PR info
 		indent := "    "
-		_, _ = fmt.Fprint(
+		fmt.Fprint(
 			os.Stderr,
 			"#",
 			variables["prNumber"],
@@ -87,10 +87,10 @@ var prStatusCmd = &cobra.Command{
 			colors.UserInput(pr.Title),
 			"\n",
 		)
-		_, _ = fmt.Fprint(os.Stderr, indent, "Status: ", colors.UserInput(pr.Status))
+		fmt.Fprint(os.Stderr, indent, "Status: ", colors.UserInput(pr.Status))
 
 		if pr.Status == "PENDING" || pr.Status == "BLOCKED" {
-			_, _ = fmt.Fprint(
+			fmt.Fprint(
 				os.Stderr,
 				indent,
 				" (",
@@ -98,16 +98,16 @@ var prStatusCmd = &cobra.Command{
 				")",
 			)
 		}
-		_, _ = fmt.Fprint(os.Stderr, "\n")
+		fmt.Fprint(os.Stderr, "\n")
 
-		_, _ = fmt.Fprint(
+		fmt.Fprint(
 			os.Stderr,
 			indent,
 			"Author: ",
 			colors.UserInput(query.GithubRepository.PullRequest.Author.Login),
 			"\n",
 		)
-		_, _ = fmt.Fprint(
+		fmt.Fprint(
 			os.Stderr,
 			indent,
 			"Created at: ",
@@ -118,7 +118,7 @@ var prStatusCmd = &cobra.Command{
 		)
 
 		if pr.Status == "QUEUED" {
-			_, _ = fmt.Fprint(
+			fmt.Fprint(
 				os.Stderr,
 				indent,
 				"Queued at: ",
@@ -129,7 +129,7 @@ var prStatusCmd = &cobra.Command{
 			)
 		}
 		if pr.Status == "MERGED" {
-			_, _ = fmt.Fprint(
+			fmt.Fprint(
 				os.Stderr,
 				indent,
 				"Merged at: ",
@@ -140,7 +140,7 @@ var prStatusCmd = &cobra.Command{
 			)
 		}
 
-		_, _ = fmt.Fprint(
+		fmt.Fprint(
 			os.Stderr,
 			indent,
 			"Base branch: ",
@@ -153,12 +153,12 @@ var prStatusCmd = &cobra.Command{
 		)
 
 		// Required checks section
-		_, _ = fmt.Fprint(os.Stderr, "Required Checks\n")
+		fmt.Fprint(os.Stderr, "Required Checks\n")
 		requiredCheckStatuses := query.GithubRepository.PullRequest.RequiredCheckStatuses
 		for index := range requiredCheckStatuses {
 			result := requiredCheckStatuses[index].Result
 			requiredCheckName := requiredCheckStatuses[index].RequiredCheck.Pattern
-			_, _ = fmt.Fprint(
+			fmt.Fprint(
 				os.Stderr,
 				indent,
 				emojiForRequiredCheckResult(string(result)),
@@ -175,7 +175,7 @@ var prStatusCmd = &cobra.Command{
 			return nil
 		}
 
-		_, _ = fmt.Fprint(
+		fmt.Fprint(
 			os.Stderr,
 			"Bot Pull Request #",
 			botPullRequest.Number,
@@ -184,7 +184,7 @@ var prStatusCmd = &cobra.Command{
 
 		botRequiredCheckStatuses := query.GithubRepository.PullRequest.BotPullRequest.RequiredCheckStatuses
 		for _, status := range botRequiredCheckStatuses {
-			_, _ = fmt.Fprint(
+			fmt.Fprint(
 				os.Stderr,
 				indent,
 				emojiForRequiredCheckResult(string(status.Result)),
@@ -219,7 +219,7 @@ func getQueryVariables() (map[string]interface{}, error) {
 
 	if branch.PullRequest == nil {
 		return nil, errors.New(
-			"this branch has no associated pull request (run `av pr create` to create one)",
+			"this branch has no associated pull request (run 'av pr' to create one)",
 		)
 	}
 
