@@ -1,0 +1,12 @@
+package main
+
+import (
+	"io"
+	"net/http"
+)
+
+func init() {
+	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "pong")
+	})
+}

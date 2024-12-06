@@ -19,7 +19,8 @@ import (
 var fetchCmd = &cobra.Command{
 	Use:   "fetch",
 	Short: "Fetch latest repository state from GitHub",
-	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) (reterr error) {
 		repo, err := getRepo()
 		if err != nil {
 			return err
@@ -60,7 +61,7 @@ var fetchCmd = &cobra.Command{
 			}
 			if cursor == "" {
 				// only do this once at the start
-				_, _ = fmt.Fprint(
+				fmt.Fprint(
 					os.Stderr,
 					"Fetching ", colors.UserInput(prsPage.TotalCount),
 					" open pull requests from GitHub...",
@@ -79,7 +80,7 @@ var fetchCmd = &cobra.Command{
 				logrus.WithField("branch", pr.HeadBranchName()).
 					Debug("found PR for known local branch")
 				if branchMeta.PullRequest == nil {
-					_, _ = fmt.Fprint(
+					fmt.Fprint(
 						os.Stderr,
 						"  - Found pull request ", colors.UserInput(pr.Number),
 						" for branch ", colors.UserInput(pr.HeadBranchName()),
@@ -89,7 +90,7 @@ var fetchCmd = &cobra.Command{
 					// This shouldn't usually ever happen, not sure what the
 					// best thing to do here, but this handling allows you to
 					// close a PR then open a new one and then run `av fetch`
-					_, _ = fmt.Fprint(
+					fmt.Fprint(
 						os.Stderr,
 						"  - ", color.RedString("WARNING: "),
 						"found new pull request ", colors.UserInput("#", pr.Number, " ", pr.Title),
@@ -122,7 +123,7 @@ var fetchCmd = &cobra.Command{
 		if err := tx.Commit(); err != nil {
 			return err
 		}
-		_, _ = fmt.Fprint(
+		fmt.Fprint(
 			os.Stderr,
 			"Updated ", color.GreenString("%d", updatedCount), " pull requests",
 			"\n",

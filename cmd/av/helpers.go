@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/aviator-co/av/internal/meta/refmeta"
+	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/spf13/cobra"
 )
 
 var cachedRepo *git.Repo
@@ -115,4 +118,34 @@ func stripRemoteRefPrefixes(repo *git.Repo, possibleRefName string) string {
 		ret = strings.TrimPrefix(ret, repo.GetRemoteName()+"/")
 	}
 	return ret
+}
+
+// deprecateCommand will create a new version of the command that injects a deprecation message
+// into the command's short and long descriptions. As well as a pre-run hook that will print
+// a deprecation warning before running the command.
+func deprecateCommand(
+	cmd cobra.Command,
+	newCmd string,
+	use string,
+) *cobra.Command {
+	deprecatedCommand := cmd
+
+	deprecatedCommand.Use = use
+	deprecatedCommand.Short = fmt.Sprintf("Deprecated: %s (use '%s' instead)", cmd.Short, newCmd)
+
+	if deprecatedCommand.Long != "" {
+		var long = fmt.Sprintf("This command is deprecated. Please use '%s' instead.\n\n", newCmd)
+
+		deprecatedCommand.Long = long + deprecatedCommand.Long
+	}
+
+	deprecatedCommand.PreRun = func(cmd *cobra.Command, args []string) {
+		fmt.Print(
+			colors.Warning("This command is deprecated. Please use "),
+			colors.CliCmd("'", newCmd, "'"),
+			colors.Warning(" instead.\n"),
+		)
+	}
+
+	return &deprecatedCommand
 }

@@ -13,7 +13,8 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize the repository for Aviator CLI",
-	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) (reterr error) {
 		repo, err := getRepo()
 		if err != nil {
 			return err
@@ -55,7 +56,7 @@ var initCmd = &cobra.Command{
 		if err := tx.Commit(); err != nil {
 			return err
 		}
-		_, _ = fmt.Println("Successfully initialized repository for use with av!")
+		fmt.Println("Successfully initialized repository for use with av!")
 		return nil
 	},
 }

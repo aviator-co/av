@@ -106,7 +106,7 @@ func normalizeRebaseHint(stderr []byte) string {
 	res := string(stderr)
 	res = carriageReturnRegex.ReplaceAllString(res, "")
 	res = hintRegex.ReplaceAllString(res, "")
-	res = strings.ReplaceAll(res, "git rebase", "av stack sync")
+	res = strings.ReplaceAll(res, "git rebase", "av sync")
 	return res
 }
 
