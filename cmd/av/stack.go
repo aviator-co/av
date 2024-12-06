@@ -31,6 +31,8 @@ func init() {
 
 	deprecatedReparentCmd := deprecateCommand(*reparentCmd, "av reparent", "reparent")
 
+	deprecatedRestackCmd := deprecateCommand(*restackCmd, "av restack", "restack")
+
 	deprecatedStackBranchCommitCmd := deprecateCommand(
 		*stackBranchCommitCmd,
 		"av commit -b",
@@ -120,6 +122,6 @@ func init() {
 		deprecatedTidyCmd,
 		deprecatedTreeCmd,
 		stackForEachCmd,
-		stackRestackCmd,
+		deprecatedRestackCmd,
 	)
 }

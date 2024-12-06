@@ -18,7 +18,7 @@ func NewRestackModel(repo *git.Repo, db meta.DB) *RestackModel {
 		repo:    repo,
 		db:      db,
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
-		Command: "av stack restack",
+		Command: "av restack",
 	}
 }
 
