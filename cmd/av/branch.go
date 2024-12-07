@@ -11,6 +11,7 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -26,6 +27,7 @@ var branchFlags struct {
 	Rename bool
 	// If true, rename the current branch even if a pull request exists.
 	Force bool
+	Split bool
 }
 var branchCmd = &cobra.Command{
 	Use:   "branch [flags] <branch-name> [<parent-branch>]",
@@ -39,9 +41,9 @@ If the --rename/-m flag is given, the current branch is renamed to the name
 given as the first argument to the command. Branches should only be renamed
 with this command (not with git branch -m ...) because av needs to update
 internal tracking metadata that defines the order of branches within a stack.`),
-	Args: cobra.RangeArgs(0, 2),
+	Args: cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
-		if len(args) == 0 {
+		if len(args) == 0 && !branchFlags.Split {
 			// The only time we don't want to suppress the usage message is when
 			// a user runs `av branch` with no arguments.
 			return cmd.Usage()
@@ -55,6 +57,43 @@ internal tracking metadata that defines the order of branches within a stack.`),
 		db, err := getDB(repo)
 		if err != nil {
 			return err
+		}
+
+		if branchFlags.Split {
+			newBranchName := args[0]
+			status, err := repo.Status()
+			if err != nil {
+				return errors.Errorf("cannot get the status of the repository: %v", err)
+			}
+			if !status.IsClean() {
+				return errors.New(
+					"The working directory is not clean. Please stash or commit changes before running 'av branch --split'.",
+				)
+			}
+			currentBranchName := status.CurrentBranch
+			currentCommitOID := status.OID
+			if currentCommitOID == "" {
+				return errors.New("the repository has no commits")
+			}
+			if err := splitLastCommit(repo, newBranchName); err != nil {
+				fmt.Fprint(
+					os.Stderr,
+					colors.Failure("====================================================\n"),
+					"The split operation was aborted.\n",
+					"The original branch ",
+					colors.UserInput(currentBranchName),
+					" remains intact.\n",
+					"Your Git repository is now in a detached HEAD state.\n",
+					"To revert to your original branch and commit, run:\n",
+					"    ",
+					colors.CliCmd(fmt.Sprintf("git switch %s", currentBranchName)),
+					"\n",
+					colors.Failure("====================================================\n"),
+				)
+				return err
+			}
+			return nil
+
 		}
 
 		branchName := args[0]
@@ -176,12 +215,17 @@ func init() {
 		BoolVarP(&branchFlags.Rename, "rename", "m", false, "rename the current branch")
 	branchCmd.Flags().
 		BoolVar(&branchFlags.Force, "force", false, "force rename the current branch, even if a pull request exists")
+	branchCmd.Flags().
+		BoolVar(&branchFlags.Split, "split", false, "split the last commit into a new branch, if no branch name provided we will generate one")
+
+	branchCmd.MarkFlagsMutuallyExclusive("split", "parent")
+	branchCmd.MarkFlagsMutuallyExclusive("split", "rename")
 
 	_ = branchCmd.RegisterFlagCompletionFunc(
 		"parent",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			branches, _ := allBranches()
-			return branches, cobra.ShellCompDirectiveDefault
+			return branches, cobra.ShellCompDirectiveNoFileComp
 		},
 	)
 }
@@ -284,5 +328,64 @@ func branchMove(
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	return nil
+}
+
+func splitLastCommit(repo *git.Repo, newBranchName string) error {
+	// Create a new branch from the current HEAD
+
+	// Get the current branch reference
+	currentBranchRef, err := repo.GoGitRepo().Head()
+	if err != nil {
+		return fmt.Errorf("failed to get reference for current branch %w", err)
+	}
+	currentBranchRefName := currentBranchRef.Name()
+
+	lastCommitHash := currentBranchRef.Hash()
+	// Get the last commit object
+	lastCommit, err := repo.GoGitRepo().CommitObject(lastCommitHash)
+	if err != nil {
+		return fmt.Errorf("failed to get last commit: %w", err)
+	}
+
+	// If no branch name is provided, generate one from the last commit message
+	if newBranchName == "" {
+		newBranchName = branchNameFromMessage(lastCommit.Message)
+		if newBranchName == "" {
+			return errors.New(
+				"Cannot create a valid branch name from the message, please provide a branch name",
+			)
+		}
+	}
+
+	// Get the parent of the last commit (HEAD~1)
+	parentCommitIter := lastCommit.Parents()
+	parentCommit, err := parentCommitIter.Next()
+	if err != nil {
+		return fmt.Errorf("failed to get parent commit: %w", err)
+	}
+
+	// Create a new branch pointing to the last commit
+	newBranchRefName := plumbing.NewBranchReferenceName(newBranchName)
+	newBranchRef := plumbing.NewHashReference(newBranchRefName, lastCommitHash)
+	if err := repo.GoGitRepo().Storer.SetReference(newBranchRef); err != nil {
+		return fmt.Errorf("failed to create new branch: %w", err)
+	}
+
+	updatedCurrentBranchRef := plumbing.NewHashReference(currentBranchRefName, parentCommit.Hash)
+	if err := repo.GoGitRepo().Storer.SetReference(updatedCurrentBranchRef); err != nil {
+		return fmt.Errorf("failed to update current branch: %w", err)
+	}
+
+	fmt.Fprint(
+		os.Stdout,
+		colors.Success(
+			fmt.Sprintf(
+				"Successfully split the last commit into a new branch %s.\n",
+				newBranchName,
+			),
+		),
+	)
+
 	return nil
 }
