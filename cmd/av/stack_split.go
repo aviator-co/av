@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/utils/colors"
+	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 )
@@ -15,9 +17,14 @@ var stackSplitCmd = &cobra.Command{
 	Use:          "split",
 	Short:        "Split the last commit of the current branch into a new branch",
 	SilenceUsage: true,
-	Args:         cobra.ExactArgs(1),
+	Args:         cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		newBranchName := args[0]
+		newBranchName := ""
+
+		if len(args) > 0 {
+			// Use the provided argument as the new branch name
+			newBranchName = args[0]
+		}
 		repo, err := getRepo()
 		if err != nil {
 			return err
@@ -55,10 +62,6 @@ var stackSplitCmd = &cobra.Command{
 }
 
 func splitLastCommit(repo *git.Repo, currentBranchName string, newBranchName string) error {
-	// Create a new branch from the current HEAD
-	if newBranchName == "" {
-		return errors.New("new branch name must be provided")
-	}
 
 	// Get the current branch reference
 	currentBranchRefName := plumbing.NewBranchReferenceName(currentBranchName)
@@ -73,6 +76,13 @@ func splitLastCommit(repo *git.Repo, currentBranchName string, newBranchName str
 	if err != nil {
 		return fmt.Errorf("failed to get last commit: %w", err)
 	}
+
+	// Generate a branch name if none is provided
+	if newBranchName == "" {
+		sanitizedMessage := sanitizeBranchName(lastCommit.Message)
+		newBranchName = fmt.Sprintf("%s", sanitizedMessage)
+	}
+
 	// Get the parent of the last commit (HEAD~1)
 	parentCommitIter := lastCommit.Parents()
 	parentCommit, err := parentCommitIter.Next()
@@ -92,6 +102,19 @@ func splitLastCommit(repo *git.Repo, currentBranchName string, newBranchName str
 		return fmt.Errorf("failed to update current branch: %w", err)
 	}
 
+	// Switch to the newly created branch
+	worktree, err := repo.GoGitRepo().Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	if err := worktree.Checkout(&gogit.CheckoutOptions{
+		Branch: newBranchRefName,
+		Create: false, // We're switching, not creating
+		Force:  false, // Avoid overwriting changes
+	}); err != nil {
+		return fmt.Errorf("failed to switch to new branch '%s': %w", newBranchName, err)
+	}
 	fmt.Fprint(
 		os.Stdout,
 		colors.Success(fmt.Sprintf("Successfully split the last commit into a new branch %s.\n", newBranchName)),
@@ -111,4 +134,19 @@ func splitAbortMessage(branchName string) {
 		"    ", colors.CliCmd(fmt.Sprintf("git switch %s", branchName)), "\n",
 		colors.Failure("====================================================\n"),
 	)
+}
+
+// sanitizeBranchName creates a valid branch name from a string
+func sanitizeBranchName(input string) string {
+	sanitized := strings.ToLower(strings.TrimSpace(input))
+	sanitized = strings.ReplaceAll(sanitized, " ", "-")
+	sanitized = strings.ReplaceAll(sanitized, "/", "-")
+	sanitized = strings.ReplaceAll(sanitized, "\\", "-")
+	sanitized = strings.ReplaceAll(sanitized, ".", "-")
+	sanitized = strings.ReplaceAll(sanitized, ":", "-")
+	// Limit length for branch names
+	if len(sanitized) > 40 {
+		sanitized = sanitized[:40]
+	}
+	return sanitized
 }
