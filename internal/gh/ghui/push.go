@@ -43,6 +43,8 @@ type pushCandidate struct {
 	branch       plumbing.ReferenceName
 	remoteCommit *object.Commit
 	localCommit  *object.Commit
+	remotePRMeta actions.PRMetadata
+	localPRMeta  actions.PRMetadata
 }
 
 type noPushBranch struct {
@@ -231,6 +233,7 @@ func (vm *GitHubPushModel) viewPushCandidates() string {
 				branch.remoteCommit.Committer.When,
 			) + ")\n",
 		)
+		sb.WriteString("         Parent=" + branch.remotePRMeta.Parent + "\n")
 		sb.WriteString(
 			"  Local:  " + branch.localCommit.Hash.String()[:7] + " " + getFirstLine(
 				branch.localCommit.Message,
@@ -238,6 +241,7 @@ func (vm *GitHubPushModel) viewPushCandidates() string {
 				branch.localCommit.Committer.When,
 			) + ")\n",
 		)
+		sb.WriteString("         Parent=" + branch.localPRMeta.Parent + "\n")
 		avbr, _ := vm.db.ReadTx().Branch(branch.branch.Short())
 		if avbr.PullRequest != nil && avbr.PullRequest.Permalink != "" {
 			sb.WriteString("  PR:     " + avbr.PullRequest.Permalink + "\n")
@@ -362,7 +366,7 @@ func (vm *GitHubPushModel) makePRsDraft(ghPRs map[plumbing.ReferenceName]*gh.Pul
 func (vm *GitHubPushModel) updatePRs(ghPRs map[plumbing.ReferenceName]*gh.PullRequest) error {
 	for br, pr := range ghPRs {
 		avbr, _ := vm.db.ReadTx().Branch(br.Short())
-		prMeta := createPRMetadata(avbr, vm)
+		prMeta := vm.createPRMetadata(avbr)
 
 		var stackToWrite *stackutils.StackTreeNode
 		if avconfig.Av.PullRequest.WriteStack {
@@ -452,7 +456,17 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 			return err
 		}
 
-		if localRef.Hash() == remoteRef.Hash() && !vm.isDifferencePRMetadata(avbr) {
+		localPRMeta := vm.createPRMetadata(avbr)
+		remotePRMeta := actions.PRMetadata{}
+		remotePR := vm.remotePR(avbr)
+		if remotePR != nil {
+			if m, err := actions.ReadPRMetadata(remotePR.Body); err == nil {
+				// Ignore the parsing error.
+				remotePRMeta = m
+			}
+		}
+
+		if localRef.Hash() == remoteRef.Hash() && localPRMeta == remotePRMeta {
 			noPushBranches = append(noPushBranches, noPushBranch{
 				branch: br,
 				reason: reasonAlreadyUpToDate,
@@ -492,6 +506,8 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 			branch:       br,
 			remoteCommit: remoteRefCommit,
 			localCommit:  localRefCommit,
+			remotePRMeta: remotePRMeta,
+			localPRMeta:  localPRMeta,
 		})
 	}
 	vm.noPushBranches = noPushBranches
@@ -529,43 +545,22 @@ func (vm *GitHubPushModel) allBranchesOnStackHavePRs(br plumbing.ReferenceName) 
 	}
 }
 
-// Compare local metadata with PR metadata for any changes
-// If something error occurs, return true to be safe
-func (vm *GitHubPushModel) isDifferencePRMetadata(avbr meta.Branch) bool {
-	local := createPRMetadata(avbr, vm)
-
-	var pr *gh.PullRequest
-	if _pr, ok := vm.pullRequestsCache[avbr.PullRequest.ID]; ok {
-		pr = _pr
-	} else {
-		_pr, err := vm.client.PullRequest(context.Background(), avbr.PullRequest.ID)
-		if err != nil {
-			return true
-		}
-		pr = _pr
+func (vm *GitHubPushModel) remotePR(avbr meta.Branch) *gh.PullRequest {
+	if avbr.PullRequest == nil {
+		return nil
 	}
-
-	if pr == nil {
-		return true
+	if pr, ok := vm.pullRequestsCache[avbr.PullRequest.ID]; ok {
+		return pr
 	}
-
-	prMeta, err := actions.ReadPRMetadata(pr.Body)
+	pr, err := vm.client.PullRequest(context.Background(), avbr.PullRequest.ID)
 	if err != nil {
-		return true
+		return nil
 	}
-
-	return local == prMeta
+	vm.pullRequestsCache[avbr.PullRequest.ID] = pr
+	return pr
 }
 
-func getFirstLine(s string) string {
-	idx := strings.Index(s, "\n")
-	if idx == -1 {
-		return s
-	}
-	return s[:idx]
-}
-
-func createPRMetadata(branch meta.Branch, vm *GitHubPushModel) actions.PRMetadata {
+func (vm *GitHubPushModel) createPRMetadata(branch meta.Branch) actions.PRMetadata {
 	trunk, _ := meta.Trunk(vm.db.ReadTx(), branch.Name)
 
 	metadata := actions.PRMetadata{
@@ -582,4 +577,12 @@ func createPRMetadata(branch meta.Branch, vm *GitHubPushModel) actions.PRMetadat
 	}
 
 	return metadata
+}
+
+func getFirstLine(s string) string {
+	idx := strings.Index(s, "\n")
+	if idx == -1 {
+		return s
+	}
+	return s[:idx]
 }
