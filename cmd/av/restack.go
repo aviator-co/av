@@ -31,7 +31,7 @@ var restackCmd = &cobra.Command{
 	Use:   "restack",
 	Short: "Rebase the stacked branches",
 	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		repo, err := getRepo()
 		if err != nil {
 			return err
