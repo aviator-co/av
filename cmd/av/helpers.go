@@ -149,3 +149,12 @@ func deprecateCommand(
 
 	return &deprecatedCommand
 }
+
+func branchNameArgs(
+	_ *cobra.Command,
+	_ []string,
+	toComplete string,
+) ([]string, cobra.ShellCompDirective) {
+	branches, _ := allBranches()
+	return branches, cobra.ShellCompDirectiveNoSpace
+}
