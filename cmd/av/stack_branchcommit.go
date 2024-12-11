@@ -29,6 +29,7 @@ var stackBranchCommitCmd = &cobra.Command{
 		return branchAndCommit(stackBranchCommitFlags.BranchName,
 			stackBranchCommitFlags.Message,
 			stackBranchCommitFlags.All,
-			stackBranchCommitFlags.AllModified)
+			stackBranchCommitFlags.AllModified,
+			"")
 	},
 }
