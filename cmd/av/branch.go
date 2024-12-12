@@ -62,108 +62,11 @@ internal tracking metadata that defines the order of branches within a stack.`),
 			return branchMove(repo, db, branchName, branchFlags.Force)
 		}
 
-		// Determine important contextual information from Git
-		// or if a parent branch is provided, check it allows as a default branch
-		defaultBranch, err := repo.DefaultBranch()
-		if err != nil {
-			return errors.WrapIf(err, "failed to determine repository default branch")
-		}
-
 		if len(args) == 2 {
 			branchFlags.Parent = args[1]
 		}
 
-		tx := db.WriteTx()
-		cu := cleanup.New(func() {
-			logrus.WithError(reterr).Debug("aborting db transaction")
-			tx.Abort()
-		})
-		defer cu.Cleanup()
-
-		// Determine the parent branch and make sure it's checked out
-		var parentBranchName string
-		if branchFlags.Parent != "" {
-			parentBranchName = branchFlags.Parent
-		} else {
-			var err error
-			parentBranchName, err = repo.CurrentBranchName()
-			if err != nil {
-				return errors.WrapIff(err, "failed to get current branch name")
-			}
-		}
-
-		remoteName := repo.GetRemoteName()
-		if parentBranchName == remoteName+"/HEAD" {
-			parentBranchName = defaultBranch
-		}
-		parentBranchName = strings.TrimPrefix(parentBranchName, remoteName+"/")
-
-		isBranchFromTrunk, err := repo.IsTrunkBranch(parentBranchName)
-		if err != nil {
-			return errors.WrapIf(err, "failed to determine if branch is a trunk")
-		}
-		checkoutStartingPoint := parentBranchName
-		var parentHead string
-		if isBranchFromTrunk {
-			// If the parent is trunk, start from the remote tracking branch.
-			checkoutStartingPoint = remoteName + "/" + defaultBranch
-			// If the parent is the trunk, we don't log the parent branch's head
-			parentHead = ""
-		} else {
-			var err error
-			parentHead, err = repo.RevParse(&git.RevParse{Rev: parentBranchName})
-			if err != nil {
-				return errors.WrapIff(
-					err,
-					"failed to determine head commit of branch %q",
-					parentHead,
-				)
-			}
-
-			if _, exist := tx.Branch(parentBranchName); !exist {
-				return errParentNotAdopted
-			}
-		}
-
-		// Resolve to a commit hash for the starting point.
-		//
-		// Different people have different setups, and they affect how they use
-		// branch.<name>.merge. Different tools have different ways to interpret this
-		// config. Some people want to set it to the same name only when it's pushed. Some
-		// people want to set it to none. etc. etc.
-		//
-		// For this new ref creation specifically, git automatically guesses what to set for
-		// branch.<name>.merge. For now, by using a commit hash, we can suppress all of
-		// those behaviors. Later maybe we can add an av-cli config to control what to set
-		// for branch.<name>.merge at what timing.
-		startPointCommitHash, err := repo.RevParse(&git.RevParse{Rev: checkoutStartingPoint})
-		if err != nil {
-			return errors.WrapIf(err, "failed to determine commit hash of starting point")
-		}
-
-		// Create a new branch off of the parent
-		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
-			Name:       branchName,
-			NewBranch:  true,
-			NewHeadRef: startPointCommitHash,
-		}); err != nil {
-			return errors.WrapIff(err, "checkout error")
-		}
-
-		tx.SetBranch(meta.Branch{
-			Name: branchName,
-			Parent: meta.BranchState{
-				Name:  parentBranchName,
-				Trunk: isBranchFromTrunk,
-				Head:  parentHead,
-			},
-		})
-
-		cu.Cancel()
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-		return nil
+		return createBranch(repo, db, branchName, branchFlags.Parent)
 	},
 }
 
@@ -181,9 +84,135 @@ func init() {
 		"parent",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			branches, _ := allBranches()
-			return branches, cobra.ShellCompDirectiveDefault
+			return branches, cobra.ShellCompDirectiveNoSpace
 		},
 	)
+}
+
+func createBranch(
+	repo *git.Repo,
+	db meta.DB,
+	branchName string,
+	parentBranchName string,
+) (reterr error) {
+	// Determine important contextual information from Git
+	// or if a parent branch is provided, check it allows as a default branch
+	defaultBranch, err := repo.DefaultBranch()
+	if err != nil {
+		return errors.WrapIf(err, "failed to determine repository default branch")
+	}
+
+	tx := db.WriteTx()
+	cu := cleanup.New(func() {
+		logrus.WithError(reterr).Debug("aborting db transaction")
+		tx.Abort()
+	})
+	defer cu.Cleanup()
+
+	// Determine the parent branch and make sure it's checked out
+	if parentBranchName == "" {
+		var err error
+		parentBranchName, err = repo.CurrentBranchName()
+		if err != nil {
+			return errors.WrapIff(err, "failed to get current branch name")
+		}
+	}
+
+	remoteName := repo.GetRemoteName()
+	if parentBranchName == remoteName+"/HEAD" {
+		parentBranchName = defaultBranch
+	}
+	parentBranchName = strings.TrimPrefix(parentBranchName, remoteName+"/")
+
+	isBranchFromTrunk, err := repo.IsTrunkBranch(parentBranchName)
+	if err != nil {
+		return errors.WrapIf(err, "failed to determine if branch is a trunk")
+	}
+	checkoutStartingPoint := parentBranchName
+	var parentHead string
+	if isBranchFromTrunk {
+		// If the parent is trunk, start from the remote tracking branch.
+		checkoutStartingPoint = remoteName + "/" + defaultBranch
+		// If the parent is the trunk, we don't log the parent branch's head
+		parentHead = ""
+	} else {
+		var err error
+		parentHead, err = repo.RevParse(&git.RevParse{Rev: parentBranchName})
+		if err != nil {
+			return errors.WrapIff(
+				err,
+				"failed to determine head commit of branch %q",
+				parentHead,
+			)
+		}
+
+		if _, exist := tx.Branch(parentBranchName); !exist {
+			return errParentNotAdopted
+		}
+	}
+
+	// Resolve to a commit hash for the starting point.
+	//
+	// Different people have different setups, and they affect how they use
+	// branch.<name>.merge. Different tools have different ways to interpret this
+	// config. Some people want to set it to the same name only when it's pushed. Some
+	// people want to set it to none. etc. etc.
+	//
+	// For this new ref creation specifically, git automatically guesses what to set for
+	// branch.<name>.merge. For now, by using a commit hash, we can suppress all of
+	// those behaviors. Later maybe we can add an av-cli config to control what to set
+	// for branch.<name>.merge at what timing.
+	startPointCommitHash, err := repo.RevParse(&git.RevParse{Rev: checkoutStartingPoint})
+	if err != nil {
+		return errors.WrapIf(err, "failed to determine commit hash of starting point")
+	}
+
+	// Create a new branch off of the parent
+	logrus.WithFields(logrus.Fields{
+		"parent":     parentBranchName,
+		"new_branch": branchName,
+	}).Debug("creating new branch from parent")
+	if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+		Name:       branchName,
+		NewBranch:  true,
+		NewHeadRef: startPointCommitHash,
+	}); err != nil {
+		return errors.WrapIff(err, "checkout error")
+	}
+
+	// On failure, we want to delete the branch we created so that the user
+	// can try again (e.g., to fix issues surfaced by a pre-commit hook).
+	cu.Add(func() {
+		fmt.Fprint(os.Stderr,
+			colors.Faint("  - Cleaning up branch "),
+			colors.UserInput(branchName),
+			colors.Faint(" because commit was not successful."),
+			"\n",
+		)
+		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+			Name: parentBranchName,
+		}); err != nil {
+			logrus.WithError(err).Error("failed to return to original branch during cleanup")
+		}
+		if err := repo.BranchDelete(branchName); err != nil {
+			logrus.WithError(err).Error("failed to delete branch during cleanup")
+		}
+	})
+
+	tx.SetBranch(meta.Branch{
+		Name: branchName,
+		Parent: meta.BranchState{
+			Name:  parentBranchName,
+			Trunk: isBranchFromTrunk,
+			Head:  parentHead,
+		},
+	})
+
+	cu.Cancel()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func branchMove(

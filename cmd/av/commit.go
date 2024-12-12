@@ -44,6 +44,7 @@ var commitFlags struct {
 	CreateBranch bool
 	BranchName   string
 	AllChanges   bool
+	Parent       string
 }
 
 var commitCmd = &cobra.Command{
@@ -64,8 +65,13 @@ var commitCmd = &cobra.Command{
 				commitFlags.Message,
 				commitFlags.AllChanges,
 				commitFlags.All,
+				commitFlags.Parent,
 			)
 
+		}
+
+		if commitFlags.Parent != "" {
+			return errors.New("parent flag is only allowed with -b/--branch or --branch-name")
 		}
 
 		repo, err := getRepo()
@@ -215,7 +221,13 @@ func runAmend(repo *git.Repo, db meta.DB, message string, edit bool, all bool) e
 	return nil
 }
 
-func branchAndCommit(branchName string, message string, all bool, allModified bool) (reterr error) {
+func branchAndCommit(
+	branchName string,
+	message string,
+	all bool,
+	allModified bool,
+	parentBranchName string,
+) (reterr error) {
 	if branchName == "" {
 		if message == "" {
 			return errors.New(
@@ -237,77 +249,18 @@ func branchAndCommit(branchName string, message string, all bool, allModified bo
 	if err != nil {
 		return err
 	}
+
+	err = createBranch(repo, db, branchName, parentBranchName)
+	if err != nil {
+		return err
+	}
+
 	tx := db.WriteTx()
 	var cu cleanup.Cleanup
 	defer cu.Cleanup()
 	cu.Add(func() {
 		logrus.WithError(reterr).Debug("aborting db transaction")
 		tx.Abort()
-	})
-
-	parentBranchName, err := repo.CurrentBranchName()
-	if err != nil {
-		return errors.WrapIff(err, "failed to get current branch name")
-	}
-
-	// Currently, we only allow the repo default branch to be a trunk.
-	// We might want to allow other branches to be trunks in the future, but
-	// that does run the risk of allowing the user to get into a weird state
-	// (where some stacks assume a branch is a trunk and others don't).
-	isBranchFromTrunk, err := repo.IsTrunkBranch(parentBranchName)
-	if err != nil {
-		return errors.WrapIf(err, "failed to check if branch is trunk")
-	}
-	var parentHead string
-	if !isBranchFromTrunk {
-		parentHead, err = repo.RevParse(&git.RevParse{Rev: parentBranchName})
-		if err != nil {
-			return errors.WrapIf(err, "failed to get parent branch head commit")
-		}
-	}
-
-	if err != nil {
-		return errors.WrapIf(err, "failed to read parent branch state")
-	}
-
-	// Create a new branch off of the parent
-	logrus.WithFields(logrus.Fields{
-		"parent":     parentBranchName,
-		"new_branch": branchName,
-	}).Debug("creating new branch from parent")
-	if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
-		Name:      branchName,
-		NewBranch: true,
-	}); err != nil {
-		return errors.WrapIff(err, "checkout error")
-	}
-
-	// On failure, we want to delete the branch we created so that the user
-	// can try again (e.g., to fix issues surfaced by a pre-commit hook).
-	cu.Add(func() {
-		fmt.Fprint(os.Stderr,
-			colors.Faint("  - Cleaning up branch "),
-			colors.UserInput(branchName),
-			colors.Faint(" because commit was not successful."),
-			"\n",
-		)
-		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
-			Name: parentBranchName,
-		}); err != nil {
-			logrus.WithError(err).Error("failed to return to original branch during cleanup")
-		}
-		if err := repo.BranchDelete(branchName); err != nil {
-			logrus.WithError(err).Error("failed to delete branch during cleanup")
-		}
-	})
-
-	tx.SetBranch(meta.Branch{
-		Name: branchName,
-		Parent: meta.BranchState{
-			Name:  parentBranchName,
-			Trunk: isBranchFromTrunk,
-			Head:  parentHead,
-		},
 	})
 
 	// For "--all" and "--all-modified",
@@ -388,6 +341,16 @@ func init() {
 			"create a new branch with automatically generated name and commit to it")
 	commitCmd.Flags().
 		StringVar(&commitFlags.BranchName, "branch-name", "", "create a new branch with the given name and commit to it")
+	commitCmd.Flags().
+		StringVar(&commitFlags.Parent, "parent", "", "the parent branch to base the new branch off of")
+
+	_ = branchCmd.RegisterFlagCompletionFunc(
+		"parent",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			branches, _ := allBranches()
+			return branches, cobra.ShellCompDirectiveNoFileComp
+		},
+	)
 
 	commitCmd.MarkFlagsMutuallyExclusive("all", "all-changes")
 
