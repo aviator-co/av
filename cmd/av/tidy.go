@@ -39,7 +39,16 @@ does not delete Git branches.
 		}
 
 		var ss []string
-		if len(deleted) > 0 {
+
+		hasDeleted := false
+		for _, d := range deleted {
+			if d {
+				hasDeleted = true
+				break
+			}
+		}
+
+		if hasDeleted {
 			ss = append(
 				ss,
 				colors.SuccessStyle.Render(
@@ -49,8 +58,10 @@ does not delete Git branches.
 			ss = append(ss, "")
 			ss = append(ss, "  Following branches no longer exist in the repository:")
 			ss = append(ss, "")
-			for name := range deleted {
-				ss = append(ss, "  * "+name)
+			for name, d := range deleted {
+				if d {
+					ss = append(ss, "  * "+name)
+				}
 			}
 			if len(orphaned) > 0 {
 				ss = append(ss, "")
