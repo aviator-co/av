@@ -465,7 +465,7 @@ func init() {
 		"parent",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			branches, _ := allBranches()
-			return branches, cobra.ShellCompDirectiveDefault
+			return branches, cobra.ShellCompDirectiveNoFileComp
 		},
 	)
 }
