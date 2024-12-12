@@ -215,6 +215,15 @@ func branchSplit(repo *git.Repo, currentBranchName string, newBranchName string)
 		return fmt.Errorf("failed to get last commit: %w", err)
 	}
 
+	headRef, err := repo.GoGitRepo().Head()
+	if err != nil {
+		return fmt.Errorf("failed to get HEAD reference: %v", err)
+	}
+
+	headHash := headRef.Hash()
+	if headHash != lastCommitHash {
+		return fmt.Errorf("user is not on the latest commit")
+	}
 	// Generate a branch name if none is provided
 	if newBranchName == "" {
 		newBranchName = sanitizeBranchName(lastCommit.Message)
