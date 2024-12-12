@@ -1,0 +1,16 @@
+package main
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+)
+
+func init() {
+	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "pong")
+	})
+	http.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(getUsers())
+	})
+}

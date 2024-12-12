@@ -9,7 +9,7 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func TestCommitAmendInStack(t *testing.T) {
+func TestAmendInStack(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
 	Chdir(t, repo.RepoDir)
 	repo.Git(t, "fetch")
@@ -18,20 +18,20 @@ func TestCommitAmendInStack(t *testing.T) {
 	// Create a branch and commit a file.
 	filepath := repo.CreateFile(t, "one.txt", "one")
 	repo.AddFile(t, filepath)
-	RequireAv(t, "stack", "branch", "one")
-	RequireAv(t, "commit", "create", "-m", "one")
+	RequireAv(t, "branch", "one")
+	RequireAv(t, "commit", "-m", "one")
 
 	// Create another branch and commit a file.
 	filepath = repo.CreateFile(t, "two.txt", "two")
 	repo.AddFile(t, filepath)
-	RequireAv(t, "stack", "branch", "two")
-	RequireAv(t, "commit", "create", "-m", "two")
+	RequireAv(t, "branch", "two")
+	RequireAv(t, "commit", "-m", "two")
 
 	// Go back to the first branch and amend the commit with another file.
 	repo.Git(t, "checkout", "one")
 	filepath = repo.CreateFile(t, "one-b.txt", "one-b")
 	repo.AddFile(t, filepath)
-	RequireAv(t, "commit", "amend", "--no-edit")
+	RequireAv(t, "commit", "--amend")
 
 	// Verify that the branches are still there.
 	db := repo.OpenDB(t)
@@ -47,16 +47,16 @@ func TestCommitAmendInStack(t *testing.T) {
 	// validate that a push didn't happen.
 }
 
-func TestCommitAmendOnMergedBranch(t *testing.T) {
+func TestAmendOnMergedBranch(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
 	Chdir(t, repo.RepoDir)
 	repo.Git(t, "fetch")
 
 	// Create a branch with a commit
-	RequireAv(t, "stack", "branch", "one")
+	RequireAv(t, "branch", "one")
 	filepath := repo.CreateFile(t, "one.txt", "one")
 	repo.AddFile(t, filepath)
-	RequireAv(t, "commit", "create", "-m", "one")
+	RequireAv(t, "commit", "-m", "one")
 
 	// Update the branch meta with the PR data
 	db := repo.OpenDB(t)
@@ -69,6 +69,6 @@ func TestCommitAmendOnMergedBranch(t *testing.T) {
 	// Attempt to commit to the "merged" branch
 	filepath = repo.CreateFile(t, "oneA.txt", "one")
 	repo.AddFile(t, filepath)
-	output := Av(t, "commit", "amend")
+	output := Av(t, "commit", "--amend")
 	require.Equal(t, 1, output.ExitCode, "expected exit code 1")
 }

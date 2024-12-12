@@ -62,7 +62,7 @@ type CreatePullRequestResult struct {
 // getPRMetadata constructs the PRMetadata for the current state of the branch.
 // TODO:
 // The way we pass/load all the relevant data here is not great(tm). The
-// `parent` argument is optional because sometimes it's loadeed by the
+// `parent` argument is optional because sometimes it's loaded by the
 // calling function and sometimes not. :shrug: It can also be nil if the
 // branch doesn't have a parent (i.e., the branch is a stack root).
 func getPRMetadata(
@@ -163,7 +163,7 @@ func CreatePullRequest(
 				"\n",
 			)
 			_, _ = fmt.Fprint(os.Stderr,
-				colors.Faint("  - use "), colors.CliCmd("av pr create --force"),
+				colors.Faint("  - use "), colors.CliCmd("av pr --force"),
 				colors.Faint(" to create a new pull request for this branch\n"),
 			)
 			return nil, err
@@ -248,7 +248,7 @@ func CreatePullRequest(
 			//     We should automagically create PRs for every branch in the stack
 			return nil, errors.Errorf(
 				"base branch %q does not have an associated pull request "+
-					"(create one by checking out the branch and running `av pr create`)",
+					"(create one by checking out the branch and running 'av pr')",
 				parentState.Name,
 			)
 		}
@@ -272,7 +272,7 @@ func CreatePullRequest(
 	// Check if a parent branch has already been merged or not
 	if parentMeta.MergeCommit != "" {
 		return nil, errors.Errorf(
-			"failed to create a pull request. The parent branch %q has already been merged\nPlease run av stack sync to rebase the branch first.",
+			"failed to create a pull request. The parent branch %q has already been merged\nPlease run 'av sync' to rebase the branch first.",
 			parentMeta.Name,
 		)
 	}

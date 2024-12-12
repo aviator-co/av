@@ -12,6 +12,7 @@ automatically update the dependent PR when the base PR is updated. Read more at
 PRs](https://www.aviator.co/blog/rethinking-code-reviews-with-stacked-prs/).
 
 # Community
+
 Join our discord community: [https://discord.gg/TFgtZtN8](https://discord.gg/NFsYWNzXcH)
 
 # Features
@@ -37,33 +38,31 @@ Join our discord community: [https://discord.gg/TFgtZtN8](https://discord.gg/NFs
 Create a new branch and make some changes:
 
 ```sh
-$ av stack branch feature-1
+$ av branch feature-1
 $ echo "Hello, world!" > hello.txt
-$ git add hello.txt
-$ git commit -m "Add hello.txt"
+$ av commit -A -m "Add hello.txt"
 ```
 
 Create a PR:
 
 ```sh
-$ av pr create
+$ av pr
 ```
 
 Create a new branch and make some changes. Create another PR that depends on the
 previous PR:
 
 ```sh
-$ av stack branch feature-2
+$ av branch feature-2
 $ echo "Another feature" >> hello.txt
-$ git add hello.txt
-$ git commit -m "Update hello.txt"
-$ av pr create
+$ av commit -a -m "Update hello.txt"
+$ av pr
 ```
 
 Visualize the PR stack:
 
 ```sh
-$ av stack tree
+$ av tree
   * feature-2 (HEAD)
   │ https://github.com/octocat/Hello-World/pull/2
   │
@@ -82,7 +81,7 @@ $ gh pr merge feature-1
 Sync the stack:
 
 ```sh
-$ av stack sync
+$ av sync
 
   ✓ GitHub fetch is done
   ✓ Restack is done
@@ -119,7 +118,11 @@ uses the GitHub API token. If you have [GitHub CLI](https://cli.github.com/)
 installed, `av` will use the token automatically from the GitHub CLI. It is
 recommended to install both.
 
-## macOS
+## macOS (Homebrew)
+
+First, if not already done, [install Homebrew](https://brew.sh).
+
+Then install using Homebrew tap.
 
 ```sh
 brew install gh aviator-co/tap/av
@@ -142,13 +145,16 @@ Add Aviator to your APT repositories.
 echo "deb [trusted=yes] https://apt.fury.io/aviator/ /" > \
 /etc/apt/sources.list.d/fury.list
 ```
+
 And then apt install.
+
 ```sh
 sudo apt update
 sudo apt install av
 ```
 
 ### Alternatively
+
 If you'd prefer you can download the `.deb` file from the [releases page](https://github.com/aviator-co/av/releases).
 
 ```sh
@@ -156,7 +162,9 @@ apt install ./av_$VERSION_linux_$ARCH.deb
 ```
 
 ## RPM-based systems
+
 Add the following file `/etc/yum.repos.d/fury.repo`.
+
 ```conf
 [fury]
 name=Gemfury Private Repo
@@ -166,16 +174,19 @@ gpgcheck=0
 ```
 
 Run the following command to confirm the configuration is working.
+
 ```sh
 yum --disablerepo=* --enablerepo=fury list available
 ```
 
 And then run yum install.
+
 ```sh
 sudo yum install av
 ```
 
 ### Alternatively
+
 If you'd prefer you can download the `.rpm` file from the [releases page](https://github.com/aviator-co/av/releases).
 
 ```sh
@@ -185,6 +196,7 @@ rpm -i ./av_$VERSION_linux_$ARCH.rpm
 ## Binary download
 
 Download the binary from the [releases page](https://github.com/aviator-co/av/releases).
+Extract the archive and add the executable to your PATH.
 
 # Setup
 
@@ -213,21 +225,43 @@ Download the binary from the [releases page](https://github.com/aviator-co/av/re
    av init
    ```
 
+# Upgrade
+
+## macOS (Homebrew)
+
+```sh
+brew update
+brew upgrade av
+```
+
+## Debian/Ubuntu
+
+```sh
+sudo apt update
+sudo apt upgrade
+```
+
+## RPM-based systems
+
+```sh
+yum update
+```
+
 # Example commands
 
-| Command               | Description                                                |
-| --------------------- | ---------------------------------------------------------- |
-| `av stack branch`     | Create a new child branch from the current branch.         |
-| `av stack restack`    | Rebase the branches to their parents.                      |
-| `av pr create`        | Create or update a PR.                                     |
-| `av stack tree`       | Visualize the PRs.                                         |
-| `av stack sync --all` | Fetch and rebase all branches.                             |
-| `av stack adopt`      | Adopt a branch that is not created from `av stack branch`. |
-| `av stack reparent`   | Change the parent of the current branch.                   |
-| `av stack switch`     | Check out branches interactively.                          |
-| `av stack reorder`    | Reorder the branches.                                      |
-| `av commit amend`     | Amend the last commit and rebase the children.             |
-| `av commit split`     | Split the last commit.                                     |
+| Command             | Description                                          |
+| ------------------- | ---------------------------------------------------- |
+| `av adopt`          | Adopt a branch that is not created from `av branch`. |
+| `av branch`         | Create a new child branch from the current branch.   |
+| `av commit --amend` | Amend the last commit and rebase the children.       |
+| `av pr`             | Create or update a PR.                               |
+| `av reorder`        | Reorder the branches.                                |
+| `av reparent`       | Change the parent of the current branch.             |
+| `av restack`        | Rebase the branches to their parents.                |
+| `av split-commit`   | Split the last commit.                               |
+| `av switch`         | Check out branches interactively.                    |
+| `av sync --all`     | Fetch and rebase all branches.                       |
+| `av tree`           | Visualize the PRs.                                   |
 
 # How it works
 
@@ -238,6 +272,6 @@ new base branch using the remembered starting point as the merge base.
 
 # Learn more
 
-* [Rethinking code reviews with stacked PRs](https://www.aviator.co/blog/rethinking-code-reviews-with-stacked-prs/)
-* [Issue Tracker](https://github.com/aviator-co/av/issues)
-* [Changelog](https://github.com/aviator-co/av/releases)
+- [Rethinking code reviews with stacked PRs](https://www.aviator.co/blog/rethinking-code-reviews-with-stacked-prs/)
+- [Issue Tracker](https://github.com/aviator-co/av/issues)
+- [Changelog](https://github.com/aviator-co/av/releases)
