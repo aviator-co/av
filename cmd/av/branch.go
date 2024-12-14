@@ -85,7 +85,7 @@ internal tracking metadata that defines the order of branches within a stack.`),
 				return errors.New("the repository has no commits")
 			}
 
-			err = branchSplit(repo, currentBranchName, branchName)
+			err = branchSplit(repo, db, currentBranchName, branchName)
 			if err != nil {
 				splitAbortMessage(currentBranchName)
 				return errors.Errorf("split failed: %v", err)
@@ -198,7 +198,7 @@ internal tracking metadata that defines the order of branches within a stack.`),
 	},
 }
 
-func branchSplit(repo *git.Repo, currentBranchName string, newBranchName string) error {
+func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranchName string) error {
 
 	// Get the current branch reference
 	currentBranchRefName := plumbing.NewBranchReferenceName(currentBranchName)
@@ -220,10 +220,16 @@ func branchSplit(repo *git.Repo, currentBranchName string, newBranchName string)
 		return fmt.Errorf("failed to get HEAD reference: %v", err)
 	}
 
-	headHash := headRef.Hash()
-	if headHash != lastCommitHash {
-		return fmt.Errorf("user is not on the latest commit")
+	// Ensure HEAD is pointing to the branch
+	if headRef.Name() != currentBranchRefName {
+		return fmt.Errorf("HEAD is not pointing to the current branch '%s'", currentBranchName)
 	}
+
+	// Ensure HEAD matches the latest commit of the branch
+	if headRef.Hash() != currentBranchRef.Hash() {
+		return fmt.Errorf("user is not on the latest commit of the branch '%s'", currentBranchName)
+	}
+
 	// Generate a branch name if none is provided
 	if newBranchName == "" {
 		newBranchName = sanitizeBranchName(lastCommit.Message)
@@ -267,7 +273,7 @@ func branchSplit(repo *git.Repo, currentBranchName string, newBranchName string)
 	)
 
 	// Adopt new branch to av database
-	err = adoptCmd.RunE(nil, []string{"parent", currentBranchName})
+	err = adoptForceAdoption(repo, db, newBranchName, currentBranchName)
 	if err != nil {
 		return fmt.Errorf("failed to run adopt command: %w", err)
 	}
