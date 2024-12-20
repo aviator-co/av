@@ -87,7 +87,6 @@ internal tracking metadata that defines the order of branches within a stack.`),
 
 			err = branchSplit(repo, db, currentBranchName, branchName)
 			if err != nil {
-				splitAbortMessage(currentBranchName)
 				return errors.Errorf("split failed: %v", err)
 			}
 			return nil
@@ -198,8 +197,67 @@ internal tracking metadata that defines the order of branches within a stack.`),
 	},
 }
 
-func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranchName string) error {
+func validateBranchHasNoDescendants(repo *git.Repo, currentBranchName string) error {
+	// Get the current branch reference
+	currentBranchRefName := plumbing.NewBranchReferenceName(currentBranchName)
+	currentBranchRef, err := repo.GoGitRepo().Reference(currentBranchRefName, true)
+	if err != nil {
+		return fmt.Errorf("failed to get reference for branch %s: %w", currentBranchName, err)
+	}
 
+	currentBranchHash := currentBranchRef.Hash()
+
+	// Iterate through all branch references
+	refs, err := repo.GoGitRepo().References()
+	if err != nil {
+		return fmt.Errorf("failed to list references: %w", err)
+	}
+
+	err = refs.ForEach(func(ref *plumbing.Reference) error {
+		// Skip non-branch references and the current branch
+		if !ref.Name().IsBranch() || ref.Name() == currentBranchRefName {
+			return nil
+		}
+
+		// Get the hash of the other branch
+		otherBranchHash := ref.Hash()
+
+		// Find the merge base between the current branch and the other branch
+		mergeBase, err := repo.MergeBase(currentBranchHash.String(), otherBranchHash.String())
+		if err != nil {
+			return fmt.Errorf("failed to find merge base for branches %s and %s: %w",
+				currentBranchName, ref.Name().Short(), err)
+		}
+
+		// Check if the merge base matches the current branch's HEAD
+		mbHash := plumbing.NewHash(mergeBase)
+		if mbHash == currentBranchHash && currentBranchHash != otherBranchHash {
+			return fmt.Errorf("branch '%s' has a descendant branch '%s'", currentBranchName, ref.Name().Short())
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// No descendants found
+	return nil
+}
+
+func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranchName string) error {
+	err := validateBranchHasNoDescendants(repo, currentBranchName)
+	if err != nil {
+		fmt.Fprint(
+			os.Stderr,
+			colors.Failure("====================================================\n"),
+			"The split operation was aborted.\n",
+			colors.Failure(err.Error()+"\n"),
+			colors.Failure("====================================================\n"),
+		)
+		return err
+	}
 	// Get the current branch reference
 	currentBranchRefName := plumbing.NewBranchReferenceName(currentBranchName)
 	currentBranchRef, err := repo.GoGitRepo().Reference(currentBranchRefName, true)
@@ -220,13 +278,9 @@ func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranch
 		return fmt.Errorf("failed to get HEAD reference: %v", err)
 	}
 
-	// Ensure HEAD is pointing to the branch
-	if headRef.Name() != currentBranchRefName {
-		return fmt.Errorf("HEAD is not pointing to the current branch '%s'", currentBranchName)
-	}
-
 	// Ensure HEAD matches the latest commit of the branch
 	if headRef.Hash() != currentBranchRef.Hash() {
+		splitAbortMessage(currentBranchName)
 		return fmt.Errorf("user is not on the latest commit of the branch '%s'", currentBranchName)
 	}
 
