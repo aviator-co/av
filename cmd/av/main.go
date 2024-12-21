@@ -94,6 +94,7 @@ func init() {
 		adoptCmd,
 		authCmd,
 		branchCmd,
+		cherryPickCmd,
 		branchMetaCmd,
 		commitCmd,
 		diffCmd,
