@@ -13,9 +13,9 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
+	giturls "github.com/chainguard-dev/git-urls"
 	"github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
-	giturls "github.com/whilp/git-urls"
 )
 
 var ErrRemoteNotFound = errors.Sentinel("this repository doesn't have a remote origin")
