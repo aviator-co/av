@@ -197,57 +197,46 @@ internal tracking metadata that defines the order of branches within a stack.`),
 	},
 }
 
-func validateBranchHasNoDescendants(repo *git.Repo, currentBranchName string) error {
-	// Get the current branch reference
-	currentBranchRefName := plumbing.NewBranchReferenceName(currentBranchName)
-	currentBranchRef, err := repo.GoGitRepo().Reference(currentBranchRefName, true)
+func validateBranchIsTip(stackNext stackNextModel) error {
+	atTip, err := isAtTipOfStack(stackNext)
 	if err != nil {
-		return fmt.Errorf("failed to get reference for branch %s: %w", currentBranchName, err)
+		return fmt.Errorf("error determining stack tip: %w", err)
 	}
 
-	currentBranchHash := currentBranchRef.Hash()
-
-	// Iterate through all branch references
-	refs, err := repo.GoGitRepo().References()
-	if err != nil {
-		return fmt.Errorf("failed to list references: %w", err)
+	if !atTip {
+		return fmt.Errorf("current branch is not at the tip of the stack")
 	}
 
-	err = refs.ForEach(func(ref *plumbing.Reference) error {
-		// Skip non-branch references and the current branch
-		if !ref.Name().IsBranch() || ref.Name() == currentBranchRefName {
-			return nil
-		}
-
-		// Get the hash of the other branch
-		otherBranchHash := ref.Hash()
-
-		// Find the merge base between the current branch and the other branch
-		mergeBase, err := repo.MergeBase(currentBranchHash.String(), otherBranchHash.String())
-		if err != nil {
-			return fmt.Errorf("failed to find merge base for branches %s and %s: %w",
-				currentBranchName, ref.Name().Short(), err)
-		}
-
-		// Check if the merge base matches the current branch's HEAD
-		mbHash := plumbing.NewHash(mergeBase)
-		if mbHash == currentBranchHash && currentBranchHash != otherBranchHash {
-			return fmt.Errorf("branch '%s' has a descendant branch '%s'", currentBranchName, ref.Name().Short())
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return err
-	}
-
-	// No descendants found
 	return nil
 }
 
+func isAtTipOfStack(stackNext stackNextModel) (bool, error) {
+	msg := stackNext.nextBranch()
+
+	switch v := msg.(type) {
+	case checkoutBranchMsg:
+		// If it's a checkoutBranchMsg, it means there's no next branch available
+		return true, nil
+	case nextBranchMsg:
+		// If it's a nextBranchMsg, it means there's a next branch
+		return false, nil
+	case error:
+		// If it's an error, handle specific cases
+		if strings.Contains(v.Error(), "already on last branch") {
+			return true, nil
+		}
+		return false, v
+	default:
+		return false, fmt.Errorf("unexpected message type: %T", v)
+	}
+}
+
 func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranchName string) error {
-	err := validateBranchHasNoDescendants(repo, currentBranchName)
+	stackNext, err := newNextModel(false, 1)
+	if err != nil {
+		return fmt.Errorf("failed to initialize stack model: %w", err)
+	}
+	err = validateBranchIsTip(stackNext)
 	if err != nil {
 		fmt.Fprint(
 			os.Stderr,
