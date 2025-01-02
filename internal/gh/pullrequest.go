@@ -30,8 +30,13 @@ type PullRequest struct {
 					} `graphql:"... on Commit"`
 				}
 			} `graphql:"... on ClosedEvent"`
+			MergedEvent struct {
+				Commit struct {
+					Oid string
+				}
+			} `graphql:"... on MergedEvent"`
 		}
-	} `graphql:"timelineItems(last: 10, itemTypes: CLOSED_EVENT)"`
+	} `graphql:"timelineItems(last: 10, itemTypes: [CLOSED_EVENT, MERGED_EVENT])"`
 }
 
 func (p *PullRequest) HeadBranchName() string {
@@ -49,10 +54,19 @@ func (p *PullRequest) BaseBranchName() string {
 func (p *PullRequest) GetMergeCommit() string {
 	if p.State == githubv4.PullRequestStateOpen {
 		return ""
-	} else if p.State == githubv4.PullRequestStateMerged {
+	} else if p.State == githubv4.PullRequestStateMerged && p.PRIVATE_MergeCommit.Oid != "" {
 		return p.PRIVATE_MergeCommit.Oid
-	} else if p.State == githubv4.PullRequestStateClosed && len(p.PRIVATE_TimelineItems.Nodes) != 0 {
-		return p.PRIVATE_TimelineItems.Nodes[0].ClosedEvent.Closer.Commit.Oid
+	}
+	// The timeline is in chronological order, so we can iterate backwards to find the latest
+	// one.
+	for i := len(p.PRIVATE_TimelineItems.Nodes) - 1; i >= 0; i-- {
+		item := p.PRIVATE_TimelineItems.Nodes[i]
+		if item.ClosedEvent.Closer.Commit.Oid != "" {
+			return item.ClosedEvent.Closer.Commit.Oid
+		}
+		if item.MergedEvent.Commit.Oid != "" {
+			return item.MergedEvent.Commit.Oid
+		}
 	}
 	return ""
 }
