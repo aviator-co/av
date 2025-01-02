@@ -155,7 +155,11 @@ func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranch
 	currentBranchRef, err := repo.GoGitRepo().Reference(currentBranchRefName, true)
 
 	if err != nil {
-		return fmt.Errorf("failed to get reference for current branch %s: %w", currentBranchName, err)
+		return fmt.Errorf(
+			"failed to get reference for current branch %s: %w",
+			currentBranchName,
+			err,
+		)
 	}
 
 	lastCommitHash := currentBranchRef.Hash()
@@ -215,7 +219,12 @@ func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranch
 
 	fmt.Fprint(
 		os.Stdout,
-		colors.Success(fmt.Sprintf("Successfully split the last commit into a new branch %s.\n", newBranchName)),
+		colors.Success(
+			fmt.Sprintf(
+				"Successfully split the last commit into a new branch %s.\n",
+				newBranchName,
+			),
+		),
 	)
 
 	// Adopt new branch to av database
@@ -265,7 +274,7 @@ func init() {
 	branchCmd.Flags().
 		BoolVar(&branchFlags.Force, "force", false, "force rename the current branch, even if a pull request exists")
 	branchCmd.Flags().
-		BoolVar(&branchFlags.Split, "split", false, "split the last commit into a new branch")
+		BoolVar(&branchFlags.Split, "split", false, "split the last commit into a new branch, if no branch name is given, one will be auto-generated")
 
 	_ = branchCmd.RegisterFlagCompletionFunc(
 		"parent",
