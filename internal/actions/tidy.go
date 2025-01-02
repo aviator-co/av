@@ -17,6 +17,8 @@ func TidyDB(repo *git.Repo, db meta.DB) (map[string]bool, map[string]bool, error
 		if _, err := repo.Git("show-ref", "refs/heads/"+name); err != nil {
 			// Ref doesn't exist. Should be removed.
 			deleted[name] = true
+		} else {
+			deleted[name] = false
 		}
 	}
 	orphaned := make(map[string]bool)
@@ -29,8 +31,10 @@ func TidyDB(repo *git.Repo, db meta.DB) (map[string]bool, map[string]bool, error
 		}
 	}
 
-	for name := range deleted {
-		tx.DeleteBranch(name)
+	for name, d := range deleted {
+		if d {
+			tx.DeleteBranch(name)
+		}
 	}
 	for name := range orphaned {
 		tx.DeleteBranch(name)

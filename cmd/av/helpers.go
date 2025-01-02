@@ -97,9 +97,14 @@ func allBranches() ([]string, error) {
 		return nil, err
 	}
 
+	defaultBranch, err := repo.DefaultBranch()
+	if err != nil {
+		return nil, err
+	}
+
 	tx := db.ReadTx()
 
-	var branches []string
+	var branches = []string{defaultBranch}
 	for b := range tx.AllBranches() {
 		branches = append(branches, b)
 	}

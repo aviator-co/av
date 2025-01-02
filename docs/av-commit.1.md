@@ -9,6 +9,7 @@ av-commit - Record changes to the repository with commits
 ```synopsis
 av commit [-m <msg>| --message=<msg>] [-a | --all] [--amend] [--edit]
     [-b | --branch] [-A | --all-changes] [--branch-name <name>]
+    [--parent <parent_branch>]
 ```
 
 ## DESCRIPTION
@@ -44,3 +45,7 @@ git-add(1) to incrementally "add" changes to the index.
 
 `--branch-name <name>`
 : Create a new branch with the given name and commit to it
+
+`--parent <parent_branch>`
+: Instead of creating a new branch from current branch, create it from
+  specified `<parent_branch>`
