@@ -31,3 +31,7 @@ metadata with `av branch --rename <old-branch-name>:<new-branch-name>`.
 
 `--force`
 : Force rename the branch, even if a pull request exists.
+
+`--split`
+: Splits the last commit into a new branch, if no branch name is given
+  create one based on commit message.
