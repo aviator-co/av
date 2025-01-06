@@ -14,7 +14,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/erikgeiser/promptkit v0.9.0
 	github.com/fatih/color v1.18.0
-	github.com/golangci/golangci-lint v1.63.3
+	github.com/golangci/golangci-lint v1.63.4
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kr/text v0.2.0
@@ -29,7 +29,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
 	golang.org/x/mod v0.22.0
-	golang.org/x/oauth2 v0.24.0
+	golang.org/x/oauth2 v0.25.0
 )
 
 require (
