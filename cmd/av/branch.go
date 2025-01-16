@@ -11,7 +11,6 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
 	"github.com/aviator-co/av/internal/utils/colors"
-	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -169,17 +168,6 @@ func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranch
 		return fmt.Errorf("failed to get last commit: %w", err)
 	}
 
-	headRef, err := repo.GoGitRepo().Head()
-	if err != nil {
-		return fmt.Errorf("failed to get HEAD reference: %v", err)
-	}
-
-	// Ensure HEAD matches the latest commit of the branch
-	if headRef.Hash() != currentBranchRef.Hash() {
-		splitAbortMessage(currentBranchName)
-		return fmt.Errorf("user is not on the latest commit of the branch '%s'", currentBranchName)
-	}
-
 	// Generate a branch name if none is provided
 	if newBranchName == "" {
 		newBranchName = sanitizeBranchName(lastCommit.Message)
@@ -198,23 +186,14 @@ func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranch
 	if err := repo.GoGitRepo().Storer.SetReference(newBranchRef); err != nil {
 		return fmt.Errorf("failed to create new branch: %w", err)
 	}
+	// Update current HEAD to the new branch
+	if err := repo.GoGitRepo().Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, newBranchRefName)); err != nil {
+		return fmt.Errorf("failed to update HEAD: %w", err)
+	}
 
 	updatedCurrentBranchRef := plumbing.NewHashReference(currentBranchRefName, parentCommit.Hash)
 	if err := repo.GoGitRepo().Storer.SetReference(updatedCurrentBranchRef); err != nil {
 		return fmt.Errorf("failed to update current branch: %w", err)
-	}
-	// Switch to the newly created branch
-	worktree, err := repo.GoGitRepo().Worktree()
-	if err != nil {
-		return fmt.Errorf("failed to get worktree: %w", err)
-	}
-
-	if err := worktree.Checkout(&gogit.CheckoutOptions{
-		Branch: newBranchRefName,
-		Create: false, // We're switching, not creating
-		Force:  false, // Avoid overwriting changes
-	}); err != nil {
-		return fmt.Errorf("failed to switch to new branch '%s': %w", newBranchName, err)
 	}
 
 	fmt.Fprint(
@@ -234,19 +213,6 @@ func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranch
 	}
 
 	return nil
-}
-
-func splitAbortMessage(branchName string) {
-	_, _ = fmt.Fprint(
-		os.Stderr,
-		colors.Failure("====================================================\n"),
-		"The split operation was aborted.\n",
-		"The original branch ", colors.UserInput(branchName), " remains intact.\n",
-		"Your Git repository is now in a detached HEAD state.\n",
-		"To revert to your original branch and commit, run:\n",
-		"    ", colors.CliCmd(fmt.Sprintf("git switch %s", branchName)), "\n",
-		colors.Failure("====================================================\n"),
-	)
 }
 
 // sanitizeBranchName creates a valid branch name from a string
