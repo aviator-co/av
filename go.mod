@@ -35,7 +35,7 @@ require (
 require (
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/ProtonMail/go-crypto v1.1.3 // indirect
+	github.com/ProtonMail/go-crypto v1.1.5 // indirect
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
 	github.com/alingse/nilnesserr v0.1.1 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
@@ -49,7 +49,7 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
-	github.com/go-git/go-billy/v5 v5.6.1 // indirect
+	github.com/go-git/go-billy/v5 v5.6.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golangci/go-printf-func-name v0.1.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
@@ -68,7 +68,7 @@ require (
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.15.3-0.20240618155329-98d742f6907a // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/pjbgf/sha1cd v0.3.0 // indirect
+	github.com/pjbgf/sha1cd v0.3.2 // indirect
 	github.com/raeperd/recvcheck v0.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1 // indirect
@@ -130,7 +130,7 @@ require (
 	github.com/fzipp/gocyclo v0.6.0 // indirect
 	github.com/ghostiam/protogetter v0.3.8 // indirect
 	github.com/go-critic/go-critic v0.11.5 // indirect
-	github.com/go-git/go-git/v5 v5.13.1
+	github.com/go-git/go-git/v5 v5.13.2
 	github.com/go-toolsmith/astcast v1.1.0 // indirect
 	github.com/go-toolsmith/astcopy v1.1.0 // indirect
 	github.com/go-toolsmith/astequal v1.2.0 // indirect
@@ -245,12 +245,12 @@ require (
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/crypto v0.32.0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20241108190413-2d47ceb2692f // indirect
-	golang.org/x/net v0.33.0 // indirect
+	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/term v0.27.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/term v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/tools v0.28.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
