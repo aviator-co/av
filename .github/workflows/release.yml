@@ -14,14 +14,15 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: fetch tags
         run: git fetch --force --tags
       - name: install go
         uses: actions/setup-go@v5
         with:
+          cache: false
           go-version-file: go.mod
-          cache-dependency-path: go.sum
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
