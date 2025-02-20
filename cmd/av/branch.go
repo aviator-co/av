@@ -294,7 +294,7 @@ func createBranch(
 	var parentHead string
 	if isBranchFromTrunk {
 		// If the parent is trunk, start from the remote tracking branch.
-		checkoutStartingPoint = remoteName + "/" + defaultBranch
+		checkoutStartingPoint = remoteName + "/" + parentBranchName
 		// If the parent is the trunk, we don't log the parent branch's head
 		parentHead = ""
 	} else {
