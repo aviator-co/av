@@ -28,8 +28,8 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/exp v0.0.0-20250228200357-dead58393ab7
-	golang.org/x/mod v0.23.0
-	golang.org/x/oauth2 v0.27.0
+	golang.org/x/mod v0.24.0
+	golang.org/x/oauth2 v0.28.0
 )
 
 require (
