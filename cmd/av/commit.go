@@ -37,7 +37,7 @@ var (
 )
 
 var commitFlags struct {
-	Message      string
+	Message      []string
 	All          bool
 	Amend        bool
 	Edit         bool
@@ -56,13 +56,17 @@ var commitCmd = &cobra.Command{
 			if commitFlags.CreateBranch || commitFlags.BranchName != "" {
 				return errors.New("cannot create a branch and amend at the same time")
 			}
-			return amendCmd(commitFlags.Message, commitFlags.Edit, commitFlags.All)
+			return amendCmd(
+				strings.Join(commitFlags.Message, "\n\n"),
+				commitFlags.Edit,
+				commitFlags.All,
+			)
 		}
 
 		if commitFlags.CreateBranch || commitFlags.BranchName != "" {
 			return branchAndCommit(
 				commitFlags.BranchName,
-				commitFlags.Message,
+				strings.Join(commitFlags.Message, "\n\n"),
 				commitFlags.AllChanges,
 				commitFlags.All,
 				commitFlags.Parent,
@@ -119,8 +123,8 @@ func runCreate(repo *git.Repo, db meta.DB) error {
 	if commitFlags.All {
 		commitArgs = append(commitArgs, "--all")
 	}
-	if commitFlags.Message != "" {
-		commitArgs = append(commitArgs, "--message", commitFlags.Message)
+	if len(commitFlags.Message) > 0 {
+		commitArgs = append(commitArgs, "--message", strings.Join(commitFlags.Message, "\n\n"))
 	}
 
 	tx := db.WriteTx()
@@ -312,6 +316,7 @@ func branchAndCommit(
 }
 
 func branchNameFromMessage(message string) string {
+	message = strings.SplitN(strings.TrimSpace(message), "\n", 2)[0]
 	name := branchNameReplacedPattern.ReplaceAllLiteralString(message, " ")
 	name = strings.TrimSpace(name)
 	name = multipleSpacePattern.ReplaceAllLiteralString(name, "-")
@@ -327,7 +332,7 @@ func branchNameFromMessage(message string) string {
 
 func init() {
 	commitCmd.Flags().
-		StringVarP(&commitFlags.Message, "message", "m", "", "the commit message")
+		StringArrayVarP(&commitFlags.Message, "message", "m", nil, "the commit message")
 	commitCmd.Flags().
 		BoolVarP(&commitFlags.All, "all", "a", false, "automatically stage modified and deleted files (same as git commit --all)")
 	commitCmd.Flags().
