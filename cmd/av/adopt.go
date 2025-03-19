@@ -209,6 +209,9 @@ func (vm adoptViewModel) initCmd() tea.Msg {
 	if err != nil {
 		return err
 	}
+	if len(pieces) == 0 {
+		return errors.New("no branch to adopt")
+	}
 	nodes := treedetector.ConvertToStackTree(vm.db, pieces, plumbing.HEAD, false)
 	return &adoptTreeInfo{
 		branches:        pieces,
