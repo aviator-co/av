@@ -127,6 +127,8 @@ type syncViewModel struct {
 	client *gh.Client
 	help   help.Model
 
+	preAvSyncHookMessage string
+
 	state              *syncState
 	changeNoticePrompt *selection.Model[string]
 	syncAllPrompt      *selection.Model[string]
@@ -180,6 +182,14 @@ func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 		return vm, tea.Batch(cmds...)
+
+	case preAvSyncHookDoneMsg:
+		var err error
+		vm.githubFetchModel, err = vm.createGitHubFetchModel()
+		if err != nil {
+			return vm, func() tea.Msg { return err }
+		}
+		return vm, vm.githubFetchModel.Init()
 
 	case *ghui.GitHubFetchProgress:
 		var cmd tea.Cmd
@@ -310,6 +320,9 @@ func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (vm *syncViewModel) View() string {
 	var ss []string
+	if vm.preAvSyncHookMessage != "" {
+		ss = append(ss, vm.preAvSyncHookMessage)
+	}
 	if vm.syncAllPrompt != nil {
 		ss = append(ss, vm.syncAllPrompt.View())
 		ss = append(ss, vm.help.ShortHelpView(uiutils.PromptKeys))
@@ -403,6 +416,9 @@ func (vm *syncViewModel) viewChangeNotice() string {
 	return sb.String()
 }
 
+type preAvSyncHookDoneMsg struct {
+}
+
 type promptUserShouldSyncAllMsg struct {
 }
 
@@ -427,11 +443,25 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 			return promptUserShouldSyncAllMsg{}
 		}
 	}
-	vm.githubFetchModel, err = vm.createGitHubFetchModel()
-	if err != nil {
-		return func() tea.Msg { return err }
+	return func() tea.Msg {
+		output, err := vm.repo.Run(&git.RunOpts{
+			Args: []string{"hook", "run", "--ignore-missing", "pre-av-sync"},
+		})
+		var messages []string
+		if len(output.Stdout) != 0 {
+			messages = append(messages, string(output.Stdout))
+		}
+		if len(output.Stderr) != 0 {
+			messages = append(messages, string(output.Stderr))
+		}
+		if len(messages) != 0 {
+			vm.preAvSyncHookMessage = strings.Join(messages, "\n")
+		}
+		if err != nil {
+			return errors.Errorf("pre-av-sync hook failed: %v", err)
+		}
+		return preAvSyncHookDoneMsg{}
 	}
-	return vm.githubFetchModel.Init()
 }
 
 func (vm *syncViewModel) initSequencerState() tea.Cmd {
