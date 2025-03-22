@@ -43,6 +43,7 @@ type AvOutput struct {
 }
 
 func Cmd(t *testing.T, exe string, args ...string) AvOutput {
+	t.Helper()
 	cmd := exec.Command(exe, args...)
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -76,6 +77,7 @@ func Cmd(t *testing.T, exe string, args ...string) AvOutput {
 }
 
 func Av(t *testing.T, args ...string) AvOutput {
+	t.Helper()
 	args = append([]string{"--debug"}, args...)
 	return Cmd(t, avCmdPath, args...)
 }
@@ -88,16 +90,6 @@ func RequireAv(t *testing.T, args ...string) AvOutput {
 }
 
 func Chdir(t *testing.T, dir string) {
-	current, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(current); err != nil {
-			t.Fatal(err)
-		}
-	})
+	t.Helper()
+	t.Chdir(dir)
 }

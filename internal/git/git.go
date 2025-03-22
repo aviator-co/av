@@ -66,7 +66,7 @@ func (r *Repo) AvTmpDir() string {
 	dir := filepath.Join(r.AvDir(), "tmp")
 	// Try to create the directory, but swallow the error since it will
 	// ultimately be surfaced when trying to create a file in the directory.
-	_ = os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(dir, 0o755)
 	return dir
 }
 

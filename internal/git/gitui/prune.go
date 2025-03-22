@@ -320,7 +320,7 @@ func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
 			)
 			continue
 		}
-		ref, err := vm.repo.GoGitRepo().Reference(plumbing.ReferenceName(br), true)
+		ref, err := vm.repo.GoGitRepo().Reference(br, true)
 		if err != nil {
 			return err
 		}
