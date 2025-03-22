@@ -6,7 +6,6 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
-	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/gh/ghui"
 	"github.com/aviator-co/av/internal/git"
@@ -36,12 +35,6 @@ var syncFlags struct {
 	Push          string
 	Prune         string
 }
-
-const (
-	changeNoticePrompt     = "Are you OK to continue with the new behavior?"
-	continueWithSyncChoice = "OK! Continue with av sync, rebasing onto the latest trunk (we will not ask again)"
-	abortSyncChoice        = "Nope. Abort av sync (we will ask again next time)"
-)
 
 var syncCmd = &cobra.Command{
 	Use:   "sync",
@@ -101,11 +94,10 @@ base branch.
 		}
 
 		return uiutils.RunBubbleTea(&syncViewModel{
-			repo:             repo,
-			db:               db,
-			client:           client,
-			help:             help.New(),
-			askingSyncChange: !config.UserState.NotifiedStackSyncChange,
+			repo:   repo,
+			db:     db,
+			client: client,
+			help:   help.New(),
 		})
 	},
 }
@@ -129,31 +121,21 @@ type syncViewModel struct {
 
 	preAvSyncHookMessage string
 
-	state              *syncState
-	changeNoticePrompt *selection.Model[string]
-	syncAllPrompt      *selection.Model[string]
-	githubFetchModel   *ghui.GitHubFetchModel
-	restackModel       *sequencerui.RestackModel
-	githubPushModel    *ghui.GitHubPushModel
-	pruneBranchModel   *gitui.PruneBranchModel
+	state            *syncState
+	syncAllPrompt    *selection.Model[string]
+	githubFetchModel *ghui.GitHubFetchModel
+	restackModel     *sequencerui.RestackModel
+	githubPushModel  *ghui.GitHubPushModel
+	pruneBranchModel *gitui.PruneBranchModel
 
-	askingSyncChange bool
-	pushingToGitHub  bool
-	pruningBranches  bool
+	pushingToGitHub bool
+	pruningBranches bool
 
-	quitWithAbortChoice bool
-	quitWithConflict    bool
-	err                 error
+	quitWithConflict bool
+	err              error
 }
 
 func (vm *syncViewModel) Init() tea.Cmd {
-	if vm.askingSyncChange && os.Getenv("AV_STACK_SYNC_CHANGE_NO_ASK") != "1" {
-		vm.changeNoticePrompt = uiutils.NewPromptModel(
-			changeNoticePrompt,
-			[]string{continueWithSyncChoice, abortSyncChoice},
-		)
-		return vm.changeNoticePrompt.Init()
-	}
 	return vm.initSync()
 }
 
@@ -262,33 +244,6 @@ func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				_, cmd := vm.syncAllPrompt.Update(msg)
 				return vm, cmd
 			}
-		} else if vm.askingSyncChange {
-
-			switch msg.String() {
-			case " ", "enter":
-				c, err := vm.changeNoticePrompt.Value()
-				if err != nil {
-					vm.err = err
-					return vm, tea.Quit
-				}
-				vm.askingSyncChange = false
-				if c == continueWithSyncChoice {
-					config.UserState.NotifiedStackSyncChange = true
-					if err := config.SaveUserState(); err != nil {
-						vm.err = err
-						return vm, tea.Quit
-					}
-					return vm, vm.initSync()
-				} else {
-					vm.quitWithAbortChoice = true
-					return vm, tea.Quit
-				}
-			case "ctrl+c":
-				return vm, tea.Quit
-			default:
-				_, cmd := vm.changeNoticePrompt.Update(msg)
-				return vm, cmd
-			}
 		} else if vm.pushingToGitHub {
 			switch msg.String() {
 			case "ctrl+c":
@@ -327,9 +282,6 @@ func (vm *syncViewModel) View() string {
 		ss = append(ss, vm.syncAllPrompt.View())
 		ss = append(ss, vm.help.ShortHelpView(uiutils.PromptKeys))
 	}
-	if vm.changeNoticePrompt != nil {
-		ss = append(ss, vm.viewChangeNotice())
-	}
 	if vm.githubFetchModel != nil {
 		ss = append(ss, vm.githubFetchModel.View())
 	}
@@ -356,64 +308,6 @@ func (vm *syncViewModel) View() string {
 		ret += renderError(vm.err)
 	}
 	return ret
-}
-
-var commandStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
-
-func (vm *syncViewModel) viewChangeNotice() string {
-	boldStyle := lipgloss.NewStyle().Bold(true)
-	sb := strings.Builder{}
-	sb.WriteString(
-		boldStyle.Render(
-			"The behavior of ",
-		) + commandStyle.Bold(true).
-			Render("av sync") +
-			boldStyle.Render(
-				" has changed. We will now ask for confirmation before syncing the stack.\n",
-			),
-	)
-	sb.WriteString("\n")
-	sb.WriteString("* " + commandStyle.Render("av sync") + " is split into four commands:\n")
-	sb.WriteString(
-		"  * " + commandStyle.Render("av adopt") + " to adopt a new branch into the stack.\n",
-	)
-	sb.WriteString(
-		"  * " + commandStyle.Render("av reparent") + " to change the parent branch.\n",
-	)
-	sb.WriteString(
-		"  * " + commandStyle.Render("av restack") + " to rebase the stack locally.\n",
-	)
-	sb.WriteString(
-		"  * " + commandStyle.Render(
-			"av sync",
-		) + " to rebase the stack with the remote repository.\n",
-	)
-	sb.WriteString(
-		"* " + commandStyle.Render(
-			"av sync",
-		) + " will ask if you want to push to the remote repository.\n",
-	)
-	sb.WriteString(
-		"* " + commandStyle.Render(
-			"av sync",
-		) + " will ask if you want to delete the branches that have been merged.\n",
-	)
-	sb.WriteString("\n")
-	sb.WriteString(
-		"With this change, " + commandStyle.Render(
-			"av sync",
-		) + " will always rebase onto the remote trunk branch (e.g., main or\n",
-	)
-	sb.WriteString(
-		"master). If you do not want to rebase onto the remote trunk branch, please use " + commandStyle.Render(
-			"av restack",
-		) + ".\n",
-	)
-	sb.WriteString("\n")
-	sb.WriteString(vm.changeNoticePrompt.View())
-	sb.WriteString(vm.help.ShortHelpView(uiutils.PromptKeys))
-	sb.WriteString("\n")
-	return sb.String()
 }
 
 type preAvSyncHookDoneMsg struct {
