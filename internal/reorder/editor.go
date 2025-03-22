@@ -56,17 +56,16 @@ type PlanDiff struct {
 	AddedBranches   []string
 }
 
-func Diff(old []Cmd, new []Cmd) PlanDiff {
-
+func Diff(oldCmds []Cmd, newCmds []Cmd) PlanDiff {
 	var oldBranches []string
-	for _, cmd := range old {
+	for _, cmd := range oldCmds {
 		if sb, ok := cmd.(StackBranchCmd); ok {
 			oldBranches = append(oldBranches, sb.Name)
 		}
 	}
 
 	var newBranches []string
-	for _, cmd := range new {
+	for _, cmd := range newCmds {
 		if sb, ok := cmd.(StackBranchCmd); ok {
 			newBranches = append(newBranches, sb.Name)
 		}

@@ -135,7 +135,7 @@ func StackBranches(tx ReadTx, name string) ([]string, error) {
 		return nil, errors.Errorf("branch %q is not in a stack", name)
 	}
 
-	var res = []string{root}
+	res := []string{root}
 	res = append(res, SubsequentBranches(tx, root)...)
 	return res, nil
 }

@@ -79,7 +79,7 @@ func checkGitHubAuthStatus() error {
 func init() {
 	// deprecated 'av auth status', hidden to avoid it showing up in 'av auth --help'
 	// since that is the new command name
-	var deprecatedAuthStatus = deprecateCommand(*authCmd, "av auth", "status")
+	deprecatedAuthStatus := deprecateCommand(*authCmd, "av auth", "status")
 	deprecatedAuthStatus.Hidden = true
 
 	authCmd.AddCommand(

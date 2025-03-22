@@ -92,6 +92,7 @@ func newNextModel(lastInStack bool, nInStack int) (stackNextModel, error) {
 		lastInStack:   lastInStack,
 	}, nil
 }
+
 func (m stackNextModel) currentBranchChildren() []string {
 	tx := m.db.ReadTx()
 	children := meta.Children(tx, m.currentBranch)
@@ -115,9 +116,11 @@ func (m stackNextModel) checkoutCurrentBranch() tea.Msg {
 	return branchCheckedOutMsg{}
 }
 
-type checkoutBranchMsg struct{}
-type nextBranchMsg struct{}
-type showSelectionMsg struct{}
+type (
+	checkoutBranchMsg struct{}
+	nextBranchMsg     struct{}
+	showSelectionMsg  struct{}
+)
 
 func (m stackNextModel) nextBranch() tea.Msg {
 	currentBranchChildren := m.currentBranchChildren()

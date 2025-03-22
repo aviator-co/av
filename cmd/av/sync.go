@@ -310,11 +310,9 @@ func (vm *syncViewModel) View() string {
 	return ret
 }
 
-type preAvSyncHookDoneMsg struct {
-}
+type preAvSyncHookDoneMsg struct{}
 
-type promptUserShouldSyncAllMsg struct {
-}
+type promptUserShouldSyncAllMsg struct{}
 
 func (vm *syncViewModel) initSync() tea.Cmd {
 	state, err := vm.readState()

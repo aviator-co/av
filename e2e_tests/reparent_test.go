@@ -76,6 +76,7 @@ func TestReparentTrunk(t *testing.T) {
 }
 
 func requireFileContent(t *testing.T, file string, expected string, args ...any) {
+	t.Helper()
 	actual, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)

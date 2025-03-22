@@ -225,7 +225,7 @@ func getQueryVariables() (map[string]interface{}, error) {
 
 	prNumber := branch.PullRequest.Number
 	repository := tx.Repository()
-	var variables = map[string]interface{}{
+	variables := map[string]interface{}{
 		"repoOwner": graphql.String(repository.Owner),
 		"repoName":  graphql.String(repository.Name),
 		"prNumber":  graphql.Int(prNumber), //nolint:gosec

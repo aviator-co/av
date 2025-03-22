@@ -149,11 +149,11 @@ type adoptViewModel struct {
 	err error
 }
 
-func (vm adoptViewModel) Init() tea.Cmd {
+func (vm *adoptViewModel) Init() tea.Cmd {
 	return tea.Batch(vm.spinner.Tick, vm.initCmd)
 }
 
-func (vm adoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (vm *adoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case error:
 		vm.err = msg
@@ -200,7 +200,7 @@ func (vm adoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm adoptViewModel) initCmd() tea.Msg {
+func (vm *adoptViewModel) initCmd() tea.Msg {
 	unmanagedBranches, err := vm.getUnmanagedBranches()
 	if err != nil {
 		return err
@@ -242,7 +242,7 @@ func (vm *adoptViewModel) getUnmanagedBranches() ([]plumbing.ReferenceName, erro
 	return ret, nil
 }
 
-func (vm adoptViewModel) getAdoptionTargets(
+func (vm *adoptViewModel) getAdoptionTargets(
 	node *stackutils.StackTreeNode,
 ) []plumbing.ReferenceName {
 	var ret []plumbing.ReferenceName
@@ -258,7 +258,7 @@ func (vm adoptViewModel) getAdoptionTargets(
 	return ret
 }
 
-func (vm adoptViewModel) getPreviousBranch() plumbing.ReferenceName {
+func (vm *adoptViewModel) getPreviousBranch() plumbing.ReferenceName {
 	if vm.treeInfo == nil {
 		return vm.currentCursor
 	}
@@ -273,7 +273,7 @@ func (vm adoptViewModel) getPreviousBranch() plumbing.ReferenceName {
 	return vm.currentCursor
 }
 
-func (vm adoptViewModel) getNextBranch() plumbing.ReferenceName {
+func (vm *adoptViewModel) getNextBranch() plumbing.ReferenceName {
 	if vm.treeInfo == nil {
 		return vm.currentCursor
 	}
@@ -317,7 +317,7 @@ func (vm *adoptViewModel) toggleAdoption(branch plumbing.ReferenceName) {
 
 type adoptionCompleteMsg struct{}
 
-func (vm adoptViewModel) adoptBranches() tea.Msg {
+func (vm *adoptViewModel) adoptBranches() tea.Msg {
 	tx := vm.db.WriteTx()
 	for branch := range vm.chosenTargets {
 		piece := vm.treeInfo.branches[branch]
@@ -337,7 +337,7 @@ func (vm adoptViewModel) adoptBranches() tea.Msg {
 	return adoptionCompleteMsg{}
 }
 
-func (vm adoptViewModel) View() string {
+func (vm *adoptViewModel) View() string {
 	var ss []string
 	if vm.treeInfo != nil {
 		choosing := false
@@ -414,14 +414,14 @@ func (vm adoptViewModel) View() string {
 	return ret
 }
 
-func (vm adoptViewModel) ExitError() error {
+func (vm *adoptViewModel) ExitError() error {
 	if vm.err != nil {
 		return actions.ErrExitSilently{ExitCode: 1}
 	}
 	return nil
 }
 
-func (vm adoptViewModel) renderBranch(branch plumbing.ReferenceName, isTrunk bool) string {
+func (vm *adoptViewModel) renderBranch(branch plumbing.ReferenceName, isTrunk bool) string {
 	if isTrunk {
 		return branch.Short()
 	}

@@ -109,7 +109,7 @@ func TestSync(t *testing.T) {
 		"sync --continue should return non-zero exit code if conflicts have not been resolved",
 	)
 	// resolve the conflict
-	err := os.WriteFile(filepath.Join(repo.RepoDir, "my-file"), []byte("1a\n1b\n2a\n"), 0644)
+	err := os.WriteFile(filepath.Join(repo.RepoDir, "my-file"), []byte("1a\n1b\n2a\n"), 0o644)
 	require.NoError(t, err)
 	repo.Git(t, "add", "my-file")
 	require.NoError(t, err, "failed to stage file")
@@ -274,7 +274,7 @@ func TestSyncWithLotsOfConflicts(t *testing.T) {
 		"stack sync should return non-zero exit code if conflicts",
 	)
 	require.Regexp(t, regexp.MustCompile("could not apply .+ Commit 2a"), sync.Stdout)
-	require.NoError(t, os.WriteFile("my-file", []byte("1a\n1b\n2a\n"), 0644))
+	require.NoError(t, os.WriteFile("my-file", []byte("1a\n1b\n2a\n"), 0o644))
 	repo.Git(t, "add", "my-file")
 
 	// Commit 2b should be able to be applied normally, then we should have a
@@ -287,7 +287,7 @@ func TestSyncWithLotsOfConflicts(t *testing.T) {
 		"stack sync should return non-zero exit code if conflicts",
 	)
 	require.Regexp(t, regexp.MustCompile("could not apply .+ Commit 3a"), sync.Stdout)
-	require.NoError(t, os.WriteFile("my-file", []byte("1a\n1b\n2a\n2b\n3a\n"), 0644))
+	require.NoError(t, os.WriteFile("my-file", []byte("1a\n1b\n2a\n2b\n3a\n"), 0o644))
 	repo.Git(t, "add", "my-file")
 
 	// And finally, 3b should be able to be applied without conflict and our stack

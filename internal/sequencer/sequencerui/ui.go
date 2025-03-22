@@ -34,9 +34,11 @@ type RestackProgress struct {
 	err    error
 }
 
-type RestackConflict struct{}
-type RestackAbort struct{}
-type RestackDone struct{}
+type (
+	RestackConflict struct{}
+	RestackAbort    struct{}
+	RestackDone     struct{}
+)
 
 type RestackModel struct {
 	Skip     bool

@@ -11,10 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	closeCommitPattern = regexp.MustCompile(
-		`(?i)\b(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\W+#(\d+)\b`,
-	)
+var closeCommitPattern = regexp.MustCompile(
+	`(?i)\b(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\W+#(\d+)\b`,
 )
 
 type LogOpts struct {

@@ -50,7 +50,7 @@ func renderTreeInternal(
 		lhs = firstLine
 	} else {
 		lhs = firstLine
-		for i := 0; i < height-1; i++ {
+		for range height - 1 {
 			lhs += "\n" + contLine
 		}
 	}

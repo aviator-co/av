@@ -14,6 +14,7 @@ const (
 )
 
 func RunMockGitHubServer(t *testing.T) *mockGitHubServer {
+	t.Helper()
 	s := &mockGitHubServer{t: t, Server: nil}
 	s.Server = httptest.NewServer(s)
 	return s

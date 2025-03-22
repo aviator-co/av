@@ -37,7 +37,7 @@ func (d *state) copy() state {
 }
 
 func (d *state) write(filepath string) error {
-	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return errors.WrapIff(err, "failed to write av state file")
 	}

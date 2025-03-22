@@ -9,9 +9,7 @@ const (
 	fileNameMax = 100
 )
 
-var (
-	filenameReplacePattern = regexp.MustCompile(`[^a-zA-Z0-9]+`)
-)
+var filenameReplacePattern = regexp.MustCompile(`[^a-zA-Z0-9]+`)
 
 func FileName(name string) string {
 	name = strings.ToLower(name)

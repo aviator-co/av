@@ -43,5 +43,4 @@ func TestGetRemoteName(t *testing.T) {
 
 	config.Av.Remote = "new-remote"
 	require.Equal(t, repo.AsAvGitRepo().GetRemoteName(), "new-remote")
-
 }

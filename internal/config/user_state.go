@@ -40,7 +40,7 @@ func SaveUserState() error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(pth, bs, 0644); err != nil {
+	if err := os.WriteFile(pth, bs, 0o644); err != nil {
 		return err
 	}
 	return nil

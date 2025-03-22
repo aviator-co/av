@@ -176,8 +176,10 @@ func checkCliVersion() {
 	}
 }
 
-var once sync.Once
-var lazyGithubClient *gh.Client
+var (
+	once             sync.Once
+	lazyGithubClient *gh.Client
+)
 
 func discoverGitHubAPIToken() string {
 	if config.Av.GitHub.Token != "" {

@@ -117,7 +117,7 @@ func getNearestTrunkCommit(
 	// TODO(draftcode): Check if the branch exists. Use the rtb as well.
 
 	mbArgs := []string{ref.String(), trunk}
-	// Per git-merge-base(1), this should return the nearest commits from HEAD among the
+	// Per git-merge-base(1), this should return the nearest commits from HEAD among
 	// the trunk branches since we don't specify --octopus.
 	mb, err := repo.MergeBase(mbArgs...)
 	if err != nil {

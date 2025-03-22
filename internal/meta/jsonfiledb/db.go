@@ -18,7 +18,7 @@ type DB struct {
 // OpenPath opens a JSON file database at the given path.
 // If the file does not exist, it is created (as well as all ancestor directories).
 func OpenPath(fp string) (*DB, bool, error) {
-	_ = os.MkdirAll(filepath.Dir(fp), 0755)
+	_ = os.MkdirAll(filepath.Dir(fp), 0o755)
 	state, err := readState(fp)
 	if err != nil {
 		return nil, false, err
@@ -43,6 +43,4 @@ func (d *DB) WriteTx() meta.WriteTx {
 	return &writeTx{d, readTx{d.state.copy()}}
 }
 
-var (
-	_ meta.DB = &DB{}
-)
+var _ meta.DB = &DB{}
