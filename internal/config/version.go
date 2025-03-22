@@ -39,7 +39,7 @@ func FetchLatestVersion() (string, error) {
 
 	req, err := http.NewRequestWithContext(
 		ctx,
-		"GET",
+		http.MethodGet,
 		"https://api.github.com/repos/aviator-co/av/releases/latest",
 		nil,
 	)

@@ -104,7 +104,7 @@ func allBranches() ([]string, error) {
 
 	tx := db.ReadTx()
 
-	var branches = []string{defaultBranch}
+	branches := []string{defaultBranch}
 	for b := range tx.AllBranches() {
 		branches = append(branches, b)
 	}
@@ -139,7 +139,7 @@ func deprecateCommand(
 	deprecatedCommand.Short = fmt.Sprintf("Deprecated: %s (use '%s' instead)", cmd.Short, newCmd)
 
 	if deprecatedCommand.Long != "" {
-		var long = fmt.Sprintf("This command is deprecated. Please use '%s' instead.\n\n", newCmd)
+		long := fmt.Sprintf("This command is deprecated. Please use '%s' instead.\n\n", newCmd)
 
 		deprecatedCommand.Long = long + deprecatedCommand.Long
 	}

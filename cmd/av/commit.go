@@ -71,7 +71,6 @@ var commitCmd = &cobra.Command{
 				commitFlags.All,
 				commitFlags.Parent,
 			)
-
 		}
 
 		if commitFlags.Parent != "" {

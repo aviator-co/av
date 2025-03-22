@@ -152,7 +152,6 @@ func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranch
 	// Get the current branch reference
 	currentBranchRefName := plumbing.NewBranchReferenceName(currentBranchName)
 	currentBranchRef, err := repo.GoGitRepo().Reference(currentBranchRefName, true)
-
 	if err != nil {
 		return fmt.Errorf(
 			"failed to get reference for current branch %s: %w",
@@ -215,7 +214,7 @@ func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranch
 	return nil
 }
 
-// sanitizeBranchName creates a valid branch name from a string
+// sanitizeBranchName creates a valid branch name from a string.
 func sanitizeBranchName(input string) string {
 	sanitized := strings.ToLower(strings.TrimSpace(input))
 	sanitized = strings.ReplaceAll(sanitized, " ", "-")
@@ -318,7 +317,7 @@ func createBranch(
 	// Different people have different setups, and they affect how they use
 	// branch.<name>.merge. Different tools have different ways to interpret this
 	// config. Some people want to set it to the same name only when it's pushed. Some
-	// people want to set it to none. etc. etc.
+	// people want to set it to none. etc.
 	//
 	// For this new ref creation specifically, git automatically guesses what to set for
 	// branch.<name>.merge. For now, by using a commit hash, we can suppress all of

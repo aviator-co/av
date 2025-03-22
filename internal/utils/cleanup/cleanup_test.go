@@ -8,8 +8,8 @@ import (
 
 func TestCleanup(t *testing.T) {
 	var cu cleanup.Cleanup
-	var flag1 = false
-	var flag2 = false
+	flag1 := false
+	flag2 := false
 	cu.Add(func() {
 		if !flag2 {
 			t.Error("cleanup functions should run in reverse order")
