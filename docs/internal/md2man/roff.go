@@ -343,6 +343,7 @@ func countColumns(node *blackfriday.Node) int {
 	var columns int
 
 	node.Walk(func(node *blackfriday.Node, entering bool) blackfriday.WalkStatus {
+		//nolint: exhaustive
 		switch node.Type {
 		case blackfriday.TableRow:
 			if !entering {
