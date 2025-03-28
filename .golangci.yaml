@@ -1,13 +1,6 @@
+version: "2"
 linters:
   enable:
-    # Default
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
-    # Additional
     - asasalint
     - asciicheck
     - bidichk
@@ -35,9 +28,6 @@ linters:
     # Probably better to enable this, but too many existing errors.
     # - gocritic
     - godot
-    - gofmt
-    - gofumpt
-    - goimports
     - goprintffuncname
     # Probably better to enable this, but too many existing errors.
     # - gosec
@@ -65,3 +55,25 @@ linters:
     - usetesting
     - wastedassign
     - whitespace
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

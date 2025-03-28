@@ -103,13 +103,14 @@ func previewMarkdown(fp string) error {
 		return nil
 	}
 
-	if runtime.GOOS == "darwin" || runtime.GOOS == "freebsd" {
+	switch runtime.GOOS {
+	case "darwin", "freebsd":
 		cmd := exec.Command("mandoc", "-a")
 		cmd.Stdin = bytes.NewBuffer(roff)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
-	} else if runtime.GOOS == "linux" {
+	case "linux":
 		cmd := exec.Command("man", "-l", "-")
 		cmd.Stdin = bytes.NewBuffer(roff)
 		cmd.Stdout = os.Stdout

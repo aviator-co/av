@@ -302,10 +302,7 @@ func (vm *adoptViewModel) toggleAdoption(branch plumbing.ReferenceName) {
 	} else {
 		// Going to choose. Choose all parents as well.
 		piece := vm.treeInfo.branches[branch]
-		for {
-			if !sliceutils.Contains(vm.treeInfo.adoptionTargets, piece.Name) {
-				break
-			}
+		for sliceutils.Contains(vm.treeInfo.adoptionTargets, piece.Name) {
 			vm.chosenTargets[piece.Name] = true
 			if piece.Parent == "" || piece.ParentIsTrunk {
 				break
