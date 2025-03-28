@@ -130,6 +130,9 @@ func (r *Repo) Git(args ...string) (string, error) {
 	startTime := time.Now()
 	cmd := exec.Command("git", args...)
 	cmd.Dir = r.repoDir
+	// Set the IN_AV_CLI environment variable to 1 to let the hooks invoked by git know it's
+	// part of av-cli invocation.
+	cmd.Env = append(os.Environ(), "IN_AV_CLI=1")
 	out, err := cmd.Output()
 	log := r.log.WithField("duration", time.Since(startTime))
 	if err != nil {
@@ -191,7 +194,10 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 	if opts.Stdin != nil {
 		cmd.Stdin = opts.Stdin
 	}
-	cmd.Env = append(os.Environ(), opts.Env...)
+	// Set the IN_AV_CLI environment variable to 1 to let the hooks invoked by git know it's
+	// part of av-cli invocation.
+	cmd.Env = append(os.Environ(), "IN_AV_CLI=1")
+	cmd.Env = append(cmd.Env, opts.Env...)
 	err := cmd.Run()
 	var exitError *exec.ExitError
 	if err != nil && !errors.As(err, &exitError) {
