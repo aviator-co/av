@@ -54,7 +54,7 @@ func (b *Branch) UnmarshalJSON(bytes []byte) error {
 	}
 
 	if b.Name != "" {
-		d.BranchAlias.Name = b.Name
+		d.Name = b.Name
 	}
 	*b = Branch(d.BranchAlias)
 

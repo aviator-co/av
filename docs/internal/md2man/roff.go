@@ -83,7 +83,7 @@ const (
 
 // NewRoffRenderer creates a new blackfriday Renderer for generating roff documents
 // from markdown.
-func NewRoffRenderer(section int, version, source, volume string) *roffRenderer { //nolint: golint
+func NewRoffRenderer(section int, version, source, volume string) *roffRenderer {
 	var extensions blackfriday.Extensions
 
 	extensions |= blackfriday.NoIntraEmphasis
@@ -150,11 +150,11 @@ func (r *roffRenderer) RenderNode(
 		// Don't render the link text for automatic links, because this
 		// will only duplicate the URL in the roff output.
 		// See https://daringfireball.net/projects/markdown/syntax#autolink
-		if !bytes.Equal(node.LinkData.Destination, node.FirstChild.Literal) {
+		if !bytes.Equal(node.Destination, node.FirstChild.Literal) {
 			out(w, string(node.FirstChild.Literal))
 		}
 		// Hyphens in a link must be escaped to avoid word-wrap in the rendered man page.
-		escapedLink := strings.ReplaceAll(string(node.LinkData.Destination), "-", "\\-")
+		escapedLink := strings.ReplaceAll(string(node.Destination), "-", "\\-")
 		out(w, linkTag+escapedLink+linkCloseTag)
 		walkAction = blackfriday.SkipChildren
 	case blackfriday.Image:
@@ -191,7 +191,7 @@ func (r *roffRenderer) RenderNode(
 	case blackfriday.Item:
 		r.handleItem(w, node, entering)
 	case blackfriday.CodeBlock:
-		if node.CodeBlockData.IsFenced && string(node.CodeBlockData.Info) == "synopsis" {
+		if node.IsFenced && string(node.Info) == "synopsis" {
 			out(w, "\n.nf\n")
 			escapeSpecialChars(w, node.Literal)
 			out(w, "\n.fi\n")
