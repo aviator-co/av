@@ -12,6 +12,7 @@ import (
 	"github.com/aviator-co/av/internal/avgql"
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
+	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
 	"github.com/aviator-co/av/internal/utils/colors"
@@ -95,6 +96,11 @@ Examples:
 		if err != nil {
 			return errors.WrapIf(err, "failed to determine current branch")
 		}
+
+		if err := runPRHook(repo, "single"); err != nil {
+			return err
+		}
+
 		client, err := getGitHubClient()
 		if err != nil {
 			return err
@@ -204,6 +210,10 @@ func submitAll(current bool, draft bool) error {
 		branchesToSubmit = append(branchesToSubmit, subsequentBranches...)
 	}
 
+	if err := runPRHook(repo, "all"); err != nil {
+		return err
+	}
+
 	// ensure pull requests for each branch in the stack
 	createdPullRequestPermalinks := []string{}
 	ctx := context.Background()
@@ -291,6 +301,10 @@ func queue() error {
 		)
 	}
 
+	if err := runPRHook(repo, "queue"); err != nil {
+		return err
+	}
+
 	prNumber := branch.PullRequest.Number
 	repository := tx.Repository()
 
@@ -329,6 +343,27 @@ func queue() error {
 		"Queued pull request ", colors.UserInput(branch.PullRequest.Permalink), ".\n",
 	)
 
+	return nil
+}
+
+func runPRHook(repo *git.Repo, hookType string) error {
+	output, err := repo.Run(&git.RunOpts{
+		Args: []string{"hook", "run", "--ignore-missing", "pre-av-pr"},
+		Env:  []string{"AV_PR_HOOK_TYPE=" + hookType},
+	})
+	var messages []string
+	if len(output.Stdout) != 0 {
+		messages = append(messages, string(output.Stdout))
+	}
+	if len(output.Stderr) != 0 {
+		messages = append(messages, string(output.Stderr))
+	}
+	if len(messages) != 0 {
+		fmt.Fprint(os.Stderr, strings.Join(messages, "\n"))
+	}
+	if err != nil {
+		return errors.Errorf("pre-av-pr hook failed: %v", err)
+	}
 	return nil
 }
 
