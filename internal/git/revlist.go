@@ -21,6 +21,8 @@ func (r *Repo) RevList(opts RevListOpts) ([]string, error) {
 		args = append(args, "--reverse")
 	}
 	args = append(args, opts.Specifiers...)
+	// Unambiguous the positional arguments
+	args = append(args, "--")
 	res, err := r.Run(&RunOpts{
 		Args:      args,
 		Env:       nil,

@@ -84,6 +84,7 @@ func (b StackBranchCmd) Execute(ctx *Context) error {
 		colors.UserInput(git.ShortSha(headCommit)),
 		"\n",
 	)
+	ctx.State.Branch = b.Name
 
 	return tx.Commit()
 }
