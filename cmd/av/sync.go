@@ -337,7 +337,9 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 	}
 	return func() tea.Msg {
 		output, err := vm.repo.Run(&git.RunOpts{
-			Args: []string{"hook", "run", "--ignore-missing", "pre-av-sync"},
+			Args:        []string{"hook", "run", "--ignore-missing", "pre-av-sync"},
+			Interactive: true,
+			ExitError:   true,
 		})
 		var messages []string
 		if len(output.Stdout) != 0 {

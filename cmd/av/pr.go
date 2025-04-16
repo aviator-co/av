@@ -348,8 +348,10 @@ func queue() error {
 
 func runPRHook(repo *git.Repo, hookType string) error {
 	output, err := repo.Run(&git.RunOpts{
-		Args: []string{"hook", "run", "--ignore-missing", "pre-av-pr"},
-		Env:  []string{"AV_PR_HOOK_TYPE=" + hookType},
+		Args:        []string{"hook", "run", "--ignore-missing", "pre-av-pr"},
+		Env:         []string{"AV_PR_HOOK_TYPE=" + hookType},
+		Interactive: true,
+		ExitError:   true,
 	})
 	var messages []string
 	if len(output.Stdout) != 0 {
