@@ -342,11 +342,13 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 			ExitError:   true,
 		})
 		var messages []string
-		if len(output.Stdout) != 0 {
-			messages = append(messages, string(output.Stdout))
-		}
-		if len(output.Stderr) != 0 {
-			messages = append(messages, string(output.Stderr))
+		if output != nil {
+			if len(output.Stdout) != 0 {
+				messages = append(messages, string(output.Stdout))
+			}
+			if len(output.Stderr) != 0 {
+				messages = append(messages, string(output.Stderr))
+			}
 		}
 		if len(messages) != 0 {
 			vm.preAvSyncHookMessage = strings.Join(messages, "\n")

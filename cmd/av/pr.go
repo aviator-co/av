@@ -354,11 +354,13 @@ func runPRHook(repo *git.Repo, hookType string) error {
 		ExitError:   true,
 	})
 	var messages []string
-	if len(output.Stdout) != 0 {
-		messages = append(messages, string(output.Stdout))
-	}
-	if len(output.Stderr) != 0 {
-		messages = append(messages, string(output.Stderr))
+	if output != nil {
+		if len(output.Stdout) != 0 {
+			messages = append(messages, string(output.Stdout))
+		}
+		if len(output.Stderr) != 0 {
+			messages = append(messages, string(output.Stderr))
+		}
 	}
 	if len(messages) != 0 {
 		fmt.Fprint(os.Stderr, strings.Join(messages, "\n"))
