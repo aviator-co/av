@@ -1,0 +1,7 @@
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        golangci/golangci-lint-action: ref-pin
+        goreleaser/goreleaser-action: ref-pin
+        actions/*: ref-pin
