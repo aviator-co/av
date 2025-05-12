@@ -158,7 +158,7 @@ func checkCliVersion() {
 	}
 	latest, err := config.FetchLatestVersion()
 	if err != nil {
-		logrus.WithError(err).Warning("failed to determine latest released version of av")
+		logrus.WithError(err).Debug("failed to determine latest released version of av")
 		return
 	}
 	logrus.WithField("latest", latest).Debug("fetched latest released version")
