@@ -113,6 +113,7 @@ func init() {
 		tidyCmd,
 		treeCmd,
 		versionCmd,
+		squashCmd,
 	)
 }
 
