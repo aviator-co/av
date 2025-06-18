@@ -29,6 +29,6 @@ repos:
       - id: check-github-workflows
 
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.7.0
+    rev: v1.9.0
     hooks:
       - id: zizmor

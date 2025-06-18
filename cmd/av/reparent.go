@@ -21,8 +21,9 @@ var reparentFlags struct {
 }
 
 var reparentCmd = &cobra.Command{
-	Use:   "reparent",
-	Short: "Change the parent of the current branch",
+	Use:               "reparent",
+	Short:             "Change the parent of the current branch",
+	ValidArgsFunction: branchNameArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, err := getRepo()
 		if err != nil {
