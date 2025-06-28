@@ -50,7 +50,6 @@ var squashCmd = &cobra.Command{
 			return errors.New("current branch does not exist in the database")
 		}
 
-		// Could this be abstracted into a helper function?
 		if branch.PullRequest != nil && branch.PullRequest.State == githubv4.PullRequestStateMerged {
 			fmt.Fprint(
 				os.Stderr,
@@ -82,8 +81,6 @@ var squashCmd = &cobra.Command{
 			return err
 		}
 
-		// What should the output be?
-		// Should a sync be triggered?
-		return nil
+		return runPostCommitRestack(repo, db)
 	},
 }
