@@ -50,7 +50,8 @@ var squashCmd = &cobra.Command{
 			return errors.New("current branch does not exist in the database")
 		}
 
-		if branch.PullRequest != nil && branch.PullRequest.State == githubv4.PullRequestStateMerged {
+		if branch.PullRequest != nil &&
+			branch.PullRequest.State == githubv4.PullRequestStateMerged {
 			fmt.Fprint(
 				os.Stderr,
 				colors.Failure("This branch has already been merged, squashing is not allowed"),
