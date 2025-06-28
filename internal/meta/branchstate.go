@@ -14,8 +14,8 @@ type BranchState struct {
 	Name string `json:"name"`
 
 	// If true, consider the branch a trunk branch. A trunk branch is one that
-	// that stacks can target for merge. Usually, the only trunk branch for a
-	// repository is main or master.
+	// stacks can target for merge. Usually, the only trunk branch for a repository is main or
+	// master.
 	Trunk bool `json:"trunk,omitempty"`
 
 	// The commit SHA of the parent's latest commit. This is used when syncing

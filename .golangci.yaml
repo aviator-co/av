@@ -1,15 +1,79 @@
+version: "2"
 linters:
   enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - canonicalheader
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    - decorder
+    - dupword
+    - durationcheck
+    # Probably better to enable this, but too many existing errors.
+    # - err113
+    - errchkjson
+    # Probably better to enable this, but too many existing errors.
+    # - errname
     - exhaustive
+    # Probably better to enable this, but too many existing errors.
+    # - exhaustruct
+    # Probably better to enable this, but too many existing errors.
+    # - exptostd
+    - fatcontext
+    - gocheckcompilerdirectives
+    - gochecksumtype
+    # Probably better to enable this, but too many existing errors.
+    # - gocritic
+    - godot
+    - goprintffuncname
+    # Probably better to enable this, but too many existing errors.
+    # - gosec
+    - iface
     - importas
-    - gofmt
-    - goimports
-    - gosec
-    - unused
-    - tagliatelle
+    - intrange
+    - makezero
+    - mirror
+    - misspell
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - predeclared
+    - reassign
+    - recvcheck
+    # Probably better to enable this, but too many existing errors.
+    # - revive
+    # Probably better to enable this, but too many existing errors.
+    # - testifylint
+    - thelper
+    - unconvert
+    # Probably better to enable this, but too many existing errors.
+    # - unparam
+    - usestdlibvars
+    - usetesting
     - wastedassign
-
-issues:
-  exclude:
-    - "Expect WriteFile permissions to be 0600 or less"
-    - "Subprocess launched with a potential tainted input or cmd arguments"
+    - whitespace
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -13,9 +13,9 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
+	giturls "github.com/chainguard-dev/git-urls"
 	"github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
-	giturls "github.com/whilp/git-urls"
 )
 
 var ErrRemoteNotFound = errors.Sentinel("this repository doesn't have a remote origin")
@@ -66,7 +66,7 @@ func (r *Repo) AvTmpDir() string {
 	dir := filepath.Join(r.AvDir(), "tmp")
 	// Try to create the directory, but swallow the error since it will
 	// ultimately be surfaced when trying to create a file in the directory.
-	_ = os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(dir, 0o755)
 	return dir
 }
 
@@ -130,6 +130,9 @@ func (r *Repo) Git(args ...string) (string, error) {
 	startTime := time.Now()
 	cmd := exec.Command("git", args...)
 	cmd.Dir = r.repoDir
+	// Set the IN_AV_CLI environment variable to 1 to let the hooks invoked by git know it's
+	// part of av-cli invocation.
+	cmd.Env = append(os.Environ(), "IN_AV_CLI=1")
 	out, err := cmd.Output()
 	log := r.log.WithField("duration", time.Since(startTime))
 	if err != nil {
@@ -191,7 +194,10 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 	if opts.Stdin != nil {
 		cmd.Stdin = opts.Stdin
 	}
-	cmd.Env = append(os.Environ(), opts.Env...)
+	// Set the IN_AV_CLI environment variable to 1 to let the hooks invoked by git know it's
+	// part of av-cli invocation.
+	cmd.Env = append(os.Environ(), "IN_AV_CLI=1")
+	cmd.Env = append(cmd.Env, opts.Env...)
 	err := cmd.Run()
 	var exitError *exec.ExitError
 	if err != nil && !errors.As(err, &exitError) {

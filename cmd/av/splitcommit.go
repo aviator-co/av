@@ -134,7 +134,6 @@ func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) err
 			os.Stderr,
 			"Run 'av sync' to sync your stack if necessary.\n",
 		)
-
 	}
 
 	return nil

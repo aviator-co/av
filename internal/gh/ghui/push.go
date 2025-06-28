@@ -347,7 +347,6 @@ func (vm *GitHubPushModel) getPRs() (map[plumbing.ReferenceName]*gh.PullRequest,
 		}
 		prs[branch.branch] = pr
 		vm.pullRequestsCache[avbr.PullRequest.ID] = pr
-
 	}
 	return prs, nil
 }

@@ -71,7 +71,7 @@ brews:
     install: |
       bin.install "av"
       man.install Dir["man/*"]
-      generate_completions_from_executable(bin/"av", "completion", shells: [:bash, :zsh])
+      generate_completions_from_executable(bin/"av", "completion", shells: [:bash, :zsh, :fish])
 
 aurs:
   - name: "av-cli-bin"
@@ -104,7 +104,7 @@ checksum:
   name_template: "checksums.txt"
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-dev-{{ .ShortCommit }}"
+  version_template: "{{ incpatch .Version }}-dev-{{ .ShortCommit }}"
 
 changelog:
   sort: asc

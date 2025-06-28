@@ -7,7 +7,7 @@ import (
 
 // String executes a template and returns the result as a string.
 func String(t *template.Template, data interface{}) (string, error) {
-	var buf = new(bytes.Buffer)
+	buf := new(bytes.Buffer)
 	err := t.Execute(buf, data)
 	if err != nil {
 		return "", err

@@ -16,6 +16,7 @@ func RequireCurrentBranchName(
 	repo *gittest.GitTestRepo,
 	name plumbing.ReferenceName,
 ) {
+	t.Helper()
 	ref, err := repo.GoGit.Reference(plumbing.HEAD, false)
 	require.NoError(t, err, "failed to determine current branch name")
 	require.Equal(
@@ -35,6 +36,7 @@ func RequireCurrentBranchName(
 }
 
 func GetFetchHeadTimestamp(t *testing.T, repo *gittest.GitTestRepo) time.Time {
+	t.Helper()
 	fileInfo, err := os.Stat(repo.RepoDir + "/.git/FETCH_HEAD")
 	require.NoError(t, err, "failed to stat .git/FETCH_HEAD")
 	return fileInfo.ModTime()
@@ -45,6 +47,7 @@ func GetStoredParentBranchState(
 	repo *gittest.GitTestRepo,
 	name string,
 ) meta.BranchState {
+	t.Helper()
 	// We shouldn't do this as part of an E2E test, but it's hard to ensure otherwise.
 	db := repo.OpenDB(t)
 	br, _ := db.ReadTx().Branch(name)

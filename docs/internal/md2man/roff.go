@@ -37,7 +37,7 @@ import (
 )
 
 // roffRenderer implements the blackfriday.Renderer interface for creating
-// roff format (manpages) from markdown text
+// roff format (manpages) from markdown text.
 type roffRenderer struct {
 	extensions   blackfriday.Extensions
 	listCounters []int
@@ -82,8 +82,8 @@ const (
 )
 
 // NewRoffRenderer creates a new blackfriday Renderer for generating roff documents
-// from markdown
-func NewRoffRenderer(section int, version, source, volume string) *roffRenderer { // nolint: golint
+// from markdown.
+func NewRoffRenderer(section int, version, source, volume string) *roffRenderer {
 	var extensions blackfriday.Extensions
 
 	extensions |= blackfriday.NoIntraEmphasis
@@ -102,24 +102,24 @@ func NewRoffRenderer(section int, version, source, volume string) *roffRenderer 
 	}
 }
 
-// GetExtensions returns the list of extensions used by this renderer implementation
+// GetExtensions returns the list of extensions used by this renderer implementation.
 func (r *roffRenderer) GetExtensions() blackfriday.Extensions {
 	return r.extensions
 }
 
-// RenderHeader handles outputting the header at document start
+// RenderHeader handles outputting the header at document start.
 func (r *roffRenderer) RenderHeader(w io.Writer, ast *blackfriday.Node) {
 	// disable hyphenation
 	out(w, ".nh\n")
 }
 
 // RenderFooter handles outputting the footer at the document end; the roff
-// renderer has no footer information
+// renderer has no footer information.
 func (r *roffRenderer) RenderFooter(w io.Writer, ast *blackfriday.Node) {
 }
 
 // RenderNode is called for each node in a markdown document; based on the node
-// type the equivalent roff output is sent to the writer
+// type the equivalent roff output is sent to the writer.
 func (r *roffRenderer) RenderNode(
 	w io.Writer,
 	node *blackfriday.Node,
@@ -150,11 +150,11 @@ func (r *roffRenderer) RenderNode(
 		// Don't render the link text for automatic links, because this
 		// will only duplicate the URL in the roff output.
 		// See https://daringfireball.net/projects/markdown/syntax#autolink
-		if !bytes.Equal(node.LinkData.Destination, node.FirstChild.Literal) {
+		if !bytes.Equal(node.Destination, node.FirstChild.Literal) {
 			out(w, string(node.FirstChild.Literal))
 		}
 		// Hyphens in a link must be escaped to avoid word-wrap in the rendered man page.
-		escapedLink := strings.ReplaceAll(string(node.LinkData.Destination), "-", "\\-")
+		escapedLink := strings.ReplaceAll(string(node.Destination), "-", "\\-")
 		out(w, linkTag+escapedLink+linkCloseTag)
 		walkAction = blackfriday.SkipChildren
 	case blackfriday.Image:
@@ -191,7 +191,7 @@ func (r *roffRenderer) RenderNode(
 	case blackfriday.Item:
 		r.handleItem(w, node, entering)
 	case blackfriday.CodeBlock:
-		if node.CodeBlockData.IsFenced && string(node.CodeBlockData.Info) == "synopsis" {
+		if node.IsFenced && string(node.Info) == "synopsis" {
 			out(w, "\n.nf\n")
 			escapeSpecialChars(w, node.Literal)
 			out(w, "\n.fi\n")
@@ -338,12 +338,12 @@ func nodeLiteralSize(node *blackfriday.Node) int {
 }
 
 // because roff format requires knowing the column count before outputting any table
-// data we need to walk a table tree and count the columns
+// data we need to walk a table tree and count the columns.
 func countColumns(node *blackfriday.Node) int {
 	var columns int
 
 	node.Walk(func(node *blackfriday.Node, entering bool) blackfriday.WalkStatus {
-		// nolint:exhaustive
+		//nolint: exhaustive
 		switch node.Type {
 		case blackfriday.TableRow:
 			if !entering {
@@ -361,7 +361,7 @@ func countColumns(node *blackfriday.Node) int {
 }
 
 func out(w io.Writer, output string) {
-	io.WriteString(w, output) // nolint: errcheck
+	io.WriteString(w, output) //nolint: errcheck
 }
 
 func escapeSpecialChars(w io.Writer, text []byte) {
@@ -378,7 +378,7 @@ func escapeSpecialChars(w io.Writer, text []byte) {
 			i++
 		}
 		if i > org {
-			w.Write(text[org:i]) // nolint: errcheck
+			w.Write(text[org:i]) //nolint: errcheck
 		}
 
 		// escape a character
@@ -386,6 +386,6 @@ func escapeSpecialChars(w io.Writer, text []byte) {
 			break
 		}
 
-		w.Write([]byte{'\\', text[i]}) // nolint: errcheck
+		w.Write([]byte{'\\', text[i]}) //nolint: errcheck
 	}
 }

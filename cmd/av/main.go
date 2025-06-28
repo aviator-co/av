@@ -159,7 +159,7 @@ func checkCliVersion() {
 	}
 	latest, err := config.FetchLatestVersion()
 	if err != nil {
-		logrus.WithError(err).Warning("failed to determine latest released version of av")
+		logrus.WithError(err).Debug("failed to determine latest released version of av")
 		return
 	}
 	logrus.WithField("latest", latest).Debug("fetched latest released version")
@@ -177,8 +177,10 @@ func checkCliVersion() {
 	}
 }
 
-var once sync.Once
-var lazyGithubClient *gh.Client
+var (
+	once             sync.Once
+	lazyGithubClient *gh.Client
+)
 
 func discoverGitHubAPIToken() string {
 	if config.Av.GitHub.Token != "" {

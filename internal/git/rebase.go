@@ -88,9 +88,11 @@ type RebaseResult struct {
 	ErrorHeadline string
 }
 
-var carriageReturnRegex = regexp.MustCompile(`^.+\r`)
-var hintRegex = regexp.MustCompile(`(?m)^hint:.+$\n?`)
-var errorMatchRegex = regexp.MustCompile(`(?m)^error: (.+)$`)
+var (
+	carriageReturnRegex = regexp.MustCompile(`^.+\r`)
+	hintRegex           = regexp.MustCompile(`(?m)^hint:.+$\n?`)
+	errorMatchRegex     = regexp.MustCompile(`(?m)^error: (.+)$`)
+)
 
 // normalizeRebaseHint normalizes the output (stderr) from running a
 // `git rebase` command. We do two things:

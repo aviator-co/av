@@ -77,10 +77,10 @@ func main() {
 			"man"+matches[1],
 			strings.TrimSuffix(ent.Name(), ".md"),
 		)
-		if err := os.MkdirAll(filepath.Dir(outFilePath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(outFilePath), 0o755); err != nil {
 			log.Fatalf("Cannot create the output directory: %v", err)
 		}
-		if err := os.WriteFile(outFilePath, roff, 0644); err != nil {
+		if err := os.WriteFile(outFilePath, roff, 0o644); err != nil {
 			log.Fatalf("Cannot write the conversion result to %q: %v", outFilePath, err)
 		}
 	}
@@ -103,13 +103,14 @@ func previewMarkdown(fp string) error {
 		return nil
 	}
 
-	if runtime.GOOS == "darwin" || runtime.GOOS == "freebsd" {
+	switch runtime.GOOS {
+	case "darwin", "freebsd":
 		cmd := exec.Command("mandoc", "-a")
 		cmd.Stdin = bytes.NewBuffer(roff)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
-	} else if runtime.GOOS == "linux" {
+	case "linux":
 		cmd := exec.Command("man", "-l", "-")
 		cmd.Stdin = bytes.NewBuffer(roff)
 		cmd.Stdout = os.Stdout

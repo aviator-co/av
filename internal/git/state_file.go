@@ -36,5 +36,5 @@ func (r *Repo) WriteStateFile(kind StateFileKind, msg any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(r.AvDir(), string(kind)), bs, 0644)
+	return os.WriteFile(filepath.Join(r.AvDir(), string(kind)), bs, 0o644)
 }

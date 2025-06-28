@@ -261,6 +261,7 @@ func CreatePullRequest(
 		"rev-list",
 		"--reverse",
 		fmt.Sprintf("%s..%s", prCompareRef, opts.BranchName),
+		"--",
 	)
 	if err != nil {
 		return nil, errors.WrapIf(err, "failed to determine commits to include in PR")
@@ -350,7 +351,6 @@ func CreatePullRequest(
 				savePRDescriptionToTemporaryFile(saveFile, res)
 			}
 			return nil, errors.WrapIf(err, "text editor failed")
-
 		}
 		opts.Title, opts.Body = stringutils.ParseSubjectBody(res)
 		if opts.Title == "" {
@@ -437,7 +437,7 @@ func OpenPullRequestInBrowser(pullRequestLink string) {
 }
 
 func savePRDescriptionToTemporaryFile(saveFile string, contents string) {
-	if err := os.WriteFile(saveFile, []byte(contents), 0644); err != nil {
+	if err := os.WriteFile(saveFile, []byte(contents), 0o644); err != nil {
 		logrus.WithError(err).
 			Error("failed to write pull request description to temporary file")
 		return
@@ -681,11 +681,15 @@ type PRMetadata struct {
 
 const PRMetadataCommentStart = "<!-- av pr metadata"
 
-const PRMetadataCommentHelpText = "This information is embedded by the av CLI when creating PRs to track the status of stacks when using Aviator. Please do not delete or edit this section of the PR.\n"
-const PRMetadataCommentEnd = "-->"
+const (
+	PRMetadataCommentHelpText = "This information is embedded by the av CLI when creating PRs to track the status of stacks when using Aviator. Please do not delete or edit this section of the PR.\n"
+	PRMetadataCommentEnd      = "-->"
+)
 
-const PRStackCommentStart = "<!-- av pr stack begin -->"
-const PRStackCommentEnd = "<!-- av pr stack end -->"
+const (
+	PRStackCommentStart = "<!-- av pr stack begin -->"
+	PRStackCommentEnd   = "<!-- av pr stack end -->"
+)
 
 // extractContent parses the given input and looks for the start and end
 // strings. It returns the content between the start and end strings and the

@@ -67,7 +67,8 @@ Generates the diff between the working tree and the parent branch
 			// expects.
 			// This roughly matches the diff that GitHub will show in the pull
 			// request files changed view.
-			diffArgs = append(diffArgs, "--merge-base", branch.Parent.Name)
+			remoteName := repo.GetRemoteName()
+			diffArgs = append(diffArgs, "--merge-base", remoteName+"/"+branch.Parent.Name)
 		} else {
 			// For a non-root branch, we compare against the original branch point.
 			// We don't want to compare exactly against the parent branch since

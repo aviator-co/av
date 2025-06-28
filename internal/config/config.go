@@ -116,6 +116,7 @@ func loadFromFile(repoConfigDir string) error {
 		if stat, err := os.Stat(fp); err == nil {
 			if !stat.IsDir() {
 				config.SetConfigFile(fp)
+				config.SetConfigType(ext)
 				if err := config.MergeInConfig(); err != nil {
 					return errors.Wrapf(err, "failed to read %s", fp)
 				}
