@@ -29,7 +29,8 @@ var squashCmd = &cobra.Command{
 		}
 
 		if err := runSquash(repo, db); err != nil {
-			fmt.Fprint(os.Stderr, "\n", colors.Failure("Failed to squash."), "\n")
+			fmt.Fprint(os.Stderr, colors.Failure("Failed to squash."), "\n")
+			fmt.Fprint(os.Stderr, colors.Failure(err.Error()), "\n")
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
 
@@ -44,13 +45,9 @@ func runSquash(repo *git.Repo, db meta.DB) error {
 	}
 
 	if !status.IsClean() {
-		fmt.Fprint(
-			os.Stderr,
-			colors.Failure(
-				"The working directory is not clean, please stash or commit them before running squash command.",
-			),
+		return errors.New(
+			"the working directory is not clean, please stash or commit them before running squash command.",
 		)
-		return errors.New("the working directory is not clean")
 	}
 
 	currentBranchName, err := repo.CurrentBranchName()
@@ -68,11 +65,6 @@ func runSquash(repo *git.Repo, db meta.DB) error {
 
 	if branch.PullRequest != nil &&
 		branch.PullRequest.State == githubv4.PullRequestStateMerged {
-		fmt.Fprint(
-			os.Stderr,
-			colors.Failure("This branch has already been merged, squashing is not allowed"),
-			"\n",
-		)
 		return errors.New("this branch has already been merged, squashing is not allowed")
 	}
 
@@ -102,7 +94,7 @@ func runSquash(repo *git.Repo, db meta.DB) error {
 	fmt.Fprint(
 		os.Stderr,
 		"\n",
-		colors.Success(fmt.Sprintf("Successfully squash %d commits", len(commitIDs))),
+		colors.Success(fmt.Sprintf("Successfully squashed %d commits", len(commitIDs))),
 		"\n",
 	)
 	fmt.Fprint(os.Stderr, ammendMessage, "\n\n")
