@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"regexp"
@@ -52,11 +53,13 @@ var commitCmd = &cobra.Command{
 	Short: "Record changes to the repository with commits",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
+		ctx := cmd.Context()
 		if commitFlags.Amend {
 			if commitFlags.CreateBranch || commitFlags.BranchName != "" {
 				return errors.New("cannot create a branch and amend at the same time")
 			}
 			return amendCmd(
+				ctx,
 				strings.Join(commitFlags.Message, "\n\n"),
 				commitFlags.Edit,
 				commitFlags.All,
@@ -65,6 +68,7 @@ var commitCmd = &cobra.Command{
 
 		if commitFlags.CreateBranch || commitFlags.BranchName != "" {
 			return branchAndCommit(
+				ctx,
 				commitFlags.BranchName,
 				strings.Join(commitFlags.Message, "\n\n"),
 				commitFlags.AllChanges,
@@ -77,19 +81,19 @@ var commitCmd = &cobra.Command{
 			return errors.New("parent flag is only allowed with -b/--branch or --branch-name")
 		}
 
-		repo, err := getRepo()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
 
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
 
 		// We need to run git commit before bubbletea grabs the terminal. Otherwise,
 		// we need to make p.ReleaseTerminal() and p.RestoreTerminal().
-		if err := runCreate(repo, db); err != nil {
+		if err := runCreate(ctx, repo, db); err != nil {
 			fmt.Fprint(os.Stderr, "\n", colors.Failure("Failed to create commit."), "\n")
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
@@ -98,15 +102,15 @@ var commitCmd = &cobra.Command{
 	},
 }
 
-func runCreate(repo *git.Repo, db meta.DB) error {
-	currentBranch, err := repo.CurrentBranchName()
+func runCreate(ctx context.Context, repo *git.Repo, db meta.DB) error {
+	currentBranch, err := repo.CurrentBranchName(ctx)
 	if err != nil {
 		return errors.WrapIf(err, "failed to determine current branch")
 	}
 
 	// Handle "--all-changes"
 	if commitFlags.AllChanges {
-		_, err := repo.Run(&git.RunOpts{
+		_, err := repo.Run(ctx, &git.RunOpts{
 			Args:      []string{"add", "--all"},
 			ExitError: true,
 		})
@@ -139,7 +143,7 @@ func runCreate(repo *git.Repo, db meta.DB) error {
 		return errors.New("this branch has already been merged, commit is not allowed")
 	}
 
-	if _, err := repo.Run(&git.RunOpts{
+	if _, err := repo.Run(ctx, &git.RunOpts{
 		Args:        commitArgs,
 		ExitError:   true,
 		Interactive: true,
@@ -149,20 +153,20 @@ func runCreate(repo *git.Repo, db meta.DB) error {
 	return nil
 }
 
-func amendCmd(message string, edit bool, all bool) error {
-	repo, err := getRepo()
+func amendCmd(ctx context.Context, message string, edit bool, all bool) error {
+	repo, err := getRepo(ctx)
 	if err != nil {
 		return err
 	}
 
-	db, err := getDB(repo)
+	db, err := getDB(ctx, repo)
 	if err != nil {
 		return err
 	}
 
 	// We need to run git commit --amend before bubbletea grabs the terminal. Otherwise,
 	// we need to make p.ReleaseTerminal() and p.RestoreTerminal().
-	if err := runAmend(repo, db, message, edit, all); err != nil {
+	if err := runAmend(ctx, repo, db, message, edit, all); err != nil {
 		fmt.Fprint(os.Stderr, "\n", colors.Failure("Failed to amend."), "\n")
 		return actions.ErrExitSilently{ExitCode: 1}
 	}
@@ -170,8 +174,15 @@ func amendCmd(message string, edit bool, all bool) error {
 	return runPostCommitRestack(repo, db)
 }
 
-func runAmend(repo *git.Repo, db meta.DB, message string, edit bool, all bool) error {
-	currentBranch, err := repo.CurrentBranchName()
+func runAmend(
+	ctx context.Context,
+	repo *git.Repo,
+	db meta.DB,
+	message string,
+	edit bool,
+	all bool,
+) error {
+	currentBranch, err := repo.CurrentBranchName(ctx)
 	if err != nil {
 		return errors.WrapIf(err, "failed to determine current branch")
 	}
@@ -202,7 +213,7 @@ func runAmend(repo *git.Repo, db meta.DB, message string, edit bool, all bool) e
 
 	// Handle "--all-changes"
 	if commitFlags.AllChanges {
-		_, err := repo.Run(&git.RunOpts{
+		_, err := repo.Run(ctx, &git.RunOpts{
 			Args:      []string{"add", "--all"},
 			ExitError: true,
 		})
@@ -214,7 +225,7 @@ func runAmend(repo *git.Repo, db meta.DB, message string, edit bool, all bool) e
 		}
 	}
 
-	if _, err := repo.Run(&git.RunOpts{
+	if _, err := repo.Run(ctx, &git.RunOpts{
 		Args:        commitArgs,
 		ExitError:   true,
 		Interactive: true,
@@ -225,6 +236,7 @@ func runAmend(repo *git.Repo, db meta.DB, message string, edit bool, all bool) e
 }
 
 func branchAndCommit(
+	ctx context.Context,
 	branchName string,
 	message string,
 	all bool,
@@ -243,17 +255,17 @@ func branchAndCommit(
 		}
 	}
 
-	repo, err := getRepo()
+	repo, err := getRepo(ctx)
 	if err != nil {
 		return err
 	}
 
-	db, err := getDB(repo)
+	db, err := getDB(ctx, repo)
 	if err != nil {
 		return err
 	}
 
-	err = createBranch(repo, db, branchName, parentBranchName)
+	err = createBranch(ctx, repo, db, branchName, parentBranchName)
 	if err != nil {
 		return err
 	}
@@ -276,7 +288,7 @@ func branchAndCommit(
 		addArgs = append(addArgs, "--update")
 	}
 	if len(addArgs) > 0 {
-		_, err := repo.Run(&git.RunOpts{
+		_, err := repo.Run(ctx, &git.RunOpts{
 			Args:      append([]string{"add"}, addArgs...),
 			ExitError: true,
 		})
@@ -293,7 +305,7 @@ func branchAndCommit(
 		commitArgs = append(commitArgs, "--message", message)
 	}
 
-	if _, err := repo.Run(&git.RunOpts{
+	if _, err := repo.Run(ctx, &git.RunOpts{
 		Args:        commitArgs,
 		ExitError:   true,
 		Interactive: true,
@@ -351,7 +363,7 @@ func init() {
 	_ = branchCmd.RegisterFlagCompletionFunc(
 		"parent",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			branches, _ := allBranches()
+			branches, _ := allBranches(cmd.Context())
 			return branches, cobra.ShellCompDirectiveNoFileComp
 		},
 	)

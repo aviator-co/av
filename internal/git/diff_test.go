@@ -16,7 +16,7 @@ func TestRepoDiffAmbiguousPathName(t *testing.T) {
 	repo.CheckoutBranch(t, plumbing.NewBranchReferenceName("foo"))
 
 	repo.CommitFile(t, "foo", "foo")
-	diff, err := repo.AsAvGitRepo().Diff(&git.DiffOpts{
+	diff, err := repo.AsAvGitRepo().Diff(t.Context(), &git.DiffOpts{
 		Quiet:      true,
 		Specifiers: []string{"main", "foo"},
 	})

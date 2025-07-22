@@ -42,16 +42,17 @@ Examples:
 `,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
 		tx := db.ReadTx()
-		currentBranch, err := repo.CurrentBranchName()
+		currentBranch, err := repo.CurrentBranchName(ctx)
 		if err != nil {
 			return err
 		}
@@ -81,7 +82,7 @@ Examples:
 			_, _ = fmt.Fprint(os.Stderr,
 				"  - switching to branch ", colors.UserInput(branch), "\n",
 			)
-			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: branch}); err != nil {
+			if _, err := repo.CheckoutBranch(ctx, &git.CheckoutBranch{Name: branch}); err != nil {
 				return errors.Wrapf(err, "failed to switch to branch %q", branch)
 			}
 			cmd := exec.Command(args[0], args[1:]...)
@@ -95,7 +96,7 @@ Examples:
 		// Switch back to the original branch.
 		// We only do this on success, because on failure, it's likely that the
 		// user will want to be on the branch that had issues.
-		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: currentBranch}); err != nil {
+		if _, err := repo.CheckoutBranch(ctx, &git.CheckoutBranch{Name: currentBranch}); err != nil {
 			return errors.Wrapf(err, "failed to switch back to branch %q", currentBranch)
 		}
 		return nil

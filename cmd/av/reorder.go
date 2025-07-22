@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,11 +37,12 @@ squashed, dropped, or moved within the stack.
 `),
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
@@ -65,7 +67,7 @@ squashed, dropped, or moved within the stack.
 			}
 
 			if stat, _ := os.Stat(filepath.Join(repo.GitDir(), "CHERRY_PICK_HEAD")); stat != nil {
-				if err := repo.CherryPick(git.CherryPick{Resume: git.CherryPickAbort}); err != nil {
+				if err := repo.CherryPick(ctx, git.CherryPick{Resume: git.CherryPickAbort}); err != nil {
 					return errors.WrapIf(err, "failed to abort in-progress cherry-pick")
 				}
 			}
@@ -85,7 +87,7 @@ squashed, dropped, or moved within the stack.
 				return actions.ErrExitSilently{ExitCode: 127}
 			}
 			tx := db.ReadTx()
-			currentBranch, err := repo.CurrentBranchName()
+			currentBranch, err := repo.CurrentBranchName(ctx)
 			if err != nil {
 				return err
 			}
@@ -97,12 +99,12 @@ squashed, dropped, or moved within the stack.
 				)
 				return actions.ErrExitSilently{ExitCode: 127}
 			}
-			initialPlan, err := reorder.CreatePlan(repo, db.ReadTx(), root)
+			initialPlan, err := reorder.CreatePlan(ctx, repo, db.ReadTx(), root)
 			if err != nil {
 				return err
 			}
 
-			plan, err := reorderEditPlan(repo, initialPlan)
+			plan, err := reorderEditPlan(ctx, repo, initialPlan)
 			if err != nil {
 				return err
 			}
@@ -156,10 +158,14 @@ func init() {
 	reorderCmd.MarkFlagsMutuallyExclusive("continue", "abort")
 }
 
-func reorderEditPlan(repo *git.Repo, initialPlan []reorder.Cmd) ([]reorder.Cmd, error) {
+func reorderEditPlan(
+	ctx context.Context,
+	repo *git.Repo,
+	initialPlan []reorder.Cmd,
+) ([]reorder.Cmd, error) {
 	plan := initialPlan
 edit:
-	plan, err := reorder.EditPlan(repo, plan)
+	plan, err := reorder.EditPlan(ctx, repo, plan)
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package git
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"io"
 	"regexp"
 	"strconv"
@@ -22,11 +23,11 @@ type LogOpts struct {
 }
 
 // Log returns a list of commits specified by the range.
-func (r *Repo) Log(opts LogOpts) ([]*CommitInfo, error) {
+func (r *Repo) Log(ctx context.Context, opts LogOpts) ([]*CommitInfo, error) {
 	args := []string{"log", "--format=%H%x00%h%x00%s%x00%b%x00"}
 	args = append(args, opts.RevisionRange...)
 	args = append(args, "--")
-	res, err := r.Run(&RunOpts{
+	res, err := r.Run(ctx, &RunOpts{
 		Args:      args,
 		ExitError: true,
 	})

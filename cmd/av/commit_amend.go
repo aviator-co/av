@@ -16,6 +16,11 @@ var commitAmendCmd = &cobra.Command{
 	Short: "Amend a commit",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		return amendCmd(commitAmendFlags.Message, !commitAmendFlags.NoEdit, commitAmendFlags.All)
+		return amendCmd(
+			cmd.Context(),
+			commitAmendFlags.Message,
+			!commitAmendFlags.NoEdit,
+			commitAmendFlags.All,
+		)
 	},
 }

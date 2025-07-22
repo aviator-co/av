@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -16,11 +17,12 @@ var splitCommitCmd = &cobra.Command{
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
-		status, err := repo.Status()
+		status, err := repo.Status(ctx)
 		if err != nil {
 			return errors.Errorf("cannot get the status of the repository: %v", err)
 		}
@@ -47,7 +49,7 @@ var splitCommitCmd = &cobra.Command{
 
 		// From here, we use detached HEAD, so that even if something goes wrong or user
 		// aborts the operation in the middle, the original branch is intact.
-		if err := splitCommit(repo, currentBranchName, currentCommitOID); err != nil {
+		if err := splitCommit(ctx, repo, currentBranchName, currentCommitOID); err != nil {
 			splitCommitAbortMessage(currentBranchName, currentCommitOID)
 			return err
 		}
@@ -55,19 +57,23 @@ var splitCommitCmd = &cobra.Command{
 	},
 }
 
-func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) error {
-	if _, err := repo.Git("switch", "--detach", currentCommitOID); err != nil {
+func splitCommit(
+	ctx context.Context,
+	repo *git.Repo,
+	currentBranchName, currentCommitOID string,
+) error {
+	if _, err := repo.Git(ctx, "switch", "--detach", currentCommitOID); err != nil {
 		return err
 	}
-	if _, err := repo.Git("reset", "--mixed", "HEAD~"); err != nil {
+	if _, err := repo.Git(ctx, "reset", "--mixed", "HEAD~"); err != nil {
 		return err
 	}
-	if _, err := repo.Git("add", "--intent-to-add", repo.Dir()); err != nil {
+	if _, err := repo.Git(ctx, "add", "--intent-to-add", repo.Dir()); err != nil {
 		return err
 	}
 
 	for {
-		status, err := repo.Status()
+		status, err := repo.Status(ctx)
 		if err != nil {
 			return errors.Errorf("cannot get the status of the repository: %v", err)
 		}
@@ -75,7 +81,7 @@ func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) err
 			break
 		}
 
-		if _, err := repo.Run(&git.RunOpts{
+		if _, err := repo.Run(ctx, &git.RunOpts{
 			Args:        []string{"add", "--patch"},
 			ExitError:   true,
 			Interactive: true,
@@ -83,7 +89,7 @@ func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) err
 			return err
 		}
 
-		status, err = repo.Status()
+		status, err = repo.Status(ctx)
 		if err != nil {
 			return errors.Errorf("cannot get the status of the repository: %v", err)
 		}
@@ -92,7 +98,7 @@ func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) err
 			return errors.New("nothing is selected to commit")
 		}
 
-		if _, err := repo.Run(&git.RunOpts{
+		if _, err := repo.Run(ctx, &git.RunOpts{
 			// Add --verbose to show the diffs to be committed.
 			Args:        []string{"commit", "--verbose", "--reedit-message", currentCommitOID},
 			ExitError:   true,
@@ -103,11 +109,11 @@ func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) err
 	}
 
 	if currentBranchName != "" {
-		newCommitOID, err := repo.RevParse(&git.RevParse{Rev: "HEAD"})
+		newCommitOID, err := repo.RevParse(ctx, &git.RevParse{Rev: "HEAD"})
 		if err != nil {
 			return errors.Errorf("cannot get the resulting commit object: %v", err)
 		}
-		if err := repo.UpdateRef(&git.UpdateRef{
+		if err := repo.UpdateRef(ctx, &git.UpdateRef{
 			Ref: "refs/heads/" + currentBranchName,
 			Old: currentCommitOID,
 			New: newCommitOID,
@@ -125,7 +131,7 @@ func splitCommit(repo *git.Repo, currentBranchName, currentCommitOID string) err
 		// At this point, the HEAD is still a detached HEAD. Check out the branch.
 		// repo.CheckoutBranch errors out if the repository is at the detached head.
 		// We have to run git checkout in other ways.
-		if _, err := repo.Git("switch", currentBranchName); err != nil {
+		if _, err := repo.Git(ctx, "switch", currentBranchName); err != nil {
 			return errors.Errorf("cannot switch to the original branch: %v", err)
 		}
 

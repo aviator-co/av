@@ -19,23 +19,23 @@ var authCmd = &cobra.Command{
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
 	Run: func(cmd *cobra.Command, _ []string) {
-		if err := checkAviatorAuthStatus(); err != nil {
+		if err := checkAviatorAuthStatus(cmd.Context()); err != nil {
 			fmt.Fprintln(os.Stderr, colors.Warning(err.Error()))
 		}
-		if err := checkGitHubAuthStatus(); err != nil {
+		if err := checkGitHubAuthStatus(cmd.Context()); err != nil {
 			fmt.Fprintln(os.Stderr, colors.Failure(err.Error()))
 		}
 	},
 }
 
-func checkAviatorAuthStatus() error {
-	avClient, err := avgql.NewClient()
+func checkAviatorAuthStatus(ctx context.Context) error {
+	avClient, err := avgql.NewClient(ctx)
 	if err != nil {
 		return err
 	}
 
 	var query struct{ avgql.ViewerSubquery }
-	if err := avClient.Query(context.Background(), &query, nil); err != nil {
+	if err := avClient.Query(ctx, &query, nil); err != nil {
 		if avgql.IsHTTPUnauthorized(err) {
 			return errors.New(
 				"You are not logged in to Aviator. Please verify that your API token is correct.",
@@ -51,13 +51,13 @@ func checkAviatorAuthStatus() error {
 	return nil
 }
 
-func checkGitHubAuthStatus() error {
-	ghClient, err := getGitHubClient()
+func checkGitHubAuthStatus(ctx context.Context) error {
+	ghClient, err := getGitHubClient(ctx)
 	if err != nil {
 		return err
 	}
 
-	viewer, err := ghClient.Viewer(context.Background())
+	viewer, err := ghClient.Viewer(ctx)
 	if err != nil {
 		// GitHub API returns 401 Unauthorized if the token is invalid or
 		// expired.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -18,17 +19,18 @@ var squashCmd = &cobra.Command{
 	Short: "Squash commits of the current branch into a single commit",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
 
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
 
-		if err := runSquash(repo, db); err != nil {
+		if err := runSquash(ctx, repo, db); err != nil {
 			fmt.Fprint(os.Stderr, colors.Failure("Failed to squash."), "\n")
 			fmt.Fprint(os.Stderr, colors.Failure(err.Error()), "\n")
 			return actions.ErrExitSilently{ExitCode: 1}
@@ -38,8 +40,8 @@ var squashCmd = &cobra.Command{
 	},
 }
 
-func runSquash(repo *git.Repo, db meta.DB) error {
-	status, err := repo.Status()
+func runSquash(ctx context.Context, repo *git.Repo, db meta.DB) error {
+	status, err := repo.Status(ctx)
 	if err != nil {
 		return errors.Errorf("cannot get the status of the repository: %v", err)
 	}
@@ -50,7 +52,7 @@ func runSquash(repo *git.Repo, db meta.DB) error {
 		)
 	}
 
-	currentBranchName, err := repo.CurrentBranchName()
+	currentBranchName, err := repo.CurrentBranchName(ctx)
 	if err != nil {
 		return err
 	}
@@ -68,7 +70,7 @@ func runSquash(repo *git.Repo, db meta.DB) error {
 		return errors.New("this branch has already been merged, squashing is not allowed")
 	}
 
-	commitIDs, err := repo.RevList(git.RevListOpts{
+	commitIDs, err := repo.RevList(ctx, git.RevListOpts{
 		Specifiers: []string{currentBranchName, "^" + branch.Parent.Name},
 		Reverse:    true,
 	})
@@ -82,11 +84,11 @@ func runSquash(repo *git.Repo, db meta.DB) error {
 
 	firstCommitSha := commitIDs[0]
 
-	if _, err := repo.Git("reset", "--soft", firstCommitSha); err != nil {
+	if _, err := repo.Git(ctx, "reset", "--soft", firstCommitSha); err != nil {
 		return err
 	}
 
-	ammendMessage, err := repo.Git("commit", "--amend", "--no-edit")
+	amendMessage, err := repo.Git(ctx, "commit", "--amend", "--no-edit")
 	if err != nil {
 		return err
 	}
@@ -97,6 +99,6 @@ func runSquash(repo *git.Repo, db meta.DB) error {
 		colors.Success(fmt.Sprintf("Successfully squashed %d commits", len(commitIDs))),
 		"\n",
 	)
-	fmt.Fprint(os.Stderr, ammendMessage, "\n\n")
+	fmt.Fprint(os.Stderr, amendMessage, "\n\n")
 	return nil
 }

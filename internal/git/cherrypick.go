@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -48,7 +49,7 @@ func (e ErrCherryPickConflict) Error() string {
 
 // CherryPick applies the given commits on top of the current HEAD.
 // If there are conflicts, ErrCherryPickConflict is returned.
-func (r *Repo) CherryPick(opts CherryPick) error {
+func (r *Repo) CherryPick(ctx context.Context, opts CherryPick) error {
 	args := []string{"cherry-pick"}
 
 	if opts.Resume != "" {
@@ -63,7 +64,7 @@ func (r *Repo) CherryPick(opts CherryPick) error {
 		args = append(args, opts.Commits...)
 	}
 
-	run, err := r.Run(&RunOpts{
+	run, err := r.Run(ctx, &RunOpts{
 		Args: args,
 	})
 	if err != nil {

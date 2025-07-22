@@ -1,6 +1,7 @@
 package reorder
 
 import (
+	"context"
 	"strings"
 
 	"github.com/aviator-co/av/internal/utils/sliceutils"
@@ -11,7 +12,7 @@ import (
 )
 
 // EditPlan opens the user's editor and allows them to edit the plan.
-func EditPlan(repo *git.Repo, plan []Cmd) ([]Cmd, error) {
+func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 	text := strings.Builder{}
 	for i, cmd := range plan {
 		if i > 0 && typeutils.Is[StackBranchCmd](cmd) {
@@ -25,7 +26,7 @@ func EditPlan(repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 	}
 	text.WriteString(instructionsText)
 
-	res, err := editor.Launch(repo, editor.Config{
+	res, err := editor.Launch(ctx, repo, editor.Config{
 		Text:              text.String(),
 		CommentPrefix:     "#",
 		EndOfLineComments: true,

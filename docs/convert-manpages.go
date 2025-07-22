@@ -3,6 +3,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"log"
 	"os"
@@ -105,13 +106,13 @@ func previewMarkdown(fp string) error {
 
 	switch runtime.GOOS {
 	case "darwin", "freebsd":
-		cmd := exec.Command("mandoc", "-a")
+		cmd := exec.CommandContext(context.Background(), "mandoc", "-a")
 		cmd.Stdin = bytes.NewBuffer(roff)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
 	case "linux":
-		cmd := exec.Command("man", "-l", "-")
+		cmd := exec.CommandContext(context.Background(), "man", "-l", "-")
 		cmd.Stdin = bytes.NewBuffer(roff)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

@@ -23,20 +23,21 @@ var prevCmd = &cobra.Command{
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get the previous branches so we can checkout the nth one
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
 		tx := db.ReadTx()
-		currentBranch, err := repo.CurrentBranchName()
+		currentBranch, err := repo.CurrentBranchName(ctx)
 		if err != nil {
 			return err
 		}
-		isCurrentBranchTrunk, err := repo.IsTrunkBranch(currentBranch)
+		isCurrentBranchTrunk, err := repo.IsTrunkBranch(ctx, currentBranch)
 		if err != nil {
 			return err
 		} else if isCurrentBranchTrunk {
@@ -80,7 +81,7 @@ var prevCmd = &cobra.Command{
 			branchToCheckout = previousBranches[len(previousBranches)-n]
 		}
 
-		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+		if _, err := repo.CheckoutBranch(ctx, &git.CheckoutBranch{
 			Name: branchToCheckout,
 		}); err != nil {
 			return err

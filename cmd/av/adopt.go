@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"sort"
 	"strings"
 
@@ -41,24 +42,25 @@ For example, "av adopt --parent main" will adopt the current branch with the mai
 the parent.`),
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
 
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
 
-		status, err := repo.Status()
+		status, err := repo.Status(ctx)
 		if err != nil {
 			return err
 		}
 
 		currentBranch := status.CurrentBranch
 		if adoptFlags.Parent != "" {
-			return adoptForceAdoption(repo, db, currentBranch, adoptFlags.Parent)
+			return adoptForceAdoption(ctx, repo, db, currentBranch, adoptFlags.Parent)
 		}
 
 		return uiutils.RunBubbleTea(&adoptViewModel{
@@ -73,7 +75,12 @@ the parent.`),
 	},
 }
 
-func adoptForceAdoption(repo *git.Repo, db meta.DB, currentBranch, parent string) error {
+func adoptForceAdoption(
+	ctx context.Context,
+	repo *git.Repo,
+	db meta.DB,
+	currentBranch, parent string,
+) error {
 	if currentBranch == "" {
 		return errors.New("the current repository state is at a detached HEAD")
 	}
@@ -89,13 +96,13 @@ func adoptForceAdoption(repo *git.Repo, db meta.DB, currentBranch, parent string
 		return errors.New("cannot adopt the current branch as its parent")
 	}
 
-	if isCurrentBranchTrunk, err := repo.IsTrunkBranch(currentBranch); err != nil {
+	if isCurrentBranchTrunk, err := repo.IsTrunkBranch(ctx, currentBranch); err != nil {
 		return errors.Wrap(err, "failed to check if the current branch is trunk")
 	} else if isCurrentBranchTrunk {
 		return errors.New("cannot adopt the default branch")
 	}
 
-	isParentBranchTrunk, err := repo.IsTrunkBranch(parent)
+	isParentBranchTrunk, err := repo.IsTrunkBranch(ctx, parent)
 	if err != nil {
 		return errors.Wrap(err, "failed to check if the parent branch is trunk")
 	}
@@ -110,7 +117,7 @@ func adoptForceAdoption(repo *git.Repo, db meta.DB, currentBranch, parent string
 		if !exist {
 			return errors.New("parent branch is not adopted yet")
 		}
-		mergeBase, err := repo.MergeBase(parent, currentBranch)
+		mergeBase, err := repo.MergeBase(ctx, parent, currentBranch)
 		if err != nil {
 			return err
 		}
@@ -205,7 +212,7 @@ func (vm *adoptViewModel) initCmd() tea.Msg {
 	if err != nil {
 		return err
 	}
-	pieces, err := treedetector.DetectBranches(vm.repo, unmanagedBranches)
+	pieces, err := treedetector.DetectBranches(context.Background(), vm.repo, unmanagedBranches)
 	if err != nil {
 		return err
 	}
@@ -464,7 +471,7 @@ func init() {
 	_ = adoptCmd.RegisterFlagCompletionFunc(
 		"parent",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			branches, _ := allBranches()
+			branches, _ := allBranches(cmd.Context())
 			return branches, cobra.ShellCompDirectiveNoFileComp
 		},
 	)

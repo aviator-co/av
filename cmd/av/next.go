@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -27,6 +28,7 @@ var nextCmd = &cobra.Command{
 	Short: "Checkout the next branch in the stack",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 		n := 1
 		if len(args) == 1 {
 			var err error
@@ -40,7 +42,7 @@ var nextCmd = &cobra.Command{
 			}
 		}
 
-		stackNext, err := newNextModel(nextFlags.Last, n)
+		stackNext, err := newNextModel(ctx, nextFlags.Last, n)
 		if err != nil {
 			return err
 		}
@@ -67,18 +69,18 @@ type stackNextModel struct {
 	err         error
 }
 
-func newNextModel(lastInStack bool, nInStack int) (stackNextModel, error) {
-	repo, err := getRepo()
+func newNextModel(ctx context.Context, lastInStack bool, nInStack int) (stackNextModel, error) {
+	repo, err := getRepo(ctx)
 	if err != nil {
 		return stackNextModel{}, err
 	}
 
-	db, err := getDB(repo)
+	db, err := getDB(ctx, repo)
 	if err != nil {
 		return stackNextModel{}, err
 	}
 
-	currentBranch, err := repo.CurrentBranchName()
+	currentBranch, err := repo.CurrentBranchName(ctx)
 	if err != nil {
 		return stackNextModel{}, err
 	}
@@ -107,7 +109,7 @@ func (m stackNextModel) currentBranchChildren() []string {
 type branchCheckedOutMsg struct{}
 
 func (m stackNextModel) checkoutCurrentBranch() tea.Msg {
-	if _, err := m.repo.CheckoutBranch(&git.CheckoutBranch{
+	if _, err := m.repo.CheckoutBranch(context.Background(), &git.CheckoutBranch{
 		Name: m.currentBranch,
 	}); err != nil {
 		return err

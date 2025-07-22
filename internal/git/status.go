@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"regexp"
 	"strings"
 )
@@ -57,8 +58,8 @@ var (
 	patternFileUntracked = regexp.MustCompile(`\? (.+)`)
 )
 
-func (r *Repo) Status() (GitStatus, error) {
-	body, err := r.Git("status", "--porcelain=v2", "--branch", "--untracked-files")
+func (r *Repo) Status(ctx context.Context) (GitStatus, error) {
+	body, err := r.Git(ctx, "status", "--porcelain=v2", "--branch", "--untracked-files")
 	if err != nil {
 		return GitStatus{}, err
 	}

@@ -20,12 +20,13 @@ var prStatusCmd = &cobra.Command{
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		variables, err := getQueryVariables()
+		ctx := cmd.Context()
+		variables, err := getQueryVariables(ctx)
 		if err != nil {
 			return err
 		}
 
-		client, err := avgql.NewClient()
+		client, err := avgql.NewClient(ctx)
 		if err != nil {
 			return err
 		}
@@ -197,20 +198,20 @@ var prStatusCmd = &cobra.Command{
 	},
 }
 
-func getQueryVariables() (map[string]interface{}, error) {
-	repo, err := getRepo()
+func getQueryVariables(ctx context.Context) (map[string]interface{}, error) {
+	repo, err := getRepo(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	db, err := getDB(repo)
+	db, err := getDB(ctx, repo)
 	if err != nil {
 		return nil, err
 	}
 
 	tx := db.ReadTx()
 
-	currentBranchName, err := repo.CurrentBranchName()
+	currentBranchName, err := repo.CurrentBranchName(ctx)
 	if err != nil {
 		return nil, err
 	}

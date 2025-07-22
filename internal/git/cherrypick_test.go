@@ -22,7 +22,7 @@ func TestRepo_CherryPick(t *testing.T) {
 	repo.CheckoutCommit(t, c1)
 	require.NoError(
 		t,
-		repo.AsAvGitRepo().CherryPick(git.CherryPick{Commits: []string{c2.String()}}),
+		repo.AsAvGitRepo().CherryPick(t.Context(), git.CherryPick{Commits: []string{c2.String()}}),
 	)
 	contents, err := os.ReadFile(filepath.Join(repo.RepoDir, "file"))
 	require.NoError(t, err)
@@ -33,13 +33,13 @@ func TestRepo_CherryPick(t *testing.T) {
 	require.NoError(
 		t,
 		repo.AsAvGitRepo().
-			CherryPick(git.CherryPick{Commits: []string{c2.String()}, FastForward: true}),
+			CherryPick(t.Context(), git.CherryPick{Commits: []string{c2.String()}, FastForward: true}),
 	)
 	_, err = os.ReadFile(filepath.Join(repo.RepoDir, "file"))
 	require.NoError(t, err)
 
 	// We're back to c2, so trying to cherry-pick c1 should fail.
-	err = repo.AsAvGitRepo().CherryPick(git.CherryPick{Commits: []string{c1.String()}})
+	err = repo.AsAvGitRepo().CherryPick(t.Context(), git.CherryPick{Commits: []string{c1.String()}})
 	conflictErr, ok := errutils.As[git.ErrCherryPickConflict](err)
 	require.True(t, ok, "expected cherry-pick conflict")
 	assert.Equal(t, c1.String(), conflictErr.ConflictingCommit)

@@ -1,13 +1,20 @@
 package reorder
 
 import (
+	"context"
+
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 )
 
 // CreatePlan creates a reorder plan for the stack rooted at rootBranch.
-func CreatePlan(repo *git.Repo, tx meta.ReadTx, rootBranch string) ([]Cmd, error) {
+func CreatePlan(
+	ctx context.Context,
+	repo *git.Repo,
+	tx meta.ReadTx,
+	rootBranch string,
+) ([]Cmd, error) {
 	var cmds []Cmd
 
 	branchNames := []string{rootBranch}
@@ -28,7 +35,7 @@ func CreatePlan(repo *git.Repo, tx meta.ReadTx, rootBranch string) ([]Cmd, error
 			branchCmd.Parent = branch.Parent.Name
 			upstreamCommit = branch.Parent.Head
 		} else {
-			trunkCommit, err := repo.MergeBase(branchName, "origin/"+branch.Parent.Name)
+			trunkCommit, err := repo.MergeBase(ctx, branchName, "origin/"+branch.Parent.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -38,7 +45,7 @@ func CreatePlan(repo *git.Repo, tx meta.ReadTx, rootBranch string) ([]Cmd, error
 
 		// Figure out the commits that belong to this branch.
 		// We'll use this to generate a "pick" command for each commit.
-		commitIDs, err := repo.RevList(git.RevListOpts{
+		commitIDs, err := repo.RevList(ctx, git.RevListOpts{
 			Specifiers: []string{branchName, "^" + upstreamCommit},
 			Reverse:    true,
 		})
@@ -54,7 +61,7 @@ func CreatePlan(repo *git.Repo, tx meta.ReadTx, rootBranch string) ([]Cmd, error
 			continue
 		}
 
-		commitObjects, err := repo.GetRefs(&git.GetRefs{
+		commitObjects, err := repo.GetRefs(ctx, &git.GetRefs{
 			Revisions: commitIDs,
 		})
 		if err != nil {

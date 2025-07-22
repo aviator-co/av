@@ -33,11 +33,12 @@ var branchMetaDeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "delete a branch metadata",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
@@ -54,11 +55,12 @@ var branchMetaListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "list all branch metadata",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
@@ -77,19 +79,20 @@ var branchMetaSetCmd = &cobra.Command{
 	Use:   "set branch-name",
 	Short: "modify the branch metadata",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 		if len(args) != 1 {
 			_ = cmd.Usage()
 			return errors.New("exactly one branch name and --parent is required")
 		}
-		repo, err := getRepo()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
-		if _, err := repo.RevParse(&git.RevParse{Rev: args[0]}); err != nil {
+		if _, err := repo.RevParse(ctx, &git.RevParse{Rev: args[0]}); err != nil {
 			return errors.WrapIf(err, "cannot check if a branch exists")
 		}
 		tx := db.WriteTx()
@@ -99,7 +102,7 @@ var branchMetaSetCmd = &cobra.Command{
 			var parentHead string
 			if branchMetaFlags.trunk {
 				var err error
-				parentHead, err = repo.RevParse(&git.RevParse{Rev: branchMetaFlags.parent})
+				parentHead, err = repo.RevParse(ctx, &git.RevParse{Rev: branchMetaFlags.parent})
 				if err != nil {
 					return err
 				}

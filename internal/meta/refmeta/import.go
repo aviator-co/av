@@ -1,6 +1,8 @@
 package refmeta
 
 import (
+	"context"
+
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
@@ -8,7 +10,7 @@ import (
 )
 
 // Import imports all ref metadata from the git repo into the database.
-func Import(repo *git.Repo, db meta.DB) error {
+func Import(ctx context.Context, repo *git.Repo, db meta.DB) error {
 	tx := db.WriteTx()
 	cu := cleanup.New(func() { tx.Abort() })
 	defer cu.Cleanup()
@@ -19,7 +21,7 @@ func Import(repo *git.Repo, db meta.DB) error {
 	}
 	tx.SetRepository(repoMeta)
 
-	allBranchMetas, err := ReadAllBranches(repo)
+	allBranchMetas, err := ReadAllBranches(ctx, repo)
 	if err != nil {
 		return err
 	}
