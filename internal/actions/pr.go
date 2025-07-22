@@ -900,7 +900,13 @@ func UpdatePullRequestWithStack(
 	tx meta.WriteTx,
 	branchName string,
 ) error {
-	branchMeta, _ := tx.Branch(branchName)
+	branchMeta, exists := tx.Branch(branchName)
+	// it's possible that this branch is not part of the primary stack, ex: they have main->branchA->branchB,
+	// but forkA is coming from branchA in which case forkA may not have a pull request associated with it.
+	// In this case, we should not try to update forkA's pull request with the stack.
+	if !exists || branchMeta.PullRequest == nil {
+		return nil
+	}
 	logrus.WithField("branch", branchName).
 		WithField("pr", branchMeta.PullRequest.ID).
 		Debug("Updating pull requests with stack")
