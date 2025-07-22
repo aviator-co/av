@@ -2,6 +2,7 @@ package e2e_tests
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,7 +23,7 @@ func init() {
 		panic(err)
 	}
 
-	cmd := exec.Command("go", "build", "../cmd/av")
+	cmd := exec.CommandContext(context.Background(), "go", "build", "../cmd/av")
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 
@@ -44,7 +45,7 @@ type AvOutput struct {
 
 func Cmd(t *testing.T, exe string, args ...string) AvOutput {
 	t.Helper()
-	cmd := exec.Command(exe, args...)
+	cmd := exec.CommandContext(t.Context(), exe, args...)
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	cmd.Stdout = stdout

@@ -1,6 +1,7 @@
 package reorder
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -39,7 +40,7 @@ func (d DeleteBranchCmd) Execute(ctx *Context) error {
 		return nil
 	}
 
-	_, err := ctx.Repo.Run(&git.RunOpts{
+	_, err := ctx.Repo.Run(context.Background(), &git.RunOpts{
 		Args:      []string{"branch", "--delete", "--force", d.Name},
 		ExitError: true,
 	})

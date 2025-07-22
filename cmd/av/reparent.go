@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
@@ -25,12 +27,13 @@ var reparentCmd = &cobra.Command{
 	Short:             "Change the parent of the current branch",
 	ValidArgsFunction: branchNameArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
 
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
@@ -131,11 +134,12 @@ func (vm *reparentViewModel) writeState(state *sequencerui.RestackState) error {
 }
 
 func (vm *reparentViewModel) createState() (*sequencerui.RestackState, error) {
-	currentBranch, err := vm.repo.CurrentBranchName()
+	ctx := context.Background()
+	currentBranch, err := vm.repo.CurrentBranchName(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if isCurrentBranchTrunk, err := vm.repo.IsTrunkBranch(currentBranch); err != nil {
+	if isCurrentBranchTrunk, err := vm.repo.IsTrunkBranch(ctx, currentBranch); err != nil {
 		return nil, err
 	} else if isCurrentBranchTrunk {
 		return nil, errors.New("current branch is a trunk branch")
@@ -144,7 +148,7 @@ func (vm *reparentViewModel) createState() (*sequencerui.RestackState, error) {
 		return nil, errors.New("current branch is not adopted to av")
 	}
 
-	if isParentBranchTrunk, err := vm.repo.IsTrunkBranch(reparentFlags.Parent); err != nil {
+	if isParentBranchTrunk, err := vm.repo.IsTrunkBranch(ctx, reparentFlags.Parent); err != nil {
 		return nil, err
 	} else if !isParentBranchTrunk {
 		if _, exist := vm.db.ReadTx().Branch(reparentFlags.Parent); !exist {
@@ -155,6 +159,7 @@ func (vm *reparentViewModel) createState() (*sequencerui.RestackState, error) {
 	state.InitialBranch = currentBranch
 	state.RelatedBranches = []string{currentBranch, reparentFlags.Parent}
 	ops, err := planner.PlanForReparent(
+		ctx,
 		vm.db.ReadTx(),
 		vm.repo,
 		plumbing.NewBranchReferenceName(currentBranch),
@@ -192,7 +197,7 @@ func init() {
 	_ = reparentCmd.RegisterFlagCompletionFunc(
 		"parent",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			branches, _ := allBranches()
+			branches, _ := allBranches(cmd.Context())
 			return branches, cobra.ShellCompDirectiveNoFileComp
 		},
 	)

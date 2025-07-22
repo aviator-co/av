@@ -1,6 +1,7 @@
 package reorder
 
 import (
+	"context"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -17,7 +18,7 @@ type PickCmd struct {
 }
 
 func (p PickCmd) Execute(ctx *Context) error {
-	err := ctx.Repo.CherryPick(git.CherryPick{
+	err := ctx.Repo.CherryPick(context.Background(), git.CherryPick{
 		Commits: []string{p.Commit},
 		// Use FastForward to avoid always amending commits.
 		FastForward: true,
@@ -32,7 +33,7 @@ func (p PickCmd) Execute(ctx *Context) error {
 		return err
 	}
 
-	head, err := ctx.Repo.RevParse(&git.RevParse{Rev: "HEAD"})
+	head, err := ctx.Repo.RevParse(context.Background(), &git.RevParse{Rev: "HEAD"})
 	if err != nil {
 		return err
 	}

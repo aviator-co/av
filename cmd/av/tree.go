@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -17,17 +18,18 @@ var treeCmd = &cobra.Command{
 	Short: "Show the tree of stacked branches",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
 
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
 
-		status, err := repo.Status()
+		status, err := repo.Status(ctx)
 		if err != nil {
 			return err
 		}
@@ -113,6 +115,7 @@ type stackTreeBranchInfo struct {
 }
 
 func getStackTreeBranchInfo(
+	ctx context.Context,
 	repo *git.Repo,
 	tx meta.ReadTx,
 	branchName string,
@@ -124,16 +127,16 @@ func getStackTreeBranchInfo(
 	if bi.PullRequest != nil && bi.PullRequest.Permalink != "" {
 		branchInfo.PullRequestLink = bi.PullRequest.Permalink
 	}
-	if _, err := repo.RevParse(&git.RevParse{Rev: branchName}); err != nil {
+	if _, err := repo.RevParse(ctx, &git.RevParse{Rev: branchName}); err != nil {
 		branchInfo.Deleted = true
 	}
 
-	parentHead, err := repo.RevParse(&git.RevParse{Rev: bi.Parent.Name})
+	parentHead, err := repo.RevParse(ctx, &git.RevParse{Rev: bi.Parent.Name})
 	if err != nil {
 		// The parent branch doesn't exist.
 		branchInfo.NeedSync = true
 	} else {
-		mergeBase, err := repo.MergeBase(parentHead, branchName)
+		mergeBase, err := repo.MergeBase(ctx, parentHead, branchName)
 		if err != nil {
 			// The merge base doesn't exist. This is odd. Mark the branch as needing
 			// sync to see if we can fix this.
@@ -145,13 +148,13 @@ func getStackTreeBranchInfo(
 		}
 	}
 
-	upstreamExists, err := repo.DoesRemoteBranchExist(branchName)
+	upstreamExists, err := repo.DoesRemoteBranchExist(ctx, branchName)
 	if err != nil || !upstreamExists {
 		// Not pushed.
 		branchInfo.NeedSync = true
 	}
 	upstreamBranch := fmt.Sprintf("remotes/origin/%s", branchName)
-	upstreamDiff, err := repo.Diff(&git.DiffOpts{
+	upstreamDiff, err := repo.Diff(ctx, &git.DiffOpts{
 		Quiet:      true,
 		Specifiers: []string{branchName, upstreamBranch},
 	})

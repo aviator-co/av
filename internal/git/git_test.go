@@ -12,13 +12,13 @@ import (
 func TestOrigin(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
 	repo.Git(t, "remote", "set-url", "origin", "https://github.com/aviator-co/av.git")
-	origin, err := repo.AsAvGitRepo().Origin()
+	origin, err := repo.AsAvGitRepo().Origin(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, "aviator-co/av", origin.RepoSlug)
 
 	repo.Git(t, "remote", "set-url", "origin", "git@github.com:aviator-co/av.git")
 	require.NoError(t, err)
-	origin, err = repo.AsAvGitRepo().Origin()
+	origin, err = repo.AsAvGitRepo().Origin(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, "aviator-co/av", origin.RepoSlug)
 }
@@ -26,13 +26,13 @@ func TestOrigin(t *testing.T) {
 func TestTrunkBranches(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
 
-	branches, err := repo.AsAvGitRepo().TrunkBranches()
+	branches, err := repo.AsAvGitRepo().TrunkBranches(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, branches, []string{"main"})
 
 	// add some branches to AdditionalTrunkBranches
 	config.Av.AdditionalTrunkBranches = []string{"develop", "staging"}
-	branches, err = repo.AsAvGitRepo().TrunkBranches()
+	branches, err = repo.AsAvGitRepo().TrunkBranches(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, branches, []string{"main", "develop", "staging"})
 }

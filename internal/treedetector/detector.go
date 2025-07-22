@@ -1,6 +1,8 @@
 package treedetector
 
 import (
+	"context"
+
 	"emperror.dev/errors"
 	avgit "github.com/aviator-co/av/internal/git"
 	"github.com/go-git/go-git/v5"
@@ -25,6 +27,7 @@ type BranchPiece struct {
 }
 
 func DetectBranches(
+	ctx context.Context,
 	repo *avgit.Repo,
 	unmanagedBranches []plumbing.ReferenceName,
 ) (map[plumbing.ReferenceName]*BranchPiece, error) {
@@ -36,7 +39,7 @@ func DetectBranches(
 	ret := map[plumbing.ReferenceName]*BranchPiece{}
 	for _, bn := range unmanagedBranches {
 		currentHash := refToHashMap[bn]
-		nearestTrunkCommit, err := getNearestTrunkCommit(repo, bn)
+		nearestTrunkCommit, err := getNearestTrunkCommit(ctx, repo, bn)
 		if err != nil {
 			return nil, err
 		}
@@ -45,7 +48,7 @@ func DetectBranches(
 			// don't have to adopt it.
 			continue
 		}
-		bp, err := traverseUntilTrunk(repo, bn, nearestTrunkCommit, hashToRefMap, refToHashMap)
+		bp, err := traverseUntilTrunk(ctx, repo, bn, nearestTrunkCommit, hashToRefMap, refToHashMap)
 		if err != nil {
 			return nil, err
 		}
@@ -55,6 +58,7 @@ func DetectBranches(
 }
 
 func traverseUntilTrunk(
+	ctx context.Context,
 	repo *avgit.Repo,
 	branch plumbing.ReferenceName,
 	nearestTrunkCommit plumbing.Hash,
@@ -72,7 +76,7 @@ func traverseUntilTrunk(
 	// commit that has multiple parents.
 	err = object.NewCommitPreorderIter(commit, nil, nil).ForEach(func(c *object.Commit) error {
 		if c.Hash == nearestTrunkCommit {
-			trunk, err := repo.DefaultBranch()
+			trunk, err := repo.DefaultBranch(ctx)
 			if err != nil {
 				return err
 			}
@@ -107,10 +111,11 @@ func traverseUntilTrunk(
 }
 
 func getNearestTrunkCommit(
+	ctx context.Context,
 	repo *avgit.Repo,
 	ref plumbing.ReferenceName,
 ) (plumbing.Hash, error) {
-	trunk, err := repo.DefaultBranch()
+	trunk, err := repo.DefaultBranch(ctx)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
@@ -119,7 +124,7 @@ func getNearestTrunkCommit(
 	mbArgs := []string{ref.String(), trunk}
 	// Per git-merge-base(1), this should return the nearest commits from HEAD among
 	// the trunk branches since we don't specify --octopus.
-	mb, err := repo.MergeBase(mbArgs...)
+	mb, err := repo.MergeBase(ctx, mbArgs...)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}

@@ -20,14 +20,14 @@ type Client struct {
 
 // NewClient creates a new GitHub client.
 // It takes configuration from the global config.Av.GitHub variable.
-func NewClient(token string) (*Client, error) {
+func NewClient(ctx context.Context, token string) (*Client, error) {
 	if token == "" {
 		return nil, errors.Errorf("no GitHub token provided (do you need to configure one?)")
 	}
 	src := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: token},
 	)
-	httpClient := oauth2.NewClient(context.Background(), src)
+	httpClient := oauth2.NewClient(ctx, src)
 	var gh *githubv4.Client
 	if config.Av.GitHub.BaseURL == "" {
 		gh = githubv4.NewClient(httpClient)

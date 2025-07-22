@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"emperror.dev/errors"
@@ -32,11 +33,12 @@ var restackCmd = &cobra.Command{
 	Short: "Rebase the stacked branches",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
@@ -162,9 +164,10 @@ func (vm *restackViewModel) writeState(state *sequencerui.RestackState) error {
 }
 
 func (vm *restackViewModel) createState() (*sequencerui.RestackState, error) {
-	var state sequencerui.RestackState
+	ctx := context.Background()
 
-	status, err := vm.repo.Status()
+	var state sequencerui.RestackState
+	status, err := vm.repo.Status(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -186,6 +189,7 @@ func (vm *restackViewModel) createState() (*sequencerui.RestackState, error) {
 	}
 
 	ops, err := planner.PlanForRestack(
+		ctx,
 		vm.db.ReadTx(),
 		vm.repo,
 		currentBranchRef,

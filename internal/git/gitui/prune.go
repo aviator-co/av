@@ -1,6 +1,7 @@
 package gitui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -209,7 +210,7 @@ func (vm *PruneBranchModel) viewNoDeleteBranches() string {
 func (vm *PruneBranchModel) runDelete() tea.Msg {
 	// Checkout the detached HEAD so that we can delete the branches. We cannot delete the
 	// branches that are checked out.
-	if err := vm.repo.Detach(); err != nil {
+	if err := vm.repo.Detach(context.Background()); err != nil {
 		return err
 	}
 
@@ -217,7 +218,7 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 	// child order.
 	for i := len(vm.deleteCandidates) - 1; i >= 0; i-- {
 		branch := vm.deleteCandidates[i]
-		if _, err := vm.repo.Git("branch", "-D", branch.branch.Short()); err != nil {
+		if _, err := vm.repo.Git(context.Background(), "branch", "-D", branch.branch.Short()); err != nil {
 			return errors.Errorf("cannot delete merged branch %q: %v", branch.branch.Short(), err)
 		}
 		tx := vm.db.WriteTx()
@@ -241,7 +242,7 @@ func (vm *PruneBranchModel) CheckoutInitialState() error {
 		if err == nil {
 			if initialHead.Type() == plumbing.HashReference {
 				// Normal reference that points to a commit. Checking out.
-				if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: initialHead.Name().Short()}); err != nil {
+				if _, err := vm.repo.CheckoutBranch(context.Background(), &git.CheckoutBranch{Name: initialHead.Name().Short()}); err != nil {
 					return err
 				}
 				return nil
@@ -252,14 +253,14 @@ func (vm *PruneBranchModel) CheckoutInitialState() error {
 	}
 
 	// The branch is deleted. Let's checkout the default branch.
-	defaultBranch, err := vm.repo.DefaultBranch()
+	defaultBranch, err := vm.repo.DefaultBranch(context.Background())
 	if err != nil {
 		return err
 	}
 	defaultBranchRef := plumbing.NewBranchReferenceName(defaultBranch)
 	ref, err := vm.repo.GoGitRepo().Reference(defaultBranchRef, true)
 	if err == nil {
-		if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: ref.Name().Short()}); err != nil {
+		if _, err := vm.repo.CheckoutBranch(context.Background(), &git.CheckoutBranch{Name: ref.Name().Short()}); err != nil {
 			return err
 		}
 		return nil
@@ -275,7 +276,7 @@ func (vm *PruneBranchModel) CheckoutInitialState() error {
 	if rtb != nil {
 		ref, err = vm.repo.GoGitRepo().Reference(*rtb, true)
 		if err == nil {
-			if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: ref.Hash().String()}); err != nil {
+			if _, err := vm.repo.CheckoutBranch(context.Background(), &git.CheckoutBranch{Name: ref.Hash().String()}); err != nil {
 				return err
 			}
 			return nil
@@ -287,7 +288,7 @@ func (vm *PruneBranchModel) CheckoutInitialState() error {
 }
 
 func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
-	remoteBranches, err := vm.repo.LsRemote(vm.repo.GetRemoteName())
+	remoteBranches, err := vm.repo.LsRemote(context.Background(), vm.repo.GetRemoteName())
 	if err != nil {
 		return err
 	}

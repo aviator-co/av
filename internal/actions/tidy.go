@@ -1,20 +1,26 @@
 package actions
 
 import (
+	"context"
+
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 )
 
 // TidyDB removes deleted branches from the metadata and returns number of branches removed from the
 // DB.
-func TidyDB(repo *git.Repo, db meta.DB) (map[string]bool, map[string]bool, error) {
+func TidyDB(
+	ctx context.Context,
+	repo *git.Repo,
+	db meta.DB,
+) (map[string]bool, map[string]bool, error) {
 	tx := db.WriteTx()
 	defer tx.Abort()
 	branches := tx.AllBranches()
 
 	deleted := make(map[string]bool)
 	for name := range branches {
-		if _, err := repo.Git("show-ref", "refs/heads/"+name); err != nil {
+		if _, err := repo.Git(ctx, "show-ref", "refs/heads/"+name); err != nil {
 			// Ref doesn't exist. Should be removed.
 			deleted[name] = true
 		} else {

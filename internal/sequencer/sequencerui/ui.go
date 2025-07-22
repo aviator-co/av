@@ -1,6 +1,7 @@
 package sequencerui
 
 import (
+	"context"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -77,7 +78,7 @@ func (vm *RestackModel) Update(msg tea.Msg) (*RestackModel, tea.Cmd) {
 		if msg.err == nil && msg.result == nil {
 			// Finished the sequence.
 			if vm.State.InitialBranch != "" {
-				if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{Name: vm.State.InitialBranch}); err != nil {
+				if _, err := vm.repo.CheckoutBranch(context.Background(), &git.CheckoutBranch{Name: vm.State.InitialBranch}); err != nil {
 					return vm, func() tea.Msg { return err }
 				}
 			}
@@ -202,11 +203,18 @@ func (vm *RestackModel) View() string {
 }
 
 func (vm *RestackModel) runSeqWithContinuationFlags() tea.Msg {
-	result, err := vm.State.Seq.Run(vm.repo, vm.db, vm.Abort, vm.Continue, vm.Skip)
+	result, err := vm.State.Seq.Run(
+		context.Background(),
+		vm.repo,
+		vm.db,
+		vm.Abort,
+		vm.Continue,
+		vm.Skip,
+	)
 	return &RestackProgress{result: result, err: err}
 }
 
 func (vm *RestackModel) runSeq() tea.Msg {
-	result, err := vm.State.Seq.Run(vm.repo, vm.db, false, false, false)
+	result, err := vm.State.Seq.Run(context.Background(), vm.repo, vm.db, false, false, false)
 	return &RestackProgress{result: result, err: err}
 }

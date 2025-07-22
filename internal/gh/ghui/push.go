@@ -285,6 +285,7 @@ func (vm *GitHubPushModel) runUpdate() (ret tea.Msg) {
 }
 
 func (vm *GitHubPushModel) runGitPush() error {
+	ctx := context.Background()
 	pushArgs := []string{"push", vm.repo.GetRemoteName(), "--atomic"}
 	for _, branch := range vm.pushCandidates {
 		// Do a compare-and-swap to be strict on what we show as a difference.
@@ -303,7 +304,7 @@ func (vm *GitHubPushModel) runGitPush() error {
 			fmt.Sprintf("%s:%s", branch.localCommit.Hash.String(), branch.branch.String()),
 		)
 	}
-	res, err := vm.repo.Run(&git.RunOpts{
+	res, err := vm.repo.Run(ctx, &git.RunOpts{
 		Args: pushArgs,
 	})
 	if err != nil {
@@ -314,13 +315,13 @@ func (vm *GitHubPushModel) runGitPush() error {
 	}
 
 	for _, branch := range vm.pushCandidates {
-		if err := vm.repo.BranchSetConfig(branch.branch.Short(), "av-pushed-remote", vm.repo.GetRemoteName()); err != nil {
+		if err := vm.repo.BranchSetConfig(ctx, branch.branch.Short(), "av-pushed-remote", vm.repo.GetRemoteName()); err != nil {
 			return err
 		}
-		if err := vm.repo.BranchSetConfig(branch.branch.Short(), "av-pushed-ref", branch.branch.String()); err != nil {
+		if err := vm.repo.BranchSetConfig(ctx, branch.branch.Short(), "av-pushed-ref", branch.branch.String()); err != nil {
 			return err
 		}
-		if err := vm.repo.BranchSetConfig(branch.branch.Short(), "av-pushed-commit", branch.localCommit.Hash.String()); err != nil {
+		if err := vm.repo.BranchSetConfig(ctx, branch.branch.Short(), "av-pushed-commit", branch.localCommit.Hash.String()); err != nil {
 			return err
 		}
 	}

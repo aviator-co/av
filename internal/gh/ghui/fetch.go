@@ -174,7 +174,7 @@ func (vm *GitHubFetchModel) View() string {
 
 func (vm *GitHubFetchModel) runGitFetch() tea.Msg {
 	remote := vm.repo.GetRemoteName()
-	if _, err := vm.repo.Git("fetch", remote); err != nil {
+	if _, err := vm.repo.Git(context.Background(), "fetch", remote); err != nil {
 		return errors.Errorf("failed to fetch from %s: %v", remote, err)
 	}
 	return &GitHubFetchProgress{gitFetchIsDone: true}

@@ -32,6 +32,7 @@
 package browser
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -39,7 +40,7 @@ import (
 )
 
 // Open tries to open url in a browser and reports whether it succeeded.
-func Open(url string) error {
+func Open(ctx context.Context, url string) error {
 	var args []string
 	if exe := os.Getenv("BROWSER"); exe != "" {
 		args = []string{exe}
@@ -59,7 +60,7 @@ func Open(url string) error {
 	if args == nil {
 		return errors.New("no open command found")
 	}
-	cmd := exec.Command(args[0], append(args[1:], url)...)
+	cmd := exec.CommandContext(ctx, args[0], append(args[1:], url)...)
 	if err := cmd.Start(); err != nil {
 		return err
 	}

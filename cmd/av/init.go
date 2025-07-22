@@ -15,12 +15,13 @@ var initCmd = &cobra.Command{
 	Short: "Initialize the repository for Aviator CLI",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) (reterr error) {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
 
-		db, _, err := getOrCreateDB(repo)
+		db, _, err := getOrCreateDB(ctx, repo)
 		if err != nil {
 			return err
 		}
@@ -31,12 +32,12 @@ var initCmd = &cobra.Command{
 		})
 		defer cu.Cleanup()
 
-		client, err := getGitHubClient()
+		client, err := getGitHubClient(ctx)
 		if err != nil {
 			return err
 		}
 
-		origin, err := repo.Origin()
+		origin, err := repo.Origin(ctx)
 		if err != nil {
 			return err
 		}

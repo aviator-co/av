@@ -45,13 +45,13 @@ func NewTempRepoWithGitHubServer(t *testing.T, serverURL string) *GitTestRepo {
 		remoteDir = filepath.Join(t.TempDir(), "remote")
 		require.NoError(t, os.MkdirAll(remoteDir, 0o755))
 	}
-	init := exec.Command("git", "init", "--initial-branch=main")
+	init := exec.CommandContext(t.Context(), "git", "init", "--initial-branch=main")
 	init.Dir = dir
 
 	err := init.Run()
 	require.NoError(t, err, "failed to initialize git repository")
 
-	remoteInit := exec.Command("git", "init", "--bare")
+	remoteInit := exec.CommandContext(t.Context(), "git", "init", "--bare")
 	remoteInit.Dir = remoteDir
 
 	err = remoteInit.Run()
@@ -123,7 +123,7 @@ func (r *GitTestRepo) AsAvGitRepo() *avgit.Repo {
 
 func (r *GitTestRepo) Git(t *testing.T, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(t.Context(), "git", args...)
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	cmd.Stdout = stdout

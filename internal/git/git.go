@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -70,8 +71,8 @@ func (r *Repo) AvTmpDir() string {
 	return dir
 }
 
-func (r *Repo) DefaultBranch() (string, error) {
-	ref, err := r.Git("symbolic-ref", "refs/remotes/origin/HEAD")
+func (r *Repo) DefaultBranch(ctx context.Context) (string, error) {
+	ref, err := r.Git(ctx, "symbolic-ref", "refs/remotes/origin/HEAD")
 	if err != nil {
 		logrus.WithError(err).Debug("failed to determine remote HEAD")
 		// this communicates with the remote, so we probably don't want to run
@@ -85,8 +86,8 @@ func (r *Repo) DefaultBranch() (string, error) {
 	return strings.TrimPrefix(ref, "refs/remotes/origin/"), nil
 }
 
-func (r *Repo) IsTrunkBranch(name string) (bool, error) {
-	branches, err := r.TrunkBranches()
+func (r *Repo) IsTrunkBranch(ctx context.Context, name string) (bool, error) {
+	branches, err := r.TrunkBranches(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -98,16 +99,16 @@ func (r *Repo) IsTrunkBranch(name string) (bool, error) {
 	return false, nil
 }
 
-func (r *Repo) IsCurrentBranchTrunk() (bool, error) {
-	currentBranch, err := r.CurrentBranchName()
+func (r *Repo) IsCurrentBranchTrunk(ctx context.Context) (bool, error) {
+	currentBranch, err := r.CurrentBranchName(ctx)
 	if err != nil {
 		return false, err
 	}
-	return r.IsTrunkBranch(currentBranch)
+	return r.IsTrunkBranch(ctx, currentBranch)
 }
 
-func (r *Repo) TrunkBranches() ([]string, error) {
-	defaultBranch, err := r.DefaultBranch()
+func (r *Repo) TrunkBranches(ctx context.Context) ([]string, error) {
+	defaultBranch, err := r.DefaultBranch(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -126,9 +127,9 @@ func (r *Repo) GetRemoteName() string {
 	return DEFAULT_REMOTE_NAME
 }
 
-func (r *Repo) Git(args ...string) (string, error) {
+func (r *Repo) Git(ctx context.Context, args ...string) (string, error) {
 	startTime := time.Now()
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = r.repoDir
 	// Set the IN_AV_CLI environment variable to 1 to let the hooks invoked by git know it's
 	// part of av-cli invocation.
@@ -178,8 +179,8 @@ func (o Output) Lines() []string {
 	return strings.Split(s, "\n")
 }
 
-func (r *Repo) Run(opts *RunOpts) (*Output, error) {
-	cmd := exec.Command("git", opts.Args...)
+func (r *Repo) Run(ctx context.Context, opts *RunOpts) (*Output, error) {
+	cmd := exec.CommandContext(ctx, "git", opts.Args...)
 	cmd.Dir = r.repoDir
 	r.log.Debugf("git %s", opts.Args)
 	var stdout, stderr bytes.Buffer
@@ -222,8 +223,8 @@ func (r *Repo) Run(opts *RunOpts) (*Output, error) {
 // The name is return in "short" format -- i.e., without the "refs/heads/" prefix.
 // IMPORTANT: This function will return an error if the repository is currently
 // in a detached-head state (e.g., during a rebase conflict).
-func (r *Repo) CurrentBranchName() (string, error) {
-	branch, err := r.Git("symbolic-ref", "--short", "HEAD")
+func (r *Repo) CurrentBranchName(ctx context.Context) (string, error) {
+	branch, err := r.Git(ctx, "symbolic-ref", "--short", "HEAD")
 	if err != nil {
 		return "", errors.Wrap(
 			err,
@@ -233,16 +234,16 @@ func (r *Repo) CurrentBranchName() (string, error) {
 	return branch, nil
 }
 
-func (r *Repo) DoesBranchExist(branch string) (bool, error) {
-	return r.DoesRefExist(fmt.Sprintf("refs/heads/%s", branch))
+func (r *Repo) DoesBranchExist(ctx context.Context, branch string) (bool, error) {
+	return r.DoesRefExist(ctx, fmt.Sprintf("refs/heads/%s", branch))
 }
 
-func (r *Repo) DoesRemoteBranchExist(branch string) (bool, error) {
-	return r.DoesRefExist(fmt.Sprintf("refs/remotes/origin/%s", branch))
+func (r *Repo) DoesRemoteBranchExist(ctx context.Context, branch string) (bool, error) {
+	return r.DoesRefExist(ctx, fmt.Sprintf("refs/remotes/origin/%s", branch))
 }
 
-func (r *Repo) DoesRefExist(ref string) (bool, error) {
-	out, err := r.Run(&RunOpts{
+func (r *Repo) DoesRefExist(ctx context.Context, ref string) (bool, error) {
+	out, err := r.Run(ctx, &RunOpts{
 		Args: []string{"show-ref", ref},
 	})
 	if err != nil {
@@ -254,8 +255,8 @@ func (r *Repo) DoesRefExist(ref string) (bool, error) {
 	return false, nil
 }
 
-func (r *Repo) LsRemote(remote string) (map[string]string, error) {
-	out, err := r.Run(&RunOpts{
+func (r *Repo) LsRemote(ctx context.Context, remote string) (map[string]string, error) {
+	out, err := r.Run(ctx, &RunOpts{
 		Args:      []string{"ls-remote", remote},
 		ExitError: true,
 	})
@@ -288,8 +289,8 @@ type CheckoutBranch struct {
 // of the previous branch, if any (this can be used to restore the previous
 // branch if necessary). The returned previous branch name may be empty if the
 // repo is currently not checked out to a branch (i.e., in detached HEAD state).
-func (r *Repo) CheckoutBranch(opts *CheckoutBranch) (string, error) {
-	previousBranchName, err := r.CurrentBranchName()
+func (r *Repo) CheckoutBranch(ctx context.Context, opts *CheckoutBranch) (string, error) {
+	previousBranchName, err := r.CurrentBranchName(ctx)
 	if err != nil {
 		r.log.WithError(err).
 			Debug("failed to get current branch name, repo is probably in detached HEAD")
@@ -304,7 +305,7 @@ func (r *Repo) CheckoutBranch(opts *CheckoutBranch) (string, error) {
 	if opts.NewBranch && opts.NewHeadRef != "" {
 		args = append(args, opts.NewHeadRef)
 	}
-	res, err := r.Run(&RunOpts{
+	res, err := r.Run(ctx, &RunOpts{
 		Args: args,
 	})
 	if err != nil {
@@ -321,8 +322,8 @@ func (r *Repo) CheckoutBranch(opts *CheckoutBranch) (string, error) {
 }
 
 // Detach detaches to the detached HEAD.
-func (r *Repo) Detach() error {
-	res, err := r.Run(&RunOpts{
+func (r *Repo) Detach(ctx context.Context) error {
+	res, err := r.Run(ctx, &RunOpts{
 		Args: []string{"switch", "--detach"},
 	})
 	if err != nil {
@@ -345,19 +346,19 @@ type RevParse struct {
 	SymbolicFullName bool
 }
 
-func (r *Repo) RevParse(rp *RevParse) (string, error) {
+func (r *Repo) RevParse(ctx context.Context, rp *RevParse) (string, error) {
 	args := []string{"rev-parse"}
 	if rp.SymbolicFullName {
 		args = append(args, "--symbolic-full-name")
 	}
 	args = append(args, rp.Rev)
-	return r.Git(args...)
+	return r.Git(ctx, args...)
 }
 
-func (r *Repo) MergeBase(committishes ...string) (string, error) {
+func (r *Repo) MergeBase(ctx context.Context, committishes ...string) (string, error) {
 	args := []string{"merge-base"}
 	args = append(args, committishes...)
-	str, err := r.Git(args...)
+	str, err := r.Git(ctx, args...)
 	if err != nil {
 		return "", err
 	}
@@ -369,8 +370,11 @@ type BranchAndCommit struct {
 	Branch string
 }
 
-func (r *Repo) BranchesContainCommittish(committish string) ([]BranchAndCommit, error) {
-	lines, err := r.Git(
+func (r *Repo) BranchesContainCommittish(
+	ctx context.Context,
+	committish string,
+) ([]BranchAndCommit, error) {
+	lines, err := r.Git(ctx,
 		"for-each-ref",
 		"--contains",
 		committish,
@@ -406,7 +410,7 @@ type UpdateRef struct {
 }
 
 // UpdateRef updates the specified ref within the Git repository.
-func (r *Repo) UpdateRef(update *UpdateRef) error {
+func (r *Repo) UpdateRef(ctx context.Context, update *UpdateRef) error {
 	args := []string{"update-ref", update.Ref, update.New}
 	if update.Old != "" {
 		args = append(args, update.Old)
@@ -414,7 +418,7 @@ func (r *Repo) UpdateRef(update *UpdateRef) error {
 	if update.CreateReflog {
 		args = append(args, "--create-reflog")
 	}
-	_, err := r.Git(args...)
+	_, err := r.Git(ctx, args...)
 	return errors.WrapIff(err, "failed to write ref %q (%s)", update.Ref, ShortSha(update.New))
 }
 
@@ -425,11 +429,11 @@ type Origin struct {
 	RepoSlug string
 }
 
-func (r *Repo) Origin() (*Origin, error) {
+func (r *Repo) Origin(ctx context.Context) (*Origin, error) {
 	// Note: `git remote get-url` gets the "real" URL of the remote (taking
 	// `insteadOf` from git config into account) whereas `git config --get ...`
 	// does *not*. Not sure if it matters here.
-	output, err := r.Run(&RunOpts{
+	output, err := r.Run(ctx, &RunOpts{
 		Args: []string{"remote", "get-url", "origin"},
 	})
 	if err != nil {

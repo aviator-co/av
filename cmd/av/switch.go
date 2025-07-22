@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -29,17 +30,18 @@ var switchCmd = &cobra.Command{
 	Args:              cobra.MaximumNArgs(1),
 	ValidArgsFunction: branchNameArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
 
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
 
-		status, err := repo.Status()
+		status, err := repo.Status(ctx)
 		if err != nil {
 			return err
 		}
@@ -52,7 +54,7 @@ var switchCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if _, err := repo.CheckoutBranch(&git.CheckoutBranch{Name: branch}); err != nil {
+			if _, err := repo.CheckoutBranch(ctx, &git.CheckoutBranch{Name: branch}); err != nil {
 				return err
 			}
 			return nil
@@ -62,7 +64,9 @@ var switchCmd = &cobra.Command{
 		var branchList []*stackTreeBranchInfo
 		branches := map[string]*stackTreeBranchInfo{}
 		for _, node := range rootNodes {
-			branchList = append(branchList, switchBranchList(repo, tx, branches, node)...)
+			branchList = append(
+				branchList,
+				switchBranchList(ctx, repo, tx, branches, node)...)
 		}
 		if len(branchList) == 0 {
 			return errors.New("no branches found")
@@ -95,6 +99,7 @@ func getInitialChosenBranch(branchList []*stackTreeBranchInfo, currentBranch str
 }
 
 func switchBranchList(
+	ctx context.Context,
 	repo *git.Repo,
 	tx meta.ReadTx,
 	branches map[string]*stackTreeBranchInfo,
@@ -102,9 +107,9 @@ func switchBranchList(
 ) []*stackTreeBranchInfo {
 	var ret []*stackTreeBranchInfo
 	for _, child := range node.Children {
-		ret = append(ret, switchBranchList(repo, tx, branches, child)...)
+		ret = append(ret, switchBranchList(ctx, repo, tx, branches, child)...)
 	}
-	stbi := getStackTreeBranchInfo(repo, tx, node.Branch.BranchName)
+	stbi := getStackTreeBranchInfo(ctx, repo, tx, node.Branch.BranchName)
 	branches[node.Branch.BranchName] = stbi
 	if !stbi.Deleted {
 		ret = append(ret, stbi)
@@ -209,7 +214,7 @@ func (vm switchViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (vm switchViewModel) checkoutBranch() tea.Msg {
 	if vm.currentChosenBranch != vm.currentHEADBranch {
-		if _, err := vm.repo.CheckoutBranch(&git.CheckoutBranch{
+		if _, err := vm.repo.CheckoutBranch(context.Background(), &git.CheckoutBranch{
 			Name: vm.currentChosenBranch,
 		}); err != nil {
 			return err

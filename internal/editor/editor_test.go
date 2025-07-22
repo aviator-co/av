@@ -42,7 +42,7 @@ func TestEditor(t *testing.T) {
 			eolcomments: true,
 		},
 	} {
-		res, err := Launch(nil, Config{
+		res, err := Launch(t.Context(), nil, Config{
 			Text:              tt.in,
 			CommentPrefix:     "%%",
 			Command:           tt.command,

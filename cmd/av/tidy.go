@@ -23,17 +23,18 @@ does not delete Git branches.
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
 
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
 
-		deleted, orphaned, err := actions.TidyDB(repo, db)
+		deleted, orphaned, err := actions.TidyDB(ctx, repo, db)
 		if err != nil {
 			return err
 		}

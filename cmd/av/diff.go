@@ -23,16 +23,17 @@ Generates the diff between the working tree and the parent branch
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
 
-		currentBranchName, err := repo.CurrentBranchName()
+		currentBranchName, err := repo.CurrentBranchName(ctx)
 		if err != nil {
 			return err
 		}
@@ -40,7 +41,7 @@ Generates the diff between the working tree and the parent branch
 		tx := db.ReadTx()
 		branch, exists := tx.Branch(currentBranchName)
 		if !exists {
-			defaultBranch, err := repo.DefaultBranch()
+			defaultBranch, err := repo.DefaultBranch(ctx)
 			if err != nil {
 				return err
 			}
@@ -93,7 +94,7 @@ Generates the diff between the working tree and the parent branch
 
 			// Determine if the branch is up-to-date with the parent and warn if
 			// not.
-			currentParentHead, err := repo.RevParse(&git.RevParse{Rev: branch.Parent.Name})
+			currentParentHead, err := repo.RevParse(ctx, &git.RevParse{Rev: branch.Parent.Name})
 			if err != nil {
 				return err
 			}
@@ -104,7 +105,7 @@ Generates the diff between the working tree and the parent branch
 		// We don't use repo.Diff here since that sets the --exit-error flag
 		// which in turn disables the output pager. We want this command to
 		// behave similarly to default `git diff` for the user.
-		_, err = repo.Run(&git.RunOpts{
+		_, err = repo.Run(ctx, &git.RunOpts{
 			Args:        diffArgs,
 			Interactive: true,
 		})
