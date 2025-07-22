@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -21,11 +20,13 @@ var fetchCmd = &cobra.Command{
 	Short: "Fetch latest repository state from GitHub",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) (reterr error) {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
@@ -41,12 +42,11 @@ var fetchCmd = &cobra.Command{
 		info := tx.Repository()
 		branches := tx.AllBranches()
 
-		client, err := getGitHubClient()
+		client, err := getGitHubClient(ctx)
 		if err != nil {
 			return err
 		}
 
-		ctx := context.Background()
 		var cursor string
 		updatedCount := 0
 		for {

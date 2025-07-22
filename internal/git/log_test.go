@@ -24,7 +24,7 @@ func TestRepo_Log(t *testing.T) {
 	)
 
 	cis, err := repo.AsAvGitRepo().
-		Log(git.LogOpts{RevisionRange: []string{c2.String(), "^" + c1.String() + "^1"}})
+		Log(t.Context(), git.LogOpts{RevisionRange: []string{c2.String(), "^" + c1.String() + "^1"}})
 	assert.NoError(t, err)
 	assert.Equal(t, []*git.CommitInfo{
 		{

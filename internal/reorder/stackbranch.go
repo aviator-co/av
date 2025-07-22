@@ -1,6 +1,7 @@
 package reorder
 
 import (
+	"context"
 	"strings"
 
 	"github.com/aviator-co/av/internal/utils/colors"
@@ -59,7 +60,7 @@ func (b StackBranchCmd) Execute(ctx *Context) error {
 		var err error
 
 		// We always start child branches at the HEAD of their parents.
-		headCommit, err = ctx.Repo.RevParse(&git.RevParse{Rev: b.Parent})
+		headCommit, err = ctx.Repo.RevParse(context.Background(), &git.RevParse{Rev: b.Parent})
 		if err != nil {
 			return err
 		}
@@ -71,10 +72,10 @@ func (b StackBranchCmd) Execute(ctx *Context) error {
 	if headCommit == "" {
 		headCommit = branch.Parent.Name
 	}
-	if _, err := ctx.Repo.Git("switch", "--force-create", b.Name); err != nil {
+	if _, err := ctx.Repo.Git(context.Background(), "switch", "--force-create", b.Name); err != nil {
 		return err
 	}
-	if _, err := ctx.Repo.Git("reset", "--hard", headCommit); err != nil {
+	if _, err := ctx.Repo.Git(context.Background(), "reset", "--hard", headCommit); err != nil {
 		return err
 	}
 	ctx.Print(

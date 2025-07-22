@@ -3,6 +3,7 @@ package git
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -30,14 +31,14 @@ type GetRefsItem struct {
 
 // GetRefs reads the contents of the specified objects from the repository.
 // This corresponds to the `git cat-file --batch` command.
-func (r *Repo) GetRefs(opts *GetRefs) ([]*GetRefsItem, error) {
+func (r *Repo) GetRefs(ctx context.Context, opts *GetRefs) ([]*GetRefsItem, error) {
 	input := new(bytes.Buffer)
 	for _, item := range opts.Revisions {
 		input.WriteString(item)
 		input.WriteString("\n")
 	}
 
-	res, err := r.Run(&RunOpts{
+	res, err := r.Run(ctx, &RunOpts{
 		Args:      []string{"cat-file", "--batch"},
 		Stdin:     input,
 		ExitError: true,

@@ -59,6 +59,7 @@ Examples:
 `),
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) (reterr error) {
+		ctx := cmd.Context()
 		if prFlags.Queue {
 			if prFlags.Draft ||
 				prFlags.Force ||
@@ -70,7 +71,7 @@ Examples:
 
 				return errors.New("cannot use other flags with --queue")
 			}
-			return queue()
+			return queue(ctx)
 		}
 
 		if prFlags.All {
@@ -85,28 +86,28 @@ Examples:
 				return errors.New("can only use --current and --draft with --all")
 			}
 
-			return submitAll(prFlags.Current, prFlags.Draft)
+			return submitAll(ctx, prFlags.Current, prFlags.Draft)
 		}
 
-		repo, err := getRepo()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
-		branchName, err := repo.CurrentBranchName()
+		branchName, err := repo.CurrentBranchName(ctx)
 		if err != nil {
 			return errors.WrapIf(err, "failed to determine current branch")
 		}
 
-		if err := runPRHook(repo, "single"); err != nil {
+		if err := runPRHook(ctx, repo, "single"); err != nil {
 			return err
 		}
 
-		client, err := getGitHubClient()
+		client, err := getGitHubClient(ctx)
 		if err != nil {
 			return err
 		}
 
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
@@ -128,7 +129,6 @@ Examples:
 			draft = prFlags.Draft
 		}
 
-		ctx := context.Background()
 		res, err := actions.CreatePullRequest(
 			ctx, repo, client, tx,
 			actions.CreatePullRequestOpts{
@@ -169,13 +169,13 @@ Examples:
 	},
 }
 
-func submitAll(current bool, draft bool) error {
-	repo, err := getRepo()
+func submitAll(ctx context.Context, current bool, draft bool) error {
+	repo, err := getRepo(ctx)
 	if err != nil {
 		return err
 	}
 
-	db, err := getDB(repo)
+	db, err := getDB(ctx, repo)
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func submitAll(current bool, draft bool) error {
 	cu := cleanup.New(func() { tx.Abort() })
 	defer cu.Cleanup()
 
-	currentBranch, err := repo.CurrentBranchName()
+	currentBranch, err := repo.CurrentBranchName(ctx)
 	if err != nil {
 		return err
 	}
@@ -210,14 +210,13 @@ func submitAll(current bool, draft bool) error {
 		branchesToSubmit = append(branchesToSubmit, subsequentBranches...)
 	}
 
-	if err := runPRHook(repo, "all"); err != nil {
+	if err := runPRHook(ctx, repo, "all"); err != nil {
 		return err
 	}
 
 	// ensure pull requests for each branch in the stack
 	createdPullRequestPermalinks := []string{}
-	ctx := context.Background()
-	client, err := getGitHubClient()
+	client, err := getGitHubClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -270,26 +269,26 @@ func submitAll(current bool, draft bool) error {
 
 	if config.Av.PullRequest.OpenBrowser {
 		for _, createdPullRequestPermalink := range createdPullRequestPermalinks {
-			actions.OpenPullRequestInBrowser(createdPullRequestPermalink)
+			actions.OpenPullRequestInBrowser(ctx, createdPullRequestPermalink)
 		}
 	}
 
 	return nil
 }
 
-func queue() error {
-	repo, err := getRepo()
+func queue(ctx context.Context) error {
+	repo, err := getRepo(ctx)
 	if err != nil {
 		return err
 	}
 
-	db, err := getDB(repo)
+	db, err := getDB(ctx, repo)
 	if err != nil {
 		return err
 	}
 
 	tx := db.ReadTx()
-	currentBranchName, err := repo.CurrentBranchName()
+	currentBranchName, err := repo.CurrentBranchName(ctx)
 	if err != nil {
 		return err
 	}
@@ -301,7 +300,7 @@ func queue() error {
 		)
 	}
 
-	if err := runPRHook(repo, "queue"); err != nil {
+	if err := runPRHook(ctx, repo, "queue"); err != nil {
 		return err
 	}
 
@@ -316,7 +315,7 @@ func queue() error {
 	}
 
 	// I have a feeling this would be better written inside of av/internals
-	client, err := avgql.NewClient()
+	client, err := avgql.NewClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -333,7 +332,7 @@ func queue() error {
 		} `graphql:"queuePullRequest(input: {repoOwner: $repoOwner, repoName:$repoName, number:$prNumber})"`
 	}
 
-	err = client.Mutate(context.Background(), &mutation, variables)
+	err = client.Mutate(ctx, &mutation, variables)
 	if err != nil {
 		logrus.WithError(err).Debug("failed to queue pull request")
 		return fmt.Errorf("failed to queue pull request: %s", err)
@@ -346,8 +345,8 @@ func queue() error {
 	return nil
 }
 
-func runPRHook(repo *git.Repo, hookType string) error {
-	output, err := repo.Run(&git.RunOpts{
+func runPRHook(ctx context.Context, repo *git.Repo, hookType string) error {
+	output, err := repo.Run(ctx, &git.RunOpts{
 		Args:        []string{"hook", "run", "--ignore-missing", "pre-av-pr"},
 		Env:         []string{"AV_PR_HOOK_TYPE=" + hookType},
 		Interactive: true,

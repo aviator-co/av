@@ -1,6 +1,8 @@
 package git
 
 import (
+	"context"
+
 	"emperror.dev/errors"
 )
 
@@ -28,7 +30,7 @@ type Diff struct {
 	Contents string
 }
 
-func (r *Repo) Diff(d *DiffOpts) (*Diff, error) {
+func (r *Repo) Diff(ctx context.Context, d *DiffOpts) (*Diff, error) {
 	args := []string{"diff", "--exit-code"}
 	if d.Quiet {
 		args = append(args, "--quiet")
@@ -47,7 +49,7 @@ func (r *Repo) Diff(d *DiffOpts) (*Diff, error) {
 	args = append(args, "--")
 	args = append(args, d.Paths...)
 
-	output, err := r.Run(&RunOpts{
+	output, err := r.Run(ctx, &RunOpts{
 		Args: args,
 	})
 	if err != nil {

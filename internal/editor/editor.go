@@ -3,6 +3,7 @@ package editor
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"strings"
@@ -39,10 +40,10 @@ const CommandNoOp = ":"
 // The text is returned after the editor is closed. If an error occurs, the
 // (possibly edited) text is returned in addition to the error. If the file
 // could not be read, an empty string is returned.
-func Launch(repo *git.Repo, config Config) (string, error) {
+func Launch(ctx context.Context, repo *git.Repo, config Config) (string, error) {
 	switch {
 	case config.Command == "":
-		config.Command = DefaultCommand(repo)
+		config.Command = DefaultCommand(ctx, repo)
 	case config.TmpFilePattern == "":
 		config.TmpFilePattern = "av-message-*"
 	}
@@ -77,7 +78,7 @@ func Launch(repo *git.Repo, config Config) (string, error) {
 		return "", errors.Wrapf(err, "invalid editor command: %q", config.Command)
 	}
 	args = append(args, tmp.Name())
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	stderr := bytes.NewBuffer(nil)
@@ -94,8 +95,8 @@ func Launch(repo *git.Repo, config Config) (string, error) {
 	return parseResult(tmp.Name(), config)
 }
 
-func DefaultCommand(repo *git.Repo) string {
-	editor, err := repo.Git("var", "GIT_EDITOR")
+func DefaultCommand(ctx context.Context, repo *git.Repo) string {
+	editor, err := repo.Git(ctx, "var", "GIT_EDITOR")
 	if err != nil {
 		logrus.WithError(err).Warn("failed to determine desired editor from git config")
 		// This is the default hard-coded into git

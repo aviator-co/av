@@ -15,19 +15,20 @@ var orphanCmd = &cobra.Command{
 	Short: "Orphan branches that are managed by av",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		repo, err := getRepo()
+		ctx := cmd.Context()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
 
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
 		tx := db.WriteTx()
 		defer tx.Abort()
 
-		currentBranch, err := repo.CurrentBranchName()
+		currentBranch, err := repo.CurrentBranchName(ctx)
 		if err != nil {
 			return errors.WrapIf(err, "failed to determine current branch")
 		}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"strings"
 
@@ -59,6 +60,7 @@ base branch.
 `),
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
+		ctx := cmd.Context()
 		if !sliceutils.Contains(
 			[]string{"ask", "yes", "no"},
 			strings.ToLower(syncFlags.Push),
@@ -80,15 +82,15 @@ base branch.
 		if cmd.Flags().Changed("parent") {
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
-		repo, err := getRepo()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
-		client, err := getGitHubClient()
+		client, err := getGitHubClient(ctx)
 		if err != nil {
 			return err
 		}
@@ -326,7 +328,7 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 		return func() tea.Msg { return errors.New("no restack in progress") }
 	}
 
-	isTrunkBranch, err := vm.repo.IsCurrentBranchTrunk()
+	isTrunkBranch, err := vm.repo.IsCurrentBranchTrunk(context.Background())
 	if err != nil {
 		return func() tea.Msg { return err }
 	}
@@ -336,11 +338,14 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 		}
 	}
 	return func() tea.Msg {
-		output, err := vm.repo.Run(&git.RunOpts{
-			Args:        []string{"hook", "run", "--ignore-missing", "pre-av-sync"},
-			Interactive: true,
-			ExitError:   true,
-		})
+		output, err := vm.repo.Run(
+			context.Background(),
+			&git.RunOpts{
+				Args:        []string{"hook", "run", "--ignore-missing", "pre-av-sync"},
+				Interactive: true,
+				ExitError:   true,
+			},
+		)
 		var messages []string
 		if output != nil {
 			if len(output.Stdout) != 0 {
@@ -404,7 +409,8 @@ func (vm *syncViewModel) writeState(seqModel *sequencerui.RestackState) error {
 }
 
 func (vm *syncViewModel) createGitHubFetchModel() (*ghui.GitHubFetchModel, error) {
-	status, err := vm.repo.Status()
+	ctx := context.Background()
+	status, err := vm.repo.Status(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -414,6 +420,7 @@ func (vm *syncViewModel) createGitHubFetchModel() (*ghui.GitHubFetchModel, error
 	if syncFlags.All {
 		var err error
 		targetBranches, err = planner.GetTargetBranches(
+			ctx,
 			vm.db.ReadTx(),
 			vm.repo,
 			true,
@@ -428,9 +435,9 @@ func (vm *syncViewModel) createGitHubFetchModel() (*ghui.GitHubFetchModel, error
 		}
 		var err error
 		if syncFlags.Current {
-			targetBranches, err = planner.GetTargetBranches(vm.db.ReadTx(), vm.repo, true, planner.CurrentAndParents)
+			targetBranches, err = planner.GetTargetBranches(ctx, vm.db.ReadTx(), vm.repo, true, planner.CurrentAndParents)
 		} else {
-			targetBranches, err = planner.GetTargetBranches(vm.db.ReadTx(), vm.repo, true, planner.CurrentStack)
+			targetBranches, err = planner.GetTargetBranches(ctx, vm.db.ReadTx(), vm.repo, true, planner.CurrentStack)
 		}
 		if err != nil {
 			return nil, err
@@ -452,6 +459,7 @@ func (vm *syncViewModel) createGitHubFetchModel() (*ghui.GitHubFetchModel, error
 }
 
 func (vm *syncViewModel) createState() (*savedSyncState, error) {
+	ctx := context.Background()
 	state := savedSyncState{
 		RestackState: &sequencerui.RestackState{},
 		SyncState: &syncState{
@@ -459,7 +467,7 @@ func (vm *syncViewModel) createState() (*savedSyncState, error) {
 			Prune: syncFlags.Prune,
 		},
 	}
-	status, err := vm.repo.Status()
+	status, err := vm.repo.Status(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -470,6 +478,7 @@ func (vm *syncViewModel) createState() (*savedSyncState, error) {
 	if syncFlags.All {
 		var err error
 		targetBranches, err = planner.GetTargetBranches(
+			ctx,
 			vm.db.ReadTx(),
 			vm.repo,
 			true,
@@ -485,9 +494,9 @@ func (vm *syncViewModel) createState() (*savedSyncState, error) {
 		}
 		var err error
 		if syncFlags.Current {
-			targetBranches, err = planner.GetTargetBranches(vm.db.ReadTx(), vm.repo, true, planner.CurrentAndParents)
+			targetBranches, err = planner.GetTargetBranches(ctx, vm.db.ReadTx(), vm.repo, true, planner.CurrentAndParents)
 		} else {
-			targetBranches, err = planner.GetTargetBranches(vm.db.ReadTx(), vm.repo, true, planner.CurrentStack)
+			targetBranches, err = planner.GetTargetBranches(ctx, vm.db.ReadTx(), vm.repo, true, planner.CurrentStack)
 		}
 		if err != nil {
 			return nil, err
@@ -501,6 +510,7 @@ func (vm *syncViewModel) createState() (*savedSyncState, error) {
 		currentBranchRef = plumbing.NewBranchReferenceName(currentBranch)
 	}
 	ops, err := planner.PlanForSync(
+		ctx,
 		vm.db.ReadTx(),
 		vm.repo,
 		currentBranchRef,

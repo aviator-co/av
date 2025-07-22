@@ -1,5 +1,7 @@
 package git
 
+import "context"
+
 type RevListOpts struct {
 	// A list of commit roots, or exclusions if the commit sha starts with a
 	// caret (^). As a special case, "foo..bar" is equivalent to "foo ^bar"
@@ -15,7 +17,7 @@ type RevListOpts struct {
 
 // RevList list commits that are reachable from the given commits (excluding
 // commits reachable from the given exclusions).
-func (r *Repo) RevList(opts RevListOpts) ([]string, error) {
+func (r *Repo) RevList(ctx context.Context, opts RevListOpts) ([]string, error) {
 	args := []string{"rev-list"}
 	if opts.Reverse {
 		args = append(args, "--reverse")
@@ -23,7 +25,7 @@ func (r *Repo) RevList(opts RevListOpts) ([]string, error) {
 	args = append(args, opts.Specifiers...)
 	// Unambiguous the positional arguments
 	args = append(args, "--")
-	res, err := r.Run(&RunOpts{
+	res, err := r.Run(ctx, &RunOpts{
 		Args:      args,
 		Env:       nil,
 		ExitError: true,

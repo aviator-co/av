@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"strings"
 
 	"emperror.dev/errors"
@@ -22,7 +23,7 @@ type RefInfo struct {
 
 // ListRefs lists all refs in the repository (optionally matching a specific
 // pattern).
-func (r *Repo) ListRefs(showRef *ListRefs) ([]RefInfo, error) {
+func (r *Repo) ListRefs(ctx context.Context, showRef *ListRefs) ([]RefInfo, error) {
 	// We want a subset of information about each ref, so we can tell Git to
 	// print only specific fields. %00 is a null byte, which is the delimiter
 	// that we split on while parsing the output.
@@ -35,7 +36,7 @@ func (r *Repo) ListRefs(showRef *ListRefs) ([]RefInfo, error) {
 	if len(showRef.Patterns) > 0 {
 		args = append(args, showRef.Patterns...)
 	}
-	out, err := r.Git(args...)
+	out, err := r.Git(ctx, args...)
 	if err != nil {
 		return nil, err
 	}

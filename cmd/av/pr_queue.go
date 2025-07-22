@@ -12,6 +12,6 @@ var prQueueCmd = &cobra.Command{
 	Args:         cobra.NoArgs,
 	// error or reterr from emperror.dev/errors here?
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		return queue()
+		return queue(cmd.Context())
 	},
 }

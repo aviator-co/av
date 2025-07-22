@@ -26,10 +26,13 @@ var stackBranchCommitCmd = &cobra.Command{
 	SilenceUsage: true,
 	Args:         cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) (reterr error) {
-		return branchAndCommit(stackBranchCommitFlags.BranchName,
+		return branchAndCommit(
+			cmd.Context(),
+			stackBranchCommitFlags.BranchName,
 			stackBranchCommitFlags.Message,
 			stackBranchCommitFlags.All,
 			stackBranchCommitFlags.AllModified,
-			"")
+			"",
+		)
 	},
 }

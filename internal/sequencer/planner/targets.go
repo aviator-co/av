@@ -1,6 +1,8 @@
 package planner
 
 import (
+	"context"
+
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -24,6 +26,7 @@ const (
 // If `includeStackRoots` is true, the stack root branches (the immediate children of the trunk
 // branches) are included in the result.
 func GetTargetBranches(
+	ctx context.Context,
 	tx meta.ReadTx,
 	repo *git.Repo,
 	includeStackRoots bool,
@@ -45,7 +48,7 @@ func GetTargetBranches(
 		return ret, nil
 	}
 	if mode == CurrentAndParents {
-		curr, err := repo.CurrentBranchName()
+		curr, err := repo.CurrentBranchName(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +69,7 @@ func GetTargetBranches(
 		return ret, nil
 	}
 	if mode == CurrentAndChildren {
-		curr, err := repo.CurrentBranchName()
+		curr, err := repo.CurrentBranchName(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +83,7 @@ func GetTargetBranches(
 		}
 		return ret, nil
 	}
-	curr, err := repo.CurrentBranchName()
+	curr, err := repo.CurrentBranchName(ctx)
 	if err != nil {
 		return nil, err
 	}

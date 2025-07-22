@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"regexp"
 	"strings"
 
@@ -27,12 +28,12 @@ type RebaseOpts struct {
 	Branch string
 }
 
-func (r *Repo) Rebase(opts RebaseOpts) (*Output, error) {
+func (r *Repo) Rebase(ctx context.Context, opts RebaseOpts) (*Output, error) {
 	// TODO: probably move the parseRebaseOutput logic in sync to here
 
 	args := []string{"rebase"}
 	if opts.Continue {
-		return r.Run(&RunOpts{
+		return r.Run(ctx, &RunOpts{
 			Args: []string{"rebase", "--continue"},
 			// `git rebase --continue` will open an editor to allow the user
 			// to edit the commit message, which we don't want here. Instead, we
@@ -41,11 +42,11 @@ func (r *Repo) Rebase(opts RebaseOpts) (*Output, error) {
 			Env: []string{"GIT_EDITOR=true"},
 		})
 	} else if opts.Abort {
-		return r.Run(&RunOpts{
+		return r.Run(ctx, &RunOpts{
 			Args: []string{"rebase", "--abort"},
 		})
 	} else if opts.Skip {
-		return r.Run(&RunOpts{
+		return r.Run(ctx, &RunOpts{
 			Args: []string{"rebase", "--skip"},
 		})
 	}
@@ -57,12 +58,12 @@ func (r *Repo) Rebase(opts RebaseOpts) (*Output, error) {
 		args = append(args, opts.Branch)
 	}
 
-	return r.Run(&RunOpts{Args: args})
+	return r.Run(ctx, &RunOpts{Args: args})
 }
 
 // RebaseParse runs a `git rebase` and parses the output into a RebaseResult.
-func (r *Repo) RebaseParse(opts RebaseOpts) (*RebaseResult, error) {
-	out, err := r.Rebase(opts)
+func (r *Repo) RebaseParse(ctx context.Context, opts RebaseOpts) (*RebaseResult, error) {
+	out, err := r.Rebase(ctx, opts)
 	if err != nil {
 		return nil, err
 	}

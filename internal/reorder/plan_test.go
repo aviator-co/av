@@ -45,7 +45,7 @@ func TestCreatePlan(t *testing.T) {
 	})
 	require.NoError(t, tx.Commit())
 
-	plan, err := CreatePlan(repo.AsAvGitRepo(), db.ReadTx(), "one")
+	plan, err := CreatePlan(t.Context(), repo.AsAvGitRepo(), db.ReadTx(), "one")
 	require.NoError(t, err)
 	for _, cmd := range plan {
 		t.Log(cmd.String())

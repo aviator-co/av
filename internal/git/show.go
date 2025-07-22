@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"context"
 	"strings"
 
 	"emperror.dev/errors"
@@ -27,10 +28,10 @@ func (c CommitInfo) BodyWithPrefix(prefix string) []string {
 	return lines
 }
 
-func (r *Repo) CommitInfo(opts CommitInfoOpts) (*CommitInfo, error) {
+func (r *Repo) CommitInfo(ctx context.Context, opts CommitInfoOpts) (*CommitInfo, error) {
 	// Need --quiet to suppress the diff that would otherwise be printed at the
 	// end
-	res, err := r.Run(&RunOpts{
+	res, err := r.Run(ctx, &RunOpts{
 		Args:      []string{"show", "--quiet", "--format=%H%n%s%n%b", opts.Rev},
 		ExitError: true,
 	})

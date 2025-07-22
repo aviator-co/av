@@ -205,13 +205,13 @@ func CreatePullRequest(
 			"  - pushing to ", color.CyanString("%s/%s", remote, opts.BranchName),
 			"\n",
 		)
-		if _, err := repo.Git(pushFlags...); err != nil {
+		if _, err := repo.Git(ctx, pushFlags...); err != nil {
 			return nil, errors.WrapIf(err, "failed to push")
 		}
-		if err := repo.BranchSetConfig(opts.BranchName, "av-pushed-remote", remote); err != nil {
+		if err := repo.BranchSetConfig(ctx, opts.BranchName, "av-pushed-remote", remote); err != nil {
 			return nil, err
 		}
-		if err := repo.BranchSetConfig(opts.BranchName, "av-pushed-ref", fmt.Sprintf("refs/heads/%s", opts.BranchName)); err != nil {
+		if err := repo.BranchSetConfig(ctx, opts.BranchName, "av-pushed-ref", fmt.Sprintf("refs/heads/%s", opts.BranchName)); err != nil {
 			return nil, err
 		}
 	} else {
@@ -224,7 +224,7 @@ func CreatePullRequest(
 	// figure this out based on whether or not we're on a stacked branch
 	parentState := branchMeta.Parent
 	if parentState.Name == "" {
-		defaultBranch, err := repo.DefaultBranch()
+		defaultBranch, err := repo.DefaultBranch(ctx)
 		if err != nil {
 			return nil, errors.WrapIf(err, "failed to determine default branch")
 		}
@@ -258,6 +258,7 @@ func CreatePullRequest(
 	}
 
 	commitsList, err := repo.Git(
+		ctx,
 		"rev-list",
 		"--reverse",
 		fmt.Sprintf("%s..%s", prCompareRef, opts.BranchName),
@@ -292,7 +293,7 @@ func CreatePullRequest(
 	if opts.Edit || opts.Body == "" || opts.Title == "" {
 		var commits []git.CommitInfo
 		for _, commitHash := range strings.Split(commitsList, "\n") {
-			commit, err := repo.CommitInfo(git.CommitInfoOpts{Rev: commitHash})
+			commit, err := repo.CommitInfo(ctx, git.CommitInfoOpts{Rev: commitHash})
 			if err != nil {
 				return nil, errors.WrapIff(err, "failed to get commit info for %q", commitHash)
 			}
@@ -341,7 +342,7 @@ func CreatePullRequest(
 			Commits: commits,
 		})
 
-		res, err := editor.Launch(repo, editor.Config{
+		res, err := editor.Launch(ctx, repo, editor.Config{
 			Text:           editorText,
 			TmpFilePattern: "pr-*.av.md",
 			CommentPrefix:  "%%",
@@ -418,15 +419,15 @@ func CreatePullRequest(
 	)
 
 	if didCreatePR && !opts.NoOpenBrowser && config.Av.PullRequest.OpenBrowser {
-		OpenPullRequestInBrowser(pull.Permalink)
+		OpenPullRequestInBrowser(ctx, pull.Permalink)
 	}
 
 	tx.SetBranch(branchMeta)
 	return &CreatePullRequestResult{didCreatePR, branchMeta, pull}, nil
 }
 
-func OpenPullRequestInBrowser(pullRequestLink string) {
-	if err := browser.Open(pullRequestLink); err != nil {
+func OpenPullRequestInBrowser(ctx context.Context, pullRequestLink string) {
+	if err := browser.Open(ctx, pullRequestLink); err != nil {
 		_, _ = fmt.Fprint(os.Stderr,
 			"  - couldn't open browser ",
 			colors.UserInput(err),

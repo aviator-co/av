@@ -1,6 +1,8 @@
 package planner
 
 import (
+	"context"
+
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
@@ -9,6 +11,7 @@ import (
 )
 
 func PlanForRestack(
+	ctx context.Context,
 	tx meta.ReadTx,
 	repo *git.Repo,
 	currentBranch plumbing.ReferenceName,
@@ -17,11 +20,11 @@ func PlanForRestack(
 	var targetBranches []plumbing.ReferenceName
 	var err error
 	if restackAll {
-		targetBranches, err = GetTargetBranches(tx, repo, false, AllBranches)
+		targetBranches, err = GetTargetBranches(ctx, tx, repo, false, AllBranches)
 	} else if restackCurrent {
-		targetBranches, err = GetTargetBranches(tx, repo, false, CurrentAndParents)
+		targetBranches, err = GetTargetBranches(ctx, tx, repo, false, CurrentAndParents)
 	} else {
-		targetBranches, err = GetTargetBranches(tx, repo, false, CurrentStack)
+		targetBranches, err = GetTargetBranches(ctx, tx, repo, false, CurrentStack)
 	}
 	if err != nil {
 		return nil, err
@@ -48,6 +51,7 @@ func PlanForRestack(
 }
 
 func PlanForSync(
+	ctx context.Context,
 	tx meta.ReadTx,
 	repo *git.Repo,
 	currentBranch plumbing.ReferenceName,
@@ -56,11 +60,11 @@ func PlanForSync(
 	var targetBranches []plumbing.ReferenceName
 	var err error
 	if restackAll {
-		targetBranches, err = GetTargetBranches(tx, repo, true, AllBranches)
+		targetBranches, err = GetTargetBranches(ctx, tx, repo, true, AllBranches)
 	} else if restackCurrent {
-		targetBranches, err = GetTargetBranches(tx, repo, true, CurrentAndParents)
+		targetBranches, err = GetTargetBranches(ctx, tx, repo, true, CurrentAndParents)
 	} else {
-		targetBranches, err = GetTargetBranches(tx, repo, true, CurrentStack)
+		targetBranches, err = GetTargetBranches(ctx, tx, repo, true, CurrentStack)
 	}
 	if err != nil {
 		return nil, err
@@ -103,6 +107,7 @@ func PlanForSync(
 }
 
 func PlanForReparent(
+	ctx context.Context,
 	tx meta.ReadTx,
 	repo *git.Repo,
 	currentBranch, newParentBranch plumbing.ReferenceName,
@@ -116,7 +121,7 @@ func PlanForReparent(
 			return nil, errors.New("cannot re-parent to a child branch")
 		}
 	}
-	isParentTrunk, err := repo.IsTrunkBranch(newParentBranch.Short())
+	isParentTrunk, err := repo.IsTrunkBranch(ctx, newParentBranch.Short())
 	if err != nil {
 		return nil, err
 	}

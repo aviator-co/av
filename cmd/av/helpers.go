@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,9 +19,10 @@ import (
 
 var cachedRepo *git.Repo
 
-func getRepo() (*git.Repo, error) {
+func getRepo(ctx context.Context) (*git.Repo, error) {
 	if cachedRepo == nil {
-		cmd := exec.Command(
+		cmd := exec.CommandContext(
+			ctx,
 			"git",
 			"rev-parse",
 			"--path-format=absolute",
@@ -56,8 +58,8 @@ var ErrRepoNotInitialized = errors.Sentinel(
 	"this repository is not initialized; please run `av init`",
 )
 
-func getDB(repo *git.Repo) (meta.DB, error) {
-	db, exists, err := getOrCreateDB(repo)
+func getDB(ctx context.Context, repo *git.Repo) (meta.DB, error) {
+	db, exists, err := getOrCreateDB(ctx, repo)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +69,7 @@ func getDB(repo *git.Repo) (meta.DB, error) {
 	return db, nil
 }
 
-func getOrCreateDB(repo *git.Repo) (meta.DB, bool, error) {
+func getOrCreateDB(ctx context.Context, repo *git.Repo) (meta.DB, bool, error) {
 	dbPath := filepath.Join(repo.AvDir(), "av.db")
 	oldDBPathPath := filepath.Join(repo.AvDir(), "repo-metadata.json")
 	dbPathStat, _ := os.Stat(dbPath)
@@ -79,7 +81,7 @@ func getOrCreateDB(repo *git.Repo) (meta.DB, bool, error) {
 		if err != nil {
 			return nil, false, err
 		}
-		if err := refmeta.Import(repo, db); err != nil {
+		if err := refmeta.Import(ctx, repo, db); err != nil {
 			return nil, false, errors.WrapIff(err, "failed to import ref metadata into av database")
 		}
 		return db, exists, nil
@@ -87,17 +89,17 @@ func getOrCreateDB(repo *git.Repo) (meta.DB, bool, error) {
 	return jsonfiledb.OpenPath(dbPath)
 }
 
-func allBranches() ([]string, error) {
-	repo, err := getRepo()
+func allBranches(ctx context.Context) ([]string, error) {
+	repo, err := getRepo(ctx)
 	if err != nil {
 		return nil, err
 	}
-	db, err := getDB(repo)
+	db, err := getDB(ctx, repo)
 	if err != nil {
 		return nil, err
 	}
 
-	defaultBranch, err := repo.DefaultBranch()
+	defaultBranch, err := repo.DefaultBranch(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -156,10 +158,10 @@ func deprecateCommand(
 }
 
 func branchNameArgs(
-	_ *cobra.Command,
+	cmd *cobra.Command,
 	_ []string,
 	toComplete string,
 ) ([]string, cobra.ShellCompDirective) {
-	branches, _ := allBranches()
+	branches, _ := allBranches(cmd.Context())
 	return branches, cobra.ShellCompDirectiveNoSpace
 }

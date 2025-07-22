@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -44,18 +45,19 @@ with this command (not with git branch -m ...) because av needs to update
 internal tracking metadata that defines the order of branches within a stack.`),
 	Args: cobra.RangeArgs(0, 2),
 	RunE: func(cmd *cobra.Command, args []string) (reterr error) {
+		ctx := cmd.Context()
 		if len(args) == 0 && !branchFlags.Split {
 			// The only time we don't want to suppress the usage message is when
 			// a user runs `av branch` with no arguments.
 			return cmd.Usage()
 		}
 
-		repo, err := getRepo()
+		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
 		}
 
-		db, err := getDB(repo)
+		db, err := getDB(ctx, repo)
 		if err != nil {
 			return err
 		}
@@ -67,10 +69,10 @@ internal tracking metadata that defines the order of branches within a stack.`),
 		}
 
 		if branchFlags.Rename {
-			return branchMove(repo, db, branchName, branchFlags.Force)
+			return branchMove(ctx, repo, db, branchName, branchFlags.Force)
 		}
 		if branchFlags.Split {
-			status, err := repo.Status()
+			status, err := repo.Status(ctx)
 			if err != nil {
 				return errors.Errorf("cannot get the status of the repository: %v", err)
 			}
@@ -84,7 +86,7 @@ internal tracking metadata that defines the order of branches within a stack.`),
 				return errors.New("the repository has no commits")
 			}
 
-			err = branchSplit(repo, db, currentBranchName, branchName)
+			err = branchSplit(ctx, repo, db, currentBranchName, branchName)
 			if err != nil {
 				return errors.Errorf("split failed: %v", err)
 			}
@@ -95,7 +97,7 @@ internal tracking metadata that defines the order of branches within a stack.`),
 			branchFlags.Parent = args[1]
 		}
 
-		return createBranch(repo, db, branchName, branchFlags.Parent)
+		return createBranch(ctx, repo, db, branchName, branchFlags.Parent)
 	},
 }
 
@@ -133,8 +135,14 @@ func isAtTipOfStack(stackNext stackNextModel) (bool, error) {
 	}
 }
 
-func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranchName string) error {
-	stackNext, err := newNextModel(false, 1)
+func branchSplit(
+	ctx context.Context,
+	repo *git.Repo,
+	db meta.DB,
+	currentBranchName string,
+	newBranchName string,
+) error {
+	stackNext, err := newNextModel(ctx, false, 1)
 	if err != nil {
 		return fmt.Errorf("failed to initialize stack model: %w", err)
 	}
@@ -206,7 +214,7 @@ func branchSplit(repo *git.Repo, db meta.DB, currentBranchName string, newBranch
 	)
 
 	// Adopt new branch to av database
-	err = adoptForceAdoption(repo, db, newBranchName, currentBranchName)
+	err = adoptForceAdoption(ctx, repo, db, newBranchName, currentBranchName)
 	if err != nil {
 		return fmt.Errorf("failed to run adopt command: %w", err)
 	}
@@ -244,13 +252,14 @@ func init() {
 	_ = branchCmd.RegisterFlagCompletionFunc(
 		"parent",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			branches, _ := allBranches()
+			branches, _ := allBranches(cmd.Context())
 			return branches, cobra.ShellCompDirectiveNoSpace
 		},
 	)
 }
 
 func createBranch(
+	ctx context.Context,
 	repo *git.Repo,
 	db meta.DB,
 	branchName string,
@@ -258,7 +267,7 @@ func createBranch(
 ) (reterr error) {
 	// Determine important contextual information from Git
 	// or if a parent branch is provided, check it allows as a default branch
-	defaultBranch, err := repo.DefaultBranch()
+	defaultBranch, err := repo.DefaultBranch(ctx)
 	if err != nil {
 		return errors.WrapIf(err, "failed to determine repository default branch")
 	}
@@ -273,7 +282,7 @@ func createBranch(
 	// Determine the parent branch and make sure it's checked out
 	if parentBranchName == "" {
 		var err error
-		parentBranchName, err = repo.CurrentBranchName()
+		parentBranchName, err = repo.CurrentBranchName(ctx)
 		if err != nil {
 			return errors.WrapIff(err, "failed to get current branch name")
 		}
@@ -285,7 +294,7 @@ func createBranch(
 	}
 	parentBranchName = strings.TrimPrefix(parentBranchName, remoteName+"/")
 
-	isBranchFromTrunk, err := repo.IsTrunkBranch(parentBranchName)
+	isBranchFromTrunk, err := repo.IsTrunkBranch(ctx, parentBranchName)
 	if err != nil {
 		return errors.WrapIf(err, "failed to determine if branch is a trunk")
 	}
@@ -298,7 +307,7 @@ func createBranch(
 		parentHead = ""
 	} else {
 		var err error
-		parentHead, err = repo.RevParse(&git.RevParse{Rev: parentBranchName})
+		parentHead, err = repo.RevParse(ctx, &git.RevParse{Rev: parentBranchName})
 		if err != nil {
 			return errors.WrapIff(
 				err,
@@ -323,7 +332,7 @@ func createBranch(
 	// branch.<name>.merge. For now, by using a commit hash, we can suppress all of
 	// those behaviors. Later maybe we can add an av-cli config to control what to set
 	// for branch.<name>.merge at what timing.
-	startPointCommitHash, err := repo.RevParse(&git.RevParse{Rev: checkoutStartingPoint})
+	startPointCommitHash, err := repo.RevParse(ctx, &git.RevParse{Rev: checkoutStartingPoint})
 	if err != nil {
 		return errors.WrapIf(err, "failed to determine commit hash of starting point")
 	}
@@ -333,7 +342,7 @@ func createBranch(
 		"parent":     parentBranchName,
 		"new_branch": branchName,
 	}).Debug("creating new branch from parent")
-	if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+	if _, err := repo.CheckoutBranch(ctx, &git.CheckoutBranch{
 		Name:       branchName,
 		NewBranch:  true,
 		NewHeadRef: startPointCommitHash,
@@ -350,12 +359,12 @@ func createBranch(
 			colors.Faint(" because commit was not successful."),
 			"\n",
 		)
-		if _, err := repo.CheckoutBranch(&git.CheckoutBranch{
+		if _, err := repo.CheckoutBranch(ctx, &git.CheckoutBranch{
 			Name: parentBranchName,
 		}); err != nil {
 			logrus.WithError(err).Error("failed to return to original branch during cleanup")
 		}
-		if err := repo.BranchDelete(branchName); err != nil {
+		if err := repo.BranchDelete(ctx, branchName); err != nil {
 			logrus.WithError(err).Error("failed to delete branch during cleanup")
 		}
 	})
@@ -377,6 +386,7 @@ func createBranch(
 }
 
 func branchMove(
+	ctx context.Context,
 	repo *git.Repo,
 	db meta.DB,
 	newBranch string,
@@ -392,7 +402,7 @@ func branchMove(
 		oldBranch, newBranch, _ = strings.Cut(newBranch, ":")
 	} else {
 		var err error
-		oldBranch, err = repo.CurrentBranchName()
+		oldBranch, err = repo.CurrentBranchName(ctx)
 		if err != nil {
 			return err
 		}
@@ -411,7 +421,7 @@ func branchMove(
 
 	currentMeta, ok := tx.Branch(oldBranch)
 	if !ok {
-		defaultBranch, err := repo.DefaultBranch()
+		defaultBranch, err := repo.DefaultBranch(ctx)
 		if err != nil {
 			return errors.WrapIf(err, "failed to determine repository default branch")
 		}
@@ -452,10 +462,10 @@ func branchMove(
 	tx.DeleteBranch(oldBranch)
 
 	// Finally, actually rename the branch in Git
-	if ok, err := repo.DoesBranchExist(oldBranch); err != nil {
+	if ok, err := repo.DoesBranchExist(ctx, oldBranch); err != nil {
 		return err
 	} else if ok {
-		if _, err := repo.Run(&git.RunOpts{
+		if _, err := repo.Run(ctx, &git.RunOpts{
 			Args:      []string{"branch", "-m", newBranch},
 			ExitError: true,
 		}); err != nil {

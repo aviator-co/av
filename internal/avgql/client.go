@@ -12,11 +12,11 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func NewClient() (*graphql.Client, error) {
+func NewClient(ctx context.Context) (*graphql.Client, error) {
 	src := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: config.Av.Aviator.APIToken},
 	)
-	httpClient := oauth2.NewClient(context.Background(), src)
+	httpClient := oauth2.NewClient(ctx, src)
 	apiURL := os.Getenv("AV_GRAPHQL_URL")
 	if apiURL == "" {
 		baseURL, err := url.Parse(config.Av.Aviator.APIHost)

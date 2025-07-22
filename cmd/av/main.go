@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -42,20 +43,21 @@ var rootCmd = &cobra.Command{
 
 	// Run setup before invoking any child commands.
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 		if rootFlags.Debug {
 			logrus.SetLevel(logrus.DebugLevel)
 			logrus.WithField("av_version", config.Version).Debug("enabled debug logging")
 		}
 
 		repoConfigDir := ""
-		repo, err := getRepo()
+		repo, err := getRepo(ctx)
 		// If we weren't able to load the Git repo, that probably just means the
 		// command isn't being run from inside a repo. That's fine, we just
 		// don't need to bother reading repo-local config.
 		if err != nil {
 			logrus.WithError(err).Debug("unable to load Git repo (probably not inside a repo)")
 		} else {
-			gitCommonDir, err := repo.Git("rev-parse", "--git-common-dir")
+			gitCommonDir, err := repo.Git(ctx, "rev-parse", "--git-common-dir")
 			if err != nil {
 				logrus.WithError(err).Warning("failed to determine $GIT_COMMON_DIR")
 			} else {
@@ -113,6 +115,7 @@ func init() {
 		tidyCmd,
 		treeCmd,
 		versionCmd,
+		squashCmd,
 	)
 }
 
@@ -181,13 +184,13 @@ var (
 	lazyGithubClient *gh.Client
 )
 
-func discoverGitHubAPIToken() string {
+func discoverGitHubAPIToken(ctx context.Context) string {
 	if config.Av.GitHub.Token != "" {
 		return config.Av.GitHub.Token
 	}
 	if ghCli, err := exec.LookPath("gh"); err == nil {
 		var stdout bytes.Buffer
-		cmd := exec.Command(ghCli, "auth", "token")
+		cmd := exec.CommandContext(ctx, ghCli, "auth", "token")
 		cmd.Stdout = &stdout
 		cmd.Stderr = nil
 		if err := cmd.Run(); err == nil {
@@ -197,14 +200,14 @@ func discoverGitHubAPIToken() string {
 	return ""
 }
 
-func getGitHubClient() (*gh.Client, error) {
-	token := discoverGitHubAPIToken()
+func getGitHubClient(ctx context.Context) (*gh.Client, error) {
+	token := discoverGitHubAPIToken(ctx)
 	if token == "" {
 		return nil, errNoGitHubToken
 	}
 	var err error
 	once.Do(func() {
-		lazyGithubClient, err = gh.NewClient(token)
+		lazyGithubClient, err = gh.NewClient(ctx, token)
 	})
 	return lazyGithubClient, err
 }

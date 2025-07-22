@@ -1,6 +1,7 @@
 package sequencer
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -88,21 +89,23 @@ func getBranchSnapshots(db meta.DB) map[plumbing.ReferenceName]*branchSnapshot {
 }
 
 func (seq *Sequencer) Run(
+	ctx context.Context,
 	repo *git.Repo,
 	db meta.DB,
 	seqAbort, seqContinue, seqSkip bool,
 ) (*git.RebaseResult, error) {
 	if seqAbort || seqContinue || seqSkip {
-		return seq.runFromInterruptedState(repo, db, seqAbort, seqContinue, seqSkip)
+		return seq.runFromInterruptedState(ctx, repo, db, seqAbort, seqContinue, seqSkip)
 	}
 
 	if seq.CurrentSyncRef == "" {
 		return nil, nil
 	}
-	return seq.rebaseBranch(repo, db)
+	return seq.rebaseBranch(ctx, repo, db)
 }
 
 func (seq *Sequencer) runFromInterruptedState(
+	ctx context.Context,
 	repo *git.Repo,
 	db meta.DB,
 	seqAbort, seqContinue, seqSkip bool,
@@ -116,7 +119,7 @@ func (seq *Sequencer) runFromInterruptedState(
 	if seqAbort {
 		// Abort the rebase if we need to
 		if stat, _ := os.Stat(filepath.Join(repo.GitDir(), "REBASE_HEAD")); stat != nil {
-			if _, err := repo.Rebase(git.RebaseOpts{Abort: true}); err != nil {
+			if _, err := repo.Rebase(ctx, git.RebaseOpts{Abort: true}); err != nil {
 				return nil, errors.Errorf("failed to abort in-progress rebase: %v", err)
 			}
 		}
@@ -125,10 +128,10 @@ func (seq *Sequencer) runFromInterruptedState(
 		return nil, nil
 	}
 	if seqContinue {
-		if err := seq.checkNoUnstagedChanges(repo); err != nil {
+		if err := seq.checkNoUnstagedChanges(ctx, repo); err != nil {
 			return nil, err
 		}
-		result, err := repo.RebaseParse(git.RebaseOpts{Continue: true})
+		result, err := repo.RebaseParse(ctx, git.RebaseOpts{Continue: true})
 		if err != nil {
 			return nil, errors.Errorf("failed to continue in-progress rebase: %v", err)
 		}
@@ -141,7 +144,7 @@ func (seq *Sequencer) runFromInterruptedState(
 		return result, nil
 	}
 	if seqSkip {
-		result, err := repo.RebaseParse(git.RebaseOpts{Skip: true})
+		result, err := repo.RebaseParse(ctx, git.RebaseOpts{Skip: true})
 		if err != nil {
 			return nil, errors.Errorf("failed to skip in-progress rebase: %v", err)
 		}
@@ -156,7 +159,11 @@ func (seq *Sequencer) runFromInterruptedState(
 	panic("unreachable")
 }
 
-func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB) (*git.RebaseResult, error) {
+func (seq *Sequencer) rebaseBranch(
+	ctx context.Context,
+	repo *git.Repo,
+	db meta.DB,
+) (*git.RebaseResult, error) {
 	op := seq.getCurrentOp()
 	snapshot, ok := seq.OriginalBranchSnapshots[op.Name]
 	if !ok {
@@ -200,7 +207,7 @@ func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB) (*git.RebaseResul
 		Upstream: previousParentHash.String(),
 		Onto:     newParentHash.String(),
 	}
-	result, err := repo.RebaseParse(opts)
+	result, err := repo.RebaseParse(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -220,8 +227,8 @@ func (seq *Sequencer) rebaseBranch(repo *git.Repo, db meta.DB) (*git.RebaseResul
 	return result, nil
 }
 
-func (seq *Sequencer) checkNoUnstagedChanges(repo *git.Repo) error {
-	diff, err := repo.Diff(&git.DiffOpts{Quiet: true})
+func (seq *Sequencer) checkNoUnstagedChanges(ctx context.Context, repo *git.Repo) error {
+	diff, err := repo.Diff(ctx, &git.DiffOpts{Quiet: true})
 	if err != nil {
 		return err
 	}
