@@ -4,12 +4,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/uiutils"
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -30,31 +34,130 @@ var squashCmd = &cobra.Command{
 			return err
 		}
 
-		if err := runSquash(ctx, repo, db); err != nil {
-			fmt.Fprint(os.Stderr, colors.Failure("Failed to squash."), "\n")
-			fmt.Fprint(os.Stderr, colors.Failure(err.Error()), "\n")
-			return actions.ErrExitSilently{ExitCode: 1}
+		viewModel := &squashViewModel{
+			repo: repo,
+			db:   db,
 		}
+
+		if err := uiutils.RunBubbleTea(viewModel); err != nil {
+			return err
+		}
+
+		fmt.Fprintln(
+			os.Stdout,
+			colors.Success(
+				fmt.Sprintf(
+					"Successfully squashed %d commits.",
+					viewModel.squashedCommitCount,
+				),
+			),
+		)
 
 		return runPostCommitRestack(repo, db)
 	},
 }
 
-func runSquash(ctx context.Context, repo *git.Repo, db meta.DB) error {
+type squashViewModel struct {
+	repo *git.Repo
+	db   meta.DB
+
+	spinner             spinner.Model
+	squashing           bool
+	squashedCommitCount int
+	err                 error
+	done                bool
+}
+
+func (vm *squashViewModel) Init() tea.Cmd {
+	vm.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
+	return tea.Batch(vm.spinner.Tick, vm.runSquash)
+}
+
+func (vm *squashViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		if vm.squashing {
+			var cmd tea.Cmd
+			vm.spinner, cmd = vm.spinner.Update(msg)
+			return vm, cmd
+		}
+		return vm, nil
+
+	case squashDoneMsg:
+		vm.squashing = false
+		vm.squashedCommitCount = int(msg)
+		vm.done = true
+		return vm, tea.Quit
+
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			return vm, tea.Quit
+		}
+
+	case error:
+		vm.err = msg
+		return vm, tea.Quit
+	}
+
+	return vm, nil
+}
+
+func (vm *squashViewModel) View() string {
+	if vm.done {
+		if vm.err != nil {
+			return vm.err.Error()
+		}
+		return ""
+	}
+
+	sb := strings.Builder{}
+
+	if vm.squashing {
+		sb.WriteString(colors.ProgressStyle.Render(vm.spinner.View() + "Squashing commits..."))
+		sb.WriteString("\n")
+	}
+
+	if vm.err != nil {
+		sb.WriteString(colors.Failure(vm.err.Error()))
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
+}
+
+func (vm *squashViewModel) ExitError() error {
+	if vm.err != nil {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	return nil
+}
+
+type squashDoneMsg int
+
+func (vm *squashViewModel) runSquash() tea.Msg {
+	vm.squashing = true
+	count, err := runSquash(context.Background(), vm.repo, vm.db)
+	if err != nil {
+		return err
+	}
+	return squashDoneMsg(count)
+}
+
+func runSquash(ctx context.Context, repo *git.Repo, db meta.DB) (int, error) {
 	status, err := repo.Status(ctx)
 	if err != nil {
-		return errors.Errorf("cannot get the status of the repository: %v", err)
+		return 0, errors.Errorf("cannot get the status of the repository: %v", err)
 	}
 
 	if !status.IsClean() {
-		return errors.New(
+		return 0, errors.New(
 			"the working directory is not clean, please stash or commit them before running squash command.",
 		)
 	}
 
 	currentBranchName, err := repo.CurrentBranchName(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	tx := db.WriteTx()
@@ -62,12 +165,12 @@ func runSquash(ctx context.Context, repo *git.Repo, db meta.DB) error {
 
 	branch, branchExists := tx.Branch(currentBranchName)
 	if !branchExists {
-		return errors.New("current branch does not exist in the database")
+		return 0, errors.New("current branch does not exist in the database")
 	}
 
 	if branch.PullRequest != nil &&
 		branch.PullRequest.State == githubv4.PullRequestStateMerged {
-		return errors.New("this branch has already been merged, squashing is not allowed")
+		return 0, errors.New("this branch has already been merged, squashing is not allowed")
 	}
 
 	commitIDs, err := repo.RevList(ctx, git.RevListOpts{
@@ -75,30 +178,23 @@ func runSquash(ctx context.Context, repo *git.Repo, db meta.DB) error {
 		Reverse:    true,
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if len(commitIDs) <= 1 {
-		return errors.New("no commits to squash")
+		return 0, errors.New("no commits to squash")
 	}
 
 	firstCommitSha := commitIDs[0]
 
 	if _, err := repo.Git(ctx, "reset", "--soft", firstCommitSha); err != nil {
-		return err
+		return 0, err
 	}
 
-	amendMessage, err := repo.Git(ctx, "commit", "--amend", "--no-edit")
+	_, err = repo.Git(ctx, "commit", "--amend", "--no-edit")
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	fmt.Fprint(
-		os.Stderr,
-		"\n",
-		colors.Success(fmt.Sprintf("Successfully squashed %d commits", len(commitIDs))),
-		"\n",
-	)
-	fmt.Fprint(os.Stderr, amendMessage, "\n\n")
-	return nil
+	return len(commitIDs), nil
 }
