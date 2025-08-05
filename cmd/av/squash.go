@@ -78,13 +78,14 @@ func runSquash(ctx context.Context, repo *git.Repo, db meta.DB) error {
 		return err
 	}
 
-	if len(commitIDs) <= 1 {
+	if len(commitIDs) < 2 {
 		return errors.New("no commits to squash")
 	}
 
-	firstCommitSha := commitIDs[0]
+	secondCommitHash := commitIDs[1]
 
-	if _, err := repo.Git(ctx, "reset", "--soft", firstCommitSha); err != nil {
+	// Reset to the second commit, so that we can squash into the first commit
+	if _, err := repo.Git(ctx, "reset", "--soft", secondCommitHash); err != nil {
 		return err
 	}
 
