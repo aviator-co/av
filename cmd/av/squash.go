@@ -70,8 +70,23 @@ func runSquash(ctx context.Context, repo *git.Repo, db meta.DB) error {
 		return errors.New("this branch has already been merged, squashing is not allowed")
 	}
 
+	// Check if branch is in sync with parent before squashing
+	if err := validateBranchSync(ctx, repo, branch); err != nil {
+		return err
+	}
+
+	// Use the parent's head commit hash if available, otherwise fall back to branch name
+	// This prevents squashing into parent commits when the parent branch has moved
+	var parentRef string
+	if branch.Parent.Head != "" {
+		parentRef = branch.Parent.Head
+	} else {
+		// Fallback to branch name when no head commit is stored
+		parentRef = branch.Parent.Name
+	}
+
 	commitIDs, err := repo.RevList(ctx, git.RevListOpts{
-		Specifiers: []string{currentBranchName, "^" + branch.Parent.Name},
+		Specifiers: []string{currentBranchName, "^" + parentRef},
 		Reverse:    true,
 	})
 	if err != nil {

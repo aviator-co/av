@@ -165,3 +165,47 @@ func branchNameArgs(
 	branches, _ := allBranches(cmd.Context())
 	return branches, cobra.ShellCompDirectiveNoSpace
 }
+
+// validateBranchSync checks if the current branch is in sync with its parent branch.
+// Only enforces this check for non-trunk branches when we have a stored parent head.
+// This validation prevents commands from operating on branches that are out of sync
+// with their parent, which could lead to unexpected behavior or loss of commits.
+func validateBranchSync(ctx context.Context, repo *git.Repo, branch meta.Branch) error {
+	if branch.Parent.Trunk {
+		// If there's no parent or the branch is a trunk branch, we don't need to check sync
+		return nil
+	}
+
+	// Get the current head of the parent branch
+	currentParentHead, err := repo.RevParse(ctx, &git.RevParse{Rev: branch.Parent.Name})
+	if err != nil {
+		return errors.Errorf(
+			"cannot get current head of parent branch %s: %v",
+			branch.Parent.Name,
+			err,
+		)
+	}
+
+	// If the current parent head differs from the stored parent head,
+	// then the parent has moved and we need to sync
+	if currentParentHead != branch.Parent.Head {
+		return errors.Errorf(
+			"branch is not in sync with parent branch %s, please run 'av sync' first",
+			branch.Parent.Name,
+		)
+	}
+
+	// Additional check: ensure the child branch is actually based on the stored parent head
+	mergeBase, err := repo.MergeBase(ctx, branch.Parent.Head, branch.Name)
+	if err != nil {
+		return errors.Errorf("cannot find merge base with parent branch: %v", err)
+	}
+
+	if mergeBase != branch.Parent.Head {
+		return errors.Errorf(
+			"branch is not in sync with parent branch %s, please run 'av sync' first",
+			branch.Parent.Name,
+		)
+	}
+	return nil
+}
