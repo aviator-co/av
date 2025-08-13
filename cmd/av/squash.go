@@ -76,7 +76,7 @@ func runSquash(ctx context.Context, repo *git.Repo, db meta.DB) error {
 	}
 
 	// Use the parent's head commit hash if available, otherwise fall back to branch name
-	// This prevents squashing into parent commits when the parent branch has moved
+	// Since we've already validated sync, we can safely use the stored parent head
 	var parentRef string
 	if branch.Parent.Head != "" {
 		parentRef = branch.Parent.Head
