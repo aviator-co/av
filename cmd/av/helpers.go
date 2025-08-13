@@ -187,7 +187,7 @@ func validateBranchSync(ctx context.Context, repo *git.Repo, branch meta.Branch)
 	}
 
 	// If the current parent head differs from the stored parent head,
-	// then the parent has moved and we need to sync
+	// then the parent has moved and we need to sync before proceeding
 	if currentParentHead != branch.Parent.Head {
 		return errors.Errorf(
 			"branch is not in sync with parent branch %s, please run 'av sync' first",
