@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var flagTreeCurrent bool
+
 var treeCmd = &cobra.Command{
 	Use:   "tree",
 	Short: "Show the tree of stacked branches",
@@ -37,7 +39,16 @@ var treeCmd = &cobra.Command{
 		var ss []string
 		currentBranch := status.CurrentBranch
 		tx := db.ReadTx()
-		rootNodes := stackutils.BuildStackTreeAllBranches(tx, currentBranch, true)
+		var rootNodes []*stackutils.StackTreeNode
+		if flagTreeCurrent {
+			node, err := stackutils.BuildStackTreeCurrentStack(tx, currentBranch, true)
+			if err != nil {
+				return err
+			}
+			rootNodes = []*stackutils.StackTreeNode{node}
+		} else {
+			rootNodes = stackutils.BuildStackTreeAllBranches(tx, currentBranch, true)
+		}
 		for _, node := range rootNodes {
 			ss = append(
 				ss,
@@ -61,6 +72,10 @@ var treeCmd = &cobra.Command{
 		fmt.Print(ret)
 		return nil
 	},
+}
+
+func init() {
+	treeCmd.Flags().BoolVar(&flagTreeCurrent, "current", false, "show only the current stack")
 }
 
 type stackBranchInfoStyles struct {
