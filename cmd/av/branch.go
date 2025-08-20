@@ -28,8 +28,10 @@ var branchFlags struct {
 	Rename bool
 	// If true, rename the current branch even if a pull request exists.
 	Force bool
-	Split bool
 	// If true, split the latest commit into a new branch
+	Split bool
+	// If true, delete the given branch from git and av metadata
+	Delete bool
 }
 var branchCmd = &cobra.Command{
 	Use:   "branch [flags] <branch-name> [<parent-branch>]",
@@ -70,6 +72,12 @@ internal tracking metadata that defines the order of branches within a stack.`),
 
 		if branchFlags.Rename {
 			return branchMove(ctx, repo, db, branchName, branchFlags.Force)
+		}
+		if branchFlags.Delete {
+			if len(args) == 0 {
+				return errors.New("--delete requires a <branch-name>")
+			}
+			return branchDelete(ctx, repo, db, branchName)
 		}
 		if branchFlags.Split {
 			status, err := repo.Status(ctx)
@@ -237,6 +245,66 @@ func sanitizeBranchName(input string) string {
 	return sanitized
 }
 
+// branchDelete deletes a branch from git and av metadata with safeguards.
+func branchDelete(
+	ctx context.Context,
+	repo *git.Repo,
+	db meta.DB,
+	branchName string,
+) error {
+	// Disallow deleting current branch
+	current, err := repo.CurrentBranchName(ctx)
+	if err != nil {
+		return err
+	}
+	if branchName == current {
+		return errors.New("cannot delete the currently checked out branch")
+	}
+
+	// Prevent deleting trunk branches
+
+	tx := db.ReadTx()
+	if trunk, ok := meta.Trunk(tx, branchName); ok {
+		defaultBranch, derr := repo.DefaultBranch(ctx)
+		if derr == nil && (branchName == trunk || branchName == defaultBranch) {
+			return errors.Errorf("refusing to delete trunk branch %q", branchName)
+		}
+	}
+
+	// Ensure there are no child branches depending on this branch
+	txw := db.WriteTx()
+	defer txw.Abort()
+	children := meta.ChildrenNames(txw, branchName)
+	if len(children) > 0 {
+		return errors.Errorf("cannot delete %q: has child branches: %s", branchName, strings.Join(children, ", "))
+	}
+
+	// If metadata exists, drop it
+	if _, ok := txw.Branch(branchName); ok {
+		txw.DeleteBranch(branchName)
+		if err := txw.Commit(); err != nil {
+			return err
+		}
+	}
+
+	// Attempt to delete git branch (local)
+	ok, err := repo.DoesBranchExist(ctx, branchName)
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		return nil
+	}
+
+	err = repo.BranchDelete(ctx, branchName)
+	if err != nil {
+		return errors.WrapIff(err, "failed to delete git branch")
+	}
+
+	return nil
+}
+
 func init() {
 	branchCmd.Flags().
 		StringVar(&branchFlags.Parent, "parent", "", "the parent branch to base the new branch off of")
@@ -248,6 +316,8 @@ func init() {
 		BoolVar(&branchFlags.Force, "force", false, "force rename the current branch, even if a pull request exists")
 	branchCmd.Flags().
 		BoolVar(&branchFlags.Split, "split", false, "split the last commit into a new branch, if no branch name is given, one will be auto-generated")
+	branchCmd.Flags().
+		BoolVar(&branchFlags.Delete, "delete", false, "delete the given branch from the stack and git")
 
 	_ = branchCmd.RegisterFlagCompletionFunc(
 		"parent",
