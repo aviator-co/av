@@ -19,7 +19,7 @@ jobs:
       - name: fetch tags
         run: git fetch --force --tags
       - name: install go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           cache: false
           go-version-file: go.mod
