@@ -714,7 +714,7 @@ func extractContent(input string, start string, end string) (content string, out
 	if postContent != "" {
 		output += "\n" + postContent
 	}
-	return
+	return content, output
 }
 
 func ParsePRBody(input string) (body string, prMeta PRMetadata, retErr error) {
@@ -722,12 +722,12 @@ func ParsePRBody(input string) (body string, prMeta PRMetadata, retErr error) {
 	metadataContent, _ := extractContent(metadata, "```", "```")
 	if err := json.Unmarshal([]byte(metadataContent), &prMeta); err != nil {
 		retErr = errors.WrapIff(err, "decoding PR metadata")
-		return
+		return body, prMeta, retErr
 	}
 
 	_, body = extractContent(body, PRStackCommentStart, PRStackCommentEnd)
 
-	return
+	return body, prMeta, retErr
 }
 
 func ReadPRMetadata(body string) (PRMetadata, error) {
