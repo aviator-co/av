@@ -11,6 +11,7 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/sirupsen/logrus"
 )
 
 type RestackOp struct {
@@ -201,25 +202,51 @@ func (seq *Sequencer) rebaseBranch(
 		newParentHash = op.NewParentHash
 	}
 
-	// The commits from `rebaseFrom` to `snapshot.Name` should be rebased onto `rebaseOnto`.
-	opts := git.RebaseOpts{
-		Branch:   op.Name.Short(),
-		Upstream: previousParentHash.String(),
-		Onto:     newParentHash.String(),
+	// Handle a special case: If the current branch is already based on the new parent, and if
+	// the new parent has the previous parent as an ancestor, then we can skip the rebase
+	// entirely. This can happen if the user has two branches that happen to share the history
+	// for some reason, and trying to correct this by reparenting one branch onto the other.
+	//
+	// The reason that we need to handle this case specially is that in this case we need to
+	// skip some commits that are already in the history of the new parent. If we try to rebase
+	// with the code below, git will try to replay those commits, and will likely result in
+	// conflicts.
+	skipGitRebase := false
+	if b1, err := repo.IsAncestor(ctx, newParentHash.String(), op.Name.String()); err == nil && b1 {
+		if b2, err := repo.IsAncestor(ctx, previousParentHash.String(), newParentHash.String()); err == nil &&
+			b2 {
+			logrus.Debug("Skipping rebase since branch is already based on new parent")
+			skipGitRebase = true
+		}
 	}
-	result, err := repo.RebaseParse(ctx, opts)
-	if err != nil {
-		return nil, err
-	}
-	if result.Status == git.RebaseConflict {
-		result.ErrorHeadline = fmt.Sprintf(
-			"Failed to rebase %q onto %q (merge base is %q)\n",
-			op.Name,
-			op.NewParent,
-			previousParentHash.String()[:7],
-		) + result.ErrorHeadline
-		seq.SequenceInterruptedNewParentHash = newParentHash
-		return result, nil
+
+	var result *git.RebaseResult
+	if !skipGitRebase {
+		// The commits from `rebaseFrom` to `snapshot.Name` should be rebased onto `rebaseOnto`.
+		opts := git.RebaseOpts{
+			Branch:   op.Name.Short(),
+			Upstream: previousParentHash.String(),
+			Onto:     newParentHash.String(),
+		}
+		var err error
+		result, err = repo.RebaseParse(ctx, opts)
+		if err != nil {
+			return nil, err
+		}
+		if result.Status == git.RebaseConflict {
+			result.ErrorHeadline = fmt.Sprintf(
+				"Failed to rebase %q onto %q (merge base is %q)\n",
+				op.Name,
+				op.NewParent,
+				previousParentHash.String()[:7],
+			) + result.ErrorHeadline
+			seq.SequenceInterruptedNewParentHash = newParentHash
+			return result, nil
+		}
+	} else {
+		result = &git.RebaseResult{
+			Status: git.RebaseAlreadyUpToDate,
+		}
 	}
 	if err := seq.postRebaseBranchUpdate(db, newParentHash); err != nil {
 		return nil, err
