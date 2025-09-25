@@ -2,6 +2,7 @@ package stackutils
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/aviator-co/av/internal/meta"
@@ -54,11 +55,9 @@ func BuildTree(
 			currentBranchPath[node.Branch.BranchName] = true
 			return true
 		}
-		for _, child := range node.Children {
-			if currentBranchVisitFn(child) {
-				currentBranchPath[node.Branch.BranchName] = true
-				return true
-			}
+		if slices.ContainsFunc(node.Children, currentBranchVisitFn) {
+			currentBranchPath[node.Branch.BranchName] = true
+			return true
 		}
 		return false
 	}

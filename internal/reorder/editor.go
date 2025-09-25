@@ -36,8 +36,8 @@ func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 	}
 
 	var newPlan []Cmd
-	lines := strings.Split(res, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(res, "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue

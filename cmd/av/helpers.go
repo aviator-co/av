@@ -118,8 +118,8 @@ func allBranches(ctx context.Context) ([]string, error) {
 // from a ref name if it exists.
 func stripRemoteRefPrefixes(repo *git.Repo, possibleRefName string) string {
 	ret := possibleRefName
-	if strings.HasPrefix(ret, "refs/heads/") {
-		ret = strings.TrimPrefix(ret, "refs/heads/")
+	if after, ok := strings.CutPrefix(ret, "refs/heads/"); ok {
+		ret = after
 	} else {
 		ret = strings.TrimPrefix(ret, "refs/remotes/")
 		ret = strings.TrimPrefix(ret, repo.GetRemoteName()+"/")

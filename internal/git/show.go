@@ -22,7 +22,7 @@ type CommitInfo struct {
 
 func (c CommitInfo) BodyWithPrefix(prefix string) []string {
 	var lines []string
-	for _, line := range strings.Split(strings.TrimSpace(c.Body), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(c.Body), "\n") {
 		lines = append(lines, prefix+line)
 	}
 	return lines

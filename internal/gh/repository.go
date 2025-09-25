@@ -28,7 +28,7 @@ func (c *Client) GetRepositoryBySlug(ctx context.Context, slug string) (*Reposit
 	var query struct {
 		Repository Repository `graphql:"repository(owner: $owner, name: $name)"`
 	}
-	err := c.query(ctx, &query, map[string]interface{}{
+	err := c.query(ctx, &query, map[string]any{
 		"owner": githubv4.String(owner),
 		"name":  githubv4.String(name),
 	})

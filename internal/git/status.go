@@ -64,7 +64,7 @@ func (r *Repo) Status(ctx context.Context) (GitStatus, error) {
 		return GitStatus{}, err
 	}
 	st := GitStatus{}
-	for _, line := range strings.Split(body, "\n") {
+	for line := range strings.SplitSeq(body, "\n") {
 		parseGitStatusLine(line, &st)
 	}
 	return st, nil

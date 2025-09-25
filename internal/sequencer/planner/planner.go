@@ -2,6 +2,7 @@ package planner
 
 import (
 	"context"
+	"slices"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
@@ -116,10 +117,8 @@ func PlanForReparent(
 		return nil, errors.New("cannot re-parent to self")
 	}
 	children := meta.SubsequentBranches(tx, currentBranch.Short())
-	for _, child := range children {
-		if child == newParentBranch.Short() {
-			return nil, errors.New("cannot re-parent to a child branch")
-		}
+	if slices.Contains(children, newParentBranch.Short()) {
+		return nil, errors.New("cannot re-parent to a child branch")
 	}
 	isParentTrunk, err := repo.IsTrunkBranch(ctx, newParentBranch.Short())
 	if err != nil {

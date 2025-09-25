@@ -98,11 +98,11 @@ func NewTempRepoWithGitHubServer(t *testing.T, serverURL string) *GitTestRepo {
 
 	err = os.WriteFile(
 		filepath.Join(repo.GitDir, "av", "config.yml"),
-		[]byte(fmt.Sprintf(`
+		fmt.Appendf(nil, `
 github:
     token: "dummy_valid_token"
     baseUrl: %q
-`, serverURL)),
+`, serverURL),
 		0o644,
 	)
 	require.NoError(t, err, "failed to write .git/av/config.yml")

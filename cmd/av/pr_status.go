@@ -198,7 +198,7 @@ var prStatusCmd = &cobra.Command{
 	},
 }
 
-func getQueryVariables(ctx context.Context) (map[string]interface{}, error) {
+func getQueryVariables(ctx context.Context) (map[string]any, error) {
 	repo, err := getRepo(ctx)
 	if err != nil {
 		return nil, err
@@ -226,7 +226,7 @@ func getQueryVariables(ctx context.Context) (map[string]interface{}, error) {
 
 	prNumber := branch.PullRequest.Number
 	repository := tx.Repository()
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"repoOwner": graphql.String(repository.Owner),
 		"repoName":  graphql.String(repository.Name),
 		"prNumber":  graphql.Int(prNumber), //nolint:gosec

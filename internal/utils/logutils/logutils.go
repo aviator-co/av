@@ -8,13 +8,13 @@ import (
 // printing an arbitrary object with a given format specifier/verb.
 type FormatPrinter struct {
 	verb string
-	item interface{}
+	item any
 }
 
 func (v FormatPrinter) String() string {
 	return fmt.Sprintf(v.verb, v.item)
 }
 
-func Format(verb string, item interface{}) FormatPrinter {
+func Format(verb string, item any) FormatPrinter {
 	return FormatPrinter{verb, item}
 }
