@@ -179,10 +179,19 @@ func (o Output) Lines() []string {
 	return strings.Split(s, "\n")
 }
 
-func (r *Repo) Run(ctx context.Context, opts *RunOpts) (*Output, error) {
-	cmd := exec.CommandContext(ctx, "git", opts.Args...)
+func (r *Repo) Cmd(ctx context.Context, args []string, env []string) *exec.Cmd {
+	r.log.Debugf("git %s", args)
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = r.repoDir
-	r.log.Debugf("git %s", opts.Args)
+	// Set the IN_AV_CLI environment variable to 1 to let the hooks invoked by git know it's
+	// part of av-cli invocation.
+	cmd.Env = append(os.Environ(), "IN_AV_CLI=1")
+	cmd.Env = append(cmd.Env, env...)
+	return cmd
+}
+
+func (r *Repo) Run(ctx context.Context, opts *RunOpts) (*Output, error) {
+	cmd := r.Cmd(ctx, opts.Args, opts.Env)
 	var stdout, stderr bytes.Buffer
 	if opts.Interactive {
 		cmd.Stdin = os.Stdin
@@ -195,10 +204,6 @@ func (r *Repo) Run(ctx context.Context, opts *RunOpts) (*Output, error) {
 	if opts.Stdin != nil {
 		cmd.Stdin = opts.Stdin
 	}
-	// Set the IN_AV_CLI environment variable to 1 to let the hooks invoked by git know it's
-	// part of av-cli invocation.
-	cmd.Env = append(os.Environ(), "IN_AV_CLI=1")
-	cmd.Env = append(cmd.Env, opts.Env...)
 	err := cmd.Run()
 	var exitError *exec.ExitError
 	if err != nil && !errors.As(err, &exitError) {
