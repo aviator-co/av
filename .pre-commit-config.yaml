@@ -1,18 +1,18 @@
 repos:
   - repo: local
     hooks:
-      - id: golines
-        name: golines
-        files: ".+.go$"
-        language: system
-        entry: |
-          sh -c 'go run github.com/segmentio/golines -w .'
       - id: goimports
         name: goimports
         files: ".+.go$"
         language: system
         entry: |
           sh -c 'go run golang.org/x/tools/cmd/goimports@latest -w .'
+      - id: gofumpt
+        name: gofumpt
+        files: ".+.go$"
+        language: system
+        entry: |
+          sh -c 'go run mvdan.cc/gofumpt@latest -l -w .'
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
