@@ -197,7 +197,7 @@ func (r *roffRenderer) RenderNode(
 			out(w, "\n.fi\n")
 		} else {
 			out(w, codeTag)
-			for _, line := range strings.Split(string(node.Literal), "\n") {
+			for line := range strings.SplitSeq(string(node.Literal), "\n") {
 				escapeSpecialChars(w, []byte("    "+line+"\n"))
 			}
 			out(w, codeCloseTag)

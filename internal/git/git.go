@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -92,10 +93,8 @@ func (r *Repo) IsTrunkBranch(ctx context.Context, name string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	for _, branch := range branches {
-		if name == branch {
-			return true, nil
-		}
+	if slices.Contains(branches, name) {
+		return true, nil
 	}
 	return false, nil
 }
@@ -386,7 +385,7 @@ func (r *Repo) BranchesContainCommittish(
 		return nil, err
 	}
 	var ret []BranchAndCommit
-	for _, line := range strings.Split(strings.TrimSpace(lines), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(lines), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) != 2 {
 			continue
