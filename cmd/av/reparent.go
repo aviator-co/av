@@ -68,7 +68,7 @@ type reparentViewModel struct {
 func (vm *reparentViewModel) Init() tea.Cmd {
 	state, err := vm.createState()
 	if err != nil {
-		return func() tea.Msg { return err }
+		return uiutils.ErrCmd(err)
 	}
 	vm.restackModel = sequencerui.NewRestackModel(vm.repo, vm.db)
 	vm.restackModel.State = state
@@ -83,13 +83,13 @@ func (vm *reparentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return vm, cmd
 	case *sequencerui.RestackConflict:
 		if err := vm.writeState(vm.restackModel.State); err != nil {
-			return vm, func() tea.Msg { return err }
+			return vm, uiutils.ErrCmd(err)
 		}
 		vm.quitWithConflict = true
 		return vm, tea.Quit
 	case *sequencerui.RestackAbort, *sequencerui.RestackDone:
 		if err := vm.writeState(nil); err != nil {
-			return vm, func() tea.Msg { return err }
+			return vm, uiutils.ErrCmd(err)
 		}
 		return vm, tea.Quit
 	case tea.KeyMsg:

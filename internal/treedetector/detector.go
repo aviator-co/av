@@ -2,6 +2,7 @@ package treedetector
 
 import (
 	"context"
+	"fmt"
 
 	"emperror.dev/errors"
 	avgit "github.com/aviator-co/av/internal/git"
@@ -119,9 +120,9 @@ func getNearestTrunkCommit(
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
-	// TODO(draftcode): Check if the branch exists. Use the rtb as well.
+	rtb := fmt.Sprintf("refs/remotes/%s/%s", repo.GetRemoteName(), trunk)
 
-	mbArgs := []string{ref.String(), trunk}
+	mbArgs := []string{rtb, ref.String()}
 	// Per git-merge-base(1), this should return the nearest commits from HEAD among
 	// the trunk branches since we don't specify --octopus.
 	mb, err := repo.MergeBase(ctx, mbArgs...)

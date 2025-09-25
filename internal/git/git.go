@@ -72,7 +72,8 @@ func (r *Repo) AvTmpDir() string {
 }
 
 func (r *Repo) DefaultBranch(ctx context.Context) (string, error) {
-	ref, err := r.Git(ctx, "symbolic-ref", "refs/remotes/origin/HEAD")
+	remoteName := r.GetRemoteName()
+	ref, err := r.Git(ctx, "symbolic-ref", fmt.Sprintf("refs/remotes/%s/HEAD", remoteName))
 	if err != nil {
 		logrus.WithError(err).Debug("failed to determine remote HEAD")
 		// this communicates with the remote, so we probably don't want to run
@@ -83,7 +84,7 @@ func (r *Repo) DefaultBranch(ctx context.Context) (string, error) {
 		)
 		return "", errors.New("failed to determine remote HEAD")
 	}
-	return strings.TrimPrefix(ref, "refs/remotes/origin/"), nil
+	return strings.TrimPrefix(ref, fmt.Sprintf("refs/remotes/%s/", remoteName)), nil
 }
 
 func (r *Repo) IsTrunkBranch(ctx context.Context, name string) (bool, error) {
