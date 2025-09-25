@@ -96,10 +96,11 @@ base branch.
 		}
 
 		return uiutils.RunBubbleTea(&syncViewModel{
-			repo:   repo,
-			db:     db,
-			client: client,
-			help:   help.New(),
+			repo:        repo,
+			db:          db,
+			client:      client,
+			help:        help.New(),
+			stackedView: uiutils.NewStackedView(),
 		})
 	},
 }
@@ -116,15 +117,15 @@ type syncState struct {
 }
 
 type syncViewModel struct {
-	repo   *git.Repo
-	db     meta.DB
-	client *gh.Client
-	help   help.Model
+	repo        *git.Repo
+	db          meta.DB
+	client      *gh.Client
+	help        help.Model
+	stackedView *uiutils.StackedView
 
 	preAvSyncHookMessage string
 
 	state            *syncState
-	syncAllPrompt    *selection.Model[string]
 	githubFetchModel *ghui.GitHubFetchModel
 	restackModel     *sequencerui.RestackModel
 	githubPushModel  *ghui.GitHubPushModel
@@ -138,7 +139,7 @@ type syncViewModel struct {
 }
 
 func (vm *syncViewModel) Init() tea.Cmd {
-	return vm.initSync()
+	return tea.Batch(vm.initSync(), vm.stackedView.Init())
 }
 
 func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -220,33 +221,10 @@ func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return vm, tea.Quit
 
 	case promptUserShouldSyncAllMsg:
-		vm.syncAllPrompt = uiutils.NewPromptModel("You are on the trunk, do you want to sync all stacks?", []string{"Yes", "No"})
-		return vm, vm.syncAllPrompt.Init()
+		return vm, vm.stackedView.Push(newSyncAllPromptModel(msg.continueCmd))
 
 	case tea.KeyMsg:
-		if vm.syncAllPrompt != nil {
-			switch msg.String() {
-			case " ", "enter":
-				c, err := vm.syncAllPrompt.Value()
-				if err != nil {
-					vm.err = err
-					return vm, tea.Quit
-				}
-				vm.syncAllPrompt = nil
-				if c == "Yes" {
-					syncFlags.All = true
-				}
-				if c == "No" {
-					return vm, tea.Quit
-				}
-				return vm, vm.initSync()
-			case "ctrl+c":
-				return vm, tea.Quit
-			default:
-				_, cmd := vm.syncAllPrompt.Update(msg)
-				return vm, cmd
-			}
-		} else if vm.pushingToGitHub {
+		if vm.pushingToGitHub {
 			switch msg.String() {
 			case "ctrl+c":
 				return vm, tea.Quit
@@ -280,10 +258,10 @@ func (vm *syncViewModel) View() string {
 	if vm.preAvSyncHookMessage != "" {
 		ss = append(ss, vm.preAvSyncHookMessage)
 	}
-	if vm.syncAllPrompt != nil {
-		ss = append(ss, vm.syncAllPrompt.View())
-		ss = append(ss, vm.help.ShortHelpView(uiutils.PromptKeys))
-	}
+	// if vm.syncAllPrompt != nil {
+	// 	ss = append(ss, vm.syncAllPrompt.View())
+	// 	ss = append(ss, vm.help.ShortHelpView(uiutils.PromptKeys))
+	// }
 	if vm.githubFetchModel != nil {
 		ss = append(ss, vm.githubFetchModel.View())
 	}
@@ -314,7 +292,9 @@ func (vm *syncViewModel) View() string {
 
 type preAvSyncHookDoneMsg struct{}
 
-type promptUserShouldSyncAllMsg struct{}
+type promptUserShouldSyncAllMsg struct {
+	continueCmd tea.Cmd
+}
 
 func (vm *syncViewModel) initSync() tea.Cmd {
 	state, err := vm.readState()
@@ -332,12 +312,7 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 	if err != nil {
 		return uiutils.ErrCmd(err)
 	}
-	if isTrunkBranch && !syncFlags.All {
-		return func() tea.Msg {
-			return promptUserShouldSyncAllMsg{}
-		}
-	}
-	return func() tea.Msg {
+	continueCmd := func() tea.Msg {
 		output, err := vm.repo.Run(
 			context.Background(),
 			&git.RunOpts{
@@ -363,6 +338,12 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 		}
 		return preAvSyncHookDoneMsg{}
 	}
+	if isTrunkBranch && !syncFlags.All {
+		return func() tea.Msg {
+			return promptUserShouldSyncAllMsg{continueCmd}
+		}
+	}
+	return continueCmd
 }
 
 func (vm *syncViewModel) initSequencerState() tea.Cmd {
@@ -560,6 +541,67 @@ func (vm *syncViewModel) ExitError() error {
 		return actions.ErrExitSilently{ExitCode: 1}
 	}
 	return nil
+}
+
+type syncAllPromptModel struct {
+	syncAllPrompt *selection.Model[string]
+	continueCmd   tea.Cmd
+	help          help.Model
+	done          bool
+}
+
+func newSyncAllPromptModel(continueCmd tea.Cmd) *syncAllPromptModel {
+	return &syncAllPromptModel{
+		syncAllPrompt: uiutils.NewPromptModel(
+			"You are on the trunk, do you want to sync all stacks?",
+			[]string{"Yes", "No"},
+		),
+		continueCmd: continueCmd,
+		help:        help.New(),
+		done:        false,
+	}
+}
+
+func (m *syncAllPromptModel) Init() tea.Cmd {
+	return m.syncAllPrompt.Init()
+}
+
+func (m *syncAllPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case " ", "enter":
+			c, err := m.syncAllPrompt.Value()
+			if err != nil {
+				return m, func() tea.Msg { return err }
+			}
+			m.done = true
+			if c == "Yes" {
+				syncFlags.All = true
+			}
+			if c == "No" {
+				return m, tea.Quit
+			}
+			return m, m.continueCmd
+		case "ctrl+c":
+			return m, tea.Quit
+		default:
+			_, cmd := m.syncAllPrompt.Update(msg)
+			return m, cmd
+		}
+	}
+	return m, nil
+}
+
+func (m *syncAllPromptModel) View() string {
+	if m.done {
+		return ""
+	}
+	return lipgloss.JoinVertical(
+		0,
+		m.syncAllPrompt.View(),
+		m.help.ShortHelpView(uiutils.PromptKeys),
+	)
 }
 
 func init() {
