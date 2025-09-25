@@ -190,7 +190,7 @@ func (m stackNextModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.nextBranch
 
 	case showSelectionMsg:
-		m.selection = uiutils.NewPromptModel(
+		m.selection = uiutils.NewLegacyPromptModel(
 			fmt.Sprintf("There are multiple children of branch %s. Which branch would you like to follow?", colors.UserInput(m.currentBranch)),
 			m.currentBranchChildren(),
 		)
