@@ -104,7 +104,7 @@ func (vm *PruneBranchModel) Update(msg tea.Msg) (*PruneBranchModel, tea.Cmd) {
 				return vm, vm.runDelete
 			}
 			vm.askingForConfirmation = true
-			vm.deletePrompt = uiutils.NewPromptModel("Are you OK with deleting these merged branches?", []string{continueDeletion, abortDeletion})
+			vm.deletePrompt = uiutils.NewLegacyPromptModel("Are you OK with deleting these merged branches?", []string{continueDeletion, abortDeletion})
 			return vm, vm.deletePrompt.Init()
 		}
 		if msg.deletionDone {
