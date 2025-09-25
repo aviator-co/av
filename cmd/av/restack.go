@@ -59,19 +59,19 @@ type restackViewModel struct {
 func (vm *restackViewModel) Init() tea.Cmd {
 	state, err := vm.readState()
 	if err != nil {
-		return func() tea.Msg { return err }
+		return uiutils.ErrCmd(err)
 	}
 	if state == nil {
 		if restackFlags.Abort || restackFlags.Continue || restackFlags.Skip {
-			return func() tea.Msg { return errors.New("no restack in progress") }
+			return uiutils.ErrCmd(errors.New("no restack in progress"))
 		}
 		state, err = vm.createState()
 		if err != nil {
-			return func() tea.Msg { return err }
+			return uiutils.ErrCmd(err)
 		}
 	}
 	if state == nil {
-		return func() tea.Msg { return nothingToRestackError }
+		return uiutils.ErrCmd(nothingToRestackError)
 	}
 	vm.restackModel = sequencerui.NewRestackModel(vm.repo, vm.db)
 	vm.restackModel.State = state
@@ -90,13 +90,13 @@ func (vm *restackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return vm, cmd
 	case *sequencerui.RestackConflict:
 		if err := vm.writeState(vm.restackModel.State); err != nil {
-			return vm, func() tea.Msg { return err }
+			return vm, uiutils.ErrCmd(err)
 		}
 		vm.quitWithConflict = true
 		return vm, tea.Quit
 	case *sequencerui.RestackAbort, *sequencerui.RestackDone:
 		if err := vm.writeState(nil); err != nil {
-			return vm, func() tea.Msg { return err }
+			return vm, uiutils.ErrCmd(err)
 		}
 		return vm, tea.Quit
 	case tea.KeyMsg:

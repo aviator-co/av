@@ -171,7 +171,7 @@ func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var err error
 		vm.githubFetchModel, err = vm.createGitHubFetchModel()
 		if err != nil {
-			return vm, func() tea.Msg { return err }
+			return vm, uiutils.ErrCmd(err)
 		}
 		return vm, vm.githubFetchModel.Init()
 
@@ -188,18 +188,18 @@ func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return vm, cmd
 	case *sequencerui.RestackConflict:
 		if err := vm.writeState(vm.restackModel.State); err != nil {
-			return vm, func() tea.Msg { return err }
+			return vm, uiutils.ErrCmd(err)
 		}
 		vm.quitWithConflict = true
 		return vm, tea.Quit
 	case *sequencerui.RestackAbort:
 		if err := vm.writeState(nil); err != nil {
-			return vm, func() tea.Msg { return err }
+			return vm, uiutils.ErrCmd(err)
 		}
 		return vm, tea.Quit
 	case *sequencerui.RestackDone:
 		if err := vm.writeState(nil); err != nil {
-			return vm, func() tea.Msg { return err }
+			return vm, uiutils.ErrCmd(err)
 		}
 		return vm, vm.initPushBranches()
 
@@ -319,18 +319,18 @@ type promptUserShouldSyncAllMsg struct{}
 func (vm *syncViewModel) initSync() tea.Cmd {
 	state, err := vm.readState()
 	if err != nil {
-		return func() tea.Msg { return err }
+		return uiutils.ErrCmd(err)
 	}
 	if state != nil {
 		return vm.continueWithState(state)
 	}
 	if syncFlags.Abort || syncFlags.Continue || syncFlags.Skip {
-		return func() tea.Msg { return errors.New("no restack in progress") }
+		return uiutils.ErrCmd(errors.New("no restack in progress"))
 	}
 
 	isTrunkBranch, err := vm.repo.IsCurrentBranchTrunk(context.Background())
 	if err != nil {
-		return func() tea.Msg { return err }
+		return uiutils.ErrCmd(err)
 	}
 	if isTrunkBranch && !syncFlags.All {
 		return func() tea.Msg {
@@ -368,10 +368,10 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 func (vm *syncViewModel) initSequencerState() tea.Cmd {
 	state, err := vm.createState()
 	if err != nil {
-		return func() tea.Msg { return err }
+		return uiutils.ErrCmd(err)
 	}
 	if state == nil {
-		return func() tea.Msg { return nothingToRestackError }
+		return uiutils.ErrCmd(nothingToRestackError)
 	}
 	return vm.continueWithState(state)
 }
