@@ -142,7 +142,7 @@ func (vm *GitHubPushModel) Update(msg tea.Msg) (*GitHubPushModel, tea.Cmd) {
 			case "enter":
 				c, err := vm.pushPrompt.Value()
 				if err != nil {
-					return vm, func() tea.Msg { return err }
+					return vm, uiutils.ErrCmd(err)
 				}
 				vm.askingForConfirmation = false
 				vm.pushPrompt = nil

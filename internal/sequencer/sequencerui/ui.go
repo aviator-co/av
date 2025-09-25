@@ -9,6 +9,7 @@ import (
 	"github.com/aviator-co/av/internal/sequencer"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
+	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -79,7 +80,7 @@ func (vm *RestackModel) Update(msg tea.Msg) (*RestackModel, tea.Cmd) {
 			// Finished the sequence.
 			if vm.State.InitialBranch != "" {
 				if _, err := vm.repo.CheckoutBranch(context.Background(), &git.CheckoutBranch{Name: vm.State.InitialBranch}); err != nil {
-					return vm, func() tea.Msg { return err }
+					return vm, uiutils.ErrCmd(err)
 				}
 			}
 			if vm.abortedBranch != "" {

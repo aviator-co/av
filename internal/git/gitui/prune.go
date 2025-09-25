@@ -118,7 +118,7 @@ func (vm *PruneBranchModel) Update(msg tea.Msg) (*PruneBranchModel, tea.Cmd) {
 			case "enter":
 				c, err := vm.deletePrompt.Value()
 				if err != nil {
-					return vm, func() tea.Msg { return err }
+					return vm, uiutils.ErrCmd(err)
 				}
 				vm.askingForConfirmation = false
 				vm.deletePrompt = nil
