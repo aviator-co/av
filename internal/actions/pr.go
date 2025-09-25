@@ -286,13 +286,20 @@ func CreatePullRequest(
 			opts.Title = existingPR.Title
 		}
 		if opts.Body == "" {
-			opts.Body = existingPR.Body
+			// Not clear when this happens, but it seems that the body sometimes has
+			// \r\n as line endings. Convert them to \n for consistency.
+			body := strings.ReplaceAll(existingPR.Body, "\r\n", "\n")
+			// Existing PR body may have metadata appended to it. Trim that off.
+			if stripped, _, err := ParsePRBody(body); err == nil {
+				body = stripped
+			}
+			opts.Body = body
 		}
 	}
 
 	if opts.Edit || opts.Body == "" || opts.Title == "" {
 		var commits []git.CommitInfo
-		for _, commitHash := range strings.Split(commitsList, "\n") {
+		for commitHash := range strings.SplitSeq(commitsList, "\n") {
 			commit, err := repo.CommitInfo(ctx, git.CommitInfoOpts{Rev: commitHash})
 			if err != nil {
 				return nil, errors.WrapIff(err, "failed to get commit info for %q", commitHash)
