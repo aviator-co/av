@@ -102,7 +102,9 @@ func DefaultCommand(ctx context.Context, repo *git.Repo) string {
 		// This is the default hard-coded into git
 		return "vi"
 	}
-	return editor
+	// Expand environment variables in the editor command
+	// This handles cases where GIT_EDITOR="$EDITOR" or similar
+	return os.ExpandEnv(editor)
 }
 
 func parseResult(path string, config Config) (string, error) {
