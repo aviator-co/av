@@ -69,16 +69,12 @@ func Launch(ctx context.Context, repo *git.Repo, config Config) (string, error) 
 	}
 
 	// Launch the editor as a subprocess.
-	// We interpret the command with shell syntax to allow users to specify
-	// both flags and use editor executables with spaces.
+	// We execute the command through a shell to properly handle environment
+	// variable expansion and shell quoting rules, matching Git's behavior.
 	// e.g., EDITOR="'/path/with spaces/editor'" or
-	// EDITOR="code --wait" work.
-	args, err := shellquote.Split(config.Command)
-	if err != nil {
-		return "", errors.Wrapf(err, "invalid editor command: %q", config.Command)
-	}
-	args = append(args, tmp.Name())
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	// EDITOR="code --wait" or GIT_EDITOR="$EDITOR" work correctly.
+	shellCmd := config.Command + " " + shellquote.Join(tmp.Name())
+	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", shellCmd)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	stderr := bytes.NewBuffer(nil)
@@ -102,9 +98,7 @@ func DefaultCommand(ctx context.Context, repo *git.Repo) string {
 		// This is the default hard-coded into git
 		return "vi"
 	}
-	// Expand environment variables in the editor command
-	// This handles cases where GIT_EDITOR="$EDITOR" or similar
-	return os.ExpandEnv(editor)
+	return editor
 }
 
 func parseResult(path string, config Config) (string, error) {
