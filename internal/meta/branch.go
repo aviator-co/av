@@ -16,7 +16,7 @@ type Branch struct {
 	Name string `json:"name"`
 
 	// Information about the parent branch.
-	Parent BranchState `json:"parent,omitempty"`
+	Parent BranchState `json:"parent"`
 
 	// The associated pull request information, if any.
 	PullRequest *PullRequest `json:"pullRequest,omitempty"`

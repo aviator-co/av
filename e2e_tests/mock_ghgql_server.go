@@ -43,12 +43,12 @@ type mockPR struct {
 }
 
 type graphqlRequest struct {
-	Query     string                 `json:"query"`
-	Variables map[string]interface{} `json:"variables"`
+	Query     string         `json:"query"`
+	Variables map[string]any `json:"variables"`
 }
 
 type graphqlResponse struct {
-	Data map[string]interface{} `json:"data"`
+	Data map[string]any `json:"data"`
 }
 
 func (s *mockGitHubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -73,12 +73,12 @@ func (s *mockGitHubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *mockGitHubServer) handlePRQuery(req graphqlRequest) graphqlResponse {
 	headRefName := req.Variables["headRefName"].(string)
-	var prs []interface{}
+	var prs []any
 	for _, pr := range s.pulls {
 		if pr.HeadRefName != headRefName {
 			continue
 		}
-		gqlpr := map[string]interface{}{
+		gqlpr := map[string]any{
 			"id":          pr.ID,
 			"number":      pr.Number,
 			"headRefName": pr.HeadRefName,
@@ -93,11 +93,11 @@ func (s *mockGitHubServer) handlePRQuery(req graphqlRequest) graphqlResponse {
 			gqlpr["mergeCommit"] = map[string]string{"oid": pr.MergeCommitOID}
 		}
 		if pr.ClosedCommitOID != "" {
-			gqlpr["timelineItems"] = map[string]interface{}{
-				"nodes": []interface{}{
-					map[string]interface{}{
+			gqlpr["timelineItems"] = map[string]any{
+				"nodes": []any{
+					map[string]any{
 						"__typename": "ClosedEvent",
-						"closer": map[string]interface{}{
+						"closer": map[string]any{
 							"__typename": "Commit",
 							"oid":        pr.ClosedCommitOID,
 						},
@@ -108,9 +108,9 @@ func (s *mockGitHubServer) handlePRQuery(req graphqlRequest) graphqlResponse {
 		prs = append(prs, gqlpr)
 	}
 	return graphqlResponse{
-		Data: map[string]interface{}{
-			"repository": map[string]interface{}{
-				"pullRequests": map[string]interface{}{
+		Data: map[string]any{
+			"repository": map[string]any{
+				"pullRequests": map[string]any{
 					"nodes": prs,
 				},
 			},

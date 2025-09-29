@@ -21,7 +21,6 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/erikgeiser/promptkit/selection"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 )
@@ -120,11 +119,10 @@ type syncViewModel struct {
 	db     meta.DB
 	client *gh.Client
 	help   help.Model
-
-	preAvSyncHookMessage string
+	views  []tea.Model
 
 	state            *syncState
-	syncAllPrompt    *selection.Model[string]
+	syncAllPrompt    tea.Model
 	githubFetchModel *ghui.GitHubFetchModel
 	restackModel     *sequencerui.RestackModel
 	githubPushModel  *ghui.GitHubPushModel
@@ -171,7 +169,7 @@ func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var err error
 		vm.githubFetchModel, err = vm.createGitHubFetchModel()
 		if err != nil {
-			return vm, func() tea.Msg { return err }
+			return vm, uiutils.ErrCmd(err)
 		}
 		return vm, vm.githubFetchModel.Init()
 
@@ -188,18 +186,18 @@ func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return vm, cmd
 	case *sequencerui.RestackConflict:
 		if err := vm.writeState(vm.restackModel.State); err != nil {
-			return vm, func() tea.Msg { return err }
+			return vm, uiutils.ErrCmd(err)
 		}
 		vm.quitWithConflict = true
 		return vm, tea.Quit
 	case *sequencerui.RestackAbort:
 		if err := vm.writeState(nil); err != nil {
-			return vm, func() tea.Msg { return err }
+			return vm, uiutils.ErrCmd(err)
 		}
 		return vm, tea.Quit
 	case *sequencerui.RestackDone:
 		if err := vm.writeState(nil); err != nil {
-			return vm, func() tea.Msg { return err }
+			return vm, uiutils.ErrCmd(err)
 		}
 		return vm, vm.initPushBranches()
 
@@ -219,54 +217,19 @@ func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		vm.pruningBranches = false
 		return vm, tea.Quit
 
-	case promptUserShouldSyncAllMsg:
-		vm.syncAllPrompt = uiutils.NewPromptModel("You are on the trunk, do you want to sync all stacks?", []string{"Yes", "No"})
-		return vm, vm.syncAllPrompt.Init()
-
 	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			return vm, tea.Quit
+		}
 		if vm.syncAllPrompt != nil {
-			switch msg.String() {
-			case " ", "enter":
-				c, err := vm.syncAllPrompt.Value()
-				if err != nil {
-					vm.err = err
-					return vm, tea.Quit
-				}
-				vm.syncAllPrompt = nil
-				if c == "Yes" {
-					syncFlags.All = true
-				}
-				if c == "No" {
-					return vm, tea.Quit
-				}
-				return vm, vm.initSync()
-			case "ctrl+c":
-				return vm, tea.Quit
-			default:
-				_, cmd := vm.syncAllPrompt.Update(msg)
-				return vm, cmd
-			}
+			_, cmd := vm.syncAllPrompt.Update(msg)
+			return vm, cmd
 		} else if vm.pushingToGitHub {
-			switch msg.String() {
-			case "ctrl+c":
-				return vm, tea.Quit
-			default:
-				_, cmd := vm.githubPushModel.Update(msg)
-				return vm, cmd
-			}
+			_, cmd := vm.githubPushModel.Update(msg)
+			return vm, cmd
 		} else if vm.pruningBranches {
-			switch msg.String() {
-			case "ctrl+c":
-				return vm, tea.Quit
-			default:
-				_, cmd := vm.pruneBranchModel.Update(msg)
-				return vm, cmd
-			}
-		} else {
-			switch msg.String() {
-			case "ctrl+c":
-				return vm, tea.Quit
-			}
+			_, cmd := vm.pruneBranchModel.Update(msg)
+			return vm, cmd
 		}
 	case error:
 		vm.err = msg
@@ -277,12 +240,8 @@ func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (vm *syncViewModel) View() string {
 	var ss []string
-	if vm.preAvSyncHookMessage != "" {
-		ss = append(ss, vm.preAvSyncHookMessage)
-	}
-	if vm.syncAllPrompt != nil {
-		ss = append(ss, vm.syncAllPrompt.View())
-		ss = append(ss, vm.help.ShortHelpView(uiutils.PromptKeys))
+	for _, v := range vm.views {
+		ss = append(ss, v.View())
 	}
 	if vm.githubFetchModel != nil {
 		ss = append(ss, vm.githubFetchModel.View())
@@ -314,30 +273,23 @@ func (vm *syncViewModel) View() string {
 
 type preAvSyncHookDoneMsg struct{}
 
-type promptUserShouldSyncAllMsg struct{}
-
 func (vm *syncViewModel) initSync() tea.Cmd {
 	state, err := vm.readState()
 	if err != nil {
-		return func() tea.Msg { return err }
+		return uiutils.ErrCmd(err)
 	}
 	if state != nil {
 		return vm.continueWithState(state)
 	}
 	if syncFlags.Abort || syncFlags.Continue || syncFlags.Skip {
-		return func() tea.Msg { return errors.New("no restack in progress") }
+		return uiutils.ErrCmd(errors.New("no restack in progress"))
 	}
 
 	isTrunkBranch, err := vm.repo.IsCurrentBranchTrunk(context.Background())
 	if err != nil {
-		return func() tea.Msg { return err }
+		return uiutils.ErrCmd(err)
 	}
-	if isTrunkBranch && !syncFlags.All {
-		return func() tea.Msg {
-			return promptUserShouldSyncAllMsg{}
-		}
-	}
-	return func() tea.Msg {
+	continuation := func() tea.Msg {
 		output, err := vm.repo.Run(
 			context.Background(),
 			&git.RunOpts{
@@ -356,22 +308,40 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 			}
 		}
 		if len(messages) != 0 {
-			vm.preAvSyncHookMessage = strings.Join(messages, "\n")
+			vm.views = append(vm.views, uiutils.SimpleMessageView{Message: strings.Join(messages, "\n")})
 		}
 		if err != nil {
 			return errors.Errorf("pre-av-sync hook failed: %v", err)
 		}
 		return preAvSyncHookDoneMsg{}
 	}
+	if isTrunkBranch && !syncFlags.All {
+		vm.syncAllPrompt = &uiutils.NewlineModel{Model: uiutils.NewPromptModel(
+			"You are on the trunk, do you want to sync all stacks?",
+			[]string{"Yes", "No"},
+			func(choice string) tea.Cmd {
+				if choice == "Yes" {
+					syncFlags.All = true
+				}
+				if choice == "No" {
+					return tea.Quit
+				}
+				return continuation
+			},
+		)}
+		vm.views = append(vm.views, vm.syncAllPrompt)
+		return vm.syncAllPrompt.Init()
+	}
+	return continuation
 }
 
 func (vm *syncViewModel) initSequencerState() tea.Cmd {
 	state, err := vm.createState()
 	if err != nil {
-		return func() tea.Msg { return err }
+		return uiutils.ErrCmd(err)
 	}
 	if state == nil {
-		return func() tea.Msg { return nothingToRestackError }
+		return uiutils.ErrCmd(nothingToRestackError)
 	}
 	return vm.continueWithState(state)
 }

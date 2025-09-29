@@ -286,13 +286,20 @@ func CreatePullRequest(
 			opts.Title = existingPR.Title
 		}
 		if opts.Body == "" {
-			opts.Body = existingPR.Body
+			// Not clear when this happens, but it seems that the body sometimes has
+			// \r\n as line endings. Convert them to \n for consistency.
+			body := strings.ReplaceAll(existingPR.Body, "\r\n", "\n")
+			// Existing PR body may have metadata appended to it. Trim that off.
+			if stripped, _, err := ParsePRBody(body); err == nil {
+				body = stripped
+			}
+			opts.Body = body
 		}
 	}
 
 	if opts.Edit || opts.Body == "" || opts.Title == "" {
 		var commits []git.CommitInfo
-		for _, commitHash := range strings.Split(commitsList, "\n") {
+		for commitHash := range strings.SplitSeq(commitsList, "\n") {
 			commit, err := repo.CommitInfo(ctx, git.CommitInfoOpts{Rev: commitHash})
 			if err != nil {
 				return nil, errors.WrapIff(err, "failed to get commit info for %q", commitHash)
@@ -714,7 +721,7 @@ func extractContent(input string, start string, end string) (content string, out
 	if postContent != "" {
 		output += "\n" + postContent
 	}
-	return
+	return content, output
 }
 
 func ParsePRBody(input string) (body string, prMeta PRMetadata, retErr error) {
@@ -722,12 +729,12 @@ func ParsePRBody(input string) (body string, prMeta PRMetadata, retErr error) {
 	metadataContent, _ := extractContent(metadata, "```", "```")
 	if err := json.Unmarshal([]byte(metadataContent), &prMeta); err != nil {
 		retErr = errors.WrapIff(err, "decoding PR metadata")
-		return
+		return body, prMeta, retErr
 	}
 
 	_, body = extractContent(body, PRStackCommentStart, PRStackCommentEnd)
 
-	return
+	return body, prMeta, retErr
 }
 
 func ReadPRMetadata(body string) (PRMetadata, error) {

@@ -75,6 +75,30 @@ func TestReparentTrunk(t *testing.T) {
 	RequireAv(t, "reparent", "--parent", "main")
 }
 
+func TestReparent_NewParentInMiddle(t *testing.T) {
+	server := RunMockGitHubServer(t)
+	defer server.Close()
+	repo := gittest.NewTempRepoWithGitHubServer(t, server.URL)
+	Chdir(t, repo.RepoDir)
+
+	RequireAv(t, "branch", "test1")
+	repo.CommitFile(t, "test.txt", "1")
+	repo.CommitFile(t, "test.txt", "2")
+
+	// Create a new branch on top of test1.
+	repo.Git(t, "checkout", "-b", "test2")
+	repo.CommitFile(t, "test.txt", "3")
+
+	// Adopt test2
+	RequireAv(t, "adopt", "--parent", "main")
+
+	// Now both test1 and test2 should have main as their parent. However, test2 is on top of
+	// test1, so test2 contains all commits from test1. Under this situation, if we reparent
+	// test2 onto test1, we should end up with no-op in terms of Git while test2 should have
+	// test1 as its parent.
+	RequireAv(t, "reparent", "--parent", "test1")
+}
+
 func requireFileContent(t *testing.T, file string, expected string, args ...any) {
 	t.Helper()
 	actual, err := os.ReadFile(file)

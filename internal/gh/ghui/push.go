@@ -128,7 +128,7 @@ func (vm *GitHubPushModel) Update(msg tea.Msg) (*GitHubPushModel, tea.Cmd) {
 				return vm, vm.runUpdate
 			}
 			vm.askingForConfirmation = true
-			vm.pushPrompt = uiutils.NewPromptModel("Are you OK with pushing these branches to remote?", []string{continuePush, abortPush})
+			vm.pushPrompt = uiutils.NewLegacyPromptModel("Are you OK with pushing these branches to remote?", []string{continuePush, abortPush})
 			return vm, vm.pushPrompt.Init()
 		}
 		if msg.gitPushDone {
@@ -142,7 +142,7 @@ func (vm *GitHubPushModel) Update(msg tea.Msg) (*GitHubPushModel, tea.Cmd) {
 			case "enter":
 				c, err := vm.pushPrompt.Value()
 				if err != nil {
-					return vm, func() tea.Msg { return err }
+					return vm, uiutils.ErrCmd(err)
 				}
 				vm.askingForConfirmation = false
 				vm.pushPrompt = nil

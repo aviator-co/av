@@ -307,7 +307,7 @@ func queue(ctx context.Context) error {
 	prNumber := branch.PullRequest.Number
 	repository := tx.Repository()
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"repoOwner": graphql.String(repository.Owner),
 		"repoName":  graphql.String(repository.Name),
 		// prNumber is int64 graphql expects in32, we should not have more than 2^31-1 PRs
