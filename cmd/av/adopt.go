@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"sort"
+	"slices"
 	"strings"
 
 	"emperror.dev/errors"
@@ -384,9 +384,7 @@ func (vm *adoptViewModel) View() string {
 		for branch := range vm.chosenTargets {
 			branches = append(branches, branch)
 		}
-		sort.Slice(branches, func(i, j int) bool {
-			return branches[i] < branches[j]
-		})
+		slices.Sort(branches)
 		if len(branches) == 0 {
 			ss = append(ss, "No branch is adopted")
 		} else if vm.adoptionComplete {

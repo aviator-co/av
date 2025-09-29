@@ -83,7 +83,7 @@ func (c *Client) PullRequest(ctx context.Context, id string) (*PullRequest, erro
 			PullRequest PullRequest `graphql:"... on PullRequest"`
 		} `graphql:"node(id: $id)"`
 	}
-	if err := c.query(ctx, &query, map[string]interface{}{
+	if err := c.query(ctx, &query, map[string]any{
 		"id": githubv4.ID(id),
 	}); err != nil {
 		return nil, errors.Wrap(err, "failed to query pull request")
@@ -126,7 +126,7 @@ func (c *Client) GetPullRequests(
 			} `graphql:"pullRequests(states: $states, headRefName: $headRefName, baseRefName: $baseRefName, first: $first, after: $after)"`
 		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
-	if err := c.query(ctx, &query, map[string]interface{}{
+	if err := c.query(ctx, &query, map[string]any{
 		"owner":       githubv4.String(input.Owner),
 		"repo":        githubv4.String(input.Repo),
 		"headRefName": nullable(githubv4.String(input.HeadRefName)),
