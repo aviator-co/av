@@ -58,6 +58,7 @@ func NewGitHubPushModel(
 	client *gh.Client,
 	pushFlag string,
 	targetBranches []plumbing.ReferenceName,
+	onDone func() tea.Cmd,
 ) *GitHubPushModel {
 	var makeDraftBeforePush bool
 	if avconfig.Av.PullRequest.RebaseWithDraft != nil {
@@ -76,6 +77,7 @@ func NewGitHubPushModel(
 		help:                help.New(),
 		chooseNoPush:        pushFlag == "no",
 		pullRequestsCache:   map[string]*gh.PullRequest{},
+		onDone:              onDone,
 	}
 }
 
@@ -83,8 +85,6 @@ type GitHubPushProgress struct {
 	candidateCalculationDone bool
 	gitPushDone              bool
 }
-
-type GitHubPushDone struct{}
 
 type GitHubPushModel struct {
 	repo                *git.Repo
@@ -95,6 +95,7 @@ type GitHubPushModel struct {
 	targetBranches      []plumbing.ReferenceName
 	spinner             spinner.Model
 	help                help.Model
+	onDone              func() tea.Cmd
 
 	chooseNoPush   bool
 	pushCandidates []pushCandidate
@@ -114,14 +115,14 @@ func (vm *GitHubPushModel) Init() tea.Cmd {
 	return tea.Batch(vm.spinner.Tick, vm.calculateChangedBranches)
 }
 
-func (vm *GitHubPushModel) Update(msg tea.Msg) (*GitHubPushModel, tea.Cmd) {
+func (vm *GitHubPushModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case *GitHubPushProgress:
 		if msg.candidateCalculationDone {
 			vm.calculatingCandidates = false
 			if len(vm.pushCandidates) == 0 || vm.chooseNoPush {
 				vm.done = true
-				return vm, func() tea.Msg { return &GitHubPushDone{} }
+				return vm, vm.onDone()
 			}
 			if vm.pushFlag == "yes" {
 				vm.runningGitPush = true
@@ -134,7 +135,7 @@ func (vm *GitHubPushModel) Update(msg tea.Msg) (*GitHubPushModel, tea.Cmd) {
 		if msg.gitPushDone {
 			vm.runningGitPush = false
 			vm.done = true
-			return vm, func() tea.Msg { return &GitHubPushDone{} }
+			return vm, vm.onDone()
 		}
 	case tea.KeyMsg:
 		if vm.askingForConfirmation {
@@ -149,7 +150,7 @@ func (vm *GitHubPushModel) Update(msg tea.Msg) (*GitHubPushModel, tea.Cmd) {
 				if c != continuePush {
 					vm.chooseNoPush = true
 					vm.done = true
-					return vm, func() tea.Msg { return &GitHubPushDone{} }
+					return vm, vm.onDone()
 				}
 				vm.runningGitPush = true
 				return vm, vm.runUpdate

@@ -15,12 +15,32 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
-func NewRestackModel(repo *git.Repo, db meta.DB) *RestackModel {
+type RestackStateOptions struct {
+	Skip       bool
+	Continue   bool
+	Abort      bool
+	DryRun     bool
+	Command    string
+	OnConflict func() tea.Cmd
+	OnAbort    func() tea.Cmd
+	OnDone     func() tea.Cmd
+}
+
+func NewRestackModel(
+	repo *git.Repo,
+	db meta.DB,
+	state *RestackState,
+	options RestackStateOptions,
+) *RestackModel {
+	if options.Command == "" {
+		options.Command = "av restack"
+	}
 	return &RestackModel{
 		repo:    repo,
 		db:      db,
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
-		Command: "av restack",
+		state:   state,
+		options: options,
 	}
 }
 
@@ -36,22 +56,11 @@ type RestackProgress struct {
 	err    error
 }
 
-type (
-	RestackConflict struct{}
-	RestackAbort    struct{}
-	RestackDone     struct{}
-)
-
 type RestackModel struct {
-	Skip     bool
-	Continue bool
-	Abort    bool
-	DryRun   bool
-	State    *RestackState
-	Command  string
-
-	repo *git.Repo
-	db   meta.DB
+	repo    *git.Repo
+	db      meta.DB
+	state   *RestackState
+	options RestackStateOptions
 
 	spinner                     spinner.Model
 	rebaseConflictErrorHeadline string
@@ -64,37 +73,37 @@ func (vm *RestackModel) Init() tea.Cmd {
 }
 
 func (vm *RestackModel) initCmd() tea.Msg {
-	if vm.Skip || vm.Continue || vm.Abort {
-		if vm.Abort {
-			vm.abortedBranch = vm.State.Seq.CurrentSyncRef
+	if vm.options.Skip || vm.options.Continue || vm.options.Abort {
+		if vm.options.Abort {
+			vm.abortedBranch = vm.state.Seq.CurrentSyncRef
 		}
 		return vm.runSeqWithContinuationFlags()
 	}
 	return vm.runSeq()
 }
 
-func (vm *RestackModel) Update(msg tea.Msg) (*RestackModel, tea.Cmd) {
+func (vm *RestackModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case *RestackProgress:
 		if msg.err == nil && msg.result == nil {
 			// Finished the sequence.
-			if vm.State.InitialBranch != "" {
-				if _, err := vm.repo.CheckoutBranch(context.Background(), &git.CheckoutBranch{Name: vm.State.InitialBranch}); err != nil {
+			if vm.state.InitialBranch != "" {
+				if _, err := vm.repo.CheckoutBranch(context.Background(), &git.CheckoutBranch{Name: vm.state.InitialBranch}); err != nil {
 					return vm, uiutils.ErrCmd(err)
 				}
 			}
 			if vm.abortedBranch != "" {
-				return vm, func() tea.Msg { return &RestackAbort{} }
+				return vm, vm.options.OnAbort()
 			}
-			return vm, func() tea.Msg { return &RestackDone{} }
+			return vm, vm.options.OnDone()
 		}
 		if msg.result != nil && msg.result.Status == git.RebaseConflict {
 			vm.rebaseConflictErrorHeadline = msg.result.ErrorHeadline
 			vm.rebaseConflictHint = msg.result.Hint
-			return vm, func() tea.Msg { return &RestackConflict{} }
+			return vm, vm.options.OnConflict()
 		}
 		if msg.err != nil {
-			return vm, func() tea.Msg { return msg.err }
+			return vm, uiutils.ErrCmd(msg.err)
 		}
 		return vm, vm.runSeq
 	case spinner.TickMsg:
@@ -107,11 +116,11 @@ func (vm *RestackModel) Update(msg tea.Msg) (*RestackModel, tea.Cmd) {
 
 func (vm *RestackModel) View() string {
 	sb := strings.Builder{}
-	if vm.State != nil && vm.State.Seq != nil {
-		if vm.State.Seq.CurrentSyncRef != "" {
+	if vm.state != nil && vm.state.Seq != nil {
+		if vm.state.Seq.CurrentSyncRef != "" {
 			sb.WriteString(
 				colors.ProgressStyle.Render(
-					vm.spinner.View() + "Restacking " + vm.State.Seq.CurrentSyncRef.Short() + "...",
+					vm.spinner.View() + "Restacking " + vm.state.Seq.CurrentSyncRef.Short() + "...",
 				),
 			)
 		} else if vm.abortedBranch != "" {
@@ -125,8 +134,8 @@ func (vm *RestackModel) View() string {
 		syncedBranches := map[plumbing.ReferenceName]bool{}
 		pendingBranches := map[plumbing.ReferenceName]bool{}
 		seenCurrent := false
-		for _, op := range vm.State.Seq.Operations {
-			if op.Name == vm.State.Seq.CurrentSyncRef || op.Name == vm.abortedBranch {
+		for _, op := range vm.state.Seq.Operations {
+			if op.Name == vm.state.Seq.CurrentSyncRef || op.Name == vm.abortedBranch {
 				seenCurrent = true
 			} else if !seenCurrent {
 				syncedBranches[op.Name] = true
@@ -137,14 +146,14 @@ func (vm *RestackModel) View() string {
 
 		var nodes []*stackutils.StackTreeNode
 		var err error
-		if vm.State.RestackingAll {
+		if vm.state.RestackingAll {
 			nodes = stackutils.BuildStackTreeAllBranches(
 				vm.db.ReadTx(),
-				vm.State.InitialBranch,
+				vm.state.InitialBranch,
 				true,
 			)
 		} else {
-			nodes, err = stackutils.BuildStackTreeRelatedBranchStacks(vm.db.ReadTx(), vm.State.InitialBranch, true, vm.State.RelatedBranches)
+			nodes, err = stackutils.BuildStackTreeRelatedBranchStacks(vm.db.ReadTx(), vm.state.InitialBranch, true, vm.state.RelatedBranches)
 		}
 		if err != nil {
 			sb.WriteString("\n")
@@ -171,7 +180,7 @@ func (vm *RestackModel) View() string {
 					if pendingBranches[bn] {
 						return colors.ProgressStyle.Render(branchName + suffix)
 					}
-					if bn == vm.State.Seq.CurrentSyncRef {
+					if bn == vm.state.Seq.CurrentSyncRef {
 						return colors.ProgressStyle.Render(vm.spinner.View() + branchName + suffix)
 					}
 					if bn == vm.abortedBranch {
@@ -188,7 +197,7 @@ func (vm *RestackModel) View() string {
 		sb.WriteString(
 			colors.FailureStyle.Render(
 				"Rebase conflict while rebasing ",
-				vm.State.Seq.CurrentSyncRef.Short(),
+				vm.state.Seq.CurrentSyncRef.Short(),
 			) + "\n",
 		)
 		sb.WriteString(vm.rebaseConflictErrorHeadline + "\n")
@@ -196,7 +205,7 @@ func (vm *RestackModel) View() string {
 		sb.WriteString("\n")
 		sb.WriteString(
 			"Resolve the conflicts and continue the restack with " + colors.CliCmd(
-				vm.Command+" --continue",
+				vm.options.Command+" --continue",
 			),
 		)
 	}
@@ -204,18 +213,18 @@ func (vm *RestackModel) View() string {
 }
 
 func (vm *RestackModel) runSeqWithContinuationFlags() tea.Msg {
-	result, err := vm.State.Seq.Run(
+	result, err := vm.state.Seq.Run(
 		context.Background(),
 		vm.repo,
 		vm.db,
-		vm.Abort,
-		vm.Continue,
-		vm.Skip,
+		vm.options.Abort,
+		vm.options.Continue,
+		vm.options.Skip,
 	)
 	return &RestackProgress{result: result, err: err}
 }
 
 func (vm *RestackModel) runSeq() tea.Msg {
-	result, err := vm.State.Seq.Run(context.Background(), vm.repo, vm.db, false, false, false)
+	result, err := vm.state.Seq.Run(context.Background(), vm.repo, vm.db, false, false, false)
 	return &RestackProgress{result: result, err: err}
 }

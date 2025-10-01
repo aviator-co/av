@@ -50,35 +50,56 @@ type restackViewModel struct {
 	repo *git.Repo
 	db   meta.DB
 
-	restackModel *sequencerui.RestackModel
+	state        *sequencerui.RestackState
+	restackModel tea.Model
 
 	quitWithConflict bool
 	err              error
 }
 
 func (vm *restackViewModel) Init() tea.Cmd {
-	state, err := vm.readState()
+	var err error
+	vm.state, err = vm.readState()
 	if err != nil {
 		return uiutils.ErrCmd(err)
 	}
-	if state == nil {
+	if vm.state == nil {
 		if restackFlags.Abort || restackFlags.Continue || restackFlags.Skip {
 			return uiutils.ErrCmd(errors.New("no restack in progress"))
 		}
-		state, err = vm.createState()
+		vm.state, err = vm.createState()
 		if err != nil {
 			return uiutils.ErrCmd(err)
 		}
 	}
-	if state == nil {
+	if vm.state == nil {
 		return uiutils.ErrCmd(nothingToRestackError)
 	}
-	vm.restackModel = sequencerui.NewRestackModel(vm.repo, vm.db)
-	vm.restackModel.State = state
-	vm.restackModel.Abort = restackFlags.Abort
-	vm.restackModel.Continue = restackFlags.Continue
-	vm.restackModel.Skip = restackFlags.Skip
-	vm.restackModel.DryRun = restackFlags.DryRun
+	vm.restackModel = sequencerui.NewRestackModel(vm.repo, vm.db, vm.state, sequencerui.RestackStateOptions{
+		Abort:    restackFlags.Abort,
+		Continue: restackFlags.Continue,
+		Skip:     restackFlags.Skip,
+		DryRun:   restackFlags.DryRun,
+		OnConflict: func() tea.Cmd {
+			if err := vm.writeState(vm.state); err != nil {
+				return uiutils.ErrCmd(err)
+			}
+			vm.quitWithConflict = true
+			return tea.Quit
+		},
+		OnAbort: func() tea.Cmd {
+			if err := vm.writeState(nil); err != nil {
+				return uiutils.ErrCmd(err)
+			}
+			return tea.Quit
+		},
+		OnDone: func() tea.Cmd {
+			if err := vm.writeState(nil); err != nil {
+				return uiutils.ErrCmd(err)
+			}
+			return tea.Quit
+		},
+	})
 	return vm.restackModel.Init()
 }
 
@@ -88,17 +109,6 @@ func (vm *restackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		vm.restackModel, cmd = vm.restackModel.Update(msg)
 		return vm, cmd
-	case *sequencerui.RestackConflict:
-		if err := vm.writeState(vm.restackModel.State); err != nil {
-			return vm, uiutils.ErrCmd(err)
-		}
-		vm.quitWithConflict = true
-		return vm, tea.Quit
-	case *sequencerui.RestackAbort, *sequencerui.RestackDone:
-		if err := vm.writeState(nil); err != nil {
-			return vm, uiutils.ErrCmd(err)
-		}
-		return vm, tea.Quit
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":

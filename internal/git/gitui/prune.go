@@ -45,6 +45,7 @@ func NewPruneBranchModel(
 	pruneFlag string,
 	targetBranches []plumbing.ReferenceName,
 	initialBranch string,
+	onDone func() tea.Cmd,
 ) *PruneBranchModel {
 	return &PruneBranchModel{
 		repo:           repo,
@@ -55,6 +56,7 @@ func NewPruneBranchModel(
 		spinner:        spinner.New(spinner.WithSpinner(spinner.Dot)),
 		help:           help.New(),
 		chooseNoPrune:  pruneFlag == "no",
+		onDone:         onDone,
 	}
 }
 
@@ -66,6 +68,7 @@ type PruneBranchModel struct {
 	initialBranch  string
 	spinner        spinner.Model
 	help           help.Model
+	onDone         func() tea.Cmd
 
 	chooseNoPrune    bool
 	deleteCandidates []deleteCandidate
@@ -83,21 +86,19 @@ type PruneBranchProgress struct {
 	deletionDone             bool
 }
 
-type PruneBranchDone struct{}
-
 func (vm *PruneBranchModel) Init() tea.Cmd {
 	vm.calculatingCandidates = true
 	return tea.Batch(vm.spinner.Tick, vm.calculateMergedBranches)
 }
 
-func (vm *PruneBranchModel) Update(msg tea.Msg) (*PruneBranchModel, tea.Cmd) {
+func (vm *PruneBranchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case *PruneBranchProgress:
 		if msg.candidateCalculationDone {
 			vm.calculatingCandidates = false
 			if len(vm.deleteCandidates) == 0 || vm.chooseNoPrune {
 				vm.done = true
-				return vm, func() tea.Msg { return &PruneBranchDone{} }
+				return vm, vm.onDone()
 			}
 			if vm.pruneFlag == "yes" {
 				vm.runningDeletion = true
@@ -110,7 +111,7 @@ func (vm *PruneBranchModel) Update(msg tea.Msg) (*PruneBranchModel, tea.Cmd) {
 		if msg.deletionDone {
 			vm.runningDeletion = false
 			vm.done = true
-			return vm, func() tea.Msg { return &PruneBranchDone{} }
+			return vm, vm.onDone()
 		}
 	case tea.KeyMsg:
 		if vm.askingForConfirmation {
@@ -125,7 +126,7 @@ func (vm *PruneBranchModel) Update(msg tea.Msg) (*PruneBranchModel, tea.Cmd) {
 				if c != continueDeletion {
 					vm.chooseNoPrune = true
 					vm.done = true
-					return vm, func() tea.Msg { return &PruneBranchDone{} }
+					return vm, vm.onDone()
 				}
 				vm.runningDeletion = true
 				return vm, vm.runDelete

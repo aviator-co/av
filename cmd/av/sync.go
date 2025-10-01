@@ -19,8 +19,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -100,7 +98,6 @@ base branch.
 			repo:   repo,
 			db:     db,
 			client: client,
-			help:   help.New(),
 		})
 	},
 }
@@ -116,27 +113,14 @@ type syncState struct {
 	Push           string
 }
 
-type addToViewsMsg struct {
-	model tea.Model
-}
-
 type syncViewModel struct {
 	repo   *git.Repo
 	db     meta.DB
 	client *gh.Client
-	help   help.Model
 	views  []tea.Model
 
-	state              *syncState
-	preAvSyncHookModel tea.Model
-	syncAllPrompt      tea.Model
-	githubFetchModel   *ghui.GitHubFetchModel
-	restackModel       *sequencerui.RestackModel
-	githubPushModel    *ghui.GitHubPushModel
-	pruneBranchModel   *gitui.PruneBranchModel
-
-	pushingToGitHub bool
-	pruningBranches bool
+	state        *syncState
+	restackState *sequencerui.RestackState
 
 	quitWithConflict bool
 	err              error
@@ -148,103 +132,19 @@ func (vm *syncViewModel) Init() tea.Cmd {
 
 func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case spinner.TickMsg:
-		var cmds []tea.Cmd
-		if vm.githubFetchModel != nil {
-			var cmd tea.Cmd
-			vm.githubFetchModel, cmd = vm.githubFetchModel.Update(msg)
-			cmds = append(cmds, cmd)
-		}
-		if vm.restackModel != nil {
-			var cmd tea.Cmd
-			vm.restackModel, cmd = vm.restackModel.Update(msg)
-			cmds = append(cmds, cmd)
-		}
-		if vm.githubPushModel != nil {
-			var cmd tea.Cmd
-			vm.githubPushModel, cmd = vm.githubPushModel.Update(msg)
-			cmds = append(cmds, cmd)
-		}
-		if vm.pruneBranchModel != nil {
-			var cmd tea.Cmd
-			vm.pruneBranchModel, cmd = vm.pruneBranchModel.Update(msg)
-			cmds = append(cmds, cmd)
-		}
-		return vm, tea.Batch(cmds...)
-
-	case addToViewsMsg:
-		vm.views = append(vm.views, msg.model)
-		return vm, msg.model.Init()
-
-	case preAvSyncHookDoneMsg:
-		var err error
-		vm.githubFetchModel, err = vm.createGitHubFetchModel()
-		if err != nil {
-			return vm, uiutils.ErrCmd(err)
-		}
-		return vm, vm.githubFetchModel.Init()
-
-	case *ghui.GitHubFetchProgress:
-		var cmd tea.Cmd
-		vm.githubFetchModel, cmd = vm.githubFetchModel.Update(msg)
-		return vm, cmd
-	case *ghui.GitHubFetchDone:
-		return vm, vm.initSequencerState()
-
-	case *sequencerui.RestackProgress:
-		var cmd tea.Cmd
-		vm.restackModel, cmd = vm.restackModel.Update(msg)
-		return vm, cmd
-	case *sequencerui.RestackConflict:
-		if err := vm.writeState(vm.restackModel.State); err != nil {
-			return vm, uiutils.ErrCmd(err)
-		}
-		vm.quitWithConflict = true
-		return vm, tea.Quit
-	case *sequencerui.RestackAbort:
-		if err := vm.writeState(nil); err != nil {
-			return vm, uiutils.ErrCmd(err)
-		}
-		return vm, tea.Quit
-	case *sequencerui.RestackDone:
-		if err := vm.writeState(nil); err != nil {
-			return vm, uiutils.ErrCmd(err)
-		}
-		return vm, vm.initPushBranches()
-
-	case *ghui.GitHubPushProgress:
-		var cmd tea.Cmd
-		vm.githubPushModel, cmd = vm.githubPushModel.Update(msg)
-		return vm, cmd
-	case *ghui.GitHubPushDone:
-		vm.pushingToGitHub = false
-		return vm, vm.initPruneBranches()
-
-	case *gitui.PruneBranchProgress:
-		var cmd tea.Cmd
-		vm.pruneBranchModel, cmd = vm.pruneBranchModel.Update(msg)
-		return vm, cmd
-	case *gitui.PruneBranchDone:
-		vm.pruningBranches = false
-		return vm, tea.Quit
-
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return vm, tea.Quit
 		}
-		if vm.syncAllPrompt != nil {
-			_, cmd := vm.syncAllPrompt.Update(msg)
-			return vm, cmd
-		} else if vm.pushingToGitHub {
-			_, cmd := vm.githubPushModel.Update(msg)
-			return vm, cmd
-		} else if vm.pruningBranches {
-			_, cmd := vm.pruneBranchModel.Update(msg)
-			return vm, cmd
-		}
 	case error:
 		vm.err = msg
 		return vm, tea.Quit
+	}
+	if len(vm.views) > 0 {
+		idx := len(vm.views) - 1
+		var cmd tea.Cmd
+		vm.views[idx], cmd = vm.views[idx].Update(msg)
+		return vm, cmd
 	}
 	return vm, nil
 }
@@ -256,18 +156,6 @@ func (vm *syncViewModel) View() string {
 		if r != "" {
 			ss = append(ss, r)
 		}
-	}
-	if vm.githubFetchModel != nil {
-		ss = append(ss, vm.githubFetchModel.View())
-	}
-	if vm.restackModel != nil {
-		ss = append(ss, vm.restackModel.View())
-	}
-	if vm.githubPushModel != nil {
-		ss = append(ss, vm.githubPushModel.View())
-	}
-	if vm.pruneBranchModel != nil {
-		ss = append(ss, vm.pruneBranchModel.View())
 	}
 
 	var ret string
@@ -285,7 +173,10 @@ func (vm *syncViewModel) View() string {
 	return ret
 }
 
-type preAvSyncHookDoneMsg struct{}
+func (vm *syncViewModel) addView(m tea.Model) tea.Cmd {
+	vm.views = append(vm.views, m)
+	return m.Init()
+}
 
 func (vm *syncViewModel) initSync() tea.Cmd {
 	state, err := vm.readState()
@@ -303,29 +194,81 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 	if err != nil {
 		return uiutils.ErrCmd(err)
 	}
-	continuation := func() tea.Msg {
-		vm.preAvSyncHookModel = newPreAvSyncHookModel(vm.repo, func() tea.Msg {
-			return preAvSyncHookDoneMsg{}
-		})
-		return addToViewsMsg{model: vm.preAvSyncHookModel}
-	}
 	if isTrunkBranch && !syncFlags.All {
-		vm.syncAllPrompt = &uiutils.NewlineModel{Model: uiutils.NewPromptModel(
-			"You are on the trunk, do you want to sync all stacks?",
-			[]string{"Yes", "No"},
-			func(choice string) tea.Cmd {
-				if choice == "Yes" {
-					syncFlags.All = true
-				}
-				if choice == "No" {
-					return tea.Quit
-				}
-				return continuation
-			},
-		)}
-		return func() tea.Msg { return addToViewsMsg{model: vm.syncAllPrompt} }
+		return vm.initTrunkCheck()
 	}
-	return continuation
+	return vm.initPreAvHook()
+}
+
+func (vm *syncViewModel) initTrunkCheck() tea.Cmd {
+	return vm.addView(&uiutils.NewlineModel{Model: uiutils.NewPromptModel(
+		"You are on the trunk, do you want to sync all stacks?",
+		[]string{"Yes", "No"},
+		func(choice string) tea.Cmd {
+			if choice == "Yes" {
+				syncFlags.All = true
+			}
+			if choice == "No" {
+				return tea.Quit
+			}
+			return vm.initPreAvHook()
+		},
+	)})
+}
+
+func (vm *syncViewModel) initPreAvHook() tea.Cmd {
+	return vm.addView(newPreAvSyncHookModel(vm.repo, vm.initGitFetch))
+}
+
+func (vm *syncViewModel) initGitFetch() tea.Cmd {
+	ctx := context.Background()
+	status, err := vm.repo.Status(ctx)
+	if err != nil {
+		return uiutils.ErrCmd(err)
+	}
+	currentBranch := status.CurrentBranch
+
+	var targetBranches []plumbing.ReferenceName
+	if syncFlags.All {
+		var err error
+		targetBranches, err = planner.GetTargetBranches(
+			ctx,
+			vm.db.ReadTx(),
+			vm.repo,
+			true,
+			planner.AllBranches,
+		)
+		if err != nil {
+			return uiutils.ErrCmd(err)
+		}
+	} else {
+		if _, exist := vm.db.ReadTx().Branch(currentBranch); !exist {
+			return uiutils.ErrCmd(errors.New("current branch is not adopted to av"))
+		}
+		var err error
+		if syncFlags.Current {
+			targetBranches, err = planner.GetTargetBranches(ctx, vm.db.ReadTx(), vm.repo, true, planner.CurrentAndParents)
+		} else {
+			targetBranches, err = planner.GetTargetBranches(ctx, vm.db.ReadTx(), vm.repo, true, planner.CurrentStack)
+		}
+		if err != nil {
+			return uiutils.ErrCmd(err)
+		}
+	}
+
+	var currentBranchRef plumbing.ReferenceName
+	if currentBranch != "" {
+		currentBranchRef = plumbing.NewBranchReferenceName(currentBranch)
+	}
+
+	return vm.addView(ghui.NewGitHubFetchModel(
+		vm.repo,
+		vm.db,
+		vm.client,
+		currentBranchRef,
+		targetBranches,
+		vm.initSequencerState,
+	))
 }
 
 func (vm *syncViewModel) initSequencerState() tea.Cmd {
@@ -341,13 +284,56 @@ func (vm *syncViewModel) initSequencerState() tea.Cmd {
 
 func (vm *syncViewModel) continueWithState(state *savedSyncState) tea.Cmd {
 	vm.state = state.SyncState
-	vm.restackModel = sequencerui.NewRestackModel(vm.repo, vm.db)
-	vm.restackModel.Command = "av sync"
-	vm.restackModel.State = state.RestackState
-	vm.restackModel.Abort = syncFlags.Abort
-	vm.restackModel.Continue = syncFlags.Continue
-	vm.restackModel.Skip = syncFlags.Skip
-	return vm.restackModel.Init()
+	vm.restackState = state.RestackState
+	return vm.addView(sequencerui.NewRestackModel(vm.repo, vm.db, state.RestackState, sequencerui.RestackStateOptions{
+		Command:  "av sync",
+		Abort:    syncFlags.Abort,
+		Continue: syncFlags.Continue,
+		Skip:     syncFlags.Skip,
+		OnConflict: func() tea.Cmd {
+			if err := vm.writeState(vm.restackState); err != nil {
+				return uiutils.ErrCmd(err)
+			}
+			vm.quitWithConflict = true
+			return tea.Quit
+		},
+		OnAbort: func() tea.Cmd {
+			if err := vm.writeState(nil); err != nil {
+				return uiutils.ErrCmd(err)
+			}
+			return tea.Quit
+		},
+		OnDone: func() tea.Cmd {
+			if err := vm.writeState(nil); err != nil {
+				return uiutils.ErrCmd(err)
+			}
+			return vm.initPushBranches()
+		},
+	}))
+}
+
+func (vm *syncViewModel) initPushBranches() tea.Cmd {
+	return vm.addView(ghui.NewGitHubPushModel(
+		vm.repo,
+		vm.db,
+		vm.client,
+		vm.state.Push,
+		vm.state.TargetBranches,
+		vm.initPruneBranches,
+	))
+}
+
+func (vm *syncViewModel) initPruneBranches() tea.Cmd {
+	return vm.addView(gitui.NewPruneBranchModel(
+		vm.repo,
+		vm.db,
+		vm.state.Prune,
+		vm.state.TargetBranches,
+		vm.restackState.InitialBranch,
+		func() tea.Cmd {
+			return tea.Quit
+		},
+	))
 }
 
 func (vm *syncViewModel) readState() (*savedSyncState, error) {
@@ -369,56 +355,6 @@ func (vm *syncViewModel) writeState(seqModel *sequencerui.RestackState) error {
 	state.RestackState = seqModel
 	state.SyncState = vm.state
 	return vm.repo.WriteStateFile(git.StateFileKindSyncV2, &state)
-}
-
-func (vm *syncViewModel) createGitHubFetchModel() (*ghui.GitHubFetchModel, error) {
-	ctx := context.Background()
-	status, err := vm.repo.Status(ctx)
-	if err != nil {
-		return nil, err
-	}
-	currentBranch := status.CurrentBranch
-
-	var targetBranches []plumbing.ReferenceName
-	if syncFlags.All {
-		var err error
-		targetBranches, err = planner.GetTargetBranches(
-			ctx,
-			vm.db.ReadTx(),
-			vm.repo,
-			true,
-			planner.AllBranches,
-		)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		if _, exist := vm.db.ReadTx().Branch(currentBranch); !exist {
-			return nil, errors.New("current branch is not adopted to av")
-		}
-		var err error
-		if syncFlags.Current {
-			targetBranches, err = planner.GetTargetBranches(ctx, vm.db.ReadTx(), vm.repo, true, planner.CurrentAndParents)
-		} else {
-			targetBranches, err = planner.GetTargetBranches(ctx, vm.db.ReadTx(), vm.repo, true, planner.CurrentStack)
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var currentBranchRef plumbing.ReferenceName
-	if currentBranch != "" {
-		currentBranchRef = plumbing.NewBranchReferenceName(currentBranch)
-	}
-
-	return ghui.NewGitHubFetchModel(
-		vm.repo,
-		vm.db,
-		vm.client,
-		currentBranchRef,
-		targetBranches,
-	), nil
 }
 
 func (vm *syncViewModel) createState() (*savedSyncState, error) {
@@ -488,30 +424,6 @@ func (vm *syncViewModel) createState() (*savedSyncState, error) {
 	return &state, nil
 }
 
-func (vm *syncViewModel) initPushBranches() tea.Cmd {
-	vm.githubPushModel = ghui.NewGitHubPushModel(
-		vm.repo,
-		vm.db,
-		vm.client,
-		vm.state.Push,
-		vm.state.TargetBranches,
-	)
-	vm.pushingToGitHub = true
-	return vm.githubPushModel.Init()
-}
-
-func (vm *syncViewModel) initPruneBranches() tea.Cmd {
-	vm.pruneBranchModel = gitui.NewPruneBranchModel(
-		vm.repo,
-		vm.db,
-		vm.state.Prune,
-		vm.state.TargetBranches,
-		vm.restackModel.State.InitialBranch,
-	)
-	vm.pruningBranches = true
-	return vm.pruneBranchModel.Init()
-}
-
 func (vm *syncViewModel) ExitError() error {
 	if errors.Is(vm.err, nothingToRestackError) {
 		return nil
@@ -526,17 +438,19 @@ func (vm *syncViewModel) ExitError() error {
 }
 
 type preAvSyncHookModel struct {
-	repo             *git.Repo
-	completeCallback func() tea.Msg
+	repo   *git.Repo
+	onDone func() tea.Cmd
 
 	hasHook  bool
 	complete bool
 }
 
-func newPreAvSyncHookModel(repo *git.Repo, completeCallback func() tea.Msg) *preAvSyncHookModel {
+type preAvSyncHookProgress struct{}
+
+func newPreAvSyncHookModel(repo *git.Repo, onDone func() tea.Cmd) *preAvSyncHookModel {
 	return &preAvSyncHookModel{
-		repo:             repo,
-		completeCallback: completeCallback,
+		repo:   repo,
+		onDone: onDone,
 	}
 }
 
@@ -544,7 +458,7 @@ func (m *preAvSyncHookModel) Init() tea.Cmd {
 	_, err := os.Lstat(filepath.Join(m.repo.GitDir(), "hooks", "pre-av-sync"))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return func() tea.Msg { return m.completeCallback() }
+			return func() tea.Msg { return preAvSyncHookProgress{} }
 		}
 		return uiutils.ErrCmd(err)
 	}
@@ -557,11 +471,15 @@ func (m *preAvSyncHookModel) Init() tea.Cmd {
 			return errors.Errorf("pre-av-sync hook failed: %v", err)
 		}
 		m.complete = true
-		return m.completeCallback()
+		return preAvSyncHookProgress{}
 	})
 }
 
 func (m *preAvSyncHookModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg.(type) {
+	case preAvSyncHookProgress:
+		return m, m.onDone()
+	}
 	return m, nil
 }
 
