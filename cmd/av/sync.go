@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"emperror.dev/errors"
@@ -15,6 +16,7 @@ import (
 	"github.com/aviator-co/av/internal/sequencer"
 	"github.com/aviator-co/av/internal/sequencer/planner"
 	"github.com/aviator-co/av/internal/sequencer/sequencerui"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/charmbracelet/bubbles/help"
@@ -114,6 +116,10 @@ type syncState struct {
 	Push           string
 }
 
+type addToViewsMsg struct {
+	model tea.Model
+}
+
 type syncViewModel struct {
 	repo   *git.Repo
 	db     meta.DB
@@ -121,12 +127,13 @@ type syncViewModel struct {
 	help   help.Model
 	views  []tea.Model
 
-	state            *syncState
-	syncAllPrompt    tea.Model
-	githubFetchModel *ghui.GitHubFetchModel
-	restackModel     *sequencerui.RestackModel
-	githubPushModel  *ghui.GitHubPushModel
-	pruneBranchModel *gitui.PruneBranchModel
+	state              *syncState
+	preAvSyncHookModel tea.Model
+	syncAllPrompt      tea.Model
+	githubFetchModel   *ghui.GitHubFetchModel
+	restackModel       *sequencerui.RestackModel
+	githubPushModel    *ghui.GitHubPushModel
+	pruneBranchModel   *gitui.PruneBranchModel
 
 	pushingToGitHub bool
 	pruningBranches bool
@@ -164,6 +171,10 @@ func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 		return vm, tea.Batch(cmds...)
+
+	case addToViewsMsg:
+		vm.views = append(vm.views, msg.model)
+		return vm, msg.model.Init()
 
 	case preAvSyncHookDoneMsg:
 		var err error
@@ -241,7 +252,10 @@ func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (vm *syncViewModel) View() string {
 	var ss []string
 	for _, v := range vm.views {
-		ss = append(ss, v.View())
+		r := v.View()
+		if r != "" {
+			ss = append(ss, r)
+		}
 	}
 	if vm.githubFetchModel != nil {
 		ss = append(ss, vm.githubFetchModel.View())
@@ -290,30 +304,10 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 		return uiutils.ErrCmd(err)
 	}
 	continuation := func() tea.Msg {
-		output, err := vm.repo.Run(
-			context.Background(),
-			&git.RunOpts{
-				Args:        []string{"hook", "run", "--ignore-missing", "pre-av-sync"},
-				Interactive: true,
-				ExitError:   true,
-			},
-		)
-		var messages []string
-		if output != nil {
-			if len(output.Stdout) != 0 {
-				messages = append(messages, string(output.Stdout))
-			}
-			if len(output.Stderr) != 0 {
-				messages = append(messages, string(output.Stderr))
-			}
-		}
-		if len(messages) != 0 {
-			vm.views = append(vm.views, uiutils.SimpleMessageView{Message: strings.Join(messages, "\n")})
-		}
-		if err != nil {
-			return errors.Errorf("pre-av-sync hook failed: %v", err)
-		}
-		return preAvSyncHookDoneMsg{}
+		vm.preAvSyncHookModel = newPreAvSyncHookModel(vm.repo, func() tea.Msg {
+			return preAvSyncHookDoneMsg{}
+		})
+		return addToViewsMsg{model: vm.preAvSyncHookModel}
 	}
 	if isTrunkBranch && !syncFlags.All {
 		vm.syncAllPrompt = &uiutils.NewlineModel{Model: uiutils.NewPromptModel(
@@ -329,8 +323,7 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 				return continuation
 			},
 		)}
-		vm.views = append(vm.views, vm.syncAllPrompt)
-		return vm.syncAllPrompt.Init()
+		return func() tea.Msg { return addToViewsMsg{model: vm.syncAllPrompt} }
 	}
 	return continuation
 }
@@ -530,6 +523,69 @@ func (vm *syncViewModel) ExitError() error {
 		return actions.ErrExitSilently{ExitCode: 1}
 	}
 	return nil
+}
+
+type preAvSyncHookModel struct {
+	repo             *git.Repo
+	completeCallback func() tea.Msg
+
+	hasHook  bool
+	complete bool
+}
+
+func newPreAvSyncHookModel(repo *git.Repo, completeCallback func() tea.Msg) *preAvSyncHookModel {
+	return &preAvSyncHookModel{
+		repo:             repo,
+		completeCallback: completeCallback,
+	}
+}
+
+func (m *preAvSyncHookModel) Init() tea.Cmd {
+	_, err := os.Lstat(filepath.Join(m.repo.GitDir(), "hooks", "pre-av-sync"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return func() tea.Msg { return m.completeCallback() }
+		}
+		return uiutils.ErrCmd(err)
+	}
+	m.hasHook = true
+	cmd := m.repo.Cmd(context.Background(), []string{"hook", "run", "--ignore-missing", "pre-av-sync"}, nil)
+	// Use tea.ExecProcess so that the hook can take over the terminal, allowing user to create
+	// an interactive hook.
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		if err != nil {
+			return errors.Errorf("pre-av-sync hook failed: %v", err)
+		}
+		m.complete = true
+		return m.completeCallback()
+	})
+}
+
+func (m *preAvSyncHookModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	return m, nil
+}
+
+func (m *preAvSyncHookModel) View() string {
+	if !m.hasHook {
+		// Do not even render anything if there is no hook for simplicity. We show the
+		// status only when the hook exists.
+		return ""
+	}
+	// NOTE: It is tempting to add a spinner here, but because the hook runs with a terminal
+	// control, the spinner actually doesn't render / updated until the hook is done. Because
+	// the terminal control is regained after the hook is done, and bubbletea will not erase the
+	// content rendered while it didn't have a control (which is a sane behavior as it cannot
+	// tell what was rendered while that) that previous spinner render will never be updated.
+	// Due to this, we will have a better visual experience by not showing a spinner at all
+	// here.
+	if m.complete {
+		return colors.SuccessStyle.Render("✓ pre-av-sync hook completed")
+	}
+	// We don't have to render anything here because the pre-av-sync failure message will be
+	// rendered through error. The stdout / stderr of the hook will be shown directly in the
+	// terminal as bubbletea won't erase the terminal content prior to the terminal control
+	// take over.
+	return ""
 }
 
 func init() {
