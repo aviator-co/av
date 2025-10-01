@@ -74,7 +74,7 @@ func Launch(ctx context.Context, repo *git.Repo, config Config) (string, error) 
 	// e.g., EDITOR="'/path/with spaces/editor'" or
 	// EDITOR="code --wait" or GIT_EDITOR="$EDITOR" work correctly.
 	shellCmd := config.Command + " " + shellquote.Join(tmp.Name())
-	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", shellCmd)
+	cmd := exec.CommandContext(ctx, "sh", "-c", shellCmd)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	stderr := bytes.NewBuffer(nil)
