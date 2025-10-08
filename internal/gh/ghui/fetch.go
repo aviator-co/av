@@ -24,6 +24,7 @@ func NewGitHubFetchModel(
 	client *gh.Client,
 	currentBranch plumbing.ReferenceName,
 	targetBranches []plumbing.ReferenceName,
+	onDone func() tea.Cmd,
 ) *GitHubFetchModel {
 	return &GitHubFetchModel{
 		repo:           repo,
@@ -32,6 +33,7 @@ func NewGitHubFetchModel(
 		currentBranch:  currentBranch,
 		targetBranches: targetBranches,
 		spinner:        spinner.New(spinner.WithSpinner(spinner.Dot)),
+		onDone:         onDone,
 
 		runningGitFetch:             true,
 		runningGitHubAPIBranch:      -1,
@@ -47,8 +49,6 @@ type GitHubFetchProgress struct {
 	mergeCommitPropagationIsDone bool
 }
 
-type GitHubFetchDone struct{}
-
 type GitHubFetchModel struct {
 	repo           *git.Repo
 	db             meta.DB
@@ -56,6 +56,7 @@ type GitHubFetchModel struct {
 	currentBranch  plumbing.ReferenceName
 	targetBranches []plumbing.ReferenceName
 	spinner        spinner.Model
+	onDone         func() tea.Cmd
 
 	runningGitFetch             bool
 	runningGitHubAPIBranch      int
@@ -67,7 +68,7 @@ func (vm *GitHubFetchModel) Init() tea.Cmd {
 	return tea.Batch(vm.spinner.Tick, vm.runGitFetch)
 }
 
-func (vm *GitHubFetchModel) Update(msg tea.Msg) (*GitHubFetchModel, tea.Cmd) {
+func (vm *GitHubFetchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case *GitHubFetchProgress:
 		if msg.gitFetchIsDone {
@@ -90,7 +91,7 @@ func (vm *GitHubFetchModel) Update(msg tea.Msg) (*GitHubFetchModel, tea.Cmd) {
 		}
 		if msg.mergeCommitPropagationIsDone {
 			vm.runningPropagateMergeCommit = false
-			return vm, func() tea.Msg { return &GitHubFetchDone{} }
+			return vm, vm.onDone()
 		}
 	case spinner.TickMsg:
 		var cmd tea.Cmd
