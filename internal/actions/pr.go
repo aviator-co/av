@@ -297,7 +297,7 @@ func CreatePullRequest(
 		}
 	}
 
-	if opts.Edit || opts.Body == "" || opts.Title == "" {
+	if opts.Edit || (opts.Body == "" && opts.Title == "") {
 		var commits []git.CommitInfo
 		for commitHash := range strings.SplitSeq(commitsList, "\n") {
 			commit, err := repo.CommitInfo(ctx, git.CommitInfoOpts{Rev: commitHash})
@@ -361,9 +361,6 @@ func CreatePullRequest(
 			return nil, errors.WrapIf(err, "text editor failed")
 		}
 		opts.Title, opts.Body = stringutils.ParseSubjectBody(res)
-		if opts.Title == "" {
-			return nil, errors.New("aborting pull request due to empty message")
-		}
 		// The tailing new line is needed for compare with `PRMetadataCommentEnd` during the metadata parsing.
 		opts.Body += "\n"
 
@@ -379,6 +376,9 @@ func CreatePullRequest(
 			// lost forever (and we can reuse it if they try again).
 			savePRDescriptionToTemporaryFile(saveFile, res)
 		}()
+	}
+	if opts.Title == "" {
+		return nil, errors.New("aborting pull request due to empty message")
 	}
 
 	prMeta, err := getPRMetadata(tx, branchMeta, &parentMeta)
