@@ -205,11 +205,14 @@ func (vm *syncViewModel) initTrunkCheck() tea.Cmd {
 		"You are on the trunk, do you want to sync all stacks?",
 		[]string{"Yes", "No"},
 		func(choice string) tea.Cmd {
-			if choice == "Yes" {
-				syncFlags.All = true
-			}
+			// The callback must return a tea.Cmd to continue the execution chain.
+			// When user selects "No", we quit immediately.
 			if choice == "No" {
 				return tea.Quit
+			}
+			// When user selects "Yes", we set the flag and continue to initPreAvHook.
+			if choice == "Yes" {
+				syncFlags.All = true
 			}
 			return vm.initPreAvHook()
 		},
