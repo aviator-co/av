@@ -4,19 +4,22 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/aviator-co/av/internal/meta"
-	"github.com/aviator-co/av/internal/treedetector"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
+type BranchTreeInfo struct {
+	TitleLine string
+	Body      string
+}
+
 func NewAdoptTreeSelectorModel(
-	db meta.DB,
-	branches map[plumbing.ReferenceName]*treedetector.BranchPiece,
+	infos map[plumbing.ReferenceName]BranchTreeInfo,
 	rootNodes []*stackutils.StackTreeNode,
 	adoptionTargets []plumbing.ReferenceName,
 	currentHEADBranch plumbing.ReferenceName,
@@ -27,10 +30,10 @@ func NewAdoptTreeSelectorModel(
 		// By default choose everything.
 		chosenTargets[branch] = true
 	}
+
 	return &AdoptTreeSelectorModel{
-		db:                db,
 		help:              help.New(),
-		branches:          branches,
+		infos:             infos,
 		rootNodes:         rootNodes,
 		adoptionTargets:   adoptionTargets,
 		currentHEADBranch: currentHEADBranch,
@@ -41,9 +44,8 @@ func NewAdoptTreeSelectorModel(
 }
 
 type AdoptTreeSelectorModel struct {
-	db                meta.DB
 	help              help.Model
-	branches          map[plumbing.ReferenceName]*treedetector.BranchPiece
+	infos             map[plumbing.ReferenceName]BranchTreeInfo
 	rootNodes         []*stackutils.StackTreeNode
 	adoptionTargets   []plumbing.ReferenceName
 	currentHEADBranch plumbing.ReferenceName
@@ -89,7 +91,7 @@ func (m *AdoptTreeSelectorModel) View() string {
 	if m.done {
 		ss = append(ss, colors.SuccessStyle.Render("✓ Choose which branches to adopt"))
 	} else {
-		ss = append(ss, colors.QuestionStyle.Render("Choose which branches to adopt"))
+		ss = append(ss, colors.QuestionStyle.Render("? Choose which branches to adopt"))
 	}
 	for _, rootNode := range m.rootNodes {
 		ss = append(ss, "")
@@ -101,7 +103,6 @@ func (m *AdoptTreeSelectorModel) View() string {
 					bn := plumbing.NewBranchReferenceName(branchName)
 					out := m.renderBranch(bn, isTrunk)
 					if !m.done && bn == m.currentCursor {
-						out = strings.TrimSuffix(out, "\n")
 						out = colors.PromptChoice.Render(out)
 					}
 					return out
@@ -120,33 +121,20 @@ func (m *AdoptTreeSelectorModel) renderBranch(branch plumbing.ReferenceName, isT
 	if isTrunk {
 		return branch.Short()
 	}
-	_, adopted := m.db.ReadTx().Branch(branch.Short())
+	info := m.infos[branch]
 
-	sb := strings.Builder{}
-	if adopted && !m.chosenTargets[branch] {
-		sb.WriteString(branch.Short())
+	var lines []string
+	if !slices.Contains(m.adoptionTargets, branch) {
+		lines = append(lines, info.TitleLine)
 	} else if m.chosenTargets[branch] {
-		sb.WriteString("[✓] " + branch.Short())
+		lines = append(lines, "[✓] "+info.TitleLine)
 	} else {
-		sb.WriteString("[ ] " + branch.Short())
+		lines = append(lines, "[ ] "+info.TitleLine)
 	}
-
-	var status []string
-	if m.currentHEADBranch == branch {
-		status = append(status, "HEAD")
+	if info.Body != "" {
+		lines = append(lines, lipgloss.NewStyle().MarginLeft(4).Render(info.Body))
 	}
-	if len(status) != 0 {
-		sb.WriteString(" (" + strings.Join(status, ", ") + ")")
-	}
-	if !adopted || m.chosenTargets[branch] {
-		sb.WriteString("\n")
-		piece := m.branches[branch]
-		for _, c := range piece.IncludedCommits {
-			title, _, _ := strings.Cut(c.Message, "\n")
-			sb.WriteString("  " + title + "\n")
-		}
-	}
-	return sb.String()
+	return strings.Join(lines, "\n")
 }
 
 func (m *AdoptTreeSelectorModel) getPreviousBranch() plumbing.ReferenceName {
@@ -176,20 +164,25 @@ func (m *AdoptTreeSelectorModel) getNextBranch() plumbing.ReferenceName {
 func (m *AdoptTreeSelectorModel) toggleAdoption(branch plumbing.ReferenceName) {
 	if m.chosenTargets[branch] {
 		// Going to unchoose. Unchoose all children as well.
-		children := treedetector.GetChildren(m.branches, branch)
-		for bn := range children {
-			delete(m.chosenTargets, bn)
-		}
 		delete(m.chosenTargets, branch)
+		for _, rootNode := range m.rootNodes {
+			descendantNames := stackutils.GetDescendantBranchNames(rootNode, branch.Short())
+			for _, descName := range descendantNames {
+				descBN := plumbing.NewBranchReferenceName(descName)
+				delete(m.chosenTargets, descBN)
+			}
+		}
 	} else {
 		// Going to choose. Choose all parents as well.
-		piece := m.branches[branch]
-		for slices.Contains(m.adoptionTargets, piece.Name) {
-			m.chosenTargets[piece.Name] = true
-			if piece.Parent == "" || piece.ParentIsTrunk {
-				break
+		m.chosenTargets[branch] = true
+		for _, rootNode := range m.rootNodes {
+			parentNames := stackutils.GetParentBranchNames(rootNode, branch.Short())
+			for _, parentName := range parentNames {
+				parentBN := plumbing.NewBranchReferenceName(parentName)
+				if slices.Contains(m.adoptionTargets, parentBN) {
+					m.chosenTargets[parentBN] = true
+				}
 			}
-			piece = m.branches[piece.Parent]
 		}
 	}
 }

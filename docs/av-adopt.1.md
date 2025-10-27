@@ -7,7 +7,7 @@ av-adopt - Adopt branches that are not managed by `av`
 ## SYNOPSIS
 
 ```synopsis
-av adopt [--parent=<parent>]
+av adopt [--parent=<parent> | --remote=<branch>]
 ```
 
 ## DESCRIPTION
@@ -37,10 +37,19 @@ branches so that they form a tree structure.
 If you want to adopt the current branch and specify the parent branch, you can
 do so by running the command with `--parent`.
 
+## ADOPTING FROM A REMOTE REPOSITORY
+
+You can also adopt branches from a remote repository by using the
+`--remote` option. This option fetches the specified remote branch and adopts
+it along with its parent branches.
+
 ## OPTIONS
 
 `--parent=<parent>`
 : Force specify the parent branch.
+
+`--remote=<branch>`
+: Specify a remote branch to adopt from.
 
 ## SEE ALSO
 

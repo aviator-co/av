@@ -147,6 +147,50 @@ func BuildStackTreeRelatedBranchStacks(
 	return buildStackTree(currentBranch, branchesToInclude, sortCurrent), nil
 }
 
+// GetParentBranchNames returns the parent branch names of the given branch.
+// The returned slice is ordered from immediate parent to the root.
+func GetParentBranchNames(rootNode *StackTreeNode, branchName string) []string {
+	var parents []string
+	var discoverFn func(node *StackTreeNode) bool
+	discoverFn = func(node *StackTreeNode) bool {
+		if node.Branch.BranchName == branchName {
+			return true
+		}
+		if slices.ContainsFunc(node.Children, discoverFn) {
+			parents = append(parents, node.Branch.BranchName)
+			return true
+		}
+		return false
+	}
+	discoverFn(rootNode)
+	return parents
+}
+
+// GetDescendantBranchNames returns the descendant branch names of the given
+// branch.
+func GetDescendantBranchNames(rootNode *StackTreeNode, branchName string) []string {
+	var descendants []string
+	var collectFn func(node *StackTreeNode)
+	var discoverFn func(node *StackTreeNode)
+	collectFn = func(node *StackTreeNode) {
+		for _, child := range node.Children {
+			descendants = append(descendants, child.Branch.BranchName)
+			collectFn(child)
+		}
+	}
+	discoverFn = func(node *StackTreeNode) {
+		if node.Branch.BranchName == branchName {
+			collectFn(node)
+			return
+		}
+		for _, child := range node.Children {
+			discoverFn(child)
+		}
+	}
+	discoverFn(rootNode)
+	return descendants
+}
+
 func buildStackTree(
 	currentBranch string,
 	branchesToInclude map[string]meta.Branch,
