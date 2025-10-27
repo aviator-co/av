@@ -13,7 +13,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 )
@@ -129,68 +128,21 @@ type adoptViewModel struct {
 	repo              *git.Repo
 	db                meta.DB
 	currentHEADBranch plumbing.ReferenceName
-	views             []tea.Model
 	branches          map[plumbing.ReferenceName]*treedetector.BranchPiece
-	err               error
+
+	uiutils.BaseStackedView
+}
+
+func (vm *adoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	return vm, vm.BaseStackedView.Update(msg)
 }
 
 func (vm *adoptViewModel) Init() tea.Cmd {
 	return vm.initModel()
 }
 
-func (vm *adoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" {
-			return vm, tea.Quit
-		}
-	case uiutils.SimpleCommandMsg:
-		return vm, msg.Cmd
-	case error:
-		vm.err = msg
-		return vm, tea.Quit
-	}
-	if len(vm.views) > 0 {
-		idx := len(vm.views) - 1
-		var cmd tea.Cmd
-		vm.views[idx], cmd = vm.views[idx].Update(msg)
-		return vm, cmd
-	}
-	return vm, nil
-}
-
-func (vm *adoptViewModel) View() string {
-	var ss []string
-	for _, v := range vm.views {
-		r := v.View()
-		if r != "" {
-			ss = append(ss, r)
-		}
-	}
-
-	var ret string
-	if len(ss) != 0 {
-		ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(lipgloss.JoinVertical(0, ss...))
-	}
-	if vm.err != nil {
-		if len(ret) != 0 {
-			ret += "\n"
-		}
-		ret += renderError(vm.err)
-	}
-	if len(ret) > 0 && ret[len(ret)-1] != '\n' {
-		ret += "\n"
-	}
-	return ret
-}
-
-func (vm *adoptViewModel) addView(m tea.Model) tea.Cmd {
-	vm.views = append(vm.views, m)
-	return m.Init()
-}
-
 func (vm *adoptViewModel) initModel() tea.Cmd {
-	return vm.addView(
+	return vm.AddView(
 		actions.NewFindAdoptableLocalBranchesModel(
 			vm.repo,
 			vm.db,
@@ -202,12 +154,12 @@ func (vm *adoptViewModel) initModel() tea.Cmd {
 func (vm *adoptViewModel) initTreeSelector(branches map[plumbing.ReferenceName]*treedetector.BranchPiece, rootNodes []*stackutils.StackTreeNode, adoptionTargets []plumbing.ReferenceName) tea.Cmd {
 	if branches == nil || len(rootNodes) == 0 || len(adoptionTargets) == 0 {
 		return tea.Batch(
-			vm.addView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch to adopt")}),
+			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch to adopt")}),
 			tea.Quit,
 		)
 	}
 	vm.branches = branches
-	cmd := vm.addView(
+	cmd := vm.AddView(
 		actions.NewAdoptTreeSelectorModel(
 			vm.db,
 			branches,
@@ -220,7 +172,7 @@ func (vm *adoptViewModel) initTreeSelector(branches map[plumbing.ReferenceName]*
 	if adoptFlags.DryRun {
 		return tea.Batch(
 			cmd,
-			vm.addView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ Running as dry-run. Quitting without adopting branches.")}),
+			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ Running as dry-run. Quitting without adopting branches.")}),
 			tea.Quit,
 		)
 	}
@@ -230,11 +182,11 @@ func (vm *adoptViewModel) initTreeSelector(branches map[plumbing.ReferenceName]*
 func (vm *adoptViewModel) initAdoption(chosenTargets []plumbing.ReferenceName) tea.Cmd {
 	if len(chosenTargets) == 0 {
 		return tea.Batch(
-			vm.addView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch adopted")}),
+			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch adopted")}),
 			tea.Quit,
 		)
 	}
-	return vm.addView(
+	return vm.AddView(
 		actions.NewAdoptBranchesModel(
 			vm.db,
 			chosenTargets,
@@ -245,7 +197,7 @@ func (vm *adoptViewModel) initAdoption(chosenTargets []plumbing.ReferenceName) t
 }
 
 func (vm *adoptViewModel) ExitError() error {
-	if vm.err != nil {
+	if vm.Err != nil {
 		return actions.ErrExitSilently{ExitCode: 1}
 	}
 	return nil
