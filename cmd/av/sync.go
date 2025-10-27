@@ -20,7 +20,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 )
@@ -117,65 +116,21 @@ type syncViewModel struct {
 	repo   *git.Repo
 	db     meta.DB
 	client *gh.Client
-	views  []tea.Model
 
 	state        *syncState
 	restackState *sequencerui.RestackState
 
 	quitWithConflict bool
-	err              error
+
+	uiutils.BaseStackedView
+}
+
+func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	return vm, vm.BaseStackedView.Update(msg)
 }
 
 func (vm *syncViewModel) Init() tea.Cmd {
 	return vm.initSync()
-}
-
-func (vm *syncViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" {
-			return vm, tea.Quit
-		}
-	case error:
-		vm.err = msg
-		return vm, tea.Quit
-	}
-	if len(vm.views) > 0 {
-		idx := len(vm.views) - 1
-		var cmd tea.Cmd
-		vm.views[idx], cmd = vm.views[idx].Update(msg)
-		return vm, cmd
-	}
-	return vm, nil
-}
-
-func (vm *syncViewModel) View() string {
-	var ss []string
-	for _, v := range vm.views {
-		r := v.View()
-		if r != "" {
-			ss = append(ss, r)
-		}
-	}
-
-	var ret string
-	if len(ss) != 0 {
-		ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
-			lipgloss.JoinVertical(0, ss...),
-		)
-	}
-	if vm.err != nil {
-		if len(ret) != 0 {
-			ret += "\n"
-		}
-		ret += renderError(vm.err)
-	}
-	return ret
-}
-
-func (vm *syncViewModel) addView(m tea.Model) tea.Cmd {
-	vm.views = append(vm.views, m)
-	return m.Init()
 }
 
 func (vm *syncViewModel) initSync() tea.Cmd {
@@ -201,7 +156,7 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 }
 
 func (vm *syncViewModel) initTrunkCheck() tea.Cmd {
-	return vm.addView(&uiutils.NewlineModel{Model: uiutils.NewPromptModel(
+	return vm.AddView(&uiutils.NewlineModel{Model: uiutils.NewPromptModel(
 		"You are on the trunk, do you want to sync all stacks?",
 		[]string{"Yes", "No"},
 		func(choice string) tea.Cmd {
@@ -217,7 +172,7 @@ func (vm *syncViewModel) initTrunkCheck() tea.Cmd {
 }
 
 func (vm *syncViewModel) initPreAvHook() tea.Cmd {
-	return vm.addView(newPreAvSyncHookModel(vm.repo, vm.initGitFetch))
+	return vm.AddView(newPreAvSyncHookModel(vm.repo, vm.initGitFetch))
 }
 
 func (vm *syncViewModel) initGitFetch() tea.Cmd {
@@ -261,7 +216,7 @@ func (vm *syncViewModel) initGitFetch() tea.Cmd {
 		currentBranchRef = plumbing.NewBranchReferenceName(currentBranch)
 	}
 
-	return vm.addView(ghui.NewGitHubFetchModel(
+	return vm.AddView(ghui.NewGitHubFetchModel(
 		vm.repo,
 		vm.db,
 		vm.client,
@@ -285,7 +240,7 @@ func (vm *syncViewModel) initSequencerState() tea.Cmd {
 func (vm *syncViewModel) continueWithState(state *savedSyncState) tea.Cmd {
 	vm.state = state.SyncState
 	vm.restackState = state.RestackState
-	return vm.addView(sequencerui.NewRestackModel(vm.repo, vm.db, state.RestackState, sequencerui.RestackStateOptions{
+	return vm.AddView(sequencerui.NewRestackModel(vm.repo, vm.db, state.RestackState, sequencerui.RestackStateOptions{
 		Command:  "av sync",
 		Abort:    syncFlags.Abort,
 		Continue: syncFlags.Continue,
@@ -313,7 +268,7 @@ func (vm *syncViewModel) continueWithState(state *savedSyncState) tea.Cmd {
 }
 
 func (vm *syncViewModel) initPushBranches() tea.Cmd {
-	return vm.addView(ghui.NewGitHubPushModel(
+	return vm.AddView(ghui.NewGitHubPushModel(
 		vm.repo,
 		vm.db,
 		vm.client,
@@ -324,7 +279,7 @@ func (vm *syncViewModel) initPushBranches() tea.Cmd {
 }
 
 func (vm *syncViewModel) initPruneBranches() tea.Cmd {
-	return vm.addView(gitui.NewPruneBranchModel(
+	return vm.AddView(gitui.NewPruneBranchModel(
 		vm.repo,
 		vm.db,
 		vm.state.Prune,
@@ -425,10 +380,10 @@ func (vm *syncViewModel) createState() (*savedSyncState, error) {
 }
 
 func (vm *syncViewModel) ExitError() error {
-	if errors.Is(vm.err, nothingToRestackError) {
+	if errors.Is(vm.Err, nothingToRestackError) {
 		return nil
 	}
-	if vm.err != nil {
+	if vm.Err != nil {
 		return actions.ErrExitSilently{ExitCode: 1}
 	}
 	if vm.quitWithConflict {

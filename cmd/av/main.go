@@ -17,6 +17,7 @@ import (
 	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/fatih/color"
 	"github.com/kr/text"
 	"github.com/sirupsen/logrus"
@@ -139,7 +140,7 @@ func main() {
 			stackTrace := fmt.Sprintf("%+v", err)
 			fmt.Fprintf(os.Stderr, "error: %s\n%s\n", err, text.Indent(stackTrace, "\t"))
 		} else {
-			fmt.Fprint(os.Stderr, renderError(err))
+			fmt.Fprint(os.Stderr, uiutils.RenderError(err))
 		}
 
 		os.Exit(1)
@@ -202,7 +203,7 @@ func discoverGitHubAPIToken(ctx context.Context) string {
 func getGitHubClient(ctx context.Context) (*gh.Client, error) {
 	token := discoverGitHubAPIToken(ctx)
 	if token == "" {
-		return nil, errNoGitHubToken
+		return nil, uiutils.ErrNoGitHubToken
 	}
 	var err error
 	once.Do(func() {

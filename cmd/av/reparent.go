@@ -131,7 +131,7 @@ func (vm *reparentViewModel) View() string {
 		if len(ret) != 0 {
 			ret += "\n"
 		}
-		ret += renderError(vm.err)
+		ret += uiutils.RenderError(vm.err)
 	}
 	return ret
 }

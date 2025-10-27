@@ -1,4 +1,4 @@
-package main
+package uiutils
 
 import (
 	"fmt"
@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	errNoGitHubToken    = errors.Sentinel("No GitHub token is set (do you need to configure one?).")
-	errParentNotAdopted = errors.Sentinel("Parent not adopted")
+	ErrNoGitHubToken    = errors.Sentinel("No GitHub token is set (do you need to configure one?).")
+	ErrParentNotAdopted = errors.Sentinel("Parent not adopted")
 )
 
 const noGitHubToken = `# ERROR: No GitHub Token
@@ -33,7 +33,7 @@ created via ` + "`git`" + ` command, ` + "`av`" + ` doesn't have such metadata f
 Please run ` + "`av adopt`" + ` to adopt the parent branch first.
 `
 
-func renderError(err error) string {
+func RenderError(err error) string {
 	var style string
 	if lipgloss.HasDarkBackground() {
 		style = styles.DarkStyle
@@ -41,9 +41,9 @@ func renderError(err error) string {
 		style = styles.LightStyle
 	}
 	var markdownText string
-	if errors.Is(err, errNoGitHubToken) {
+	if errors.Is(err, ErrNoGitHubToken) {
 		markdownText = noGitHubToken
-	} else if errors.Is(err, errParentNotAdopted) {
+	} else if errors.Is(err, ErrParentNotAdopted) {
 		markdownText = parentNotAdopted
 	}
 
