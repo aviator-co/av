@@ -2,30 +2,28 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/treedetector"
 	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 )
 
 var adoptFlags struct {
-	Parent string
-	DryRun bool
+	Parent           string
+	DryRun           bool
+	RemoteBranchName string
 }
 
 var adoptCmd = &cobra.Command{
@@ -39,7 +37,11 @@ should be adopted to av.
 
 If you want to adopt the current branch, you can use the --parent flag to specify the parent branch.
 For example, "av adopt --parent main" will adopt the current branch with the main branch as
-the parent.`),
+the parent.
+
+If you want to adopt branches on the remote repository, use --remote $BRANCH_NAME to adopt branches.
+The command will adopt the stack of pull requests starting from the specified branch name.
+`),
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		ctx := cmd.Context()
@@ -62,15 +64,22 @@ the parent.`),
 		if adoptFlags.Parent != "" {
 			return adoptForceAdoption(ctx, repo, db, currentBranch, adoptFlags.Parent)
 		}
-
+		if adoptFlags.RemoteBranchName != "" {
+			client, err := getGitHubClient(ctx)
+			if err != nil {
+				return err
+			}
+			return uiutils.RunBubbleTea(&remoteAdoptViewModel{
+				repo:       repo,
+				db:         db,
+				ghClient:   client,
+				branchName: adoptFlags.RemoteBranchName,
+			})
+		}
 		return uiutils.RunBubbleTea(&adoptViewModel{
 			repo:              repo,
 			db:                db,
 			currentHEADBranch: plumbing.NewBranchReferenceName(currentBranch),
-			currentCursor:     plumbing.NewBranchReferenceName(currentBranch),
-			chosenTargets:     make(map[plumbing.ReferenceName]bool),
-			help:              help.New(),
-			spinner:           spinner.New(spinner.WithSpinner(spinner.Dot)),
 		})
 	},
 }
@@ -134,326 +143,256 @@ func adoptForceAdoption(
 	return tx.Commit()
 }
 
-type adoptTreeInfo struct {
-	branches        map[plumbing.ReferenceName]*treedetector.BranchPiece
-	rootNodes       []*stackutils.StackTreeNode
-	adoptionTargets []plumbing.ReferenceName
-}
-
 type adoptViewModel struct {
 	repo              *git.Repo
 	db                meta.DB
 	currentHEADBranch plumbing.ReferenceName
+	branches          map[plumbing.ReferenceName]*treedetector.BranchPiece
 
-	help               help.Model
-	spinner            spinner.Model
-	currentCursor      plumbing.ReferenceName
-	chosenTargets      map[plumbing.ReferenceName]bool
-	treeInfo           *adoptTreeInfo
-	adoptionComplete   bool
-	adoptionInProgress bool
-
-	err error
-}
-
-func (vm *adoptViewModel) Init() tea.Cmd {
-	return tea.Batch(vm.spinner.Tick, vm.initCmd)
+	uiutils.BaseStackedView
 }
 
 func (vm *adoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case error:
-		vm.err = msg
-		return vm, tea.Quit
-	case *adoptTreeInfo:
-		vm.treeInfo = msg
-		if len(vm.treeInfo.adoptionTargets) == 0 {
-			return vm, tea.Quit
-		}
-		for _, branch := range vm.treeInfo.adoptionTargets {
-			// By default choose everything.
-			vm.chosenTargets[branch] = true
-		}
-		vm.currentCursor = vm.treeInfo.adoptionTargets[0]
-		if adoptFlags.DryRun {
-			return vm, tea.Quit
-		}
-	case adoptionCompleteMsg:
-		vm.adoptionComplete = true
-		return vm, tea.Quit
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			return vm, tea.Quit
-		}
-		if vm.treeInfo != nil {
-			switch msg.String() {
-			case "up", "k", "ctrl+p":
-				vm.currentCursor = vm.getPreviousBranch()
-			case "down", "j", "ctrl+n":
-				vm.currentCursor = vm.getNextBranch()
-			case " ":
-				vm.toggleAdoption(vm.currentCursor)
-			case "enter":
-				vm.adoptionInProgress = true
-				return vm, vm.adoptBranches
-			}
-		}
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		vm.spinner, cmd = vm.spinner.Update(msg)
-		return vm, cmd
-	}
-	return vm, nil
+	return vm, vm.BaseStackedView.Update(msg)
 }
 
-func (vm *adoptViewModel) initCmd() tea.Msg {
-	unmanagedBranches, err := vm.getUnmanagedBranches()
-	if err != nil {
-		return err
-	}
-	pieces, err := treedetector.DetectBranches(context.Background(), vm.repo, unmanagedBranches)
-	if err != nil {
-		return err
-	}
-	if len(pieces) == 0 {
-		return errors.New("no branch to adopt")
-	}
-	nodes := treedetector.ConvertToStackTree(vm.db, pieces, plumbing.HEAD, false)
-	return &adoptTreeInfo{
-		branches:        pieces,
-		rootNodes:       nodes,
-		adoptionTargets: vm.getAdoptionTargets(nodes[0]),
-	}
+func (vm *adoptViewModel) Init() tea.Cmd {
+	return vm.initModel()
 }
 
-func (vm *adoptViewModel) getUnmanagedBranches() ([]plumbing.ReferenceName, error) {
-	tx := vm.db.ReadTx()
-	adoptedBranches := tx.AllBranches()
-	branches, err := vm.repo.GoGitRepo().Branches()
-	if err != nil {
-		return nil, err
-	}
-	var ret []plumbing.ReferenceName
-	if err := branches.ForEach(func(ref *plumbing.Reference) error {
-		if ref.Type() != plumbing.HashReference {
-			return nil
-		}
-		if _, adopted := adoptedBranches[ref.Name().Short()]; !adopted {
-			ret = append(ret, ref.Name())
-		}
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return ret, nil
+func (vm *adoptViewModel) initModel() tea.Cmd {
+	return vm.AddView(
+		actions.NewFindAdoptableLocalBranchesModel(
+			vm.repo,
+			vm.db,
+			vm.initTreeSelector,
+		),
+	)
 }
 
-func (vm *adoptViewModel) getAdoptionTargets(
-	node *stackutils.StackTreeNode,
-) []plumbing.ReferenceName {
-	var ret []plumbing.ReferenceName
-	for _, child := range node.Children {
-		ret = append(ret, vm.getAdoptionTargets(child)...)
+func (vm *adoptViewModel) initTreeSelector(branches map[plumbing.ReferenceName]*treedetector.BranchPiece, rootNodes []*stackutils.StackTreeNode, adoptionTargets []plumbing.ReferenceName) tea.Cmd {
+	if branches == nil || len(rootNodes) == 0 || len(adoptionTargets) == 0 {
+		return tea.Batch(
+			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch to adopt")}),
+			tea.Quit,
+		)
 	}
-	if node.Branch.ParentBranchName != "" {
-		_, adopted := vm.db.ReadTx().Branch(node.Branch.BranchName)
+	vm.branches = branches
+	infos := make(map[plumbing.ReferenceName]actions.BranchTreeInfo)
+	for _, branch := range adoptionTargets {
+		titleLine := branch.Short()
+		var status []string
+		if vm.currentHEADBranch == branch {
+			status = append(status, "HEAD")
+		}
+		if len(status) != 0 {
+			titleLine += " (" + strings.Join(status, ", ") + ")"
+		}
+
+		_, adopted := vm.db.ReadTx().Branch(branch.Short())
+		body := ""
 		if !adopted {
-			ret = append(ret, plumbing.NewBranchReferenceName(node.Branch.BranchName))
-		}
-	}
-	return ret
-}
-
-func (vm *adoptViewModel) getPreviousBranch() plumbing.ReferenceName {
-	if vm.treeInfo == nil {
-		return vm.currentCursor
-	}
-	for i, branch := range vm.treeInfo.adoptionTargets {
-		if branch == vm.currentCursor {
-			if i == 0 {
-				return vm.currentCursor
+			piece := branches[branch]
+			var lines []string
+			for _, c := range piece.IncludedCommits {
+				prTitle, _, _ := strings.Cut(c.Message, "\n")
+				lines = append(lines, "  "+prTitle)
 			}
-			return vm.treeInfo.adoptionTargets[i-1]
+			body = strings.Join(lines, "\n")
+		}
+		infos[branch] = actions.BranchTreeInfo{
+			TitleLine: titleLine,
+			Body:      body,
 		}
 	}
-	return vm.currentCursor
+	cmd := vm.AddView(
+		actions.NewAdoptTreeSelectorModel(
+			infos,
+			rootNodes,
+			adoptionTargets,
+			vm.currentHEADBranch,
+			vm.initAdoption,
+		),
+	)
+	if adoptFlags.DryRun {
+		return tea.Batch(
+			cmd,
+			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ Running as dry-run. Quitting without adopting branches.")}),
+			tea.Quit,
+		)
+	}
+	return cmd
 }
 
-func (vm *adoptViewModel) getNextBranch() plumbing.ReferenceName {
-	if vm.treeInfo == nil {
-		return vm.currentCursor
+func (vm *adoptViewModel) initAdoption(chosenTargets []plumbing.ReferenceName) tea.Cmd {
+	if len(chosenTargets) == 0 {
+		return tea.Batch(
+			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch adopted")}),
+			tea.Quit,
+		)
 	}
-	for i, branch := range vm.treeInfo.adoptionTargets {
-		if branch == vm.currentCursor {
-			if i == len(vm.treeInfo.adoptionTargets)-1 {
-				return vm.currentCursor
-			}
-			return vm.treeInfo.adoptionTargets[i+1]
-		}
-	}
-	return vm.currentCursor
-}
-
-func (vm *adoptViewModel) toggleAdoption(branch plumbing.ReferenceName) {
-	if vm.treeInfo == nil {
-		return
-	}
-	if vm.chosenTargets[branch] {
-		// Going to unchoose. Unchoose all children as well.
-		children := treedetector.GetChildren(vm.treeInfo.branches, branch)
-		for bn := range children {
-			delete(vm.chosenTargets, bn)
-		}
-		delete(vm.chosenTargets, branch)
-	} else {
-		// Going to choose. Choose all parents as well.
-		piece := vm.treeInfo.branches[branch]
-		for sliceutils.Contains(vm.treeInfo.adoptionTargets, piece.Name) {
-			vm.chosenTargets[piece.Name] = true
-			if piece.Parent == "" || piece.ParentIsTrunk {
-				break
-			}
-			piece = vm.treeInfo.branches[piece.Parent]
-		}
-	}
-}
-
-type adoptionCompleteMsg struct{}
-
-func (vm *adoptViewModel) adoptBranches() tea.Msg {
-	tx := vm.db.WriteTx()
-	for branch := range vm.chosenTargets {
-		piece := vm.treeInfo.branches[branch]
-		bi, _ := tx.Branch(branch.Short())
-		bi.Parent = meta.BranchState{
-			Name:  piece.Parent.Short(),
-			Trunk: piece.ParentIsTrunk,
+	var branches []actions.AdoptingBranch
+	for _, target := range chosenTargets {
+		piece := vm.branches[target]
+		ab := actions.AdoptingBranch{
+			Name: target.Short(),
+			Parent: meta.BranchState{
+				Name:  piece.Parent.Short(),
+				Trunk: piece.ParentIsTrunk,
+			},
 		}
 		if !piece.ParentIsTrunk {
-			bi.Parent.Head = piece.ParentMergeBase.String()
+			ab.Parent.Head = piece.ParentMergeBase.String()
 		}
-		tx.SetBranch(bi)
+		branches = append(branches, ab)
 	}
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-	return adoptionCompleteMsg{}
-}
-
-func (vm *adoptViewModel) View() string {
-	var ss []string
-	if vm.treeInfo != nil {
-		choosing := false
-		if len(vm.treeInfo.adoptionTargets) == 0 {
-			ss = append(ss, colors.SuccessStyle.Render("✓ No branch to adopt"))
-		} else if vm.adoptionComplete {
-			ss = append(ss, colors.SuccessStyle.Render("✓ Adoption complete"))
-		} else if vm.adoptionInProgress {
-			ss = append(ss, colors.ProgressStyle.Render(vm.spinner.View()+"Adopting the chosen branches..."))
-		} else {
-			choosing = true
-			ss = append(ss, colors.QuestionStyle.Render("Choose which branches to adopt"))
-		}
-		for _, rootNode := range vm.treeInfo.rootNodes {
-			ss = append(ss, "")
-			ss = append(
-				ss,
-				stackutils.RenderTree(
-					rootNode,
-					func(branchName string, isTrunk bool) string {
-						bn := plumbing.NewBranchReferenceName(branchName)
-						out := vm.renderBranch(bn, isTrunk)
-						if choosing && bn == vm.currentCursor {
-							out = strings.TrimSuffix(out, "\n")
-							out = colors.PromptChoice.Render(out)
-						}
-						return out
-					},
-				),
-			)
-		}
-		if choosing {
-			ss = append(ss, "")
-			ss = append(ss, vm.help.ShortHelpView(promptKeys))
-		}
-	}
-	if vm.adoptionInProgress || vm.adoptionComplete {
-		ss = append(ss, "")
-		var branches []plumbing.ReferenceName
-		for branch := range vm.chosenTargets {
-			branches = append(branches, branch)
-		}
-		slices.Sort(branches)
-		if len(branches) == 0 {
-			ss = append(ss, "No branch is adopted")
-		} else if vm.adoptionComplete {
-			ss = append(ss, "Adopted the following branches:")
-			ss = append(ss, "")
-		} else if vm.adoptionInProgress {
-			ss = append(ss, "Adopting the following branches:")
-			ss = append(ss, "")
-		}
-		for _, branch := range branches {
-			ss = append(ss, "  "+branch.Short())
-			piece := vm.treeInfo.branches[branch]
-			for _, c := range piece.IncludedCommits {
-				title, _, _ := strings.Cut(c.Message, "\n")
-				ss = append(ss, "    "+title)
-			}
-		}
-	}
-
-	var ret string
-	if len(ss) != 0 {
-		ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
-			lipgloss.JoinVertical(0, ss...),
-		) + "\n"
-	}
-	if vm.err != nil {
-		ret += renderError(vm.err)
-	}
-	return ret
+	return vm.AddView(
+		actions.NewAdoptBranchesModel(
+			vm.db,
+			branches,
+			func() tea.Cmd { return tea.Quit },
+		),
+	)
 }
 
 func (vm *adoptViewModel) ExitError() error {
-	if vm.err != nil {
+	if vm.Err != nil {
 		return actions.ErrExitSilently{ExitCode: 1}
 	}
 	return nil
 }
 
-func (vm *adoptViewModel) renderBranch(branch plumbing.ReferenceName, isTrunk bool) string {
-	if isTrunk {
-		return branch.Short()
-	}
-	_, adopted := vm.db.ReadTx().Branch(branch.Short())
+type remoteAdoptViewModel struct {
+	repo       *git.Repo
+	db         meta.DB
+	ghClient   *gh.Client
+	branchName string
 
-	sb := strings.Builder{}
-	if adopted && !vm.chosenTargets[branch] {
-		sb.WriteString(branch.Short())
-	} else if vm.chosenTargets[branch] {
-		sb.WriteString("[✓] " + branch.Short())
-	} else {
-		sb.WriteString("[ ] " + branch.Short())
-	}
+	uiutils.BaseStackedView
+}
 
-	var status []string
-	if vm.currentHEADBranch == branch {
-		status = append(status, "HEAD")
+func (vm *remoteAdoptViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	return vm, vm.BaseStackedView.Update(msg)
+}
+
+func (vm *remoteAdoptViewModel) Init() tea.Cmd {
+	return vm.initModel()
+}
+
+func (vm *remoteAdoptViewModel) initModel() tea.Cmd {
+	return vm.AddView(
+		actions.NewGetRemoteStackedPRModel(
+			vm.db.ReadTx().Repository(),
+			vm.ghClient,
+			vm.branchName,
+			vm.initTreeSelector,
+		),
+	)
+}
+
+func (vm *remoteAdoptViewModel) initTreeSelector(prs []actions.RemotePRInfo) tea.Cmd {
+	if len(prs) == 0 {
+		return tea.Batch(
+			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch to adopt")}),
+			tea.Quit,
+		)
 	}
-	if len(status) != 0 {
-		sb.WriteString(" (" + strings.Join(status, ", ") + ")")
-	}
-	if !adopted || vm.chosenTargets[branch] {
-		sb.WriteString("\n")
-		piece := vm.treeInfo.branches[branch]
-		for _, c := range piece.IncludedCommits {
-			title, _, _ := strings.Cut(c.Message, "\n")
-			sb.WriteString("  " + title + "\n")
+	var adoptionTargets []plumbing.ReferenceName
+	infos := make(map[plumbing.ReferenceName]actions.BranchTreeInfo)
+	for _, prInfo := range prs {
+		branch := plumbing.NewBranchReferenceName(prInfo.Name)
+		adoptionTargets = append(adoptionTargets, branch)
+		infos[branch] = actions.BranchTreeInfo{
+			TitleLine: prInfo.Title,
+			Body:      prInfo.PullRequest.Permalink,
 		}
 	}
-	return sb.String()
+	var lastNode *stackutils.StackTreeNode
+	for _, prInfo := range prs {
+		node := &stackutils.StackTreeNode{
+			Branch: &stackutils.StackTreeBranchInfo{
+				BranchName:       prInfo.Name,
+				ParentBranchName: prInfo.Parent.Name,
+			},
+		}
+		if lastNode != nil {
+			node.Children = []*stackutils.StackTreeNode{lastNode}
+		}
+		lastNode = node
+	}
+	lastNode = &stackutils.StackTreeNode{
+		Branch: &stackutils.StackTreeBranchInfo{
+			BranchName:       prs[len(prs)-1].Parent.Name,
+			ParentBranchName: "",
+		},
+		Children: []*stackutils.StackTreeNode{lastNode},
+	}
+
+	cmd := vm.AddView(
+		actions.NewAdoptTreeSelectorModel(
+			infos,
+			[]*stackutils.StackTreeNode{lastNode},
+			adoptionTargets,
+			"",
+			func(chosenTargets []plumbing.ReferenceName) tea.Cmd {
+				return vm.initGitFetch(prs, chosenTargets)
+			},
+		),
+	)
+	if adoptFlags.DryRun {
+		return tea.Batch(
+			cmd,
+			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ Running as dry-run. Quitting without adopting branches.")}),
+			tea.Quit,
+		)
+	}
+	return cmd
+}
+
+func (vm *remoteAdoptViewModel) initGitFetch(prs []actions.RemotePRInfo, chosenTargets []plumbing.ReferenceName) tea.Cmd {
+	refspecs := []string{}
+	for _, target := range chosenTargets {
+		// Directly clone as a local branch.
+		refspecs = append(refspecs, fmt.Sprintf("refs/heads/%s:refs/heads/%s", target.Short(), target.Short()))
+	}
+	return vm.AddView(
+		actions.NewGitFetchModel(vm.repo, refspecs, func() tea.Cmd {
+			return vm.initAdoption(prs, chosenTargets)
+		}),
+	)
+}
+
+func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenTargets []plumbing.ReferenceName) tea.Cmd {
+	var branches []actions.AdoptingBranch
+	for _, target := range chosenTargets {
+		idx := slices.IndexFunc(prs, func(prInfo actions.RemotePRInfo) bool {
+			return prInfo.Name == target.Short()
+		})
+		if idx == -1 {
+			return uiutils.ErrCmd(fmt.Errorf("internal error: failed to find PR info for branch %s", target.Short()))
+		}
+		pr := prs[idx]
+		ab := actions.AdoptingBranch{
+			Name:        target.Short(),
+			Parent:      pr.Parent,
+			PullRequest: &pr.PullRequest,
+		}
+		branches = append(branches, ab)
+	}
+	return vm.AddView(
+		actions.NewAdoptBranchesModel(
+			vm.db,
+			branches,
+			func() tea.Cmd { return tea.Quit },
+		),
+	)
+}
+
+func (vm *remoteAdoptViewModel) ExitError() error {
+	if vm.Err != nil {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	return nil
 }
 
 func init() {
@@ -465,6 +404,10 @@ func init() {
 		&adoptFlags.DryRun, "dry-run", false,
 		"dry-run adoption",
 	)
+	adoptCmd.Flags().StringVar(
+		&adoptFlags.RemoteBranchName, "remote", "",
+		"adopt branches from remote pull requests, starting from the specified branch",
+	)
 
 	_ = adoptCmd.RegisterFlagCompletionFunc(
 		"parent",
@@ -473,27 +416,4 @@ func init() {
 			return branches, cobra.ShellCompDirectiveNoFileComp
 		},
 	)
-}
-
-var promptKeys = []key.Binding{
-	key.NewBinding(
-		key.WithKeys("up", "k"),
-		key.WithHelp("↑/k", "move up"),
-	),
-	key.NewBinding(
-		key.WithKeys("down", "j"),
-		key.WithHelp("↓/j", "move down"),
-	),
-	key.NewBinding(
-		key.WithKeys("space"),
-		key.WithHelp("space", "select / unselect"),
-	),
-	key.NewBinding(
-		key.WithKeys("enter"),
-		key.WithHelp("enter", "adopt selected branches"),
-	),
-	key.NewBinding(
-		key.WithKeys("ctrl+c"),
-		key.WithHelp("ctrl+c", "cancel"),
-	),
 }

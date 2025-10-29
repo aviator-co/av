@@ -71,12 +71,6 @@ func (p *PullRequest) GetMergeCommit() string {
 	return ""
 }
 
-type PullRequestOpts struct {
-	Owner  string
-	Repo   string
-	Number int64
-}
-
 func (c *Client) PullRequest(ctx context.Context, id string) (*PullRequest, error) {
 	var query struct {
 		Node struct {
@@ -92,6 +86,32 @@ func (c *Client) PullRequest(ctx context.Context, id string) (*PullRequest, erro
 		return nil, errors.Errorf("pull request %q not found", id)
 	}
 	return &query.Node.PullRequest, nil
+}
+
+type GetPullRequestByNumberInput struct {
+	// REQUIRED
+	Owner  string
+	Repo   string
+	Number int64
+}
+
+func (c *Client) GetPullRequestByNumber(ctx context.Context, input GetPullRequestByNumberInput) (*PullRequest, error) {
+	var query struct {
+		Repository struct {
+			PullRequest PullRequest `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+	if err := c.query(ctx, &query, map[string]any{
+		"owner":  githubv4.String(input.Owner),
+		"repo":   githubv4.String(input.Repo),
+		"number": githubv4.Int(input.Number),
+	}); err != nil {
+		return nil, errors.Wrap(err, "failed to query pull request by number")
+	}
+	if query.Repository.PullRequest.ID == "" {
+		return nil, errors.Errorf("pull request #%d not found in %s/%s", input.Number, input.Owner, input.Repo)
+	}
+	return &query.Repository.PullRequest, nil
 }
 
 type GetPullRequestsInput struct {

@@ -294,7 +294,7 @@ func (vm switchViewModel) View() string {
 		) + "\n"
 	}
 	if vm.err != nil {
-		ret += renderError(vm.err)
+		ret += uiutils.RenderError(vm.err)
 	}
 	return ret
 }

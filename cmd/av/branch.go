@@ -12,6 +12,7 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -317,7 +318,7 @@ func createBranch(
 		}
 
 		if _, exist := tx.Branch(parentBranchName); !exist {
-			return errParentNotAdopted
+			return uiutils.ErrParentNotAdopted
 		}
 	}
 
