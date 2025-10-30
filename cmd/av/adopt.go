@@ -350,6 +350,12 @@ func (vm *remoteAdoptViewModel) initTreeSelector(prs []actions.RemotePRInfo) tea
 }
 
 func (vm *remoteAdoptViewModel) initGitFetch(prs []actions.RemotePRInfo, chosenTargets []plumbing.ReferenceName) tea.Cmd {
+	if len(chosenTargets) == 0 {
+		return tea.Batch(
+			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch adopted")}),
+			tea.Quit,
+		)
+	}
 	refspecs := []string{}
 	for _, target := range chosenTargets {
 		// Directly clone as a local branch.
