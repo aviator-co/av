@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -12,7 +11,6 @@ import (
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/meta/jsonfiledb"
-	"github.com/aviator-co/av/internal/meta/refmeta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/spf13/cobra"
 )
@@ -71,21 +69,6 @@ func getDB(ctx context.Context, repo *git.Repo) (meta.DB, error) {
 
 func getOrCreateDB(ctx context.Context, repo *git.Repo) (meta.DB, bool, error) {
 	dbPath := filepath.Join(repo.AvDir(), "av.db")
-	oldDBPathPath := filepath.Join(repo.AvDir(), "repo-metadata.json")
-	dbPathStat, _ := os.Stat(dbPath)
-	oldDBPathStat, _ := os.Stat(oldDBPathPath)
-
-	if dbPathStat == nil && oldDBPathStat != nil {
-		// Migrate old db to new db
-		db, exists, err := jsonfiledb.OpenPath(dbPath)
-		if err != nil {
-			return nil, false, err
-		}
-		if err := refmeta.Import(ctx, repo, db); err != nil {
-			return nil, false, errors.WrapIff(err, "failed to import ref metadata into av database")
-		}
-		return db, exists, nil
-	}
 	return jsonfiledb.OpenPath(dbPath)
 }
 
