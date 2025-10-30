@@ -33,7 +33,7 @@ Generates the diff between the working tree and the parent branch
 			return err
 		}
 
-		currentBranchName, err := repo.CurrentBranchName(ctx)
+		currentBranchName, err := repo.CurrentBranchName()
 		if err != nil {
 			return err
 		}
@@ -41,10 +41,7 @@ Generates the diff between the working tree and the parent branch
 		tx := db.ReadTx()
 		branch, exists := tx.Branch(currentBranchName)
 		if !exists {
-			defaultBranch, err := repo.DefaultBranch(ctx)
-			if err != nil {
-				return err
-			}
+			defaultBranch := repo.DefaultBranch()
 			branch.Parent = meta.BranchState{
 				Name:  defaultBranch,
 				Trunk: true,

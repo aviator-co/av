@@ -103,7 +103,7 @@ var commitCmd = &cobra.Command{
 }
 
 func runCreate(ctx context.Context, repo *git.Repo, db meta.DB) error {
-	currentBranch, err := repo.CurrentBranchName(ctx)
+	currentBranch, err := repo.CurrentBranchName()
 	if err != nil {
 		return errors.WrapIf(err, "failed to determine current branch")
 	}
@@ -182,7 +182,7 @@ func runAmend(
 	edit bool,
 	all bool,
 ) error {
-	currentBranch, err := repo.CurrentBranchName(ctx)
+	currentBranch, err := repo.CurrentBranchName()
 	if err != nil {
 		return errors.WrapIf(err, "failed to determine current branch")
 	}

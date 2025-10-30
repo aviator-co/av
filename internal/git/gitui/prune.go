@@ -254,10 +254,7 @@ func (vm *PruneBranchModel) CheckoutInitialState() error {
 	}
 
 	// The branch is deleted. Let's checkout the default branch.
-	defaultBranch, err := vm.repo.DefaultBranch(context.Background())
-	if err != nil {
-		return err
-	}
+	defaultBranch := vm.repo.DefaultBranch()
 	defaultBranchRef := plumbing.NewBranchReferenceName(defaultBranch)
 	ref, err := vm.repo.GoGitRepo().Reference(defaultBranchRef, true)
 	if err == nil {

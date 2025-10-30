@@ -28,7 +28,7 @@ var orphanCmd = &cobra.Command{
 		tx := db.WriteTx()
 		defer tx.Abort()
 
-		currentBranch, err := repo.CurrentBranchName(ctx)
+		currentBranch, err := repo.CurrentBranchName()
 		if err != nil {
 			return errors.WrapIf(err, "failed to determine current branch")
 		}

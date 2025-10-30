@@ -93,7 +93,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		branchName, err := repo.CurrentBranchName(ctx)
+		branchName, err := repo.CurrentBranchName()
 		if err != nil {
 			return errors.WrapIf(err, "failed to determine current branch")
 		}
@@ -183,7 +183,7 @@ func submitAll(ctx context.Context, current bool, draft bool) error {
 	cu := cleanup.New(func() { tx.Abort() })
 	defer cu.Cleanup()
 
-	currentBranch, err := repo.CurrentBranchName(ctx)
+	currentBranch, err := repo.CurrentBranchName()
 	if err != nil {
 		return err
 	}
@@ -288,7 +288,7 @@ func queue(ctx context.Context) error {
 	}
 
 	tx := db.ReadTx()
-	currentBranchName, err := repo.CurrentBranchName(ctx)
+	currentBranchName, err := repo.CurrentBranchName()
 	if err != nil {
 		return err
 	}

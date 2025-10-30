@@ -80,7 +80,7 @@ func newNextModel(ctx context.Context, lastInStack bool, nInStack int) (stackNex
 		return stackNextModel{}, err
 	}
 
-	currentBranch, err := repo.CurrentBranchName(ctx)
+	currentBranch, err := repo.CurrentBranchName()
 	if err != nil {
 		return stackNextModel{}, err
 	}

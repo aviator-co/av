@@ -145,7 +145,7 @@ func (vm *syncViewModel) initSync() tea.Cmd {
 		return uiutils.ErrCmd(errors.New("no restack in progress"))
 	}
 
-	isTrunkBranch, err := vm.repo.IsCurrentBranchTrunk(context.Background())
+	isTrunkBranch, err := vm.repo.IsCurrentBranchTrunk()
 	if err != nil {
 		return uiutils.ErrCmd(err)
 	}

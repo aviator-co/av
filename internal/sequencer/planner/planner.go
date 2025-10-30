@@ -120,10 +120,7 @@ func PlanForReparent(
 	if slices.Contains(children, newParentBranch.Short()) {
 		return nil, errors.New("cannot re-parent to a child branch")
 	}
-	isParentTrunk, err := repo.IsTrunkBranch(ctx, newParentBranch.Short())
-	if err != nil {
-		return nil, err
-	}
+	isParentTrunk := repo.IsTrunkBranch(newParentBranch.Short())
 	var ret []sequencer.RestackOp
 	ret = append(ret, sequencer.RestackOp{
 		Name:             currentBranch,

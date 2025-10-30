@@ -105,16 +105,11 @@ func adoptForceAdoption(
 		return errors.New("cannot adopt the current branch as its parent")
 	}
 
-	if isCurrentBranchTrunk, err := repo.IsTrunkBranch(ctx, currentBranch); err != nil {
-		return errors.Wrap(err, "failed to check if the current branch is trunk")
-	} else if isCurrentBranchTrunk {
+	if repo.IsTrunkBranch(currentBranch) {
 		return errors.New("cannot adopt the default branch")
 	}
 
-	isParentBranchTrunk, err := repo.IsTrunkBranch(ctx, parent)
-	if err != nil {
-		return errors.Wrap(err, "failed to check if the parent branch is trunk")
-	}
+	isParentBranchTrunk := repo.IsTrunkBranch(parent)
 	if isParentBranchTrunk {
 		branch.Parent = meta.BranchState{
 			Name:  parent,

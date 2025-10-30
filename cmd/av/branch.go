@@ -268,10 +268,7 @@ func createBranch(
 ) (reterr error) {
 	// Determine important contextual information from Git
 	// or if a parent branch is provided, check it allows as a default branch
-	defaultBranch, err := repo.DefaultBranch(ctx)
-	if err != nil {
-		return errors.WrapIf(err, "failed to determine repository default branch")
-	}
+	defaultBranch := repo.DefaultBranch()
 
 	tx := db.WriteTx()
 	cu := cleanup.New(func() {
@@ -283,7 +280,7 @@ func createBranch(
 	// Determine the parent branch and make sure it's checked out
 	if parentBranchName == "" {
 		var err error
-		parentBranchName, err = repo.CurrentBranchName(ctx)
+		parentBranchName, err = repo.CurrentBranchName()
 		if err != nil {
 			return errors.WrapIff(err, "failed to get current branch name")
 		}
@@ -295,10 +292,7 @@ func createBranch(
 	}
 	parentBranchName = strings.TrimPrefix(parentBranchName, remoteName+"/")
 
-	isBranchFromTrunk, err := repo.IsTrunkBranch(ctx, parentBranchName)
-	if err != nil {
-		return errors.WrapIf(err, "failed to determine if branch is a trunk")
-	}
+	isBranchFromTrunk := repo.IsTrunkBranch(parentBranchName)
 	checkoutStartingPoint := parentBranchName
 	var parentHead string
 	if isBranchFromTrunk {
@@ -403,7 +397,7 @@ func branchMove(
 		oldBranch, newBranch, _ = strings.Cut(newBranch, ":")
 	} else {
 		var err error
-		oldBranch, err = repo.CurrentBranchName(ctx)
+		oldBranch, err = repo.CurrentBranchName()
 		if err != nil {
 			return err
 		}
@@ -422,10 +416,7 @@ func branchMove(
 
 	currentMeta, ok := tx.Branch(oldBranch)
 	if !ok {
-		defaultBranch, err := repo.DefaultBranch(ctx)
-		if err != nil {
-			return errors.WrapIf(err, "failed to determine repository default branch")
-		}
+		defaultBranch := repo.DefaultBranch()
 		currentMeta.Parent = meta.BranchState{
 			Name:  defaultBranch,
 			Trunk: true,

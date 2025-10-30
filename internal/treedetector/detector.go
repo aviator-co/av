@@ -49,7 +49,7 @@ func DetectBranches(
 			// don't have to adopt it.
 			continue
 		}
-		bp, err := traverseUntilTrunk(ctx, repo, bn, nearestTrunkCommit, hashToRefMap, refToHashMap)
+		bp, err := traverseUntilTrunk(repo, bn, nearestTrunkCommit, hashToRefMap, refToHashMap)
 		if err != nil {
 			return nil, err
 		}
@@ -59,7 +59,6 @@ func DetectBranches(
 }
 
 func traverseUntilTrunk(
-	ctx context.Context,
 	repo *avgit.Repo,
 	branch plumbing.ReferenceName,
 	nearestTrunkCommit plumbing.Hash,
@@ -77,10 +76,7 @@ func traverseUntilTrunk(
 	// commit that has multiple parents.
 	err = object.NewCommitPreorderIter(commit, nil, nil).ForEach(func(c *object.Commit) error {
 		if c.Hash == nearestTrunkCommit {
-			trunk, err := repo.DefaultBranch(ctx)
-			if err != nil {
-				return err
-			}
+			trunk := repo.DefaultBranch()
 			ret.Parent = plumbing.NewBranchReferenceName(trunk)
 			ret.ParentIsTrunk = true
 			ret.ParentMergeBase = c.Hash
@@ -116,10 +112,7 @@ func getNearestTrunkCommit(
 	repo *avgit.Repo,
 	ref plumbing.ReferenceName,
 ) (plumbing.Hash, error) {
-	trunk, err := repo.DefaultBranch(ctx)
-	if err != nil {
-		return plumbing.ZeroHash, err
-	}
+	trunk := repo.DefaultBranch()
 	rtb := fmt.Sprintf("refs/remotes/%s/%s", repo.GetRemoteName(), trunk)
 
 	mbArgs := []string{rtb, ref.String()}

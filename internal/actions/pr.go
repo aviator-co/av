@@ -224,10 +224,7 @@ func CreatePullRequest(
 	// figure this out based on whether or not we're on a stacked branch
 	parentState := branchMeta.Parent
 	if parentState.Name == "" {
-		defaultBranch, err := repo.DefaultBranch(ctx)
-		if err != nil {
-			return nil, errors.WrapIf(err, "failed to determine default branch")
-		}
+		defaultBranch := repo.DefaultBranch()
 		parentState = meta.BranchState{
 			Name:  defaultBranch,
 			Trunk: true,

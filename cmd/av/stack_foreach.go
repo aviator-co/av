@@ -52,7 +52,7 @@ Examples:
 			return err
 		}
 		tx := db.ReadTx()
-		currentBranch, err := repo.CurrentBranchName(ctx)
+		currentBranch, err := repo.CurrentBranchName()
 		if err != nil {
 			return err
 		}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"strings"
 
 	"emperror.dev/errors"
@@ -114,7 +113,7 @@ func (vm *postCommitRestackViewModel) writeState(state *sequencerui.RestackState
 }
 
 func (vm *postCommitRestackViewModel) createState() (*sequencerui.RestackState, error) {
-	currentBranch, err := vm.repo.CurrentBranchName(context.Background())
+	currentBranch, err := vm.repo.CurrentBranchName()
 	if err != nil {
 		return nil, err
 	}

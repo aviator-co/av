@@ -57,7 +57,7 @@ var ErrRepoNotInitialized = errors.Sentinel(
 )
 
 func getDB(ctx context.Context, repo *git.Repo) (meta.DB, error) {
-	db, exists, err := getOrCreateDB(ctx, repo)
+	db, exists, err := getOrCreateDB(repo)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func getDB(ctx context.Context, repo *git.Repo) (meta.DB, error) {
 	return db, nil
 }
 
-func getOrCreateDB(ctx context.Context, repo *git.Repo) (meta.DB, bool, error) {
+func getOrCreateDB(repo *git.Repo) (meta.DB, bool, error) {
 	dbPath := filepath.Join(repo.AvDir(), "av.db")
 	return jsonfiledb.OpenPath(dbPath)
 }
@@ -82,11 +82,7 @@ func allBranches(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 
-	defaultBranch, err := repo.DefaultBranch(ctx)
-	if err != nil {
-		return nil, err
-	}
-
+	defaultBranch := repo.DefaultBranch()
 	tx := db.ReadTx()
 
 	branches := []string{defaultBranch}
