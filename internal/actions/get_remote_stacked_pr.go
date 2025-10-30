@@ -33,6 +33,7 @@ type RemotePRInfo struct {
 	Name        string
 	Parent      meta.BranchState
 	PullRequest meta.PullRequest
+	MergeCommit string
 	Title       string
 }
 
@@ -104,7 +105,8 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 					Permalink: pr.Permalink,
 					State:     pr.State,
 				},
-				Title: pr.Title,
+				MergeCommit: pr.GetMergeCommit(),
+				Title:       pr.Title,
 			}
 			m.prs = append(m.prs, remotePRInfo)
 			if remotePRInfo.Parent.Trunk {
