@@ -64,7 +64,7 @@ func (b StackBranchCmd) Execute(ctx *Context) error {
 		if err != nil {
 			return err
 		}
-		parentState.Head = headCommit
+		parentState.BranchingPointCommitHash = headCommit
 	}
 	branch.Parent = parentState
 	tx.SetBranch(branch)

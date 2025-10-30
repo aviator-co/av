@@ -83,7 +83,7 @@ func getBranchSnapshots(db meta.DB) map[plumbing.ReferenceName]*branchSnapshot {
 		if avbr.Parent.Trunk {
 			snapshot.IsParentTrunk = true
 		} else {
-			snapshot.PreviouslySyncedParentBranchHash = plumbing.NewHash(avbr.Parent.Head)
+			snapshot.PreviouslySyncedParentBranchHash = plumbing.NewHash(avbr.Parent.BranchingPointCommitHash)
 		}
 	}
 	return ret
@@ -274,7 +274,7 @@ func (seq *Sequencer) postRebaseBranchUpdate(db meta.DB, newParentHash plumbing.
 		Trunk: op.NewParentIsTrunk,
 	}
 	if !op.NewParentIsTrunk {
-		newParentBranchState.Head = newParentHash.String()
+		newParentBranchState.BranchingPointCommitHash = newParentHash.String()
 	}
 
 	tx := db.WriteTx()

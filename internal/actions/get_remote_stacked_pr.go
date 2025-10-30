@@ -95,9 +95,9 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 			remotePRInfo := RemotePRInfo{
 				Name: strings.TrimPrefix(pr.HeadRefName, "refs/heads/"),
 				Parent: meta.BranchState{
-					Name:  prMeta.Parent,
-					Head:  prMeta.ParentHead,
-					Trunk: prMeta.ParentHead == "",
+					Name:                     prMeta.Parent,
+					Trunk:                    prMeta.Trunk == prMeta.Parent,
+					BranchingPointCommitHash: prMeta.ParentHead,
 				},
 				PullRequest: meta.PullRequest{
 					ID:        pr.ID,

@@ -373,9 +373,9 @@ func createBranch(
 	tx.SetBranch(meta.Branch{
 		Name: branchName,
 		Parent: meta.BranchState{
-			Name:  parentBranchName,
-			Trunk: isBranchFromTrunk,
-			Head:  parentHead,
+			Name:                     parentBranchName,
+			Trunk:                    isBranchFromTrunk,
+			BranchingPointCommitHash: parentHead,
 		},
 	})
 

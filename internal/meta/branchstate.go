@@ -18,11 +18,24 @@ type BranchState struct {
 	// master.
 	Trunk bool `json:"trunk,omitempty"`
 
-	// The commit SHA of the parent's latest commit. This is used when syncing
-	// the branch with the parent to identify the commits that belong to the
-	// child branch (since the HEAD of the parent branch may change).
-	// This will be unset if Trunk is true.
-	Head string `json:"head,omitempty"`
+	// The branching point commit hash.
+	//
+	// When we start a new branch off of a parent branch, we record the
+	// commit SHA of the parent's latest commit at that time as the
+	// branching point commit hash. This allows us to later identify which
+	// commits belong to the child branch when syncing with the parent
+	// branch.
+	//
+	// NOTE: This field is named "head" in the JSON for historical reasons.
+	//
+	// This field may be empty if the branching off from a trunk branch. In
+	// that case, we will find the branching point commit hash based on `git
+	// merge-base`. Note that this will only work if the trunk branch has
+	// not been rebased since the branch was created, which typically
+	// stands. On the other hand, when branching off of a non-trunk branch,
+	// we should almost always set this field as the non-trunk branches are
+	// tend to be rebased.
+	BranchingPointCommitHash string `json:"head,omitempty"`
 }
 
 // unmarshalBranchState unmarshals a BranchState from JSON (which can either be
@@ -42,7 +55,7 @@ func unmarshalBranchState(data []byte) (BranchState, error) {
 		if s == "" {
 			return BranchState{}, nil
 		}
-		return BranchState{Name: s, Head: ""}, nil
+		return BranchState{Name: s, BranchingPointCommitHash: ""}, nil
 	}
 
 	// Define a type alias here so that it doesn't have the UnmarshalJSON

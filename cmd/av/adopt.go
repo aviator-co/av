@@ -131,9 +131,9 @@ func adoptForceAdoption(
 			return err
 		}
 		branch.Parent = meta.BranchState{
-			Name:  parent,
-			Trunk: false,
-			Head:  mergeBase,
+			Name:                     parent,
+			Trunk:                    false,
+			BranchingPointCommitHash: mergeBase,
 		}
 		tx.SetBranch(branch)
 	}
@@ -242,7 +242,7 @@ func (vm *adoptViewModel) initAdoption(chosenTargets []plumbing.ReferenceName) t
 			},
 		}
 		if !piece.ParentIsTrunk {
-			ab.Parent.Head = piece.ParentMergeBase.String()
+			ab.Parent.BranchingPointCommitHash = piece.ParentMergeBase.String()
 		}
 		branches = append(branches, ab)
 	}

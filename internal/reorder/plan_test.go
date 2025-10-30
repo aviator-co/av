@@ -38,9 +38,9 @@ func TestCreatePlan(t *testing.T) {
 	tx.SetBranch(meta.Branch{
 		Name: "two",
 		Parent: meta.BranchState{
-			Name:  "one",
-			Trunk: false,
-			Head:  c1b.String(),
+			Name:                     "one",
+			Trunk:                    false,
+			BranchingPointCommitHash: c1b.String(),
 		},
 	})
 	require.NoError(t, tx.Commit())

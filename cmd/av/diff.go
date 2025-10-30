@@ -90,7 +90,7 @@ Generates the diff between the working tree and the parent branch
 			// have those changes). Instead, we want to compute the diff between
 			// 1a and 2a. We can't just use merge-base here to account for the
 			// fact that one might be amended (not just advanced).
-			diffArgs = append(diffArgs, branch.Parent.Head)
+			diffArgs = append(diffArgs, branch.Parent.BranchingPointCommitHash)
 
 			// Determine if the branch is up-to-date with the parent and warn if
 			// not.
@@ -98,7 +98,7 @@ Generates the diff between the working tree and the parent branch
 			if err != nil {
 				return err
 			}
-			notUpToDate = currentParentHead != branch.Parent.Head
+			notUpToDate = currentParentHead != branch.Parent.BranchingPointCommitHash
 		}
 
 		// NOTE:

@@ -149,16 +149,16 @@ func TestRestack(t *testing.T) {
 		Trunk: true,
 	}, GetStoredParentBranchState(t, repo, "stack-1"))
 	require.Equal(t, meta.BranchState{
-		Name: "stack-1",
-		Head: stack1Commit.String(),
+		Name:                     "stack-1",
+		BranchingPointCommitHash: stack1Commit.String(),
 	}, GetStoredParentBranchState(t, repo, "stack-2"))
 	require.Equal(t, meta.BranchState{
-		Name: "stack-2",
-		Head: stack2Commit.String(),
+		Name:                     "stack-2",
+		BranchingPointCommitHash: stack2Commit.String(),
 	}, GetStoredParentBranchState(t, repo, "stack-3"))
 	require.Equal(t, meta.BranchState{
-		Name: "stack-1",
-		Head: stack1Commit.String(),
+		Name:                     "stack-1",
+		BranchingPointCommitHash: stack1Commit.String(),
 	}, GetStoredParentBranchState(t, repo, "stack-4"))
 }
 
@@ -214,8 +214,8 @@ func TestStackRestackAbort(t *testing.T) {
 	// Because we aborted the sync, the stack-2 parent HEAD must stay at the original stack-1
 	// HEAD.
 	require.Equal(t, meta.BranchState{
-		Name: "stack-1",
-		Head: origStack1Commit.String(),
+		Name:                     "stack-1",
+		BranchingPointCommitHash: origStack1Commit.String(),
 	}, GetStoredParentBranchState(t, repo, "stack-2"))
 }
 

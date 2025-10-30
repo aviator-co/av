@@ -73,7 +73,7 @@ func getPRMetadata(
 	trunk, _ := meta.Trunk(tx, branch.Name)
 	prMeta := PRMetadata{
 		Parent:     branch.Parent.Name,
-		ParentHead: branch.Parent.Head,
+		ParentHead: branch.Parent.BranchingPointCommitHash,
 		Trunk:      trunk,
 	}
 	if parent == nil && branch.Parent.Name != "" {
