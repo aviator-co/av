@@ -29,6 +29,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var ErrNoPRMetadata = errors.Sentinel("no PR metadata found")
+
 type CreatePullRequestOpts struct {
 	// The HEAD branch to create a pull request for.
 	BranchName string
@@ -724,6 +726,10 @@ func extractContent(input string, start string, end string) (content string, out
 func ParsePRBody(input string) (body string, prMeta PRMetadata, retErr error) {
 	metadata, body := extractContent(input, PRMetadataCommentStart, PRMetadataCommentEnd)
 	metadataContent, _ := extractContent(metadata, "```", "```")
+	if metadataContent == "" {
+		retErr = ErrNoPRMetadata
+		return body, prMeta, retErr
+	}
 	if err := json.Unmarshal([]byte(metadataContent), &prMeta); err != nil {
 		retErr = errors.WrapIff(err, "decoding PR metadata")
 		return body, prMeta, retErr
