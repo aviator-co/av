@@ -105,16 +105,11 @@ func adoptForceAdoption(
 		return errors.New("cannot adopt the current branch as its parent")
 	}
 
-	if isCurrentBranchTrunk, err := repo.IsTrunkBranch(ctx, currentBranch); err != nil {
-		return errors.Wrap(err, "failed to check if the current branch is trunk")
-	} else if isCurrentBranchTrunk {
+	if repo.IsTrunkBranch(currentBranch) {
 		return errors.New("cannot adopt the default branch")
 	}
 
-	isParentBranchTrunk, err := repo.IsTrunkBranch(ctx, parent)
-	if err != nil {
-		return errors.Wrap(err, "failed to check if the parent branch is trunk")
-	}
+	isParentBranchTrunk := repo.IsTrunkBranch(parent)
 	if isParentBranchTrunk {
 		branch.Parent = meta.BranchState{
 			Name:  parent,
@@ -131,9 +126,9 @@ func adoptForceAdoption(
 			return err
 		}
 		branch.Parent = meta.BranchState{
-			Name:  parent,
-			Trunk: false,
-			Head:  mergeBase,
+			Name:                     parent,
+			Trunk:                    false,
+			BranchingPointCommitHash: mergeBase,
 		}
 		tx.SetBranch(branch)
 	}
@@ -242,7 +237,7 @@ func (vm *adoptViewModel) initAdoption(chosenTargets []plumbing.ReferenceName) t
 			},
 		}
 		if !piece.ParentIsTrunk {
-			ab.Parent.Head = piece.ParentMergeBase.String()
+			ab.Parent.BranchingPointCommitHash = piece.ParentMergeBase.String()
 		}
 		branches = append(branches, ab)
 	}
@@ -350,6 +345,12 @@ func (vm *remoteAdoptViewModel) initTreeSelector(prs []actions.RemotePRInfo) tea
 }
 
 func (vm *remoteAdoptViewModel) initGitFetch(prs []actions.RemotePRInfo, chosenTargets []plumbing.ReferenceName) tea.Cmd {
+	if len(chosenTargets) == 0 {
+		return tea.Batch(
+			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch adopted")}),
+			tea.Quit,
+		)
+	}
 	refspecs := []string{}
 	for _, target := range chosenTargets {
 		// Directly clone as a local branch.

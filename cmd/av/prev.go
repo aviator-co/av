@@ -33,14 +33,11 @@ var prevCmd = &cobra.Command{
 			return err
 		}
 		tx := db.ReadTx()
-		currentBranch, err := repo.CurrentBranchName(ctx)
+		currentBranch, err := repo.CurrentBranchName()
 		if err != nil {
 			return err
 		}
-		isCurrentBranchTrunk, err := repo.IsTrunkBranch(ctx, currentBranch)
-		if err != nil {
-			return err
-		} else if isCurrentBranchTrunk {
+		if repo.IsTrunkBranch(currentBranch) {
 			fmt.Fprint(os.Stderr, "already on trunk branch (", colors.UserInput(currentBranch), ")\n")
 			return nil
 		}

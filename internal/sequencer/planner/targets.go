@@ -48,7 +48,7 @@ func GetTargetBranches(
 		return ret, nil
 	}
 	if mode == CurrentAndParents {
-		curr, err := repo.CurrentBranchName(ctx)
+		curr, err := repo.CurrentBranchName()
 		if err != nil {
 			return nil, err
 		}
@@ -69,7 +69,7 @@ func GetTargetBranches(
 		return ret, nil
 	}
 	if mode == CurrentAndChildren {
-		curr, err := repo.CurrentBranchName(ctx)
+		curr, err := repo.CurrentBranchName()
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func GetTargetBranches(
 		}
 		return ret, nil
 	}
-	curr, err := repo.CurrentBranchName(ctx)
+	curr, err := repo.CurrentBranchName()
 	if err != nil {
 		return nil, err
 	}

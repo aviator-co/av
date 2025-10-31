@@ -33,6 +33,7 @@ type RemotePRInfo struct {
 	Name        string
 	Parent      meta.BranchState
 	PullRequest meta.PullRequest
+	MergeCommit string
 	Title       string
 }
 
@@ -94,9 +95,9 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 			remotePRInfo := RemotePRInfo{
 				Name: strings.TrimPrefix(pr.HeadRefName, "refs/heads/"),
 				Parent: meta.BranchState{
-					Name:  prMeta.Parent,
-					Head:  prMeta.ParentHead,
-					Trunk: prMeta.ParentHead == "",
+					Name:                     prMeta.Parent,
+					Trunk:                    prMeta.Trunk == prMeta.Parent,
+					BranchingPointCommitHash: prMeta.ParentHead,
 				},
 				PullRequest: meta.PullRequest{
 					ID:        pr.ID,
@@ -104,7 +105,8 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 					Permalink: pr.Permalink,
 					State:     pr.State,
 				},
-				Title: pr.Title,
+				MergeCommit: pr.GetMergeCommit(),
+				Title:       pr.Title,
 			}
 			m.prs = append(m.prs, remotePRInfo)
 			if remotePRInfo.Parent.Trunk {

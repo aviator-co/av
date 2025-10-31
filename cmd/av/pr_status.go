@@ -211,7 +211,7 @@ func getQueryVariables(ctx context.Context) (map[string]any, error) {
 
 	tx := db.ReadTx()
 
-	currentBranchName, err := repo.CurrentBranchName(ctx)
+	currentBranchName, err := repo.CurrentBranchName()
 	if err != nil {
 		return nil, err
 	}

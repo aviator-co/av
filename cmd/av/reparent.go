@@ -145,22 +145,18 @@ func (vm *reparentViewModel) writeState(state *sequencerui.RestackState) error {
 
 func (vm *reparentViewModel) createState() (*sequencerui.RestackState, error) {
 	ctx := context.Background()
-	currentBranch, err := vm.repo.CurrentBranchName(ctx)
+	currentBranch, err := vm.repo.CurrentBranchName()
 	if err != nil {
 		return nil, err
 	}
-	if isCurrentBranchTrunk, err := vm.repo.IsTrunkBranch(ctx, currentBranch); err != nil {
-		return nil, err
-	} else if isCurrentBranchTrunk {
+	if vm.repo.IsTrunkBranch(currentBranch) {
 		return nil, errors.New("current branch is a trunk branch")
 	}
 	if _, exist := vm.db.ReadTx().Branch(currentBranch); !exist {
 		return nil, errors.New("current branch is not adopted to av")
 	}
 
-	if isParentBranchTrunk, err := vm.repo.IsTrunkBranch(ctx, reparentFlags.Parent); err != nil {
-		return nil, err
-	} else if !isParentBranchTrunk {
+	if !vm.repo.IsTrunkBranch(reparentFlags.Parent) {
 		if _, exist := vm.db.ReadTx().Branch(reparentFlags.Parent); !exist {
 			return nil, errors.New("parent branch is not adopted to av")
 		}

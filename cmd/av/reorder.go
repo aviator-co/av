@@ -87,7 +87,7 @@ squashed, dropped, or moved within the stack.
 				return actions.ErrExitSilently{ExitCode: 127}
 			}
 			tx := db.ReadTx()
-			currentBranch, err := repo.CurrentBranchName(ctx)
+			currentBranch, err := repo.CurrentBranchName()
 			if err != nil {
 				return err
 			}

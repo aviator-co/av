@@ -36,9 +36,10 @@ type branchSnapshot struct {
 	ParentBranch plumbing.ReferenceName
 	// True if the parent branch is the trunk branch (refs/heads/master etc.).
 	IsParentTrunk bool
-	// Commit hash that the parent branch was previously at last time this was synced.
-	// This is plumbing.ZeroHash if the parent branch is a trunk.
-	PreviouslySyncedParentBranchHash plumbing.Hash
+	// Commit hash that the branch was branched off from the parent. This
+	// can be empty when the parent branch is trunk, but this can be
+	// specified in some circumstances even if the parent is trunk.
+	BranchingPointCommitHash plumbing.Hash
 }
 
 // Sequencer re-stacks the specified branches.
@@ -80,10 +81,9 @@ func getBranchSnapshots(db meta.DB) map[plumbing.ReferenceName]*branchSnapshot {
 			ParentBranch: plumbing.ReferenceName("refs/heads/" + avbr.Parent.Name),
 		}
 		ret[snapshot.Name] = snapshot
-		if avbr.Parent.Trunk {
-			snapshot.IsParentTrunk = true
-		} else {
-			snapshot.PreviouslySyncedParentBranchHash = plumbing.NewHash(avbr.Parent.Head)
+		snapshot.IsParentTrunk = avbr.Parent.Trunk
+		if avbr.Parent.BranchingPointCommitHash != "" {
+			snapshot.BranchingPointCommitHash = plumbing.NewHash(avbr.Parent.BranchingPointCommitHash)
 		}
 	}
 	return ret
@@ -171,16 +171,20 @@ func (seq *Sequencer) rebaseBranch(
 		panic(fmt.Sprintf("branch %q not found in original branch infos", op.Name))
 	}
 
-	var previousParentHash plumbing.Hash
-	if snapshot.IsParentTrunk {
-		// Use the current remote tracking branch hash as the previous parent hash.
-		var err error
-		previousParentHash, err = seq.getRemoteTrackingBranchCommit(repo, snapshot.ParentBranch)
+	var branchingPoint plumbing.Hash
+	if snapshot.BranchingPointCommitHash.IsZero() {
+		// If the branching point is not specified, find the merge-base with the parent's remote-tracking branch.
+		rtb, err := seq.getRemoteTrackingBranch(repo, snapshot.ParentBranch)
 		if err != nil {
 			return nil, err
 		}
+		mb, err := repo.MergeBase(ctx, rtb.String(), op.Name.String())
+		if err != nil {
+			return nil, err
+		}
+		branchingPoint = plumbing.NewHash(mb)
 	} else {
-		previousParentHash = snapshot.PreviouslySyncedParentBranchHash
+		branchingPoint = snapshot.BranchingPointCommitHash
 	}
 
 	var newParentHash plumbing.Hash
@@ -213,7 +217,7 @@ func (seq *Sequencer) rebaseBranch(
 	// conflicts.
 	skipGitRebase := false
 	if b1, err := repo.IsAncestor(ctx, newParentHash.String(), op.Name.String()); err == nil && b1 {
-		if b2, err := repo.IsAncestor(ctx, previousParentHash.String(), newParentHash.String()); err == nil &&
+		if b2, err := repo.IsAncestor(ctx, branchingPoint.String(), newParentHash.String()); err == nil &&
 			b2 {
 			logrus.Debug("Skipping rebase since branch is already based on new parent")
 			skipGitRebase = true
@@ -225,7 +229,7 @@ func (seq *Sequencer) rebaseBranch(
 		// The commits from `rebaseFrom` to `snapshot.Name` should be rebased onto `rebaseOnto`.
 		opts := git.RebaseOpts{
 			Branch:   op.Name.Short(),
-			Upstream: previousParentHash.String(),
+			Upstream: branchingPoint.String(),
 			Onto:     newParentHash.String(),
 		}
 		var err error
@@ -238,7 +242,7 @@ func (seq *Sequencer) rebaseBranch(
 				"Failed to rebase %q onto %q (merge base is %q)\n",
 				op.Name,
 				op.NewParent,
-				previousParentHash.String()[:7],
+				branchingPoint.String()[:7],
 			) + result.ErrorHeadline
 			seq.SequenceInterruptedNewParentHash = newParentHash
 			return result, nil
@@ -274,7 +278,7 @@ func (seq *Sequencer) postRebaseBranchUpdate(db meta.DB, newParentHash plumbing.
 		Trunk: op.NewParentIsTrunk,
 	}
 	if !op.NewParentIsTrunk {
-		newParentBranchState.Head = newParentHash.String()
+		newParentBranchState.BranchingPointCommitHash = newParentHash.String()
 	}
 
 	tx := db.WriteTx()
@@ -311,19 +315,27 @@ func (seq *Sequencer) getRemoteTrackingBranchCommit(
 	repo *git.Repo,
 	ref plumbing.ReferenceName,
 ) (plumbing.Hash, error) {
+	rtb, err := seq.getRemoteTrackingBranch(repo, ref)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+	return seq.getBranchCommit(repo, *rtb)
+}
+
+func (seq *Sequencer) getRemoteTrackingBranch(repo *git.Repo, ref plumbing.ReferenceName) (*plumbing.ReferenceName, error) {
 	remote, err := repo.GoGitRepo().Remote(seq.RemoteName)
 	if err != nil {
-		return plumbing.ZeroHash, errors.Errorf("failed to get remote %q: %v", seq.RemoteName, err)
+		return nil, errors.Errorf("failed to get remote %q: %v", seq.RemoteName, err)
 	}
 	rtb := mapToRemoteTrackingBranch(remote.Config(), ref)
 	if rtb == nil {
-		return plumbing.ZeroHash, errors.Errorf(
+		return nil, errors.Errorf(
 			"failed to get remote tracking branch in %q for %q",
 			seq.RemoteName,
 			ref,
 		)
 	}
-	return seq.getBranchCommit(repo, *rtb)
+	return rtb, nil
 }
 
 func (seq *Sequencer) getBranchCommit(

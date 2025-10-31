@@ -80,6 +80,9 @@ func NewTempRepoWithGitHubServer(t *testing.T, serverURL string) *GitTestRepo {
 	repo.Git(t, "commit", "-m", "Initial commit")
 	repo.Git(t, "push", "origin", "main")
 
+	repo.Git(t, "remote", "set-head", "--auto", "origin")
+	repo.Git(t, "branch", "--all")
+
 	// Write metadata because some commands expect it to be there.
 	// This repository obviously doesn't exist so tests still need to be careful
 	// not to invoke operations that would communicate with GitHub (e.g.,
@@ -117,7 +120,10 @@ type GitTestRepo struct {
 }
 
 func (r *GitTestRepo) AsAvGitRepo() *avgit.Repo {
-	repo, _ := avgit.OpenRepo(r.RepoDir, r.GitDir)
+	repo, err := avgit.OpenRepo(r.RepoDir, r.GitDir)
+	if err != nil {
+		panic(fmt.Sprintf("failed to open av git repo: %v", err))
+	}
 	return repo
 }
 

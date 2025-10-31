@@ -108,9 +108,9 @@ var branchMetaSetCmd = &cobra.Command{
 				}
 			}
 			br.Parent = meta.BranchState{
-				Name:  branchMetaFlags.parent,
-				Trunk: branchMetaFlags.trunk,
-				Head:  parentHead,
+				Name:                     branchMetaFlags.parent,
+				Trunk:                    branchMetaFlags.trunk,
+				BranchingPointCommitHash: parentHead,
 			}
 		}
 		tx.SetBranch(br)

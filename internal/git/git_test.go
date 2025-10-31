@@ -26,21 +26,23 @@ func TestOrigin(t *testing.T) {
 func TestTrunkBranches(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
 
-	branches, err := repo.AsAvGitRepo().TrunkBranches(t.Context())
-	require.NoError(t, err)
+	branches := repo.AsAvGitRepo().TrunkBranches()
 	require.Equal(t, branches, []string{"main"})
 
 	// add some branches to AdditionalTrunkBranches
 	config.Av.AdditionalTrunkBranches = []string{"develop", "staging"}
-	branches, err = repo.AsAvGitRepo().TrunkBranches(t.Context())
-	require.NoError(t, err)
+	branches = repo.AsAvGitRepo().TrunkBranches()
 	require.Equal(t, branches, []string{"main", "develop", "staging"})
 }
 
 func TestGetRemoteName(t *testing.T) {
 	repo := gittest.NewTempRepo(t)
-	require.Equal(t, repo.AsAvGitRepo().GetRemoteName(), git.DEFAULT_REMOTE_NAME)
+	avGitRepo := repo.AsAvGitRepo()
+	require.Equal(t, avGitRepo.GetRemoteName(), git.DEFAULT_REMOTE_NAME)
 
+	// This is a global config, so changing it here affects other tests. Be
+	// sure to reset it.
 	config.Av.Remote = "new-remote"
-	require.Equal(t, repo.AsAvGitRepo().GetRemoteName(), "new-remote")
+	require.Equal(t, avGitRepo.GetRemoteName(), "new-remote")
+	config.Av.Remote = ""
 }

@@ -566,7 +566,7 @@ func (vm *GitHubPushModel) createPRMetadata(branch meta.Branch) actions.PRMetada
 
 	metadata := actions.PRMetadata{
 		Parent:     branch.Parent.Name,
-		ParentHead: branch.Parent.Head,
+		ParentHead: branch.Parent.BranchingPointCommitHash,
 		Trunk:      trunk,
 	}
 

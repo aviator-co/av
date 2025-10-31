@@ -52,7 +52,7 @@ func runSquash(ctx context.Context, repo *git.Repo, db meta.DB) error {
 		)
 	}
 
-	currentBranchName, err := repo.CurrentBranchName(ctx)
+	currentBranchName, err := repo.CurrentBranchName()
 	if err != nil {
 		return err
 	}

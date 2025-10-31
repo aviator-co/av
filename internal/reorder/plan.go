@@ -31,9 +31,9 @@ func CreatePlan(
 		var upstreamCommit string
 		// TODO: would be nice to show the user whether or not the branch is
 		// 		already up-to-date with the parent.
-		if branch.Parent.Head != "" {
+		if branch.Parent.BranchingPointCommitHash != "" {
 			branchCmd.Parent = branch.Parent.Name
-			upstreamCommit = branch.Parent.Head
+			upstreamCommit = branch.Parent.BranchingPointCommitHash
 		} else {
 			trunkCommit, err := repo.MergeBase(ctx, branchName, "origin/"+branch.Parent.Name)
 			if err != nil {

@@ -17,6 +17,7 @@ import (
 	"github.com/aviator-co/av/internal/config"
 	giturls "github.com/chainguard-dev/git-urls"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,10 +26,11 @@ var ErrRemoteNotFound = errors.Sentinel("this repository doesn't have a remote o
 const DEFAULT_REMOTE_NAME = "origin"
 
 type Repo struct {
-	repoDir string
-	gitDir  string
-	gitRepo *git.Repository
-	log     logrus.FieldLogger
+	repoDir       string
+	gitDir        string
+	gitRepo       *git.Repository
+	log           logrus.FieldLogger
+	defaultBranch plumbing.ReferenceName
 }
 
 func OpenRepo(repoDir string, gitDir string) (*Repo, error) {
@@ -40,11 +42,29 @@ func OpenRepo(repoDir string, gitDir string) (*Repo, error) {
 		return nil, errors.Errorf("failed to open git repo: %v", err)
 	}
 	r := &Repo{
-		repoDir,
-		gitDir,
-		repo,
-		logrus.WithFields(logrus.Fields{"repo": filepath.Base(repoDir)}),
+		repoDir:       repoDir,
+		gitDir:        gitDir,
+		gitRepo:       repo,
+		log:           logrus.WithFields(logrus.Fields{"repo": filepath.Base(repoDir)}),
+		defaultBranch: "",
 	}
+
+	// Fill the default branch now so that we can error early if it can't be
+	// determined.
+	remoteName := r.GetRemoteName()
+	ref, err := r.GoGitRepo().Reference(plumbing.NewRemoteHEADReferenceName(remoteName), false)
+	if err != nil {
+		logrus.WithError(err).Debug("failed to determine remote HEAD")
+		// This `git remote set-head --auto origin` communicates with
+		// the remote, so we probably don't want to run it here inline,
+		// but we suggest it to the user in order to fix this situation.
+		logrus.Warn(
+			"Failed to determine repository default branch. " +
+				"Ensure you have a remote named origin and try running `git remote set-head --auto origin` to fix this.",
+		)
+		return nil, fmt.Errorf("failed to determine remote HEAD: %v", err)
+	}
+	r.defaultBranch = plumbing.NewBranchReferenceName(strings.TrimPrefix(ref.Target().String(), fmt.Sprintf("refs/remotes/%s/", remoteName)))
 	return r, nil
 }
 
@@ -72,51 +92,24 @@ func (r *Repo) AvTmpDir() string {
 	return dir
 }
 
-func (r *Repo) DefaultBranch(ctx context.Context) (string, error) {
-	remoteName := r.GetRemoteName()
-	ref, err := r.Git(ctx, "symbolic-ref", fmt.Sprintf("refs/remotes/%s/HEAD", remoteName))
-	if err != nil {
-		logrus.WithError(err).Debug("failed to determine remote HEAD")
-		// this communicates with the remote, so we probably don't want to run
-		// it by default, but we helpfully suggest it to the user. :shrug:
-		logrus.Warn(
-			"Failed to determine repository default branch. " +
-				"Ensure you have a remote named origin and try running `git remote set-head --auto origin` to fix this.",
-		)
-		return "", errors.New("failed to determine remote HEAD")
-	}
-	return strings.TrimPrefix(ref, fmt.Sprintf("refs/remotes/%s/", remoteName)), nil
+func (r *Repo) DefaultBranch() string {
+	return r.defaultBranch.Short()
 }
 
-func (r *Repo) IsTrunkBranch(ctx context.Context, name string) (bool, error) {
-	branches, err := r.TrunkBranches(ctx)
+func (r *Repo) IsTrunkBranch(name string) bool {
+	return slices.Contains(r.TrunkBranches(), name)
+}
+
+func (r *Repo) IsCurrentBranchTrunk() (bool, error) {
+	currentBranch, err := r.CurrentBranchName()
 	if err != nil {
 		return false, err
 	}
-	if slices.Contains(branches, name) {
-		return true, nil
-	}
-	return false, nil
+	return r.IsTrunkBranch(currentBranch), nil
 }
 
-func (r *Repo) IsCurrentBranchTrunk(ctx context.Context) (bool, error) {
-	currentBranch, err := r.CurrentBranchName(ctx)
-	if err != nil {
-		return false, err
-	}
-	return r.IsTrunkBranch(ctx, currentBranch)
-}
-
-func (r *Repo) TrunkBranches(ctx context.Context) ([]string, error) {
-	defaultBranch, err := r.DefaultBranch(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	branches := []string{defaultBranch}
-	branches = append(branches, config.Av.AdditionalTrunkBranches...)
-
-	return branches, nil
+func (r *Repo) TrunkBranches() []string {
+	return append([]string{r.DefaultBranch()}, config.Av.AdditionalTrunkBranches...)
 }
 
 func (r *Repo) GetRemoteName() string {
@@ -228,15 +221,19 @@ func (r *Repo) Run(ctx context.Context, opts *RunOpts) (*Output, error) {
 // The name is return in "short" format -- i.e., without the "refs/heads/" prefix.
 // IMPORTANT: This function will return an error if the repository is currently
 // in a detached-head state (e.g., during a rebase conflict).
-func (r *Repo) CurrentBranchName(ctx context.Context) (string, error) {
-	branch, err := r.Git(ctx, "symbolic-ref", "--short", "HEAD")
+func (r *Repo) CurrentBranchName() (string, error) {
+	ref, err := r.GoGitRepo().Reference(plumbing.HEAD, false)
 	if err != nil {
 		return "", errors.Wrap(
 			err,
 			"failed to determine current branch (are you in detached HEAD or is a rebase in progress?)",
 		)
 	}
-	return branch, nil
+	if ref.Type() == plumbing.SymbolicReference {
+		return ref.Target().Short(), nil
+	}
+	// Detached HEAD
+	return "", errors.New("repository is in detached HEAD state")
 }
 
 func (r *Repo) DoesBranchExist(ctx context.Context, branch string) (bool, error) {
@@ -295,7 +292,7 @@ type CheckoutBranch struct {
 // branch if necessary). The returned previous branch name may be empty if the
 // repo is currently not checked out to a branch (i.e., in detached HEAD state).
 func (r *Repo) CheckoutBranch(ctx context.Context, opts *CheckoutBranch) (string, error) {
-	previousBranchName, err := r.CurrentBranchName(ctx)
+	previousBranchName, err := r.CurrentBranchName()
 	if err != nil {
 		r.log.WithError(err).
 			Debug("failed to get current branch name, repo is probably in detached HEAD")
