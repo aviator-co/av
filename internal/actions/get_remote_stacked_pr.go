@@ -88,7 +88,14 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 				}
 			}
 			prMeta, err := ReadPRMetadata(pr.Body)
-			if err != nil {
+			if errors.Is(err, ErrNoPRMetadata) {
+				prMeta = PRMetadata{
+					Parent:     pr.BaseBranchName(),
+					Trunk:      pr.BaseBranchName(),
+					ParentHead: "",
+					ParentPull: 0,
+				}
+			} else if err != nil {
 				m.failed = true
 				return errors.Wrapf(err, "failed to read metadata for PR %d", pr.Number)
 			}

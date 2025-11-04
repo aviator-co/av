@@ -17,6 +17,7 @@ import (
 	"github.com/aviator-co/av/internal/utils/uiutils"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
 
@@ -286,21 +287,23 @@ func (vm *remoteAdoptViewModel) initModel() tea.Cmd {
 }
 
 func (vm *remoteAdoptViewModel) initTreeSelector(prs []actions.RemotePRInfo) tea.Cmd {
-	if len(prs) == 0 {
-		return tea.Batch(
-			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch to adopt")}),
-			tea.Quit,
-		)
-	}
 	var adoptionTargets []plumbing.ReferenceName
 	infos := make(map[plumbing.ReferenceName]actions.BranchTreeInfo)
 	for _, prInfo := range prs {
 		branch := plumbing.NewBranchReferenceName(prInfo.Name)
-		adoptionTargets = append(adoptionTargets, branch)
+		if prInfo.PullRequest.State == githubv4.PullRequestStateOpen {
+			adoptionTargets = append(adoptionTargets, branch)
+		}
 		infos[branch] = actions.BranchTreeInfo{
 			TitleLine: prInfo.Title,
 			Body:      prInfo.PullRequest.Permalink,
 		}
+	}
+	if len(adoptionTargets) == 0 {
+		return tea.Batch(
+			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch to adopt")}),
+			tea.Quit,
+		)
 	}
 	var lastNode *stackutils.StackTreeNode
 	for _, prInfo := range prs {
@@ -364,6 +367,10 @@ func (vm *remoteAdoptViewModel) initGitFetch(prs []actions.RemotePRInfo, chosenT
 }
 
 func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenTargets []plumbing.ReferenceName) tea.Cmd {
+	prMap := make(map[string]actions.RemotePRInfo)
+	for _, prInfo := range prs {
+		prMap[prInfo.Name] = prInfo
+	}
 	var branches []actions.AdoptingBranch
 	for _, target := range chosenTargets {
 		idx := slices.IndexFunc(prs, func(prInfo actions.RemotePRInfo) bool {
@@ -377,6 +384,14 @@ func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenT
 			Name:        target.Short(),
 			Parent:      pr.Parent,
 			PullRequest: &pr.PullRequest,
+		}
+		// If the parent is already merged / closed, change the parent to the trunk branch.
+		for !pr.Parent.Trunk {
+			parentPRInfo := prMap[pr.Parent.Name]
+			if parentPRInfo.PullRequest.State == githubv4.PullRequestStateOpen {
+				break
+			}
+			pr.Parent = parentPRInfo.Parent
 		}
 		branches = append(branches, ab)
 	}
