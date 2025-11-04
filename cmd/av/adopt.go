@@ -292,7 +292,10 @@ func (vm *remoteAdoptViewModel) initTreeSelector(prs []actions.RemotePRInfo) tea
 	for _, prInfo := range prs {
 		branch := plumbing.NewBranchReferenceName(prInfo.Name)
 		if prInfo.PullRequest.State == githubv4.PullRequestStateOpen {
-			adoptionTargets = append(adoptionTargets, branch)
+			// Check if the branch is already adopted.
+			if _, ok := vm.db.ReadTx().Branch(prInfo.Name); !ok {
+				adoptionTargets = append(adoptionTargets, branch)
+			}
 		}
 		infos[branch] = actions.BranchTreeInfo{
 			TitleLine: prInfo.Title,
@@ -399,7 +402,20 @@ func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenT
 		actions.NewAdoptBranchesModel(
 			vm.db,
 			branches,
-			func() tea.Cmd { return tea.Quit },
+			func() tea.Cmd {
+				hasChild := make(map[string]bool)
+				for _, ab := range branches {
+					hasChild[ab.Parent.Name] = true
+				}
+				for _, ab := range branches {
+					if !hasChild[ab.Name] {
+						// Check out the leaf branch. This can fail if the workspace is dirty. In that case, just quietly exit.
+						_, _ = vm.repo.Git(context.Background(), "switch", ab.Name, "--quiet")
+						break
+					}
+				}
+				return tea.Quit
+			},
 		),
 	)
 }
