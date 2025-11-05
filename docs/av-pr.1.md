@@ -16,8 +16,8 @@ av pr create [-t <title>| --title=<title>] [-b <body>| --body=<body>]
 
 Push the current branch and create a pull request if not exist. If the branch
 has a parent branch, you need to make a pull-request for the parent first. If
-title and body are not provided, `$EDITOR` pops up and you are asked to provide
-them.
+title and body are not provided, `$GIT_EDITOR` pops up and you are asked to
+provide them.
 
 When there's already a pull-request, the command just pushes the branch to
 remote, and you are not asked to provide the title and the body. If you want to
