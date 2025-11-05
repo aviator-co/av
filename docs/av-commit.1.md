@@ -37,7 +37,7 @@ git-add(1) to incrementally "add" changes to the index.
 : Amend the last commit, using the same message as last commit by default
 
 `--edit`
-: When amending a commit, open the default git `$EDITOR` for modifying the
+: When amending a commit, open the default `$GIT_EDITOR` for modifying the
   commit message
 
 `-b, --branch`
