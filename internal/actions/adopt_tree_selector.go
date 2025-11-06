@@ -123,14 +123,19 @@ func (m *AdoptTreeSelectorModel) renderBranch(branch plumbing.ReferenceName, isT
 	}
 	info := m.infos[branch]
 
-	var lines []string
-	if !slices.Contains(m.adoptionTargets, branch) {
-		lines = append(lines, info.TitleLine)
-	} else if m.chosenTargets[branch] {
-		lines = append(lines, "[✓] "+info.TitleLine)
-	} else {
-		lines = append(lines, "[ ] "+info.TitleLine)
+	titleLine := info.TitleLine
+	if titleLine == "" {
+		titleLine = branch.Short()
 	}
+	var prefix string
+	if slices.Contains(m.adoptionTargets, branch) {
+		if m.chosenTargets[branch] {
+			prefix = "[✓] "
+		} else {
+			prefix = "[ ] "
+		}
+	}
+	lines := []string{prefix + titleLine}
 	if info.Body != "" {
 		lines = append(lines, lipgloss.NewStyle().MarginLeft(4).Render(info.Body))
 	}
