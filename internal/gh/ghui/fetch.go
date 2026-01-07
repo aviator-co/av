@@ -295,6 +295,10 @@ func (vm *GitHubFetchModel) updateMergeCommitsFromChildren() tea.Msg {
 		avbr, _ := vm.db.ReadTx().Branch(br.Short())
 		if avbr.Parent.Trunk {
 			trunkRef := plumbing.NewBranchReferenceName(avbr.Parent.Name)
+			// Skip if we've already processed this trunk
+			if _, ok := trunkRefs[trunkRef]; ok {
+				continue
+			}
 			rtb := mapToRemoteTrackingBranch(remoteConfig, trunkRef)
 			if rtb != nil {
 				trunkRefs[trunkRef] = *rtb
@@ -310,37 +314,17 @@ func (vm *GitHubFetchModel) updateMergeCommitsFromChildren() tea.Msg {
 			continue
 		}
 
-		// Verify the merge commit is actually in the trunk history
-		trunk, hasTrunk := meta.Trunk(tx, avbr.Name)
-		if !hasTrunk {
-			tx.Abort()
-			continue
-		}
-
-		trunkRef := plumbing.NewBranchReferenceName(trunk)
-		remoteTrunkRef, ok := trunkRefs[trunkRef]
-		if !ok {
-			// No remote tracking branch for this trunk
-			tx.Abort()
-			continue
-		}
-
-		// Check if the merge commit is reachable from the remote trunk
-		ref, err := repo.Reference(remoteTrunkRef, true)
+		// Check if we should propagate this merge commit up the stack
+		shouldPropagate, err := vm.shouldPropagateMergeCommit(ctx, tx, avbr, trunkRefs)
 		if err != nil {
+			return err
+		}
+		if !shouldPropagate {
 			tx.Abort()
 			continue
 		}
 
-		// Use git merge-base to check if the merge commit is an ancestor of the trunk
-		isAncestor, err := vm.repo.IsAncestor(ctx, avbr.MergeCommit, ref.Hash().String())
-		if err != nil || !isAncestor {
-			// Merge commit is not in trunk history, don't propagate
-			tx.Abort()
-			continue
-		}
-
-		// Only propagate if the merge commit is actually in the trunk
+		// Propagate the merge commit to parent branches
 		parent := avbr.Parent
 		for !parent.Trunk {
 			parentBr, ok := tx.Branch(parent.Name)
@@ -359,6 +343,46 @@ func (vm *GitHubFetchModel) updateMergeCommitsFromChildren() tea.Msg {
 		}
 	}
 	return &GitHubFetchProgress{mergeCommitPropagationIsDone: true}
+}
+
+// shouldPropagateMergeCommit verifies that a merge commit is actually in the trunk
+// history before allowing it to be propagated to parent branches. This prevents
+// incorrectly marking branches as merged when a downstream PR is flattened into
+// its parent (GitHub marks it "merged" but it's not in trunk).
+func (vm *GitHubFetchModel) shouldPropagateMergeCommit(
+	ctx context.Context,
+	tx meta.ReadTx,
+	branch meta.Branch,
+	trunkRefs map[plumbing.ReferenceName]plumbing.ReferenceName,
+) (bool, error) {
+	// Verify the merge commit is actually in the trunk history
+	trunk, hasTrunk := meta.Trunk(tx, branch.Name)
+	if !hasTrunk {
+		return false, nil
+	}
+
+	trunkRef := plumbing.NewBranchReferenceName(trunk)
+	remoteTrunkRef, ok := trunkRefs[trunkRef]
+	if !ok {
+		// No remote tracking branch for this trunk
+		return false, nil
+	}
+
+	// Check if the merge commit is reachable from the remote trunk
+	repo := vm.repo.GoGitRepo()
+	ref, err := repo.Reference(remoteTrunkRef, true)
+	if err != nil {
+		return false, nil
+	}
+
+	// Use git merge-base to check if the merge commit is an ancestor of the trunk
+	isAncestor, err := vm.repo.IsAncestor(ctx, branch.MergeCommit, ref.Hash().String())
+	if err != nil || !isAncestor {
+		// Merge commit is not in trunk history, don't propagate
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func mapToRemoteTrackingBranch(
