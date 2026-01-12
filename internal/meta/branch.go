@@ -23,6 +23,9 @@ type Branch struct {
 
 	// The merge commit onto the trunk branch, if any
 	MergeCommit string `json:"mergeCommit,omitempty"`
+
+	// Whether this branch should be excluded from "av sync --all" operations
+	ExcludeFromSyncAll bool `json:"excludeFromSyncAll,omitempty"`
 }
 
 func (b *Branch) IsStackRoot() bool {

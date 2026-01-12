@@ -38,6 +38,10 @@ func GetTargetBranches(
 			if !br.IsStackRoot() {
 				continue
 			}
+			// Skip branches excluded from sync --all
+			if br.ExcludeFromSyncAll {
+				continue
+			}
 			if includeStackRoots {
 				ret = append(ret, plumbing.NewBranchReferenceName(br.Name))
 			}
