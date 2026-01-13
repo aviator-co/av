@@ -18,7 +18,7 @@ type BubbleTeaModelWithExitHandling interface {
 
 func RunBubbleTea(model BubbleTeaModelWithExitHandling) error {
 	var opts []tea.ProgramOption
-	if !isatty.IsTerminal(os.Stdout.Fd()) {
+	if !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
 		opts = []tea.ProgramOption{
 			tea.WithInput(nil),
 		}
