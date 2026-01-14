@@ -45,7 +45,8 @@ func GetTargetBranches(
 			if includeStackRoots {
 				ret = append(ret, plumbing.NewBranchReferenceName(br.Name))
 			}
-			for _, n := range meta.SubsequentBranches(tx, br.Name) {
+			// Use filtered traversal to skip excluded branches and their descendants
+			for _, n := range meta.SubsequentBranchesFiltered(tx, br.Name, true) {
 				ret = append(ret, plumbing.NewBranchReferenceName(n))
 			}
 		}

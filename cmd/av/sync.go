@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,9 +33,6 @@ var syncFlags struct {
 	Skip          bool
 	Push          string
 	Prune         string
-	Exclude       string
-	Include       string
-	ListExcluded  bool
 }
 
 var syncCmd = &cobra.Command{
@@ -60,10 +56,9 @@ latest commit to the repository base branch (e.g., main or master) into the
 stack. This is useful for rebasing a whole stack on the latest changes from the
 base branch.
 
-Branches can be excluded from --all operations using the --exclude flag. Excluded
-branches can still be synced by explicitly naming them, but they will be skipped
-when using --all. Use --include to remove the exclusion, or --list-excluded to
-see all currently excluded branches.
+Branches can be excluded from --all operations using av sync-exclude.
+Excluded branches and their descendants will be skipped when running av sync --all,
+but can still be synced explicitly.
 `),
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
@@ -97,18 +92,6 @@ see all currently excluded branches.
 		if err != nil {
 			return err
 		}
-
-		// Handle exclusion management flags (these exit early without syncing)
-		if syncFlags.Exclude != "" {
-			return handleExcludeBranch(db, syncFlags.Exclude)
-		}
-		if syncFlags.Include != "" {
-			return handleIncludeBranch(db, syncFlags.Include)
-		}
-		if syncFlags.ListExcluded {
-			return handleListExcluded(db)
-		}
-
 		client, err := getGitHubClient(ctx)
 		if err != nil {
 			return err
@@ -517,37 +500,8 @@ func init() {
 		&syncFlags.Skip, "skip", false,
 		"skip the current commit and continue an in-progress sync",
 	)
-	syncCmd.Flags().StringVar(
-		&syncFlags.Exclude, "exclude", "",
-		"mark a branch as permanently excluded from --all operations",
-	)
-	syncCmd.Flags().StringVar(
-		&syncFlags.Include, "include", "",
-		"remove exclusion marking from a branch",
-	)
-	syncCmd.Flags().BoolVar(
-		&syncFlags.ListExcluded, "list-excluded", false,
-		"list all branches excluded from --all operations",
-	)
 	syncCmd.MarkFlagsMutuallyExclusive("current", "all")
 	syncCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
-	syncCmd.MarkFlagsMutuallyExclusive("exclude", "include", "list-excluded")
-
-	// Register tab completion for branch name flags
-	_ = syncCmd.RegisterFlagCompletionFunc(
-		"exclude",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			branches, _ := allBranches(cmd.Context())
-			return branches, cobra.ShellCompDirectiveNoFileComp
-		},
-	)
-	_ = syncCmd.RegisterFlagCompletionFunc(
-		"include",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			branches, _ := allBranches(cmd.Context())
-			return branches, cobra.ShellCompDirectiveNoFileComp
-		},
-	)
 
 	// Deprecated flags
 	syncCmd.Flags().Bool("no-fetch", false,
@@ -567,76 +521,4 @@ func init() {
 	)
 	_ = syncCmd.Flags().
 		MarkDeprecated("parent", "please use 'av adopt' or 'av reparent'")
-}
-
-func handleExcludeBranch(db meta.DB, branchName string) error {
-	tx := db.WriteTx()
-	defer tx.Abort()
-
-	branch, exists := tx.Branch(branchName)
-	if !exists {
-		return errors.Errorf("branch %q is not adopted by av", branchName)
-	}
-
-	if branch.ExcludeFromSyncAll {
-		_, _ = os.Stderr.WriteString(colors.Warning(fmt.Sprintf("Branch %q is already excluded from sync --all\n", branchName)))
-		return nil
-	}
-
-	branch.ExcludeFromSyncAll = true
-	tx.SetBranch(branch)
-	if err := tx.Commit(); err != nil {
-		return errors.WrapIf(err, "failed to update branch metadata")
-	}
-
-	_, _ = os.Stderr.WriteString(colors.Success(fmt.Sprintf("Branch %q is now excluded from sync --all\n", branchName)))
-	return nil
-}
-
-func handleIncludeBranch(db meta.DB, branchName string) error {
-	tx := db.WriteTx()
-	defer tx.Abort()
-
-	branch, exists := tx.Branch(branchName)
-	if !exists {
-		return errors.Errorf("branch %q is not adopted by av", branchName)
-	}
-
-	if !branch.ExcludeFromSyncAll {
-		_, _ = os.Stderr.WriteString(colors.Warning(fmt.Sprintf("Branch %q is not excluded from sync --all\n", branchName)))
-		return nil
-	}
-
-	branch.ExcludeFromSyncAll = false
-	tx.SetBranch(branch)
-	if err := tx.Commit(); err != nil {
-		return errors.WrapIf(err, "failed to update branch metadata")
-	}
-
-	_, _ = os.Stderr.WriteString(colors.Success(fmt.Sprintf("Branch %q is now included in sync --all\n", branchName)))
-	return nil
-}
-
-func handleListExcluded(db meta.DB) error {
-	tx := db.ReadTx()
-
-	branches := tx.AllBranches()
-	var excluded []string
-	for _, branch := range branches {
-		if branch.ExcludeFromSyncAll {
-			excluded = append(excluded, branch.Name)
-		}
-	}
-
-	if len(excluded) == 0 {
-		_, _ = os.Stderr.WriteString("No branches are excluded from sync --all\n")
-		return nil
-	}
-
-	_, _ = os.Stderr.WriteString("Branches excluded from sync --all:\n")
-	for _, branchName := range excluded {
-		_, _ = os.Stderr.WriteString(colors.Faint(fmt.Sprintf("  - %s\n", branchName)))
-	}
-
-	return nil
 }

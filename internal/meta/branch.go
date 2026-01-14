@@ -131,6 +131,25 @@ func SubsequentBranches(tx ReadTx, name string) []string {
 	return res
 }
 
+// SubsequentBranchesFiltered finds all the child branches of the given branch
+// name in "dependency order", optionally skipping branches that are excluded
+// from sync --all and their descendants.
+func SubsequentBranchesFiltered(tx ReadTx, name string, skipExcluded bool) []string {
+	logrus.Debugf("finding subsequent branches for %q (skipExcluded=%v)", name, skipExcluded)
+	var res []string
+	children := Children(tx, name)
+	for _, child := range children {
+		if skipExcluded && child.ExcludeFromSyncAll {
+			// Skip this branch and its entire subtree
+			logrus.Debugf("skipping excluded branch %q and its descendants", child.Name)
+			continue
+		}
+		res = append(res, child.Name)
+		res = append(res, SubsequentBranchesFiltered(tx, child.Name, skipExcluded)...)
+	}
+	return res
+}
+
 // StackBranches returns branches in the stack associated with the given branch.
 func StackBranches(tx ReadTx, name string) ([]string, error) {
 	root, found := Root(tx, name)
