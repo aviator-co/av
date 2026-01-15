@@ -29,6 +29,7 @@ av - Aviator CLI
 - av-squash(1): Squash commits of the current branch into a single commit
 - av-switch(1): Interactively switch to a different branch
 - av-sync(1): Synchronize stacked branches with GitHub
+- av-sync-exclude(1): Toggle branch exclusion from sync --all operations
 - av-tidy(1): Tidy stacked branches
 - av-tree(1): Show the tree of stacked branches
 

@@ -55,6 +55,10 @@ If the --rebase-to-trunk flag is given, this command will synchronize changes fr
 latest commit to the repository base branch (e.g., main or master) into the
 stack. This is useful for rebasing a whole stack on the latest changes from the
 base branch.
+
+Branches can be excluded from --all operations using av sync-exclude.
+Excluded branches and their descendants will be skipped when running av sync --all,
+but can still be synced explicitly.
 `),
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {

@@ -105,6 +105,14 @@ func renderStackTreeBranchInfo(
 	if branchName == currentBranchName {
 		stats = append(stats, styles.HEAD.Render("HEAD"))
 	}
+	if bi.ExcludeFromSyncAll {
+		descendants := meta.SubsequentBranches(tx, branchName)
+		if len(descendants) > 0 {
+			stats = append(stats, colors.Faint("branch and children excluded from sync --all"))
+		} else {
+			stats = append(stats, colors.Faint("excluded from sync --all"))
+		}
+	}
 	if len(stats) > 0 {
 		sb.WriteString(" (")
 		sb.WriteString(strings.Join(stats, ", "))
