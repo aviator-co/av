@@ -7,7 +7,7 @@ av-tree - Show the tree of stacked branches
 ## SYNOPSIS
 
 ```synopsis
-av tree
+av tree [--current]
 ```
 
 ## DESCRIPTION

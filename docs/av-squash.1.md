@@ -28,7 +28,7 @@ any child branches on the newly squashed commit.
 
 Squash all commits on the current branch:
 
-```
+```bash
 $ av squash
 ```
 

@@ -7,7 +7,7 @@ av-adopt - Adopt branches that are not managed by `av`
 ## SYNOPSIS
 
 ```synopsis
-av adopt [--parent=<parent> | --remote=<branch>]
+av adopt [--dry-run] [--parent=<parent> | --remote=<branch>]
 ```
 
 ## DESCRIPTION
