@@ -73,6 +73,37 @@ func toggleBranchExclusion(db meta.DB, branchName string) error {
 	descendants := meta.SubsequentBranches(tx, branchName)
 	descendantCount := len(descendants)
 
+	// Validate the state transition
+	if !branch.ExcludeFromSyncAll {
+		// Trying to EXCLUDE the branch
+
+		// Check if any ancestor is already excluded
+		hasExcludedAncestor, ancestorName := meta.HasExcludedAncestor(tx, branchName)
+		if hasExcludedAncestor {
+			return errors.Errorf("cannot exclude branch %q: ancestor branch %q is already excluded", branchName, ancestorName)
+		}
+
+		// Check if any descendants are explicitly excluded
+		var excludedDescendants []string
+		for _, descendant := range descendants {
+			descendantBranch, _ := tx.Branch(descendant)
+			if descendantBranch.ExcludeFromSyncAll {
+				excludedDescendants = append(excludedDescendants, descendant)
+			}
+		}
+		if len(excludedDescendants) > 0 {
+			return errors.Errorf("cannot exclude branch %q: descendant branch(es) %v are already excluded (include them first)", branchName, excludedDescendants)
+		}
+	} else {
+		// Trying to INCLUDE the branch
+
+		// Check if it's implicitly excluded (not explicitly but has excluded ancestor)
+		hasExcludedAncestor, ancestorName := meta.HasExcludedAncestor(tx, branchName)
+		if hasExcludedAncestor {
+			return errors.Errorf("branch %q is not explicitly excluded (excluded via ancestor %q)", branchName, ancestorName)
+		}
+	}
+
 	branch.ExcludeFromSyncAll = !branch.ExcludeFromSyncAll
 	tx.SetBranch(branch)
 	if err := tx.Commit(); err != nil {

@@ -150,6 +150,26 @@ func SubsequentBranchesFiltered(tx ReadTx, name string, skipExcluded bool) []str
 	return res
 }
 
+// HasExcludedAncestor checks if any ancestor of the given branch is excluded
+// from sync --all. It walks up the parent chain until reaching the trunk.
+func HasExcludedAncestor(tx ReadTx, name string) (bool, string) {
+	branch, ok := tx.Branch(name)
+	if !ok {
+		return false, ""
+	}
+	if branch.Parent.Trunk {
+		return false, ""
+	}
+	parentBranch, ok := tx.Branch(branch.Parent.Name)
+	if !ok {
+		return false, ""
+	}
+	if parentBranch.ExcludeFromSyncAll {
+		return true, branch.Parent.Name
+	}
+	return HasExcludedAncestor(tx, branch.Parent.Name)
+}
+
 // StackBranches returns branches in the stack associated with the given branch.
 func StackBranches(tx ReadTx, name string) ([]string, error) {
 	root, found := Root(tx, name)
