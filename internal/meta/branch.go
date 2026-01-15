@@ -23,6 +23,9 @@ type Branch struct {
 
 	// The merge commit onto the trunk branch, if any
 	MergeCommit string `json:"mergeCommit,omitempty"`
+
+	// Whether this branch should be excluded from "av sync --all" operations
+	ExcludeFromSyncAll bool `json:"excludeFromSyncAll,omitempty"`
 }
 
 func (b *Branch) IsStackRoot() bool {
@@ -126,6 +129,45 @@ func SubsequentBranches(tx ReadTx, name string) []string {
 		res = append(res, SubsequentBranches(tx, child.Name)...)
 	}
 	return res
+}
+
+// SubsequentBranchesFiltered finds all the child branches of the given branch
+// name in "dependency order", optionally skipping branches that are excluded
+// from sync --all and their descendants.
+func SubsequentBranchesFiltered(tx ReadTx, name string, skipExcluded bool) []string {
+	logrus.Debugf("finding subsequent branches for %q (skipExcluded=%v)", name, skipExcluded)
+	var res []string
+	children := Children(tx, name)
+	for _, child := range children {
+		if skipExcluded && child.ExcludeFromSyncAll {
+			// Skip this branch and its entire subtree
+			logrus.Debugf("skipping excluded branch %q and its descendants", child.Name)
+			continue
+		}
+		res = append(res, child.Name)
+		res = append(res, SubsequentBranchesFiltered(tx, child.Name, skipExcluded)...)
+	}
+	return res
+}
+
+// HasExcludedAncestor checks if any ancestor of the given branch is excluded
+// from sync --all. It walks up the parent chain until reaching the trunk.
+func HasExcludedAncestor(tx ReadTx, name string) (bool, string) {
+	branch, ok := tx.Branch(name)
+	if !ok {
+		return false, ""
+	}
+	if branch.Parent.Trunk {
+		return false, ""
+	}
+	parentBranch, ok := tx.Branch(branch.Parent.Name)
+	if !ok {
+		return false, ""
+	}
+	if parentBranch.ExcludeFromSyncAll {
+		return true, branch.Parent.Name
+	}
+	return HasExcludedAncestor(tx, branch.Parent.Name)
 }
 
 // StackBranches returns branches in the stack associated with the given branch.

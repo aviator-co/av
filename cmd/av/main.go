@@ -113,6 +113,7 @@ func init() {
 		stackCmd,
 		switchCmd,
 		syncCmd,
+		syncExcludeCmd,
 		restackCmd,
 		tidyCmd,
 		treeCmd,
