@@ -9,7 +9,7 @@ av-pr - Create a pull request for the current branch
 ```synopsis
 av pr create [-t <title>| --title=<title>] [-b <body>| --body=<body>]
     [--draft] [--edit] [--force] [--no-push] [--reviewers=<reviewers>]
-    [--submit] [--current] [--queue]
+    [--current] [--queue]
 ```
 
 ## DESCRIPTION
