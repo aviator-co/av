@@ -15,8 +15,8 @@ av reorder [--continue | --abort]
 This is analogous to git rebase --interactive but operates across all branches
 in the stack.
 
-Branches can be re-arranged within the stack and commits can be dropped, or
-moved within the stack, even across the branches.
+Branches can be re-arranged within the stack and commits can be edited,
+squashed, dropped, or moved within the stack, even across the branches.
 
 ## OPTIONS
 
