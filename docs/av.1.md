@@ -32,6 +32,14 @@ av - Aviator CLI
 - av-tidy(1): Tidy stacked branches
 - av-tree(1): Show the tree of stacked branches
 
+## OPTIONS
+
+`--debug`
+: Enable verbose debug logging.
+
+`-C <directory>`, `--repo=<directory>`
+: Directory to use for git repository.
+
 ## FURTHER DOCUMENTATION
 
 See [Aviator documentation](https://docs.aviator.co) for the help document
