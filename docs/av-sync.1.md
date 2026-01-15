@@ -48,6 +48,18 @@ updates the same file you are working on, you need to rebase your branch onto
 the latest trunk branch. In this case, you can use `--rebase-to-trunk` option to
 rebase the stacks to the latest trunk branch.
 
+## EXCLUDING BRANCHES
+
+Branches can be excluded from `--all` operations using `av sync-exclude`. When a
+branch is excluded, it and all its descendant branches will be skipped during
+`av sync --all`. The branch can still be synced by running `av sync` from within
+that branch or its stack, or by syncing the stack explicitly.
+
+This is useful for temporarily excluding work-in-progress branches or experimental
+work from your regular sync workflow.
+
+See `av-sync-exclude`(1) for more information.
+
 ## OPTIONS
 
 `--all`
@@ -80,5 +92,6 @@ branch to delete. Default is `ask`.
 ## SEE ALSO
 
 `av-restack`(1) for rebasing the branches locally.
+`av-sync-exclude`(1) for excluding branches from --all operations.
 `av-adopt`(1) for adopting a new branch.
 `av-reparent`(1) for changing the parent of a branch.

@@ -658,7 +658,14 @@ func UpdatePullRequestState(
 	} else {
 		// openPull is nil so the PR should be merged or closed
 		if currentPull != nil {
-			branch.MergeCommit = currentPull.GetMergeCommit()
+			// Only set merge commit if the PR is actually in MERGED state.
+			// PRs can be marked as "merged" by GitHub when they have no diff
+			// (e.g., when changes are flattened into parent), but they haven't
+			// actually been merged into trunk. The fetch logic will verify if
+			// the merge commit is in trunk history before propagating.
+			if currentPull.State == githubv4.PullRequestStateMerged {
+				branch.MergeCommit = currentPull.GetMergeCommit()
+			}
 			branch.PullRequest = &meta.PullRequest{
 				ID:        currentPull.ID,
 				Number:    currentPull.Number,

@@ -28,6 +28,7 @@ av - Aviator CLI
 - av-split-commit(1): Split a commit into multiple commits
 - av-switch(1): Interactively switch to a different branch
 - av-sync(1): Synchronize stacked branches with GitHub
+- av-sync-exclude(1): Toggle branch exclusion from sync --all operations
 - av-tidy(1): Tidy stacked branches
 - av-tree(1): Show the tree of stacked branches
 

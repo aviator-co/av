@@ -142,5 +142,5 @@ func branchNameArgs(
 	toComplete string,
 ) ([]string, cobra.ShellCompDirective) {
 	branches, _ := allBranches(cmd.Context())
-	return branches, cobra.ShellCompDirectiveNoSpace
+	return branches, cobra.ShellCompDirectiveNoFileComp
 }
