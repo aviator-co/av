@@ -4,6 +4,12 @@
 
 av-init - Initialize the repository for `av`
 
+## SYNOPSIS
+
+```synopsis
+av init
+```
+
 ## DESCRIPTION
 
 `av` internally stores metadata in the repository. This command initializes the

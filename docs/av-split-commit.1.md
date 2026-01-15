@@ -4,6 +4,12 @@
 
 av-split-commit - Split a commit into multiple commits
 
+## SYNOPSIS
+
+```synopsis
+av split-commit
+```
+
 ## DESCRIPTION
 
 Split the currently checked out commit into multiple commits. When invoked, it

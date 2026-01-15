@@ -4,6 +4,12 @@
 
 av-pr-status - Get the status of the associated pull request.
 
+## SYNOPSIS
+
+```synopsis
+av pr status
+```
+
 ## DESCRIPTION
 
 Gets the status of the current branch's associated pull request. Also includes
