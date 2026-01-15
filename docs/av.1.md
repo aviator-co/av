@@ -26,6 +26,7 @@ av - Aviator CLI
 - av-reparent(1): Change the parent of the current branch
 - av-restack(1): Rebase the stacked branches
 - av-split-commit(1): Split a commit into multiple commits
+- av-squash(1): Squash commits of the current branch into a single commit
 - av-switch(1): Interactively switch to a different branch
 - av-sync(1): Synchronize stacked branches with GitHub
 - av-tidy(1): Tidy stacked branches
