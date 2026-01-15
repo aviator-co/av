@@ -7,7 +7,7 @@ av-adopt - Adopt branches that are not managed by `av`
 ## SYNOPSIS
 
 ```synopsis
-av adopt [--parent=<parent> | --remote=<branch>]
+av adopt [--dry-run] [--parent=<parent> | --remote=<branch>]
 ```
 
 ## DESCRIPTION
@@ -47,6 +47,9 @@ it along with its parent branches.
 
 `--parent=<parent>`
 : Force specify the parent branch.
+
+`--dry-run`
+: Show what branches would be adopted without actually adopting them.
 
 `--remote=<branch>`
 : Specify a remote branch to adopt from.

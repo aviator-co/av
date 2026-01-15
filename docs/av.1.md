@@ -26,11 +26,20 @@ av - Aviator CLI
 - av-reparent(1): Change the parent of the current branch
 - av-restack(1): Rebase the stacked branches
 - av-split-commit(1): Split a commit into multiple commits
+- av-squash(1): Squash commits of the current branch into a single commit
 - av-switch(1): Interactively switch to a different branch
 - av-sync(1): Synchronize stacked branches with GitHub
 - av-sync-exclude(1): Toggle branch exclusion from sync --all operations
 - av-tidy(1): Tidy stacked branches
 - av-tree(1): Show the tree of stacked branches
+
+## OPTIONS
+
+`--debug`
+: Enable verbose debug logging.
+
+`-C <directory>`, `--repo=<directory>`
+: Directory to use for git repository.
 
 ## FURTHER DOCUMENTATION
 

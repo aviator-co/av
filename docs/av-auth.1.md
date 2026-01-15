@@ -2,7 +2,7 @@
 
 ## NAME
 
-av-auth - Show info about the logged in user
+av-auth - Check user authentication status
 
 ## SYNOPSIS
 
