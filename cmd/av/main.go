@@ -100,6 +100,7 @@ func init() {
 		branchCmd,
 		branchMetaCmd,
 		commitCmd,
+		validateDBCmd,
 		diffCmd,
 		fetchCmd,
 		initCmd,

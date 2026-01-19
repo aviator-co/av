@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/aviator-co/av/internal/meta"
@@ -71,6 +72,12 @@ func (m *AdoptBranchesModel) adoptBranches() tea.Msg {
 		bi, _ := tx.Branch(branch.Name)
 		bi.Parent = branch.Parent
 		bi.PullRequest = branch.PullRequest
+		if err := meta.ValidateNoCycle(tx, branch.Name, bi.Parent); err != nil {
+			return fmt.Errorf(
+				"could not adopt branch %q because it would introduce cyclical branch dependencies",
+				branch.Name,
+			)
+		}
 		tx.SetBranch(bi)
 	}
 	if err := tx.Commit(); err != nil {

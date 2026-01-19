@@ -170,6 +170,33 @@ func HasExcludedAncestor(tx ReadTx, name string) (bool, string) {
 	return HasExcludedAncestor(tx, branch.Parent.Name)
 }
 
+// ValidateNoCycle returns an error if setting a branch's parent would introduce
+// cyclical dependencies in the stack.
+func ValidateNoCycle(tx ReadTx, branchName string, parent BranchState) error {
+	if parent.Trunk || parent.Name == "" {
+		return nil
+	}
+
+	visited := map[string]bool{branchName: true}
+	current := parent.Name
+	for current != "" {
+		if visited[current] {
+			return errors.New("would introduce cyclical branch dependencies")
+		}
+		visited[current] = true
+
+		branch, ok := tx.Branch(current)
+		if !ok {
+			return nil
+		}
+		if branch.Parent.Trunk {
+			return nil
+		}
+		current = branch.Parent.Name
+	}
+	return nil
+}
+
 // StackBranches returns branches in the stack associated with the given branch.
 func StackBranches(tx ReadTx, name string) ([]string, error) {
 	root, found := Root(tx, name)

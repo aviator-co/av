@@ -2,6 +2,7 @@ package reorder
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/aviator-co/av/internal/utils/colors"
@@ -67,6 +68,12 @@ func (b StackBranchCmd) Execute(ctx *Context) error {
 		parentState.BranchingPointCommitHash = headCommit
 	}
 	branch.Parent = parentState
+	if err := meta.ValidateNoCycle(tx, b.Name, branch.Parent); err != nil {
+		return fmt.Errorf(
+			"could not reorder branch %q because it would introduce cyclical branch dependencies",
+			b.Name,
+		)
+	}
 	tx.SetBranch(branch)
 
 	if headCommit == "" {
