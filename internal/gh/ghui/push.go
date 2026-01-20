@@ -25,6 +25,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/shurcooL/githubv4"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -313,6 +314,14 @@ func (vm *GitHubPushModel) runGitPush() error {
 	}
 	if res.ExitCode != 0 {
 		return errors.Errorf("failed to push branches to GitHub\n%s\n%s", res.Stdout, res.Stderr)
+	}
+
+	// Set upstream tracking for pushed branches
+	for _, branch := range vm.pushCandidates {
+		if err := vm.repo.SetUpstream(ctx, branch.branch.Short(), vm.repo.GetRemoteName()); err != nil {
+			// Log the error but don't fail since the push succeeded
+			logrus.Warnf("failed to set upstream tracking for %s: %v", branch.branch.Short(), err)
+		}
 	}
 
 	for _, branch := range vm.pushCandidates {
