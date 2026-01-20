@@ -210,6 +210,9 @@ func CreatePullRequest(
 		if _, err := repo.Git(ctx, pushFlags...); err != nil {
 			return nil, errors.WrapIf(err, "failed to push")
 		}
+		if err := repo.SetUpstream(ctx, opts.BranchName, remote); err != nil {
+			logrus.Warnf("failed to set upstream tracking for branch %q: %v", opts.BranchName, err)
+		}
 		if err := repo.BranchSetConfig(ctx, opts.BranchName, "av-pushed-remote", remote); err != nil {
 			return nil, err
 		}
