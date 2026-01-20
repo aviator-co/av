@@ -23,3 +23,15 @@ func (r *Repo) BranchSetConfig(ctx context.Context, name, key, value string) err
 	})
 	return err
 }
+
+// SetUpstream configures the upstream tracking relationship for a local branch
+// (equivalent to `git branch --set-upstream-to=<remote>/<branch> <branch>`).
+func (r *Repo) SetUpstream(ctx context.Context, branchName, remoteName string) error {
+	if err := r.BranchSetConfig(ctx, branchName, "remote", remoteName); err != nil {
+		return err
+	}
+	if err := r.BranchSetConfig(ctx, branchName, "merge", fmt.Sprintf("refs/heads/%s", branchName)); err != nil {
+		return err
+	}
+	return nil
+}
