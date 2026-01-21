@@ -6,13 +6,13 @@ repos:
         files: ".+.go$"
         language: system
         entry: |
-          sh -c 'go run golang.org/x/tools/cmd/goimports@latest -w .'
+          sh -c 'PATH=/usr/local/go/bin:$PATH go run golang.org/x/tools/cmd/goimports@latest -w .'
       - id: gofumpt
         name: gofumpt
         files: ".+.go$"
         language: system
         entry: |
-          sh -c 'go run mvdan.cc/gofumpt@latest -l -w .'
+          sh -c 'PATH=/usr/local/go/bin:$PATH go run mvdan.cc/gofumpt@latest -l -w .'
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

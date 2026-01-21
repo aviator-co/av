@@ -1,12 +1,18 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"strings"
 
 	"github.com/aviator-co/av/internal/actions"
-	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/aviator-co/av/internal/gh"
+	"github.com/aviator-co/av/internal/gh/ghui"
+	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/git/gitui"
+	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/uiutils"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 )
 
@@ -34,62 +40,111 @@ does not delete Git branches.
 			return err
 		}
 
-		deleted, orphaned, err := actions.TidyDB(ctx, repo, db)
+		client, err := getGitHubClient(ctx)
 		if err != nil {
 			return err
 		}
 
-		var ss []string
-
-		hasDeleted := false
-		for _, d := range deleted {
-			if d {
-				hasDeleted = true
-				break
-			}
-		}
-
-		if hasDeleted {
-			ss = append(
-				ss,
-				colors.SuccessStyle.Render(
-					"✓ Updated the branch metadata for the deleted branches",
-				),
-			)
-			ss = append(ss, "")
-			ss = append(ss, "  Following branches no longer exist in the repository:")
-			ss = append(ss, "")
-			for name, d := range deleted {
-				if d {
-					ss = append(ss, "  * "+name)
-				}
-			}
-			if len(orphaned) > 0 {
-				ss = append(ss, "")
-				ss = append(
-					ss,
-					"  Following branches are orphaned since they have deleted parents:",
-				)
-				ss = append(ss, "")
-				for name := range orphaned {
-					ss = append(ss, "  * "+name)
-				}
-				ss = append(ss, "")
-				ss = append(ss, "  The orphaned branches still exist in the repository.")
-				ss = append(ss, "  You can re-adopt them to av by running 'av adopt'.")
-			}
-		} else {
-			ss = append(ss, colors.SuccessStyle.Render("✓ No branch to tidy"))
-		}
-
-		var ret string
-		if len(ss) != 0 {
-			ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
-				lipgloss.JoinVertical(0, ss...),
-			) + "\n"
-		}
-		fmt.Print(ret)
-
-		return nil
+		return uiutils.RunBubbleTea(&tidyViewModel{
+			repo:   repo,
+			db:     db,
+			client: client,
+		})
 	},
+}
+
+type tidyViewModel struct {
+	repo   *git.Repo
+	db     meta.DB
+	client *gh.Client
+
+	deleted  map[string]bool
+	orphaned map[string]bool
+
+	uiutils.BaseStackedView
+}
+
+func (vm *tidyViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	return vm, vm.BaseStackedView.Update(msg)
+}
+
+func (vm *tidyViewModel) Init() tea.Cmd {
+	return vm.initGitHubFetch()
+}
+
+func (vm *tidyViewModel) initGitHubFetch() tea.Cmd {
+	ctx := context.Background()
+	status, err := vm.repo.Status(ctx)
+	if err != nil {
+		return uiutils.ErrCmd(err)
+	}
+	currentBranch := status.CurrentBranch
+
+	var targetBranches []plumbing.ReferenceName
+	branches := vm.db.ReadTx().AllBranches()
+	for name := range branches {
+		targetBranches = append(targetBranches, plumbing.NewBranchReferenceName(name))
+	}
+
+	var currentBranchRef plumbing.ReferenceName
+	if currentBranch != "" {
+		currentBranchRef = plumbing.NewBranchReferenceName(currentBranch)
+	}
+
+	return vm.AddView(ghui.NewGitHubFetchModel(
+		vm.repo,
+		vm.db,
+		vm.client,
+		currentBranchRef,
+		targetBranches,
+		vm.initTidyDB,
+	))
+}
+
+func (vm *tidyViewModel) initTidyDB() tea.Cmd {
+	ctx := context.Background()
+	deleted, orphaned, err := actions.TidyDB(ctx, vm.repo, vm.db)
+	if err != nil {
+		return uiutils.ErrCmd(err)
+	}
+
+	vm.deleted = deleted
+	vm.orphaned = orphaned
+
+	return vm.initPruneBranches()
+}
+
+func (vm *tidyViewModel) initPruneBranches() tea.Cmd {
+	ctx := context.Background()
+	status, err := vm.repo.Status(ctx)
+	if err != nil {
+		return uiutils.ErrCmd(err)
+	}
+	currentBranch := status.CurrentBranch
+
+	var targetBranches []plumbing.ReferenceName
+	branches := vm.db.ReadTx().AllBranches()
+	for name, branch := range branches {
+		if branch.MergeCommit != "" {
+			targetBranches = append(targetBranches, plumbing.NewBranchReferenceName(name))
+		}
+	}
+
+	return vm.AddView(gitui.NewPruneBranchModel(
+		vm.repo,
+		vm.db,
+		"ask",
+		targetBranches,
+		currentBranch,
+		func() tea.Cmd {
+			return tea.Quit
+		},
+	))
+}
+
+func (vm *tidyViewModel) ExitError() error {
+	if vm.Err != nil {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	return nil
 }
