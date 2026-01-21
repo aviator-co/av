@@ -116,7 +116,6 @@ func adoptForceAdoption(
 			Name:  parent,
 			Trunk: true,
 		}
-		tx.SetBranch(branch)
 	} else {
 		_, exist := tx.Branch(parent)
 		if !exist {
@@ -131,8 +130,12 @@ func adoptForceAdoption(
 			Trunk:                    false,
 			BranchingPointCommitHash: mergeBase,
 		}
-		tx.SetBranch(branch)
 	}
+
+	if err := meta.ValidateNoCycle(tx, currentBranch, branch.Parent); err != nil {
+		return err
+	}
+	tx.SetBranch(branch)
 	if adoptFlags.DryRun {
 		return nil
 	}

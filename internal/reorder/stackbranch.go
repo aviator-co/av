@@ -67,6 +67,9 @@ func (b StackBranchCmd) Execute(ctx *Context) error {
 		parentState.BranchingPointCommitHash = headCommit
 	}
 	branch.Parent = parentState
+	if err := meta.ValidateNoCycle(tx, b.Name, branch.Parent); err != nil {
+		return err
+	}
 	tx.SetBranch(branch)
 
 	if headCommit == "" {

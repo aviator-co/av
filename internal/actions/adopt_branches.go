@@ -71,6 +71,9 @@ func (m *AdoptBranchesModel) adoptBranches() tea.Msg {
 		bi, _ := tx.Branch(branch.Name)
 		bi.Parent = branch.Parent
 		bi.PullRequest = branch.PullRequest
+		if err := meta.ValidateNoCycle(tx, branch.Name, bi.Parent); err != nil {
+			return err
+		}
 		tx.SetBranch(bi)
 	}
 	if err := tx.Commit(); err != nil {

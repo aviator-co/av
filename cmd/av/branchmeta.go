@@ -112,6 +112,9 @@ var branchMetaSetCmd = &cobra.Command{
 				Trunk:                    branchMetaFlags.trunk,
 				BranchingPointCommitHash: parentHead,
 			}
+			if err := meta.ValidateNoCycle(tx, args[0], br.Parent); err != nil {
+				return err
+			}
 		}
 		tx.SetBranch(br)
 		return tx.Commit()

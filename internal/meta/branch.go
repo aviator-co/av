@@ -2,6 +2,7 @@ package meta
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"emperror.dev/errors"
 	"github.com/shurcooL/githubv4"
@@ -168,6 +169,42 @@ func HasExcludedAncestor(tx ReadTx, name string) (bool, string) {
 		return true, branch.Parent.Name
 	}
 	return HasExcludedAncestor(tx, branch.Parent.Name)
+}
+
+// ValidateNoCycle returns an error if setting a branch's parent would introduce
+// cyclical dependencies in the stack.
+func ValidateNoCycle(tx ReadTx, branchName string, parent BranchState) error {
+	if parent.Trunk || parent.Name == "" {
+		return nil
+	}
+
+	visited := map[string]bool{branchName: true}
+	current := parent.Name
+	for current != "" {
+		if visited[current] {
+			return fmt.Errorf(
+				"branch %q cannot have parent %q because it would introduce cyclical branch dependencies",
+				branchName,
+				parent.Name,
+			)
+		}
+		visited[current] = true
+
+		branch, ok := tx.Branch(current)
+		if !ok {
+			return fmt.Errorf(
+				"branch %q cannot have parent %q: ancestor branch %q is missing from av metadata",
+				branchName,
+				parent.Name,
+				current,
+			)
+		}
+		if branch.Parent.Trunk {
+			return nil
+		}
+		current = branch.Parent.Name
+	}
+	return nil
 }
 
 // StackBranches returns branches in the stack associated with the given branch.
