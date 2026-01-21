@@ -2,6 +2,7 @@ package meta
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"emperror.dev/errors"
 	"github.com/shurcooL/githubv4"
@@ -181,13 +182,22 @@ func ValidateNoCycle(tx ReadTx, branchName string, parent BranchState) error {
 	current := parent.Name
 	for current != "" {
 		if visited[current] {
-			return errors.New("would introduce cyclical branch dependencies")
+			return fmt.Errorf(
+				"branch %q cannot have parent %q because it would introduce cyclical branch dependencies",
+				branchName,
+				parent.Name,
+			)
 		}
 		visited[current] = true
 
 		branch, ok := tx.Branch(current)
 		if !ok {
-			return nil
+			return fmt.Errorf(
+				"branch %q cannot have parent %q: ancestor branch %q is missing from av metadata",
+				branchName,
+				parent.Name,
+				current,
+			)
 		}
 		if branch.Parent.Trunk {
 			return nil

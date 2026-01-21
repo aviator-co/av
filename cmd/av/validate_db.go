@@ -87,20 +87,12 @@ func validateDB(ctx context.Context, repo *git.Repo, tx meta.ReadTx) ([]diagnost
 				branch:   branchName,
 				message:  "parent points to itself",
 			})
-		} else if !branch.Parent.Trunk && branch.Parent.Name != "" {
-			if _, ok := tx.Branch(branch.Parent.Name); !ok {
-				issues = append(issues, diagnosticIssue{
-					severity: diagnosticError,
-					branch:   branchName,
-					message:  fmt.Sprintf("parent %q is missing from av metadata", branch.Parent.Name),
-				})
-			} else if err := meta.ValidateNoCycle(tx, branchName, branch.Parent); err != nil {
-				issues = append(issues, diagnosticIssue{
-					severity: diagnosticError,
-					branch:   branchName,
-					message:  "parent chain introduces cyclical branch dependencies",
-				})
-			}
+		} else if err := meta.ValidateNoCycle(tx, branchName, branch.Parent); err != nil {
+			issues = append(issues, diagnosticIssue{
+				severity: diagnosticError,
+				branch:   branchName,
+				message:  err.Error(),
+			})
 		}
 	}
 

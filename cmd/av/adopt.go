@@ -133,10 +133,7 @@ func adoptForceAdoption(
 	}
 
 	if err := meta.ValidateNoCycle(tx, currentBranch, branch.Parent); err != nil {
-		return fmt.Errorf(
-			"could not adopt branch %q because it would introduce cyclical branch dependencies",
-			currentBranch,
-		)
+		return err
 	}
 	tx.SetBranch(branch)
 	if adoptFlags.DryRun {

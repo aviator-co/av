@@ -113,10 +113,7 @@ var branchMetaSetCmd = &cobra.Command{
 				BranchingPointCommitHash: parentHead,
 			}
 			if err := meta.ValidateNoCycle(tx, args[0], br.Parent); err != nil {
-				return fmt.Errorf(
-					"could not set parent for branch %q because it would introduce cyclical branch dependencies",
-					args[0],
-				)
+				return err
 			}
 		}
 		tx.SetBranch(br)

@@ -41,10 +41,11 @@ func TestValidateNoCycle(t *testing.T) {
 			parent: BranchState{Name: "main", Trunk: true},
 		},
 		{
-			name:   "missing parent allowed",
-			tx:     testReadTx{branches: map[string]Branch{}},
-			branch: "feature",
-			parent: BranchState{Name: "missing", Trunk: false},
+			name:      "missing parent rejected",
+			tx:        testReadTx{branches: map[string]Branch{}},
+			branch:    "feature",
+			parent:    BranchState{Name: "missing", Trunk: false},
+			expectErr: true,
 		},
 		{
 			name:      "self parent rejected",
@@ -69,6 +70,12 @@ func TestValidateNoCycle(t *testing.T) {
 			err := ValidateNoCycle(tt.tx, tt.branch, tt.parent)
 			if tt.expectErr {
 				assert.Error(t, err)
+				if tt.name == "missing parent rejected" {
+					assert.Contains(t, err.Error(), "missing from av metadata")
+				}
+				if tt.name == "cycle in parent chain rejected" || tt.name == "self parent rejected" {
+					assert.Contains(t, err.Error(), "cyclical branch dependencies")
+				}
 			} else {
 				assert.NoError(t, err)
 			}
