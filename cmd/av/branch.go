@@ -8,6 +8,7 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
@@ -181,6 +182,9 @@ func branchSplit(
 		newBranchName = sanitizeBranchName(lastCommit.Message)
 	}
 
+	// Apply branch name prefix
+	newBranchName = applyBranchNamePrefix(newBranchName)
+
 	// Get the parent of the last commit (HEAD~1)
 	parentCommitIter := lastCommit.Parents()
 	parentCommit, err := parentCommitIter.Next()
@@ -221,6 +225,14 @@ func branchSplit(
 	}
 
 	return nil
+}
+
+// applyBranchNamePrefix applies the configured branch name prefix to a branch name.
+func applyBranchNamePrefix(branchName string) string {
+	if config.Av.PullRequest.BranchNamePrefix != "" {
+		return config.Av.PullRequest.BranchNamePrefix + branchName
+	}
+	return branchName
 }
 
 // sanitizeBranchName creates a valid branch name from a string.
@@ -266,6 +278,9 @@ func createBranch(
 	branchName string,
 	parentBranchName string,
 ) (reterr error) {
+	// Apply branch name prefix
+	branchName = applyBranchNamePrefix(branchName)
+
 	// Determine important contextual information from Git
 	// or if a parent branch is provided, check it allows as a default branch
 	defaultBranch := repo.DefaultBranch()

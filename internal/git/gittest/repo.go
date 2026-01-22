@@ -105,6 +105,8 @@ func NewTempRepoWithGitHubServer(t *testing.T, serverURL string) *GitTestRepo {
 github:
     token: "dummy_valid_token"
     baseUrl: %q
+pullRequest:
+    branchNamePrefix: ""
 `, serverURL),
 		0o644,
 	)
