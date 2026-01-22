@@ -216,6 +216,9 @@ func CreatePullRequest(
 		if err := repo.BranchSetConfig(ctx, opts.BranchName, "av-pushed-ref", fmt.Sprintf("refs/heads/%s", opts.BranchName)); err != nil {
 			return nil, err
 		}
+		if err := repo.BranchSetUpstream(ctx, opts.BranchName, remote); err != nil {
+			return nil, err
+		}
 	} else {
 		_, _ = fmt.Fprint(os.Stderr,
 			"  - skipping push to GitHub",

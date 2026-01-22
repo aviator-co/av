@@ -325,6 +325,9 @@ func (vm *GitHubPushModel) runGitPush() error {
 		if err := vm.repo.BranchSetConfig(ctx, branch.branch.Short(), "av-pushed-commit", branch.localCommit.Hash.String()); err != nil {
 			return err
 		}
+		if err := vm.repo.BranchSetUpstream(ctx, branch.branch.Short(), vm.repo.GetRemoteName()); err != nil {
+			return err
+		}
 	}
 	return nil
 }
