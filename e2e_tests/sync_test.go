@@ -294,4 +294,3 @@ func TestSyncWithLotsOfConflicts(t *testing.T) {
 	// sync should be over.
 	RequireAv(t, "sync", "--continue")
 }
-
