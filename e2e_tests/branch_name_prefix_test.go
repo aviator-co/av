@@ -1,6 +1,7 @@
 package e2e_tests
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,18 +10,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBranchNamePrefixWithCommit(t *testing.T) {
+// setupRepoWithPrefix creates a test repository with the specified branch name prefix.
+func setupRepoWithPrefix(t *testing.T, prefix string) *gittest.GitTestRepo {
+	t.Helper()
 	repo := gittest.NewTempRepo(t)
 	Chdir(t, repo.RepoDir)
 
-	// Create a config file with BranchNamePrefix set
 	configDir := filepath.Join(repo.RepoDir, ".git", "av")
 	require.NoError(t, os.MkdirAll(configDir, 0o755))
 	configFile := filepath.Join(configDir, "config.yml")
-	configContent := `pullRequest:
-  branchNamePrefix: "user/myname/"
-`
+	configContent := fmt.Sprintf("pullRequest:\n  branchNamePrefix: %q\n", prefix)
 	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0o644))
+
+	return repo
+}
+
+func TestBranchNamePrefixWithCommit(t *testing.T) {
+	repo := setupRepoWithPrefix(t, "user/myname/")
 
 	// Create a branch using av commit -b
 	repo.CreateFile(t, "test.txt", "test content")
@@ -33,17 +39,7 @@ func TestBranchNamePrefixWithCommit(t *testing.T) {
 }
 
 func TestBranchNamePrefixWithSplit(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.RepoDir)
-
-	// Create a config file with BranchNamePrefix set
-	configDir := filepath.Join(repo.RepoDir, ".git", "av")
-	require.NoError(t, os.MkdirAll(configDir, 0o755))
-	configFile := filepath.Join(configDir, "config.yml")
-	configContent := `pullRequest:
-  branchNamePrefix: "feature/"
-`
-	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0o644))
+	repo := setupRepoWithPrefix(t, "feature/")
 
 	// Create a branch and make two commits
 	RequireAv(t, "branch", "base-branch")
@@ -53,23 +49,13 @@ func TestBranchNamePrefixWithSplit(t *testing.T) {
 	// Split the last commit
 	RequireAv(t, "branch", "--split")
 
-	// Verify the new branch name has the prefix
+	// Verify the new branch name has the exact expected prefix and sanitized name
 	currentBranch := repo.Git(t, "branch", "--show-current")
-	require.Contains(t, currentBranch, "feature/")
+	require.Equal(t, "feature/write-file2-txt\n", currentBranch)
 }
 
 func TestBranchNamePrefixWithExplicitName(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.RepoDir)
-
-	// Create a config file with BranchNamePrefix set
-	configDir := filepath.Join(repo.RepoDir, ".git", "av")
-	require.NoError(t, os.MkdirAll(configDir, 0o755))
-	configFile := filepath.Join(configDir, "config.yml")
-	configContent := `pullRequest:
-  branchNamePrefix: "will/"
-`
-	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0o644))
+	repo := setupRepoWithPrefix(t, "will/")
 
 	// Create a branch with explicit name using av branch
 	RequireAv(t, "branch", "test-branch")
@@ -80,17 +66,7 @@ func TestBranchNamePrefixWithExplicitName(t *testing.T) {
 }
 
 func TestBranchNamePrefixWithSplitExplicitName(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.RepoDir)
-
-	// Create a config file with BranchNamePrefix set
-	configDir := filepath.Join(repo.RepoDir, ".git", "av")
-	require.NoError(t, os.MkdirAll(configDir, 0o755))
-	configFile := filepath.Join(configDir, "config.yml")
-	configContent := `pullRequest:
-  branchNamePrefix: "user/dev/"
-`
-	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0o644))
+	repo := setupRepoWithPrefix(t, "user/dev/")
 
 	// Create a branch and make two commits
 	RequireAv(t, "branch", "base-branch")
@@ -107,17 +83,7 @@ func TestBranchNamePrefixWithSplitExplicitName(t *testing.T) {
 }
 
 func TestBranchNamePrefixEmpty(t *testing.T) {
-	repo := gittest.NewTempRepo(t)
-	Chdir(t, repo.RepoDir)
-
-	// Explicitly set empty BranchNamePrefix to override global config
-	configDir := filepath.Join(repo.RepoDir, ".git", "av")
-	require.NoError(t, os.MkdirAll(configDir, 0o755))
-	configFile := filepath.Join(configDir, "config.yml")
-	configContent := `pullRequest:
-  branchNamePrefix: ""
-`
-	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0o644))
+	repo := setupRepoWithPrefix(t, "")
 
 	repo.CreateFile(t, "test.txt", "test content")
 	repo.AddFile(t, "test.txt")
