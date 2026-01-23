@@ -315,21 +315,22 @@ func (vm *GitHubPushModel) runGitPush() error {
 		return errors.Errorf("failed to push branches to GitHub\n%s\n%s", res.Stdout, res.Stderr)
 	}
 
+	var errs []error
 	for _, branch := range vm.pushCandidates {
 		if err := vm.repo.BranchSetConfig(ctx, branch.branch.Short(), "av-pushed-remote", vm.repo.GetRemoteName()); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 		if err := vm.repo.BranchSetConfig(ctx, branch.branch.Short(), "av-pushed-ref", branch.branch.String()); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 		if err := vm.repo.BranchSetConfig(ctx, branch.branch.Short(), "av-pushed-commit", branch.localCommit.Hash.String()); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 		if err := vm.repo.BranchSetUpstream(ctx, branch.branch.Short(), vm.repo.GetRemoteName()); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 	}
-	return nil
+	return errors.Combine(errs...)
 }
 
 func (vm *GitHubPushModel) getPRs() (map[plumbing.ReferenceName]*gh.PullRequest, error) {
