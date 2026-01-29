@@ -9,7 +9,6 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
-	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/cleanup"
@@ -335,9 +334,6 @@ func branchNameFromMessage(message string) string {
 		name = name[:branchNameLength]
 	}
 	name = strings.ToLower(name)
-	if config.Av.PullRequest.BranchNamePrefix != "" {
-		name = fmt.Sprintf("%s%s", config.Av.PullRequest.BranchNamePrefix, name)
-	}
 	return name
 }
 
