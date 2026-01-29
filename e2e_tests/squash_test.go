@@ -1,6 +1,7 @@
 package e2e_tests
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/aviator-co/av/internal/git/gittest"
@@ -320,4 +321,109 @@ func TestSquashStackedBranchBDoesNotAffectBranchA(t *testing.T) {
 	require.FileExists(t, repo.RepoDir+"/b1.txt")
 	require.FileExists(t, repo.RepoDir+"/b2.txt")
 	require.FileExists(t, repo.RepoDir+"/b3.txt")
+}
+
+func TestSquashWithModifiedParentBranch(t *testing.T) {
+	repo := gittest.NewTempRepo(t)
+	Chdir(t, repo.RepoDir)
+	repo.Git(t, "fetch")
+
+	// Create parent branch
+	RequireAv(t, "branch", "parent-branch")
+	repo.CreateFile(t, "parent1.txt", "parent content 1")
+	repo.AddFile(t, "parent1.txt")
+	RequireAv(t, "commit", "-m", "parent commit 1")
+
+	repo.CreateFile(t, "parent2.txt", "parent content 2")
+	repo.AddFile(t, "parent2.txt")
+	RequireAv(t, "commit", "-m", "parent commit 2")
+
+	// Create child branch from parent
+	RequireAv(t, "branch", "child-branch")
+	repo.CreateFile(t, "child1.txt", "child content 1")
+	repo.AddFile(t, "child1.txt")
+	RequireAv(t, "commit", "-m", "child commit 1")
+
+	repo.CreateFile(t, "child2.txt", "child content 2")
+	repo.AddFile(t, "child2.txt")
+	RequireAv(t, "commit", "-m", "child commit 2")
+
+	// Simulate external changes to parent branch (force push scenario)
+	repo.Git(t, "checkout", "parent-branch")
+	repo.Git(t, "reset", "--hard", "HEAD~1") // Reset to parent commit 1
+	repo.CreateFile(t, "parent_new.txt", "new parent content")
+	repo.AddFile(t, "parent_new.txt")
+	repo.Git(t, "commit", "-m", "parent new commit")
+
+	// Switch back to child branch and attempt squash
+	RequireAv(t, "switch", "child-branch")
+
+	// Squash should now fail because branch is not in sync with parent
+	output := Av(t, "squash")
+	require.NotEqual(t, 0, output.ExitCode)
+	require.Contains(t, output.Stderr, "branch is not in sync with parent branch")
+	require.Contains(t, output.Stderr, "please run 'av sync' first")
+
+	// Verify child files are still present (no partial squash happened)
+	require.FileExists(t, repo.RepoDir+"/child1.txt")
+	require.FileExists(t, repo.RepoDir+"/child2.txt")
+
+	// Verify we still have the expected commits (no squashing occurred)
+	commitCount := strings.TrimSpace(
+		repo.Git(t, "rev-list", "--count", "child-branch", "^parent-branch"),
+	)
+	// After the parent branch was force-pushed (reset and new commits), the child branch
+	// now has more commits relative to the new parent head, which is expected behavior
+	require.NotEqual(
+		t,
+		"1",
+		commitCount,
+		"Should have more than 1 commit, confirming squash was prevented",
+	)
+
+	// The key achievement: squash was prevented, avoiding the bug where we would
+	// squash into a parent commit due to the force-pushed parent branch
+}
+
+func TestSquashFailsWhenBranchOutOfSync(t *testing.T) {
+	repo := gittest.NewTempRepo(t)
+	Chdir(t, repo.RepoDir)
+	repo.Git(t, "fetch")
+
+	// Create parent branch
+	RequireAv(t, "branch", "parent-branch")
+	repo.CreateFile(t, "parent1.txt", "parent content 1")
+	repo.AddFile(t, "parent1.txt")
+	RequireAv(t, "commit", "-m", "parent commit 1")
+
+	// Create child branch from parent
+	RequireAv(t, "branch", "child-branch")
+	repo.CreateFile(t, "child1.txt", "child content 1")
+	repo.AddFile(t, "child1.txt")
+	RequireAv(t, "commit", "-m", "child commit 1")
+
+	repo.CreateFile(t, "child2.txt", "child content 2")
+	repo.AddFile(t, "child2.txt")
+	RequireAv(t, "commit", "-m", "child commit 2")
+
+	// Modify parent branch externally to create out-of-sync condition
+	repo.Git(t, "checkout", "parent-branch")
+	repo.CreateFile(t, "parent2.txt", "parent content 2")
+	repo.AddFile(t, "parent2.txt")
+	repo.Git(t, "commit", "-m", "parent commit 2")
+
+	// Switch back to child branch
+	RequireAv(t, "switch", "child-branch")
+
+	// Squash should fail because branch is not in sync with parent
+	output := Av(t, "squash")
+	require.NotEqual(t, 0, output.ExitCode)
+	require.Contains(t, output.Stderr, "branch is not in sync with parent branch parent-branch")
+	require.Contains(t, output.Stderr, "please run 'av sync' first")
+
+	// Verify no changes were made (both child commits should still exist)
+	commitCount := strings.TrimSpace(
+		repo.Git(t, "rev-list", "--count", "child-branch", "^parent-branch"),
+	)
+	require.Equal(t, "2", commitCount)
 }
