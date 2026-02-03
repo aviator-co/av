@@ -3,12 +3,14 @@ package gitui
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/aviator-co/av/internal/utils/errutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -215,24 +217,52 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 		return err
 	}
 
+	// Always restore the checked out state, even if deletion fails.
+	// Use a variable to capture any deletion error and restore HEAD before returning.
+	var deletionErr error
+
 	// Delete in the reverse order just in case. The targetBranches are sorted in the parent ->
 	// child order.
 	for i := len(vm.deleteCandidates) - 1; i >= 0; i-- {
 		branch := vm.deleteCandidates[i]
 		if _, err := vm.repo.Git(context.Background(), "branch", "-D", branch.branch.Short()); err != nil {
-			return errors.Errorf("cannot delete merged branch %q: %v", branch.branch.Short(), err)
+			// Check if the error is due to the branch being checked out in a worktree
+			if exiterr, ok := errutils.As[*exec.ExitError](err); ok &&
+				strings.Contains(string(exiterr.Stderr), "used by worktree") {
+				deletionErr = errors.Errorf(
+					"cannot delete branch %q: it is checked out in a worktree\n"+
+						"  Use 'git worktree list' to see all worktrees\n"+
+						"  Remove the worktree with 'git worktree remove <path>' or checkout a different branch in that worktree",
+					branch.branch.Short(),
+				)
+			} else {
+				deletionErr = errors.Errorf("cannot delete merged branch %q: %v", branch.branch.Short(), err)
+			}
+			break
 		}
 		tx := vm.db.WriteTx()
 		tx.DeleteBranch(branch.branch.Short())
 		if err := tx.Commit(); err != nil {
-			return err
+			deletionErr = err
+			break
 		}
 	}
 
-	// Restore the checked out state.
+	// Restore the checked out state before returning any error.
 	if err := vm.CheckoutInitialState(); err != nil {
-		return err
+		// If we have both a deletion error and a checkout error, prioritize the checkout error
+		// as it's more critical (leaves user in a bad state).
+		if deletionErr != nil {
+			return errors.Errorf("failed to restore branch after deletion error: %v (original error: %v)", err, deletionErr)
+		}
+		return errors.Errorf("failed to restore branch: %v", err)
 	}
+
+	// If there was a deletion error, return it now after HEAD has been restored.
+	if deletionErr != nil {
+		return deletionErr
+	}
+
 	return &PruneBranchProgress{deletionDone: true}
 }
 
