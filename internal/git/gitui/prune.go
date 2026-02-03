@@ -220,7 +220,7 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 	for i := len(vm.deleteCandidates) - 1; i >= 0; i-- {
 		branch := vm.deleteCandidates[i]
 		if _, err := vm.repo.Git(context.Background(), "branch", "-D", branch.branch.Short()); err != nil {
-			return errors.Errorf("cannot delete merged branch %q: %v", branch.branch.Short(), err)
+			return errors.Errorf("cannot delete merged branch 1 %q: %v", branch.branch.Short(), err)
 		}
 		tx := vm.db.WriteTx()
 		tx.DeleteBranch(branch.branch.Short())
