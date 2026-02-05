@@ -220,25 +220,24 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 	// Always restore the checked out state, even if deletion fails.
 	// Use a variable to capture any deletion error and restore HEAD before returning.
 	var deletionErr error
+	var worktreeBranches []string
 
 	// Delete in the reverse order just in case. The targetBranches are sorted in the parent ->
 	// child order.
 	for i := len(vm.deleteCandidates) - 1; i >= 0; i-- {
 		branch := vm.deleteCandidates[i]
-		if _, err := vm.repo.Git(context.Background(), "branch", "-D", branch.branch.Short()); err != nil {
+		if err := vm.repo.BranchDelete(context.Background(), branch.branch.Short()); err != nil {
 			// Check if the error is due to the branch being checked out in a worktree
 			if exiterr, ok := errutils.As[*exec.ExitError](err); ok &&
 				strings.Contains(string(exiterr.Stderr), "used by worktree") {
-				deletionErr = errors.Errorf(
-					"cannot delete branch %q: it is checked out in a worktree\n"+
-						"  Use 'git worktree list' to see all worktrees\n"+
-						"  Remove the worktree with 'git worktree remove <path>' or checkout a different branch in that worktree",
-					branch.branch.Short(),
-				)
+				// Collect worktree branches but continue deleting others
+				worktreeBranches = append(worktreeBranches, branch.branch.Short())
+				continue
 			} else {
+				// Other errors are fatal
 				deletionErr = errors.Errorf("cannot delete merged branch %q: %v", branch.branch.Short(), err)
+				break
 			}
-			break
 		}
 		tx := vm.db.WriteTx()
 		tx.DeleteBranch(branch.branch.Short())
@@ -258,9 +257,29 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 		return errors.Errorf("failed to restore branch: %v", err)
 	}
 
-	// If there was a deletion error, return it now after HEAD has been restored.
+	// Build worktree error message if any branches couldn't be deleted
+	var worktreeErr error
+	if len(worktreeBranches) > 0 {
+		var sb strings.Builder
+		sb.WriteString("Could not delete the following branches (checked out in worktrees):\n")
+		for _, br := range worktreeBranches {
+			fmt.Fprintf(&sb, "- %s\n", br)
+		}
+		sb.WriteString("Use 'git worktree list' to see all worktrees\n")
+		sb.WriteString("Remove worktrees with 'git worktree remove <path>' or checkout a different branch in those worktrees\n")
+		worktreeErr = errors.New(sb.String())
+	}
+
+	// Return both fatal deletion errors and worktree warnings
 	if deletionErr != nil {
+		if worktreeErr != nil {
+			return errors.Errorf("fatal error during branch deletion: %v\n\n%v", deletionErr, worktreeErr)
+		}
 		return deletionErr
+	}
+
+	if worktreeErr != nil {
+		return worktreeErr
 	}
 
 	return &PruneBranchProgress{deletionDone: true}

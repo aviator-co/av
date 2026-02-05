@@ -54,15 +54,11 @@ func (d DeleteBranchCmd) Execute(ctx *Context) error {
 			return nil
 		}
 		if strings.Contains(stderr, "used by worktree") {
-			_, _ = fmt.Fprint(os.Stderr,
-				colors.Failure("Cannot delete branch "), colors.UserInput(d.Name),
-				colors.Failure(": it is checked out in a worktree\n"),
-				"  - Use ", colors.CliCmd("git worktree list"),
-				" to see all worktrees\n",
-				"  - Remove the worktree with ", colors.CliCmd("git worktree remove <path>"),
-				" or checkout a different branch in that worktree\n",
-			)
-			return err
+			msg := fmt.Sprintf("cannot delete branch %q: it is checked out in a worktree\n", d.Name)
+			msg += "Use 'git worktree list' to see all worktrees\n"
+			msg += "Remove the worktree with 'git worktree remove <path>' or checkout a different branch in that worktree\n"
+			_, _ = fmt.Fprint(os.Stderr, msg)
+			return nil
 		}
 	}
 	if err != nil {
