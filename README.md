@@ -30,6 +30,15 @@ Join our discord community: [https://discord.gg/TFgtZtN8](https://discord.gg/NFs
 
 ![Demo](resources/demo.gif)
 
+# Agent plugins
+
+The [aviator-co/agent-plugins](https://github.com/aviator-co/agent-plugins) repository provides plugins for coding agents like Claude Code. The `av-cli` skill teaches agents how to use `av` for stacked PR workflows, including:
+
+- Creating branches
+- Committing changes
+- Syncing stacks
+- Managing PRs using `av` commands instead of raw `git`
+
 # Usage
 
 > [!TIP]
