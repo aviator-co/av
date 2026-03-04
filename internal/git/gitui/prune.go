@@ -197,7 +197,7 @@ func (vm *PruneBranchModel) View() string {
 func (vm *PruneBranchModel) viewCandidates() string {
 	sb := strings.Builder{}
 	for _, branch := range vm.deleteCandidates {
-		sb.WriteString(fmt.Sprintf("%s: %s\n", branch.branch.Short(), branch.commit.String()))
+		fmt.Fprintf(&sb, "%s: %s\n", branch.branch.Short(), branch.commit.String())
 	}
 	return sb.String()
 }
