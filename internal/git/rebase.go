@@ -54,7 +54,18 @@ func (r *Repo) Rebase(ctx context.Context, opts RebaseOpts) (*Output, error) {
 		args = append(args, "--onto", opts.Onto)
 	}
 	args = append(args, opts.Upstream)
+
+	// If the branch is checked out in another worktree, run the rebase from
+	// that worktree directory instead. git rebase <branch> first does a checkout
+	// which fails if the branch is in a different worktree.
 	if opts.Branch != "" {
+		worktreePath, err := r.WorktreeForBranch(ctx, opts.Branch)
+		if err != nil {
+			return nil, err
+		}
+		if worktreePath != "" {
+			return r.runInDir(ctx, worktreePath, &RunOpts{Args: args})
+		}
 		args = append(args, opts.Branch)
 	}
 
