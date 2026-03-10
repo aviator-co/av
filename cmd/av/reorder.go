@@ -78,6 +78,34 @@ squashed, dropped, or moved within the stack.
 			return repo.WriteStateFile(git.StateFileKindReorder, nil)
 		} else if reorderFlags.Continue {
 			state = continuation.State
+
+			// Handle any in-progress cherry-pick from the previous conflict.
+			if stat, _ := os.Stat(filepath.Join(repo.GitDir(), "CHERRY_PICK_HEAD")); stat != nil {
+				if err := repo.CherryPick(ctx, git.CherryPick{Resume: git.CherryPickContinue}); err != nil {
+					fmt.Fprint(os.Stderr,
+						colors.Failure("Failed to continue cherry-pick: ", err.Error(), "\n"),
+						colors.Warning("Resolve the conflict and run "),
+						colors.CliCmd("av reorder --continue"),
+						colors.Warning(" to continue.\n"),
+					)
+					return actions.ErrExitSilently{ExitCode: 1}
+				}
+			}
+
+			// The conflict has been resolved (either by cherry-pick --continue
+			// above, or by the user having already resolved it via
+			// git cherry-pick --skip/--continue or git commit).
+			// Advance past the command that caused the conflict.
+			if len(state.Commands) > 0 {
+				state.Commands = state.Commands[1:]
+			}
+
+			// Update HEAD in state after conflict resolution.
+			head, err := repo.RevParse(ctx, &git.RevParse{Rev: "HEAD"})
+			if err != nil {
+				return err
+			}
+			state.Head = head
 		} else {
 			if continuation.State != nil {
 				fmt.Fprint(os.Stderr,
