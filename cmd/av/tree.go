@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/aviator-co/av/internal/git"
@@ -36,6 +37,14 @@ var treeCmd = &cobra.Command{
 			return err
 		}
 
+		worktrees, _ := repo.WorktreeList(ctx)
+		worktreesByBranch := make(map[string]string)
+		for _, wt := range worktrees {
+			if wt.Branch != "" {
+				worktreesByBranch[wt.Branch] = filepath.Base(wt.Path)
+			}
+		}
+
 		var ss []string
 		currentBranch := status.CurrentBranch
 		tx := db.ReadTx()
@@ -59,6 +68,7 @@ var treeCmd = &cobra.Command{
 						currentBranch,
 						branchName,
 						isTrunk,
+						worktreesByBranch,
 					)
 				}),
 			)
@@ -96,6 +106,7 @@ func renderStackTreeBranchInfo(
 	currentBranchName string,
 	branchName string,
 	isTrunk bool,
+	worktrees map[string]string,
 ) string {
 	bi, _ := tx.Branch(branchName)
 
@@ -104,6 +115,8 @@ func renderStackTreeBranchInfo(
 	var stats []string
 	if branchName == currentBranchName {
 		stats = append(stats, styles.HEAD.Render("HEAD"))
+	} else if wtName, ok := worktrees[branchName]; ok {
+		stats = append(stats, colors.Faint("worktree: "+wtName))
 	}
 	if bi.ExcludeFromSyncAll {
 		descendants := meta.SubsequentBranches(tx, branchName)
