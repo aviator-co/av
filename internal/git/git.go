@@ -183,6 +183,15 @@ func (r *Repo) Cmd(ctx context.Context, args []string, env []string) *exec.Cmd {
 	return cmd
 }
 
+// runInDir runs a git command from the specified directory instead of the repo directory.
+// This is used when a branch is checked out in a different worktree.
+func (r *Repo) runInDir(ctx context.Context, dir string, opts *RunOpts) (*Output, error) {
+	saved := r.repoDir
+	r.repoDir = dir
+	defer func() { r.repoDir = saved }()
+	return r.Run(ctx, opts)
+}
+
 func (r *Repo) Run(ctx context.Context, opts *RunOpts) (*Output, error) {
 	cmd := r.Cmd(ctx, opts.Args, opts.Env)
 	var stdout, stderr bytes.Buffer
