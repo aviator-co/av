@@ -37,15 +37,25 @@ var prFlags struct {
 
 var prCmd = &cobra.Command{
 	Use:   "pr",
-	Short: "Create a pull request for the current branch",
+	Short: "Create or update a pull request for the current branch",
 	Long: strings.TrimSpace(`
-Create a pull request for the current branch.
+Create or update a pull request for the current branch.
+
+When creating a new pull request, an editor opens for the title and body unless
+they are provided via flags. If the branch has a parent, the parent must have a
+pull request first.
+
+When a pull request already exists, the command just pushes the branch to the
+remote without opening an editor. Use --edit to modify the existing description.
 
 Examples:
+  Push and sync an existing PR (no editor, no extra flags needed):
+    $ av pr
+
   Create a PR with an empty body:
     $ av pr --title "My PR"
 
-  Create a pull request, specifying the body of the PR from standard input.
+  Create a pull request, specifying the body of the PR from standard input:
     $ av pr --title "Implement fancy feature" --body - <<EOF
     > Implement my very fancy feature.
     > Can you please review it?
