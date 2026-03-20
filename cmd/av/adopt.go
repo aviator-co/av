@@ -373,21 +373,21 @@ func (vm *remoteAdoptViewModel) initGitFetch(prs []actions.RemotePRInfo, chosenT
 }
 
 func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenTargets []plumbing.ReferenceName) tea.Cmd {
+	chosenSet := make(map[string]bool)
+	for _, target := range chosenTargets {
+		chosenSet[target.Short()] = true
+	}
 	prMap := make(map[string]actions.RemotePRInfo)
 	for _, prInfo := range prs {
 		prMap[prInfo.Name] = prInfo
 	}
 	var branches []actions.AdoptingBranch
-	for _, target := range chosenTargets {
-		idx := slices.IndexFunc(prs, func(prInfo actions.RemotePRInfo) bool {
-			return prInfo.Name == target.Short()
-		})
-		if idx == -1 {
-			return uiutils.ErrCmd(fmt.Errorf("internal error: failed to find PR info for branch %s", target.Short()))
+	for _, pr := range slices.Backward(prs) {
+		if !chosenSet[pr.Name] {
+			continue
 		}
-		pr := prs[idx]
 		ab := actions.AdoptingBranch{
-			Name:        target.Short(),
+			Name:        pr.Name,
 			Parent:      pr.Parent,
 			PullRequest: &pr.PullRequest,
 		}
