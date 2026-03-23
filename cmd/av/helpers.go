@@ -69,7 +69,14 @@ func getDB(ctx context.Context, repo *git.Repo) (meta.DB, error) {
 
 func getOrCreateDB(repo *git.Repo) (meta.DB, bool, error) {
 	dbPath := filepath.Join(repo.AvDir(), "av.db")
-	return jsonfiledb.OpenPath(dbPath)
+	db, exists, err := jsonfiledb.OpenPath(dbPath)
+	if err != nil {
+		return nil, false, errors.WrapIff(err,
+			"failed to open av database at %q (the file may be corrupted; try deleting it and running 'av init')",
+			dbPath,
+		)
+	}
+	return db, exists, nil
 }
 
 func allBranches(ctx context.Context) ([]string, error) {
