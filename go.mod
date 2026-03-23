@@ -10,8 +10,8 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/dustin/go-humanize v1.0.1
-	github.com/erikgeiser/promptkit v0.9.0
-	github.com/fatih/color v1.18.0
+	github.com/erikgeiser/promptkit v0.10.0
+	github.com/fatih/color v1.19.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kr/text v0.2.0
