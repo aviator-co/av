@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"emperror.dev/errors"
 	"github.com/sirupsen/logrus"
@@ -98,7 +99,9 @@ func loadFromFile(repoConfigDir string) error {
 	config.AddConfigPath("$XDG_CONFIG_HOME/av")
 	config.AddConfigPath("$HOME/.config/av")
 	config.AddConfigPath("$HOME/.av")
-	config.AddConfigPath("$AV_HOME")
+	if strings.TrimSpace(os.Getenv("AV_HOME")) != "" {
+		config.AddConfigPath("$AV_HOME")
+	}
 	if err := config.ReadInConfig(); err != nil {
 		// We can ignore config file not exist case.
 		if !errors.As(err, &viper.ConfigFileNotFoundError{}) {
