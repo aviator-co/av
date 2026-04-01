@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"emperror.dev/errors"
-	"github.com/mattn/go-isatty"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/gh/ghui"
@@ -22,6 +21,7 @@ import (
 	"github.com/aviator-co/av/internal/utils/uiutils"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
