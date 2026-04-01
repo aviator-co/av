@@ -21,6 +21,7 @@ import (
 	"github.com/aviator-co/av/internal/utils/uiutils"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -423,6 +424,22 @@ func (m *preAvSyncHookModel) Init() tea.Cmd {
 	}
 	m.hasHook = true
 	cmd := m.repo.Cmd(context.Background(), []string{"hook", "run", "--ignore-missing", "pre-av-sync"}, nil)
+	if !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
+		// When not in a terminal, run the hook as a regular subprocess instead of
+		// tea.ExecProcess. ExecProcess tries to suspend and re-initialize bubbletea's
+		// terminal reader after the process exits, which causes a nil pointer
+		// dereference when there is no TTY (e.g., running from an IDE or script).
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return func() tea.Msg {
+			if err := cmd.Run(); err != nil {
+				return errors.Errorf("pre-av-sync hook failed: %v", err)
+			}
+			m.complete = true
+			return preAvSyncHookProgress{}
+		}
+	}
 	// Use tea.ExecProcess so that the hook can take over the terminal, allowing user to create
 	// an interactive hook.
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
