@@ -66,6 +66,7 @@ type RestackModel struct {
 	rebaseConflictErrorHeadline string
 	rebaseConflictHint          string
 	abortedBranch               plumbing.ReferenceName
+	worktreeMessages            []string
 }
 
 func (vm *RestackModel) Init() tea.Cmd {
@@ -87,6 +88,8 @@ func (vm *RestackModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *RestackProgress:
 		if msg.err == nil && msg.result == nil {
 			// Finished the sequence.
+			restoreMessages := vm.state.Seq.RestoreWorktrees(context.Background())
+			vm.worktreeMessages = append(vm.worktreeMessages, restoreMessages...)
 			if vm.state.InitialBranch != "" {
 				if _, err := vm.repo.CheckoutBranch(context.Background(), &git.CheckoutBranch{Name: vm.state.InitialBranch}); err != nil {
 					return vm, uiutils.ErrCmd(err)
@@ -174,6 +177,9 @@ func (vm *RestackModel) View() string {
 					}
 
 					bn := plumbing.NewBranchReferenceName(branchName)
+					if reason, ok := vm.state.Seq.SkippedBranches[branchName]; ok {
+						return colors.ProgressStyle.Render("⚠ " + branchName + suffix + " (skipped: " + reason + ")")
+					}
 					if syncedBranches[bn] {
 						return colors.SuccessStyle.Render("✓ " + branchName + suffix)
 					}
@@ -190,6 +196,12 @@ func (vm *RestackModel) View() string {
 				}))
 			}
 			sb.WriteString("\n")
+		}
+	}
+	if len(vm.worktreeMessages) > 0 {
+		sb.WriteString("\n")
+		for _, msg := range vm.worktreeMessages {
+			sb.WriteString(colors.Faint(msg) + "\n")
 		}
 	}
 	if vm.rebaseConflictErrorHeadline != "" {
