@@ -1,0 +1,25 @@
+# Test that aborting a restack restores original state.
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+exec av branch stack-2
+commit-file my-file '1a\n2a\n' 'Commit 2a'
+
+# Introduce a conflicting commit on stack-1.
+exec git checkout stack-1
+commit-file my-file '1a\n1b\n' 'Commit 1b'
+
+# Restack should fail with conflict.
+! exec av restack
+exists .git/REBASE_HEAD
+
+# Abort the restack.
+exec av restack --abort
+! exists .git/REBASE_HEAD
+
+# Should be back on stack-1 (starting branch).
+exec git rev-parse --abbrev-ref HEAD
+stdout '^stack-1$'
+
+# stack-2 parent metadata should be unchanged.
+branch-parent stack-2 stack-1

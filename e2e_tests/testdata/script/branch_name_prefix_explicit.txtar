@@ -1,0 +1,7 @@
+# Test that av branch with explicit name applies the configured prefix.
+set-branch-prefix will/
+
+exec av branch test-branch
+
+exec git branch --show-current
+stdout '^will/test-branch$'

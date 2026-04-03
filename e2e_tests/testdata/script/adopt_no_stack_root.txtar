@@ -1,0 +1,23 @@
+# Test adopting branches created without av (no existing stack root).
+#
+# main: root_commit
+# stack-1: root_commit -> 1a -> 1b
+# stack-2: root_commit -> 1a -> 1b -> 2a -> 2b
+# stack-3: root_commit -> 1a -> 1b -> 2a -> 2b -> 3a -> 3b
+# stack-4: root_commit -> 1a -> 1b -> 4a -> 4b
+exec git checkout -b stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+commit-file my-file '1b\n' 'Commit 1b'
+exec git checkout -b stack-2
+commit-file my-file '2a\n' 'Commit 2a'
+commit-file my-file '2b\n' 'Commit 2b'
+exec git checkout -b stack-3
+commit-file my-file '3a\n' 'Commit 3a'
+commit-file my-file '3b\n' 'Commit 3b'
+exec git switch stack-1
+exec git checkout -b stack-4
+commit-file my-file '4a\n' 'Commit 4a'
+commit-file my-file '4b\n' 'Commit 4b'
+
+exec git switch main
+exec av adopt --dry-run
