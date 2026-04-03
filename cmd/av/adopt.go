@@ -386,11 +386,6 @@ func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenT
 		if !chosenSet[pr.Name] {
 			continue
 		}
-		ab := actions.AdoptingBranch{
-			Name:        pr.Name,
-			Parent:      pr.Parent,
-			PullRequest: &pr.PullRequest,
-		}
 		// If the parent is already merged / closed, change the parent to the trunk branch.
 		for !pr.Parent.Trunk {
 			parentPRInfo := prMap[pr.Parent.Name]
@@ -399,7 +394,11 @@ func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenT
 			}
 			pr.Parent = parentPRInfo.Parent
 		}
-		branches = append(branches, ab)
+		branches = append(branches, actions.AdoptingBranch{
+			Name:        pr.Name,
+			Parent:      pr.Parent,
+			PullRequest: &pr.PullRequest,
+		})
 	}
 	return vm.AddView(
 		actions.NewAdoptBranchesModel(
