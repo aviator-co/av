@@ -10,7 +10,7 @@ import (
 
 const (
 	// These are ugly, but this is easy way to tell which query is being used.
-	prQuery = "query($after:String$baseRefName:String$first:Int!$headRefName:String$owner:String!$repo:String!$states:[PullRequestState!]){repository(owner: $owner, name: $repo){pullRequests(states: $states, headRefName: $headRefName, baseRefName: $baseRefName, first: $first, after: $after){nodes{id,number,headRefName,baseRefName,isDraft,permalink,state,title,body,mergeCommit{oid},timelineItems(last: 10, itemTypes: [CLOSED_EVENT, MERGED_EVENT]){nodes{... on ClosedEvent{closer{... on Commit{oid}}},... on MergedEvent{commit{oid}}}}},pageInfo{endCursor,hasNextPage,hasPreviousPage,startCursor}}}}"
+	prQuery = "query($after:String$baseRefName:String$first:Int!$headRefName:String$owner:String!$repo:String!$states:[PullRequestState!]){repository(owner: $owner, name: $repo){pullRequests(states: $states, headRefName: $headRefName, baseRefName: $baseRefName, first: $first, after: $after){nodes{id,number,headRefName,baseRefName,isDraft,permalink,state,title,body,author{login},createdAt,mergeCommit{oid},timelineItems(last: 10, itemTypes: [CLOSED_EVENT, MERGED_EVENT]){nodes{... on ClosedEvent{closer{... on Commit{oid}}},... on MergedEvent{commit{oid}}}}},pageInfo{endCursor,hasNextPage,hasPreviousPage,startCursor}}}}"
 )
 
 func RunMockGitHubServer(t *testing.T) *mockGitHubServer {
@@ -88,6 +88,8 @@ func (s *mockGitHubServer) handlePRQuery(req graphqlRequest) graphqlResponse {
 			"state":       pr.State,
 			"title":       pr.Title,
 			"body":        pr.Body,
+			"author":      map[string]string{"login": "mock-user"},
+			"createdAt":   "2026-01-01T00:00:00Z",
 		}
 		if pr.MergeCommitOID != "" {
 			gqlpr["mergeCommit"] = map[string]string{"oid": pr.MergeCommitOID}
