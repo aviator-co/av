@@ -318,7 +318,16 @@ func (r *Repo) CheckoutBranch(ctx context.Context, opts *CheckoutBranch) (string
 			"stdout": string(res.Stdout),
 			"stderr": string(res.Stderr),
 		}).Debug("git checkout failed")
-		return "", errors.Errorf("failed to checkout branch %q: %s", opts.Name, string(res.Stderr))
+		stderr := string(res.Stderr)
+		if strings.Contains(stderr, "already checked out at") {
+			return "", errors.Errorf(
+				"failed to checkout branch %q: it is already checked out in another worktree\n"+
+					"Use 'git worktree list' to see all worktrees, "+
+					"or switch to that worktree with 'cd <worktree-path>'",
+				opts.Name,
+			)
+		}
+		return "", errors.Errorf("failed to checkout branch %q: %s", opts.Name, stderr)
 	}
 	return previousBranchName, nil
 }
