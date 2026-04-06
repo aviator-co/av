@@ -8,6 +8,11 @@ import (
 	"testing"
 )
 
+// mockLogger is the subset of testing.TB used by mockGitHubServer.
+type mockLogger interface {
+	Logf(format string, args ...any)
+}
+
 const (
 	// These are ugly, but this is easy way to tell which query is being used.
 	prQuery = "query($after:String$baseRefName:String$first:Int!$headRefName:String$owner:String!$repo:String!$states:[PullRequestState!]){repository(owner: $owner, name: $repo){pullRequests(states: $states, headRefName: $headRefName, baseRefName: $baseRefName, first: $first, after: $after){nodes{id,number,headRefName,baseRefName,isDraft,permalink,state,title,body,author{login},createdAt,mergeCommit{oid},timelineItems(last: 10, itemTypes: [CLOSED_EVENT, MERGED_EVENT]){nodes{... on ClosedEvent{closer{... on Commit{oid}}},... on MergedEvent{commit{oid}}}}},pageInfo{endCursor,hasNextPage,hasPreviousPage,startCursor}}}}"
@@ -21,7 +26,7 @@ func RunMockGitHubServer(t *testing.T) *mockGitHubServer {
 }
 
 type mockGitHubServer struct {
-	t *testing.T
+	t mockLogger
 
 	pulls []mockPR
 

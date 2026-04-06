@@ -1,0 +1,17 @@
+# Test that creating a commit in a stack preserves branch metadata.
+
+# Create branch one with a commit.
+exec av branch one
+commit-file one.txt one one
+
+# Create branch two with a commit.
+exec av branch two
+commit-file two.txt two two
+
+# Go back to branch one and add another commit.
+exec git checkout one
+commit-file one-b.txt one-b one-b
+
+# Verify both branches still exist in metadata.
+branch-parent one main
+branch-parent two one

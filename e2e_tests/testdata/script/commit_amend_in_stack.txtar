@@ -1,0 +1,18 @@
+# Test that amending a commit in a stack preserves branch metadata.
+
+# Create branch one with a commit.
+exec av branch one
+commit-file one.txt one one
+
+# Create branch two with a commit.
+exec av branch two
+commit-file two.txt two two
+
+# Go back to branch one and amend with another file.
+exec git checkout one
+commit-file one-b.txt one-b
+exec av commit --amend
+
+# Verify both branches still exist in metadata.
+branch-parent one main
+branch-parent two one
