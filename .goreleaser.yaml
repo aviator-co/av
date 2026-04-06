@@ -20,7 +20,8 @@ builds:
       - "-X 'github.com/aviator-co/av/internal/config.Version=v{{ .Version }}'"
 
 # Create a GitHub release on the av repo
-release: {}
+release:
+  prerelease: auto
 
 archives:
   - name_template: >-
@@ -57,7 +58,26 @@ nfpms:
 
 # Push to the homebrew tap
 brews:
-  - repository:
+  - skip_upload: auto
+    repository:
+      owner: "aviator-co"
+      name: "homebrew-tap"
+      git:
+        url: "git@github.com:aviator-co/homebrew-tap.git"
+        private_key: "{{ .Env.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}"
+    commit_author:
+      name: "aviator-bot"
+      email: "105820887+aviator-bot@users.noreply.github.com"
+    homepage: "https://aviator.co"
+    license: "MIT"
+    install: |
+      bin.install "av"
+      man.install Dir["man/*"]
+      generate_completions_from_executable(bin/"av", "completion", shells: [:bash, :zsh, :fish])
+
+  - name: av-nightly
+    skip_upload: '{{ if .Prerelease }}false{{ else }}true{{ end }}'
+    repository:
       owner: "aviator-co"
       name: "homebrew-tap"
       git:
