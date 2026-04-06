@@ -1,0 +1,36 @@
+# Test sync after a branch is merged and new commits are added to trunk.
+#
+#     main:    X
+#     stack-1:  \ -> 1a -> 1b
+#     stack-2:              \ -> 2a -> 2b
+#
+# stack-1 is squash-merged into main, then a new commit is added to main.
+# After sync, stack-2 should be rebased onto the latest main.
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+commit-file my-file '1a\n1b\n' 'Commit 1b'
+exec av branch stack-2
+commit-file my-file '1a\n1b\n2a\n' 'Commit 2a'
+commit-file my-file '1a\n1b\n2a\n2b\n' 'Commit 2b'
+
+exec av sync
+
+# Squash-merge stack-1 and add a new commit to main.
+exec git checkout main
+exec git merge --squash stack-1
+exec git commit --no-edit
+commit-file test-file '3a\n' 'Commit 3a'
+exec git push origin main
+
+set-branch-merge-commit stack-1 main~1
+
+# The squash commit should NOT be an ancestor of stack-2 before sync.
+! exec git merge-base --is-ancestor main stack-2
+
+# Must be on a stack branch, not trunk, to avoid "sync all stacks?" prompt.
+exec git checkout stack-2
+exec av sync
+
+# After sync, main (including commit 3a) should be an ancestor of stack-2.
+exec git merge-base --is-ancestor main stack-2
