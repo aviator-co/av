@@ -8,6 +8,7 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/gh/ghui"
 	"github.com/aviator-co/av/internal/git"
@@ -26,14 +27,15 @@ import (
 )
 
 var syncFlags struct {
-	All           bool
-	RebaseToTrunk bool
-	Current       bool
-	Abort         bool
-	Continue      bool
-	Skip          bool
-	Push          string
-	Prune         string
+	All              bool
+	RebaseToTrunk    bool
+	Current          bool
+	Abort            bool
+	Continue         bool
+	Skip             bool
+	Push             string
+	Prune            string
+	FastForwardTrunk bool
 }
 
 var syncCmd = &cobra.Command{
@@ -85,6 +87,9 @@ but can still be synced explicitly.
 		if cmd.Flags().Changed("parent") {
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
+		if !cmd.Flags().Changed("ff-trunk") {
+			syncFlags.FastForwardTrunk = config.Av.Sync.FastForwardTrunk
+		}
 		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
@@ -112,9 +117,10 @@ type savedSyncState struct {
 }
 
 type syncState struct {
-	TargetBranches []plumbing.ReferenceName
-	Prune          string
-	Push           string
+	TargetBranches   []plumbing.ReferenceName
+	Prune            string
+	Push             string
+	FastForwardTrunk bool
 }
 
 type syncViewModel struct {
@@ -290,6 +296,16 @@ func (vm *syncViewModel) initPruneBranches() tea.Cmd {
 		vm.state.Prune,
 		vm.state.TargetBranches,
 		vm.restackState.InitialBranch,
+		vm.initFastForwardTrunk,
+	))
+}
+
+func (vm *syncViewModel) initFastForwardTrunk() tea.Cmd {
+	if !vm.state.FastForwardTrunk {
+		return tea.Quit
+	}
+	return vm.AddView(gitui.NewFastForwardTrunkModel(
+		vm.repo,
 		func() tea.Cmd {
 			return tea.Quit
 		},
@@ -322,8 +338,9 @@ func (vm *syncViewModel) createState() (*savedSyncState, error) {
 	state := savedSyncState{
 		RestackState: &sequencerui.RestackState{},
 		SyncState: &syncState{
-			Push:  syncFlags.Push,
-			Prune: syncFlags.Prune,
+			Push:             syncFlags.Push,
+			Prune:            syncFlags.Prune,
+			FastForwardTrunk: syncFlags.FastForwardTrunk,
 		},
 	}
 	status, err := vm.repo.Status(ctx)
@@ -503,6 +520,10 @@ func init() {
 	syncCmd.Flags().BoolVar(
 		&syncFlags.RebaseToTrunk, "rebase-to-trunk", false,
 		"rebase the branches to the latest trunk always",
+	)
+	syncCmd.Flags().BoolVar(
+		&syncFlags.FastForwardTrunk, "ff-trunk", false,
+		"fast-forward the local trunk branch to match the remote",
 	)
 
 	syncCmd.Flags().BoolVar(
