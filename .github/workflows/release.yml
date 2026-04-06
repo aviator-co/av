@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "*"
+      - "!*-nightly*"
 
 jobs:
   goreleaser:
@@ -26,7 +27,7 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
-          version: latest
+          version: "~> v2"
           args: release --clean
         env:
           AVIATOR_CO_HOMEBREW_REPO_SSH_KEY: ${{ secrets.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}
