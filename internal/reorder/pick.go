@@ -12,6 +12,12 @@ import (
 	"github.com/kr/text"
 )
 
+// ErrEmptySquashMessage is returned by PerformSquash when the user saves an
+// empty commit message in the editor during a squash. Callers may detect this
+// sentinel to provide a friendlier recovery path (e.g., returning
+// ErrInterruptReorder so the user can retry with --continue).
+var ErrEmptySquashMessage = errors.New("squash commit message is empty after editing")
+
 // PickMode represents how a commit is applied during reorder.
 type PickMode string
 
@@ -54,6 +60,15 @@ func (p PickCmd) Execute(ctx *Context) error {
 
 	if p.Mode != PickModePick {
 		if err := p.PerformSquash(context.Background(), ctx.Repo); err != nil {
+			if errors.Is(err, ErrEmptySquashMessage) {
+				ctx.Print(
+					colors.Failure("  - squash commit message is empty after editing\n"),
+					colors.Warning("    Edit the message and run "),
+					colors.CliCmd("av reorder --continue"),
+					colors.Warning(" to retry.\n"),
+				)
+				return ErrInterruptReorder
+			}
 			return err
 		}
 	}
@@ -78,10 +93,27 @@ func (p PickCmd) Execute(ctx *Context) error {
 // For PickModeSquash, the editor is opened to compose the combined commit message.
 // Must only be called after the commit has been cherry-picked and when Mode != PickModePick.
 func (p PickCmd) PerformSquash(ctx context.Context, repo *git.Repo) error {
+	// Guard: squash/fixup requires a parent commit on the same branch. If HEAD
+	// has no parent reachable via HEAD~1 (i.e., this is the first commit in
+	// the branch), the subsequent reset --soft HEAD~1 would cross the branch
+	// boundary and corrupt the stack.
+	parentHash, err := repo.RevParse(ctx, &git.RevParse{Rev: "HEAD~1"})
+	if err != nil {
+		// rev-parse returns an error when there is no parent commit.
+		return errors.New(
+			"squash/fixup cannot be applied to the first commit in a branch" +
+				" — there is no previous commit to fold into",
+		)
+	}
+	_ = parentHash
+
 	var amendArgs []string
-	if p.Mode == PickModeFixup {
+	switch p.Mode {
+	case PickModePick:
+		return errors.New("PerformSquash called with pick mode — squash/fixup mode is required")
+	case PickModeFixup:
 		amendArgs = []string{"commit", "--amend", "--no-edit"}
-	} else {
+	case PickModeSquash:
 		// Squash: open the editor with both commit messages so the user can
 		// compose the combined message.
 		prevMsg, err := getCommitMessage(ctx, repo, "HEAD~1")
@@ -106,9 +138,11 @@ func (p PickCmd) PerformSquash(ctx context.Context, repo *git.Repo) error {
 		}
 		editedMsg = strings.TrimSpace(editedMsg)
 		if editedMsg == "" {
-			return errors.New("squash commit message is empty after editing")
+			return ErrEmptySquashMessage
 		}
 		amendArgs = []string{"commit", "--amend", "--message", editedMsg}
+	default:
+		return errors.Errorf("PerformSquash called with unexpected mode %q", p.Mode)
 	}
 
 	// Undo the cherry-picked commit while keeping its changes staged, then
@@ -117,14 +151,14 @@ func (p PickCmd) PerformSquash(ctx context.Context, repo *git.Repo) error {
 		Args:      []string{"reset", "--soft", "HEAD~1"},
 		ExitError: true,
 	}); err != nil {
-		return err
+		return errors.WrapIff(err, "resetting HEAD before %s of commit %s", p.Mode, p.Commit)
 	}
 
 	if _, err := repo.Run(ctx, &git.RunOpts{
 		Args:      amendArgs,
 		ExitError: true,
 	}); err != nil {
-		return err
+		return errors.WrapIff(err, "amending commit during %s of %s", p.Mode, p.Commit)
 	}
 
 	return nil
@@ -136,7 +170,7 @@ func getCommitMessage(ctx context.Context, repo *git.Repo, rev string) (string, 
 		ExitError: true,
 	})
 	if err != nil {
-		return "", err
+		return "", errors.WrapIff(err, "getting commit message for %s", rev)
 	}
 	return strings.TrimRight(string(out.Stdout), "\n"), nil
 }

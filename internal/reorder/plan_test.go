@@ -72,7 +72,48 @@ func TestAutosquashPickCmds(t *testing.T) {
 		}
 		want := []PickCmd{
 			pick("a", "Add feature"),
-			{Commit: "b", Comment: "fixup! Unknown commit", Mode: PickModeFixup},
+			{
+				Commit:  "b",
+				Comment: `WARNING: target commit "Unknown commit" not found in this branch`,
+				Mode:    PickModeFixup,
+			},
+		}
+		assert.Equal(t, want, autosquashPickCmds(picks))
+	})
+
+	t.Run("fixup preceding its target is placed after target", func(t *testing.T) {
+		// fixup! foo appears before foo — the implementation finds the *last*
+		// non-fixup commit matching the target title and places the fixup after
+		// it. Since foo appears after the fixup, the fixup should follow foo.
+		picks := []PickCmd{
+			pick("a", "fixup! foo"),
+			pick("b", "foo"),
+			pick("c", "bar"),
+		}
+		want := []PickCmd{
+			pick("b", "foo"),
+			{Commit: "a", Comment: "fixup! foo", Mode: PickModeFixup},
+			pick("c", "bar"),
+		}
+		assert.Equal(t, want, autosquashPickCmds(picks))
+	})
+
+	t.Run("mixed fixup and squash on same target preserve relative order", func(t *testing.T) {
+		// Both fixup! foo and squash! foo target "foo". They should both be
+		// placed directly after "foo" with correct modes, and their relative
+		// order (fixup first, squash second, as they appear in the original
+		// list) must be preserved.
+		picks := []PickCmd{
+			pick("a", "foo"),
+			pick("b", "fixup! foo"),
+			pick("c", "bar"),
+			pick("d", "squash! foo"),
+		}
+		want := []PickCmd{
+			pick("a", "foo"),
+			{Commit: "b", Comment: "fixup! foo", Mode: PickModeFixup},
+			{Commit: "d", Comment: "squash! foo", Mode: PickModeSquash},
+			pick("c", "bar"),
 		}
 		assert.Equal(t, want, autosquashPickCmds(picks))
 	})

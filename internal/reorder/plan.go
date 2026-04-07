@@ -2,6 +2,7 @@ package reorder
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -161,10 +162,15 @@ func autosquashPickCmds(picks []PickCmd) []PickCmd {
 		}
 	}
 
-	// Append any fixups whose target was not found in this branch.
+	// Append any fixups whose target was not found in this branch,
+	// annotated with a warning so the user can see the problem in the editor.
 	for _, fixIdx := range unplaced {
 		fixPick := picks[fixIdx]
 		fixPick.Mode = fixups[fixIdx].mode
+		fixPick.Comment = fmt.Sprintf(
+			"WARNING: target commit %q not found in this branch",
+			fixups[fixIdx].targetTitle,
+		)
 		result = append(result, fixPick)
 	}
 
