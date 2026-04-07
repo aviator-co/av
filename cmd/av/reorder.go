@@ -92,6 +92,17 @@ squashed, dropped, or moved within the stack.
 				}
 			}
 
+			// If the conflicting command was a squash or fixup, the cherry-pick
+			// has now produced a standalone commit that must be folded into the
+			// previous commit before we advance state.
+			if len(state.Commands) > 0 {
+				if pickCmd, ok := state.Commands[0].(reorder.PickCmd); ok && pickCmd.Mode != reorder.PickModePick {
+					if err := pickCmd.PerformSquash(ctx, repo); err != nil {
+						return errors.WrapIf(err, "failed to squash commit after conflict resolution")
+					}
+				}
+			}
+
 			// The conflict has been resolved (either by cherry-pick --continue
 			// above, or by the user having already resolved it via
 			// git cherry-pick --skip/--continue or git commit).

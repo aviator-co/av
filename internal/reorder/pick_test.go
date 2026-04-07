@@ -13,6 +13,9 @@ import (
 
 func TestPickCmd_String(t *testing.T) {
 	assert.Equal(t, "pick mycommit", PickCmd{Commit: "mycommit"}.String())
+	assert.Equal(t, "squash mycommit", PickCmd{Commit: "mycommit", Mode: PickModeSquash}.String())
+	assert.Equal(t, "fixup mycommit", PickCmd{Commit: "mycommit", Mode: PickModeFixup}.String())
+	assert.Equal(t, "squash mycommit  # a comment", PickCmd{Commit: "mycommit", Comment: "a comment", Mode: PickModeSquash}.String())
 }
 
 func TestPickCmd_Execute(t *testing.T) {

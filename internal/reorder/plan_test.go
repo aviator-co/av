@@ -7,8 +7,76 @@ import (
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAutosquashPickCmds(t *testing.T) {
+	pick := func(commit, comment string) PickCmd {
+		return PickCmd{Commit: commit, Comment: comment}
+	}
+
+	t.Run("no fixups", func(t *testing.T) {
+		picks := []PickCmd{pick("a", "Add feature"), pick("b", "Fix bug")}
+		assert.Equal(t, picks, autosquashPickCmds(picks))
+	})
+
+	t.Run("fixup placed after target", func(t *testing.T) {
+		picks := []PickCmd{
+			pick("a", "Add feature"),
+			pick("b", "Fix bug"),
+			pick("c", "fixup! Add feature"),
+		}
+		want := []PickCmd{
+			pick("a", "Add feature"),
+			{Commit: "c", Comment: "fixup! Add feature", Mode: PickModeFixup},
+			pick("b", "Fix bug"),
+		}
+		assert.Equal(t, want, autosquashPickCmds(picks))
+	})
+
+	t.Run("squash placed after target", func(t *testing.T) {
+		picks := []PickCmd{
+			pick("a", "Add feature"),
+			pick("b", "Fix bug"),
+			pick("c", "squash! Add feature"),
+		}
+		want := []PickCmd{
+			pick("a", "Add feature"),
+			{Commit: "c", Comment: "squash! Add feature", Mode: PickModeSquash},
+			pick("b", "Fix bug"),
+		}
+		assert.Equal(t, want, autosquashPickCmds(picks))
+	})
+
+	t.Run("multiple fixups for same target preserve order", func(t *testing.T) {
+		picks := []PickCmd{
+			pick("a", "Add feature"),
+			pick("b", "fixup! Add feature"),
+			pick("c", "Fix bug"),
+			pick("d", "fixup! Add feature"),
+		}
+		want := []PickCmd{
+			pick("a", "Add feature"),
+			{Commit: "b", Comment: "fixup! Add feature", Mode: PickModeFixup},
+			{Commit: "d", Comment: "fixup! Add feature", Mode: PickModeFixup},
+			pick("c", "Fix bug"),
+		}
+		assert.Equal(t, want, autosquashPickCmds(picks))
+	})
+
+	t.Run("fixup with no matching target appended at end", func(t *testing.T) {
+		picks := []PickCmd{
+			pick("a", "Add feature"),
+			pick("b", "fixup! Unknown commit"),
+		}
+		want := []PickCmd{
+			pick("a", "Add feature"),
+			{Commit: "b", Comment: "fixup! Unknown commit", Mode: PickModeFixup},
+		}
+		assert.Equal(t, want, autosquashPickCmds(picks))
+	})
+}
 
 func TestCreatePlan(t *testing.T) {
 	repo := gittest.NewTempRepo(t)

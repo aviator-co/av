@@ -2,6 +2,8 @@ package reorder
 
 import (
 	"context"
+	"slices"
+	"strings"
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
@@ -68,19 +70,103 @@ func CreatePlan(
 			return nil, err
 		}
 
-		// Append the "stack-branch" command and each "pick" command to the plan
-		cmds = append(cmds, branchCmd)
+		// Build the initial list of pick commands for this branch.
+		var picks []PickCmd
 		for _, object := range commitObjects {
 			commit, err := git.ParseCommitContents(object.Contents)
 			if err != nil {
 				return nil, errors.WrapIff(err, "parsing commit %s", object.OID)
 			}
-			cmds = append(cmds, PickCmd{
+			picks = append(picks, PickCmd{
 				Commit:  git.ShortSha(object.OID),
 				Comment: commit.MessageTitle(),
 			})
 		}
+
+		// Reorder fixup!/squash! commits to sit immediately after their targets,
+		// matching git's --autosquash behavior.
+		picks = autosquashPickCmds(picks)
+
+		cmds = append(cmds, branchCmd)
+		for _, p := range picks {
+			cmds = append(cmds, p)
+		}
 	}
 
 	return cmds, nil
+}
+
+// autosquashPickCmds reorders picks so that fixup!/squash! commits are placed
+// immediately after the most recent commit they target, matching git's
+// --autosquash behavior. fixup! commits are set to PickModeFixup and squash!
+// commits are set to PickModeSquash.
+func autosquashPickCmds(picks []PickCmd) []PickCmd {
+	type fixupInfo struct {
+		mode        PickMode
+		targetTitle string
+	}
+
+	fixups := make(map[int]fixupInfo)
+	for i, p := range picks {
+		if strings.HasPrefix(p.Comment, "fixup! ") {
+			fixups[i] = fixupInfo{PickModeFixup, p.Comment[len("fixup! "):]}
+		} else if strings.HasPrefix(p.Comment, "squash! ") {
+			fixups[i] = fixupInfo{PickModeSquash, p.Comment[len("squash! "):]}
+		}
+	}
+
+	if len(fixups) == 0 {
+		return picks
+	}
+
+	// For each fixup, find the last non-fixup commit with a matching title.
+	lastMatchIdx := make(map[int]int) // fixupIdx -> targetCommitIdx (-1 if not found)
+	for fixIdx, info := range fixups {
+		lastMatchIdx[fixIdx] = -1
+		for i, p := range picks {
+			if _, isFix := fixups[i]; !isFix && p.Comment == info.targetTitle {
+				lastMatchIdx[fixIdx] = i
+			}
+		}
+	}
+
+	// Group fixup indices by the commit they should follow, preserving
+	// their original relative order within each group.
+	insertAfter := make(map[int][]int) // targetCommitIdx -> []fixupIdx
+	var unplaced []int
+	for fixIdx, targetIdx := range lastMatchIdx {
+		if targetIdx >= 0 {
+			insertAfter[targetIdx] = append(insertAfter[targetIdx], fixIdx)
+		} else {
+			unplaced = append(unplaced, fixIdx)
+		}
+	}
+	for targetIdx := range insertAfter {
+		slices.Sort(insertAfter[targetIdx])
+	}
+	slices.Sort(unplaced)
+
+	// Build the result: emit each non-fixup commit followed by any fixups
+	// that target it.
+	var result []PickCmd
+	for i, p := range picks {
+		if _, isFix := fixups[i]; isFix {
+			continue
+		}
+		result = append(result, p)
+		for _, fixIdx := range insertAfter[i] {
+			fixPick := picks[fixIdx]
+			fixPick.Mode = fixups[fixIdx].mode
+			result = append(result, fixPick)
+		}
+	}
+
+	// Append any fixups whose target was not found in this branch.
+	for _, fixIdx := range unplaced {
+		fixPick := picks[fixIdx]
+		fixPick.Mode = fixups[fixIdx].mode
+		result = append(result, fixPick)
+	}
+
+	return result
 }
