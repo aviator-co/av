@@ -3,21 +3,26 @@ package gh
 import (
 	"context"
 	"strings"
+	"time"
 
 	"emperror.dev/errors"
 	"github.com/shurcooL/githubv4"
 )
 
 type PullRequest struct {
-	ID                  string
-	Number              int64
-	HeadRefName         string
-	BaseRefName         string
-	IsDraft             bool
-	Permalink           string
-	State               githubv4.PullRequestState
-	Title               string
-	Body                string
+	ID          string
+	Number      int64
+	HeadRefName string
+	BaseRefName string
+	IsDraft     bool
+	Permalink   string
+	State       githubv4.PullRequestState
+	Title       string
+	Body        string
+	Author      struct {
+		Login string
+	}
+	CreatedAt           time.Time
 	PRIVATE_MergeCommit struct {
 		Oid string
 	} `graphql:"mergeCommit"`

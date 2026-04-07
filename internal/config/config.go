@@ -44,6 +44,12 @@ type PullRequest struct {
 	WriteStack bool
 }
 
+type Sync struct {
+	// If true, fast-forward the local trunk branch to match the remote
+	// tracking branch after syncing.
+	FastForwardTrunk bool
+}
+
 type Aviator struct {
 	// The base URL of the Aviator API to use.
 	// By default, this is https://aviator.co, but for on-prem installations
@@ -58,6 +64,7 @@ var Av = struct {
 	PullRequest             PullRequest
 	GitHub                  GitHub
 	Aviator                 Aviator
+	Sync                    Sync
 	AdditionalTrunkBranches []string
 	Remote                  string
 }{

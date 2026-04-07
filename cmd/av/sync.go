@@ -8,6 +8,7 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/gh/ghui"
 	"github.com/aviator-co/av/internal/git"
@@ -21,18 +22,20 @@ import (
 	"github.com/aviator-co/av/internal/utils/uiutils"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
 var syncFlags struct {
-	All           bool
-	RebaseToTrunk bool
-	Current       bool
-	Abort         bool
-	Continue      bool
-	Skip          bool
-	Push          string
-	Prune         string
+	All              bool
+	RebaseToTrunk    bool
+	Current          bool
+	Abort            bool
+	Continue         bool
+	Skip             bool
+	Push             string
+	Prune            string
+	FastForwardTrunk bool
 }
 
 var syncCmd = &cobra.Command{
@@ -84,6 +87,9 @@ but can still be synced explicitly.
 		if cmd.Flags().Changed("parent") {
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
+		if !cmd.Flags().Changed("ff-trunk") {
+			syncFlags.FastForwardTrunk = config.Av.Sync.FastForwardTrunk
+		}
 		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
@@ -111,9 +117,10 @@ type savedSyncState struct {
 }
 
 type syncState struct {
-	TargetBranches []plumbing.ReferenceName
-	Prune          string
-	Push           string
+	TargetBranches   []plumbing.ReferenceName
+	Prune            string
+	Push             string
+	FastForwardTrunk bool
 }
 
 type syncViewModel struct {
@@ -289,6 +296,16 @@ func (vm *syncViewModel) initPruneBranches() tea.Cmd {
 		vm.state.Prune,
 		vm.state.TargetBranches,
 		vm.restackState.InitialBranch,
+		vm.initFastForwardTrunk,
+	))
+}
+
+func (vm *syncViewModel) initFastForwardTrunk() tea.Cmd {
+	if !vm.state.FastForwardTrunk {
+		return tea.Quit
+	}
+	return vm.AddView(gitui.NewFastForwardTrunkModel(
+		vm.repo,
 		func() tea.Cmd {
 			return tea.Quit
 		},
@@ -321,8 +338,9 @@ func (vm *syncViewModel) createState() (*savedSyncState, error) {
 	state := savedSyncState{
 		RestackState: &sequencerui.RestackState{},
 		SyncState: &syncState{
-			Push:  syncFlags.Push,
-			Prune: syncFlags.Prune,
+			Push:             syncFlags.Push,
+			Prune:            syncFlags.Prune,
+			FastForwardTrunk: syncFlags.FastForwardTrunk,
 		},
 	}
 	status, err := vm.repo.Status(ctx)
@@ -423,6 +441,22 @@ func (m *preAvSyncHookModel) Init() tea.Cmd {
 	}
 	m.hasHook = true
 	cmd := m.repo.Cmd(context.Background(), []string{"hook", "run", "--ignore-missing", "pre-av-sync"}, nil)
+	if !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
+		// When not in a terminal, run the hook as a regular subprocess instead of
+		// tea.ExecProcess. ExecProcess tries to suspend and re-initialize bubbletea's
+		// terminal reader after the process exits, which causes a nil pointer
+		// dereference when there is no TTY (e.g., running from an IDE or script).
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return func() tea.Msg {
+			if err := cmd.Run(); err != nil {
+				return errors.Errorf("pre-av-sync hook failed: %v", err)
+			}
+			m.complete = true
+			return preAvSyncHookProgress{}
+		}
+	}
 	// Use tea.ExecProcess so that the hook can take over the terminal, allowing user to create
 	// an interactive hook.
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
@@ -486,6 +520,10 @@ func init() {
 	syncCmd.Flags().BoolVar(
 		&syncFlags.RebaseToTrunk, "rebase-to-trunk", false,
 		"rebase the branches to the latest trunk always",
+	)
+	syncCmd.Flags().BoolVar(
+		&syncFlags.FastForwardTrunk, "ff-trunk", false,
+		"fast-forward the local trunk branch to match the remote",
 	)
 
 	syncCmd.Flags().BoolVar(
