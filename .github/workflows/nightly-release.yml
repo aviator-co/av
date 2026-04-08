@@ -1,10 +1,6 @@
-name: goreleaser
+name: nightly-release
 
 on:
-  push:
-    tags:
-      - "*"
-      - "!*-nightly*"
   workflow_dispatch:
     inputs:
       aviator_deployment_id:
@@ -16,18 +12,18 @@ on:
         required: false
         type: string
       aviator_release_candidate_version:
-        description: "Name of the version (e.g., 0.2.0)"
-        required: false
+        description: "Name of the version (e.g., 0.2.0-nightly.1)"
+        required: true
         type: string
 
 jobs:
-  goreleaser:
+  nightly:
     runs-on: ubuntu-latest
     permissions:
       contents: "write"
     steps:
       - uses: fjogeleit/http-request-action@551353b829c3646756b2ec2b3694f819d7957495 # v2
-        if: github.event_name == 'workflow_dispatch' && inputs.aviator_deployment_id != ''
+        if: inputs.aviator_deployment_id != ''
         with:
           url: '${{ vars.AVIATOR_API_HOST }}/api/v1/sync-deploy-github-action'
           method: 'POST'
@@ -41,8 +37,7 @@ jobs:
           persist-credentials: false
       - name: fetch tags
         run: git fetch --force --tags
-      - name: create release tag
-        if: github.event_name == 'workflow_dispatch' && inputs.aviator_release_candidate_version != ''
+      - name: create nightly tag
         env:
           VERSION: ${{ inputs.aviator_release_candidate_version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -60,8 +55,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
-          args: release --clean
+          args: release --clean --skip=aur --skip=fury --skip=nfpm
         env:
           AVIATOR_CO_HOMEBREW_REPO_SSH_KEY: ${{ secrets.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FURY_TOKEN: ${{ secrets.FURY_PUSH_TOKEN }}
