@@ -88,12 +88,22 @@ func (vm *RestackModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *RestackProgress:
 		if msg.err == nil && msg.result == nil {
 			// Finished the sequence.
-			restoreMessages := vm.state.Seq.RestoreWorktrees(context.Background())
-			vm.worktreeMessages = append(vm.worktreeMessages, restoreMessages...)
+			// Checkout the initial branch BEFORE restoring worktrees.
+			// After rebasing, the last rebased branch is left checked out
+			// in the current worktree. Checking out the initial branch
+			// first frees that branch so it can be restored to its
+			// original worktree.
+			ctx := context.Background()
+			var cleanupErr error
 			if vm.state.InitialBranch != "" {
-				if _, err := vm.repo.CheckoutBranch(context.Background(), &git.CheckoutBranch{Name: vm.state.InitialBranch}); err != nil {
-					return vm, uiutils.ErrCmd(err)
-				}
+				_, cleanupErr = vm.repo.CheckoutBranch(ctx, &git.CheckoutBranch{Name: vm.state.InitialBranch})
+			} else if len(vm.state.Seq.DetachedWorktrees) > 0 {
+				cleanupErr = vm.repo.Detach(ctx)
+			}
+			restoreMessages := vm.state.Seq.RestoreWorktrees(ctx)
+			vm.worktreeMessages = append(vm.worktreeMessages, restoreMessages...)
+			if cleanupErr != nil {
+				return vm, uiutils.ErrCmd(cleanupErr)
 			}
 			if vm.abortedBranch != "" {
 				return vm, vm.options.OnAbort()

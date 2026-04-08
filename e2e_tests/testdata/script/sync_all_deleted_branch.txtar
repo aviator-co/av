@@ -1,0 +1,33 @@
+# Test that sync --all succeeds when a branch has been deleted from git
+# but not yet cleaned up in av's metadata (e.g., deleted on GitHub but
+# not tidied locally).
+#
+#     main:    X  -> X2
+#     stack-1:  \ -> 1a   (git ref deleted, av metadata remains)
+#     stack-2:  \ -> 2a
+
+exec git switch main
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+
+exec git switch main
+exec av branch stack-2
+commit-file my-file-2 '2a\n' 'Commit 2a'
+
+# Delete stack-1's git ref without tidying av metadata.
+exec git switch stack-2
+exec git branch -D stack-1
+
+# Push a new commit to main so there's something to sync.
+exec git switch main
+commit-file other-file 'X2\n' 'Commit X2'
+exec git push origin main
+
+exec git switch stack-2
+
+# Should succeed, skipping the deleted branch rather than failing
+# with "error: git merge-base: exit status 128".
+exec av sync --all --rebase-to-trunk
+
+# stack-2 should have been synced onto the latest main.
+exec git merge-base --is-ancestor main stack-2
