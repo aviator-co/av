@@ -12,7 +12,7 @@ on:
         required: false
         type: string
       aviator_release_candidate_version:
-        description: "Name of the version (e.g., 0.2.0-nightly.1)"
+        description: "Name of the version (e.g., 0.2.0-rc1)"
         required: true
         type: string
 
@@ -43,9 +43,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          git tag "v${VERSION}"
+          git tag "v${VERSION}-nightly"
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push origin "v${VERSION}"
+          git push origin "v${VERSION}-nightly"
+      - name: configure nightly prerelease
+        run: yq -i '.release.prerelease = true' .goreleaser.yaml
       - name: install go
         uses: actions/setup-go@v6
         with:
@@ -55,7 +57,8 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
-          args: release --clean --skip=aur --skip=fury --skip=nfpm
+          args: release --clean --skip=aur --skip=publish --skip=nfpm
         env:
+          RELEASE_ENV: nightly
           AVIATOR_CO_HOMEBREW_REPO_SSH_KEY: ${{ secrets.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
