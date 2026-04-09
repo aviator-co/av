@@ -62,6 +62,7 @@ jobs:
           version: "~> v2"
           args: release --clean
         env:
+          GORELEASER_CURRENT_TAG: ${{ inputs.aviator_release_candidate_version && format('v{0}', inputs.aviator_release_candidate_version) || github.ref_name }}
           AVIATOR_CO_HOMEBREW_REPO_SSH_KEY: ${{ secrets.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FURY_TOKEN: ${{ secrets.FURY_PUSH_TOKEN }}
