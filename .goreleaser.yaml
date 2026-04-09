@@ -114,6 +114,7 @@ aurs:
 
 publishers:
   - name: fury.io
+    disable: '{{ if eq (index .Env "RELEASE_ENV") "nightly" }}true{{ else }}false{{ end }}'
     ids:
       - packages
     dir: "{{ dir .ArtifactPath }}"
