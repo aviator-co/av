@@ -47,7 +47,7 @@ jobs:
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push origin "v${VERSION}-nightly"
       - name: configure nightly prerelease
-        run: yq -i '.release.prerelease = true' .goreleaser.yaml
+        run: yq '.release.prerelease = true' .goreleaser.yaml > /tmp/goreleaser-nightly.yaml
       - name: install go
         uses: actions/setup-go@v6
         with:
@@ -57,7 +57,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
-          args: release --clean --skip=aur --skip=publish --skip=nfpm
+          args: release --clean --config /tmp/goreleaser-nightly.yaml --skip=aur --skip=publish --skip=nfpm
         env:
           RELEASE_ENV: nightly
           AVIATOR_CO_HOMEBREW_REPO_SSH_KEY: ${{ secrets.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}
