@@ -20,8 +20,7 @@ builds:
       - "-X 'github.com/aviator-co/av/internal/config.Version=v{{ .Version }}'"
 
 # Create a GitHub release on the av repo
-release:
-  prerelease: auto
+release: {}
 
 archives:
   - name_template: >-
@@ -58,7 +57,7 @@ nfpms:
 
 # Push to the homebrew tap
 brews:
-  - skip_upload: auto
+  - skip_upload: '{{ if eq (index .Env "RELEASE_ENV") "nightly" }}true{{ else }}false{{ end }}'
     repository:
       owner: "aviator-co"
       name: "homebrew-tap"
@@ -76,7 +75,7 @@ brews:
       generate_completions_from_executable(bin/"av", "completion", shells: [:bash, :zsh, :fish])
 
   - name: av-nightly
-    skip_upload: '{{ if .Prerelease }}false{{ else }}true{{ end }}'
+    skip_upload: '{{ if eq (index .Env "RELEASE_ENV") "nightly" }}false{{ else }}true{{ end }}'
     repository:
       owner: "aviator-co"
       name: "homebrew-tap"
