@@ -35,6 +35,10 @@ type State struct {
 	Head string `json:"head"`
 	// The name of the current branch in the reorder operation.
 	Branch string `json:"branch"`
+	// BranchBase is the commit hash that the current branch was initialized to
+	// by the most recent StackBranchCmd. PerformSquash uses this to prevent a
+	// squash/fixup from folding across the branch boundary into the parent branch.
+	BranchBase string `json:"branchBase"`
 	// The sequence of commands to be executed.
 	// NOTE: we handle marshalling/unmarshalling in the MarshalJSON/UnmarshalJSON methods.
 	Commands []Cmd `json:"-"`

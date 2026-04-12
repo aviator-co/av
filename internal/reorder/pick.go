@@ -59,7 +59,7 @@ func (p PickCmd) Execute(ctx *Context) error {
 	}
 
 	if p.Mode != PickModePick {
-		if err := p.PerformSquash(context.Background(), ctx.Repo); err != nil {
+		if err := p.PerformSquash(context.Background(), ctx.Repo, ctx.State.BranchBase); err != nil {
 			if errors.Is(err, ErrEmptySquashMessage) {
 				ctx.Print(
 					colors.Failure("  - squash commit message is empty after editing\n"),
@@ -92,20 +92,30 @@ func (p PickCmd) Execute(ctx *Context) error {
 // For PickModeFixup, the previous commit's message is kept unchanged.
 // For PickModeSquash, the editor is opened to compose the combined commit message.
 // Must only be called after the commit has been cherry-picked and when Mode != PickModePick.
-func (p PickCmd) PerformSquash(ctx context.Context, repo *git.Repo) error {
-	// Guard: squash/fixup requires a parent commit on the same branch. If HEAD
-	// has no parent reachable via HEAD~1 (i.e., this is the first commit in
-	// the branch), the subsequent reset --soft HEAD~1 would cross the branch
-	// boundary and corrupt the stack.
+// branchBase is the commit hash that the current branch was initialized to (from
+// State.BranchBase). It is used to prevent folding across the branch boundary
+// into a commit that belongs to the parent branch. Pass "" to skip this check
+// (e.g., in tests that do not exercise branch-boundary behavior).
+func (p PickCmd) PerformSquash(ctx context.Context, repo *git.Repo, branchBase string) error {
+	// Guard: HEAD~1 must exist and must not be the branch base commit.
+	// If HEAD~1 doesn't exist, this is an orphan commit with no parent to fold
+	// into. If HEAD~1 equals branchBase, the cherry-picked commit is the first
+	// pick in this branch section and folding would amend the parent branch's
+	// tip instead of a commit within this branch.
 	parentHash, err := repo.RevParse(ctx, &git.RevParse{Rev: "HEAD~1"})
 	if err != nil {
-		// rev-parse returns an error when there is no parent commit.
+		// rev-parse fails when HEAD is an orphan commit with no parent.
 		return errors.New(
 			"squash/fixup cannot be applied to the first commit in a branch" +
 				" — there is no previous commit to fold into",
 		)
 	}
-	_ = parentHash
+	if branchBase != "" && parentHash == branchBase {
+		return errors.New(
+			"squash/fixup cannot be applied to the first commit in a branch" +
+				" — there is no previous commit within this branch to fold into",
+		)
+	}
 
 	var amendArgs []string
 	switch p.Mode {

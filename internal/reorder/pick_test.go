@@ -114,7 +114,7 @@ func TestPerformSquash_Fixup(t *testing.T) {
 	headHash := repo.CommitFile(t, "b.txt", "bbb\n", gittest.WithMessage("second commit"))
 
 	cmd := PickCmd{Commit: headHash.String(), Mode: PickModeFixup}
-	err := cmd.PerformSquash(t.Context(), repo.AsAvGitRepo())
+	err := cmd.PerformSquash(t.Context(), repo.AsAvGitRepo(), "")
 	require.NoError(t, err, "PerformSquash with PickModeFixup should succeed")
 
 	// After squash there should be exactly one commit on top of the initial repo commit.
@@ -166,7 +166,7 @@ func TestPerformSquash_FirstCommit_ReturnsError(t *testing.T) {
 	// Now HEAD has no parent — HEAD~1 does not resolve.
 	headHash := repo.GetCommitAtRef(t, plumbing.HEAD)
 	cmd := PickCmd{Commit: headHash.String(), Mode: PickModeFixup}
-	err := cmd.PerformSquash(t.Context(), repo.AsAvGitRepo())
+	err := cmd.PerformSquash(t.Context(), repo.AsAvGitRepo(), "")
 	require.Error(t, err, "PerformSquash should return an error when there is no parent commit")
 	assert.Contains(t, err.Error(), "no previous commit", "error should mention there is no previous commit")
 }

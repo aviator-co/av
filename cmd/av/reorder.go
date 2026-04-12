@@ -107,19 +107,45 @@ squashed, dropped, or moved within the stack.
 			// this avoids double-squashing when the user already resolved the
 			// conflict manually before calling --continue.
 			if continuation.SquashPending && len(state.Commands) > 0 {
-				if pickCmd, ok := state.Commands[0].(reorder.PickCmd); ok && pickCmd.Mode != reorder.PickModePick {
-					if err := pickCmd.PerformSquash(ctx, repo); err != nil {
-						if errors.Is(err, reorder.ErrEmptySquashMessage) {
-							fmt.Fprint(os.Stderr,
-								colors.Failure("squash commit message is empty after editing\n"),
-								colors.Warning("Edit the message and run "),
-								colors.CliCmd("av reorder --continue"),
-								colors.Warning(" to retry.\n"),
-							)
-							return actions.ErrExitSilently{ExitCode: 1}
-						}
-						return errors.WrapIf(err, "failed to squash commit after conflict resolution")
+				pickCmd, ok := state.Commands[0].(reorder.PickCmd)
+				if !ok || pickCmd.Mode == reorder.PickModePick {
+					// SquashPending should never be true for a non-squash/fixup
+					// command. Treat this as corrupted state.
+					return errors.New(
+						"internal error: SquashPending is set but the pending command is not a squash/fixup — " +
+							"reorder state may be corrupted; run 'av reorder --abort' and restart",
+					)
+				}
+
+				// Verify that HEAD has actually advanced past the pre-conflict
+				// position. If the user ran 'git cherry-pick --abort' or
+				// '--skip', CHERRY_PICK_HEAD is gone but HEAD is still at
+				// state.Head — PerformSquash would then amend the wrong commit.
+				currentHead, err := repo.RevParse(ctx, &git.RevParse{Rev: "HEAD"})
+				if err != nil {
+					return err
+				}
+				if currentHead == state.Head {
+					fmt.Fprint(os.Stderr,
+						colors.Failure("ERROR: cannot continue squash/fixup — the cherry-pick was not applied.\n"),
+						colors.Warning("If you aborted or skipped the cherry-pick, run "),
+						colors.CliCmd("av reorder --abort"),
+						colors.Warning(" and restart the reorder.\n"),
+					)
+					return actions.ErrExitSilently{ExitCode: 1}
+				}
+
+				if err := pickCmd.PerformSquash(ctx, repo, state.BranchBase); err != nil {
+					if errors.Is(err, reorder.ErrEmptySquashMessage) {
+						fmt.Fprint(os.Stderr,
+							colors.Failure("squash commit message is empty after editing\n"),
+							colors.Warning("Edit the message and run "),
+							colors.CliCmd("av reorder --continue"),
+							colors.Warning(" to retry.\n"),
+						)
+						return actions.ErrExitSilently{ExitCode: 1}
 					}
+					return errors.WrapIf(err, "failed to squash commit after conflict resolution")
 				}
 			}
 
