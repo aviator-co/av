@@ -1,0 +1,35 @@
+# Test that renaming branches updates parent-child relationships correctly.
+#
+# Setup: create a one -> two -> three stack.
+exec av branch one
+commit-file one.txt one
+exec av branch two
+commit-file two.txt two
+exec av branch three
+commit-file three.txt three
+
+# Rename one -> un (while on branch one).
+exec git checkout one
+exec av branch -m un
+exec git rev-parse --abbrev-ref HEAD
+stdout '^un$'
+
+# Navigate to child and rename two -> deux.
+exec av next
+exec git rev-parse --abbrev-ref HEAD
+stdout '^two$'
+exec av branch -m deux
+
+# Navigate to child and rename three -> trois.
+exec av next
+exec git rev-parse --abbrev-ref HEAD
+stdout '^three$'
+exec av branch -m trois
+
+# Verify all parent-child relationships were updated.
+branch-parent un main
+branch-children un deux
+branch-parent deux un
+branch-children deux trois
+branch-parent trois deux
+branch-children trois

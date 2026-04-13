@@ -1,0 +1,8 @@
+# Test that squash fails when there is only one commit.
+exec git fetch
+
+exec av branch feature-branch
+commit-file file1.txt content1 'only commit'
+
+! exec av squash
+stderr 'no commits to squash'

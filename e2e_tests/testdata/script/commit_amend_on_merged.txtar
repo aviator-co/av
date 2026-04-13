@@ -1,0 +1,11 @@
+# Test that amending a commit on a merged branch is rejected.
+
+exec av branch one
+commit-file one.txt one one
+
+# Mark branch as merged in av metadata.
+set-branch-pr one nodeid-42 42 MERGED
+
+# Attempt to amend on a merged branch should fail.
+commit-file oneA.txt one
+! exec av commit --amend

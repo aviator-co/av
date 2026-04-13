@@ -187,6 +187,9 @@ func (vm *restackViewModel) createState() (*sequencerui.RestackState, error) {
 	if restackFlags.All {
 		state.RestackingAll = true
 	} else {
+		if currentBranch == "" {
+			return nil, errors.New("not on any branch (detached HEAD state); please checkout a branch first")
+		}
 		if _, exist := vm.db.ReadTx().Branch(currentBranch); !exist {
 			return nil, errors.New("current branch is not adopted to av")
 		}

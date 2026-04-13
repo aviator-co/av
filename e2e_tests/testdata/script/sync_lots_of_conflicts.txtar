@@ -1,0 +1,45 @@
+# Test sync with conflicts at every level of a three-branch stack.
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+exec av branch stack-2
+commit-file my-file '1a\n2a\n' 'Commit 2a'
+exec av branch stack-3
+commit-file my-file '1a\n2a\n3a\n' 'Commit 3a'
+
+exec git checkout stack-1
+
+# Add conflicting commits to each branch.
+exec git checkout stack-1
+commit-file my-file '1a\n1b\n' 'Commit 1b'
+exec git checkout stack-2
+commit-file my-file '1a\n2a\n2b\n' 'Commit 2b'
+exec git checkout stack-3
+commit-file my-file '1a\n2a\n3a\n3b\n' 'Commit 3b'
+exec git checkout stack-1
+
+# First conflict.
+! exec av sync --push=no --prune=no
+stdout 'could not apply.*Commit 2a'
+cp $WORK/resolve1.txt my-file
+exec git add my-file
+
+# Second conflict.
+! exec av sync --continue
+stdout 'could not apply.*Commit 3a'
+cp $WORK/resolve2.txt my-file
+exec git add my-file
+
+# 3b applies cleanly, sync completes.
+exec av sync --continue
+
+-- resolve1.txt --
+1a
+1b
+2a
+-- resolve2.txt --
+1a
+1b
+2a
+2b
+3a

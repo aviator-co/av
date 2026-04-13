@@ -1,0 +1,27 @@
+# Test reparenting a branch onto a different parent.
+
+exec av branch foo
+commit-file foo.txt foo
+
+exec av branch bar
+commit-file bar.txt bar
+
+exec av branch spam
+commit-file spam.txt spam
+
+# Reparent spam onto bar (should be a no-op since it's already there).
+exec av reparent --parent bar
+exec cat spam.txt
+stdout '^spam$'
+exec cat bar.txt
+stdout '^bar$'
+
+# Reparent spam onto foo.
+exec av reparent --parent foo
+exec git rev-parse --abbrev-ref HEAD
+stdout '^spam$'
+exec cat spam.txt
+stdout '^spam$'
+exec cat foo.txt
+stdout '^foo$'
+! exists bar.txt

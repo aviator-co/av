@@ -72,6 +72,10 @@ var switchCmd = &cobra.Command{
 			return errors.New("no branches found")
 		}
 
+		// Remove deleted branches from the tree so they don't show
+		// up in the interactive view.
+		rootNodes = pruneDeletedBranches(rootNodes, branches)
+
 		if !isatty.IsTerminal(os.Stdout.Fd()) {
 			return errors.New("switch command must be run in a terminal")
 		}
@@ -324,6 +328,26 @@ func (switchViewModel) renderBranchInfo(
 		}
 	}
 	return strings.Join(ss, "\n")
+}
+
+// pruneDeletedBranches removes deleted branches from the tree, promoting their
+// children to the parent node.
+func pruneDeletedBranches(
+	nodes []*stackutils.StackTreeNode,
+	branches map[string]*stackTreeBranchInfo,
+) []*stackutils.StackTreeNode {
+	var result []*stackutils.StackTreeNode
+	for _, node := range nodes {
+		node.Children = pruneDeletedBranches(node.Children, branches)
+		stbi := branches[node.Branch.BranchName]
+		if stbi != nil && stbi.Deleted {
+			// Skip this node but keep its children.
+			result = append(result, node.Children...)
+		} else {
+			result = append(result, node)
+		}
+	}
+	return result
 }
 
 func (vm switchViewModel) ExitError() error {
