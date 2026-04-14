@@ -47,7 +47,7 @@ jobs:
           git tag "v${VERSION}-nightly" 2>/dev/null || echo "Tag v${VERSION}-nightly already exists"
           git push origin "v${VERSION}-nightly" 2>/dev/null || echo "Tag v${VERSION}-nightly already on remote"
       - name: configure nightly prerelease
-        run: yq '.release.prerelease = true' .goreleaser.yaml > /tmp/goreleaser-nightly.yaml
+        run: yq '.release.prerelease = true | del(.git.ignore_tags)' .goreleaser.yaml > /tmp/goreleaser-nightly.yaml
       - name: install go
         uses: actions/setup-go@v6
         with:
