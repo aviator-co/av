@@ -71,7 +71,7 @@ internal tracking metadata that defines the order of branches within a stack.`),
 		}
 
 		if branchFlags.Rename {
-			if len(args) > 1 && !strings.ContainsRune(args[0], ':') {
+			if len(args) > 1 {
 				return errors.New("unexpected extra arguments with --rename/-m flag\n" +
 					"  To rename a branch: av branch --rename <new-name>\n" +
 					"  To create a branch: av branch <name> (without -m)")
