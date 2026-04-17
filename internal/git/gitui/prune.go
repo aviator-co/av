@@ -227,24 +227,23 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 	for i := len(vm.deleteCandidates) - 1; i >= 0; i-- {
 		branch := vm.deleteCandidates[i]
 		if err := vm.repo.BranchDelete(context.Background(), branch.branch.Short()); err != nil {
-			// Check if the error is due to the branch being checked out in a worktree
-			if exiterr, ok := errutils.As[*exec.ExitError](err); ok &&
-				strings.Contains(string(exiterr.Stderr), "used by worktree") {
-				// Collect worktree branches but continue deleting others
+			var stderr string
+			if exiterr, ok := errutils.As[*exec.ExitError](err); ok {
+				stderr = strings.TrimSpace(string(exiterr.Stderr))
+			}
+			// Branches checked out in a worktree fail here; collect them and keep going.
+			if strings.Contains(stderr, "used by worktree") {
 				worktreeBranches = append(worktreeBranches, branch.branch.Short())
 				continue
-			} else {
-				// Other errors are fatal. Surface the git stderr so users see the
-				// actual cause rather than just "exit status 1".
-				errMsg := err.Error()
-				if exiterr, ok := errutils.As[*exec.ExitError](err); ok {
-					if stderr := strings.TrimSpace(string(exiterr.Stderr)); stderr != "" {
-						errMsg = stderr
-					}
-				}
-				deletionErr = errors.Errorf("cannot delete merged branch %q: %s", branch.branch.Short(), errMsg)
-				break
 			}
+			// Other errors are fatal. Surface the git stderr so users see the
+			// actual cause rather than just "exit status 1".
+			errMsg := err.Error()
+			if stderr != "" {
+				errMsg = stderr
+			}
+			deletionErr = errors.Errorf("cannot delete merged branch %q: %s", branch.branch.Short(), errMsg)
+			break
 		}
 		tx := vm.db.WriteTx()
 		tx.DeleteBranch(branch.branch.Short())
