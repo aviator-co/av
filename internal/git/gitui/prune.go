@@ -234,8 +234,15 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 				worktreeBranches = append(worktreeBranches, branch.branch.Short())
 				continue
 			} else {
-				// Other errors are fatal
-				deletionErr = errors.Errorf("cannot delete merged branch %q: %v", branch.branch.Short(), err)
+				// Other errors are fatal. Surface the git stderr so users see the
+				// actual cause rather than just "exit status 1".
+				errMsg := err.Error()
+				if exiterr, ok := errutils.As[*exec.ExitError](err); ok {
+					if stderr := strings.TrimSpace(string(exiterr.Stderr)); stderr != "" {
+						errMsg = stderr
+					}
+				}
+				deletionErr = errors.Errorf("cannot delete merged branch %q: %s", branch.branch.Short(), errMsg)
 				break
 			}
 		}
