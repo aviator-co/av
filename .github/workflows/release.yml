@@ -42,15 +42,18 @@ jobs:
       - name: fetch tags
         run: git fetch --force --tags
       - name: create release tag
+        id: create_tag
         if: github.event_name == 'workflow_dispatch' && inputs.aviator_release_candidate_version != ''
         env:
-          VERSION: ${{ inputs.aviator_release_candidate_version }}
+          RC_VERSION: ${{ inputs.aviator_release_candidate_version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
+          VERSION="${RC_VERSION%-rc*}"
           git tag "v${VERSION}"
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push origin "v${VERSION}"
+          echo "release_tag=v${VERSION}" >> "$GITHUB_OUTPUT"
       - name: install go
         uses: actions/setup-go@v6
         with:
@@ -62,7 +65,7 @@ jobs:
           version: "~> v2"
           args: release --clean
         env:
-          GORELEASER_CURRENT_TAG: ${{ inputs.aviator_release_candidate_version && format('v{0}', inputs.aviator_release_candidate_version) || github.ref_name }}
+          GORELEASER_CURRENT_TAG: ${{ steps.create_tag.outputs.release_tag || github.ref_name }}
           AVIATOR_CO_HOMEBREW_REPO_SSH_KEY: ${{ secrets.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FURY_TOKEN: ${{ secrets.FURY_PUSH_TOKEN }}
