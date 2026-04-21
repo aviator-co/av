@@ -78,7 +78,7 @@ func TestAutosquashCmds(t *testing.T) {
 			PickCmd{
 				Commit:  "b",
 				Comment: `WARNING: target commit "Unknown commit" not found in the stack`,
-				Mode:    PickModeFixup,
+				Mode:    PickModePick,
 			},
 		}
 		assert.Equal(t, want, autosquashCmds(cmds))

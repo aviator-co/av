@@ -167,7 +167,7 @@ func autosquashCmds(cmds []Cmd) []Cmd {
 	// annotated with a warning so the user can see the problem in the editor.
 	for _, fixIdx := range unplaced {
 		fixPick := cmds[fixIdx].(PickCmd)
-		fixPick.Mode = fixups[fixIdx].mode
+		fixPick.Mode = PickModePick
 		fixPick.Comment = fmt.Sprintf(
 			"WARNING: target commit %q not found in the stack",
 			fixups[fixIdx].targetTitle,
