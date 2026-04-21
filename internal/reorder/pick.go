@@ -122,7 +122,7 @@ func (p PickCmd) PerformSquash(ctx context.Context, repo *git.Repo, branchBase s
 	case PickModePick:
 		return errors.New("PerformSquash called with pick mode — squash/fixup mode is required")
 	case PickModeFixup:
-		amendArgs = []string{"commit", "--amend", "--no-edit"}
+		amendArgs = []string{"commit", "--amend", "--no-edit", "--no-verify"}
 	case PickModeSquash:
 		// Squash: open the editor with both commit messages so the user can
 		// compose the combined message.
@@ -150,7 +150,7 @@ func (p PickCmd) PerformSquash(ctx context.Context, repo *git.Repo, branchBase s
 		if editedMsg == "" {
 			return ErrEmptySquashMessage
 		}
-		amendArgs = []string{"commit", "--amend", "--message", editedMsg}
+		amendArgs = []string{"commit", "--amend", "--no-verify", "--message", editedMsg}
 	default:
 		return errors.Errorf("PerformSquash called with unexpected mode %q", p.Mode)
 	}
