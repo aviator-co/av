@@ -41,8 +41,8 @@ func parseGitVersion(out string) (int, int, error) {
 
 // HookRunArgs returns the arguments to pass to `git` to run a custom
 // (non-native) hook. The --allow-unknown-hook-name flag is appended on git
-// versions that support it (>= 2.44); it is accepted on 2.44–2.53 and
-// required on 2.54+, which rejects non-native hook names otherwise.
+// 2.54+, which introduced it and simultaneously began rejecting non-native
+// hook names without it. Older gits don't recognize the flag.
 func (r *Repo) HookRunArgs(ctx context.Context, hookName string) []string {
 	args := []string{"hook", "run", "--ignore-missing"}
 	if r.supportsAllowUnknownHookName(ctx) {
@@ -59,5 +59,5 @@ func (r *Repo) supportsAllowUnknownHookName(ctx context.Context) bool {
 		r.log.WithError(err).Debug("failed to determine git version")
 		return true
 	}
-	return major > 2 || (major == 2 && minor >= 44)
+	return major > 2 || (major == 2 && minor >= 54)
 }
