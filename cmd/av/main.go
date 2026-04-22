@@ -31,7 +31,8 @@ var rootFlags struct {
 }
 
 var rootCmd = &cobra.Command{
-	Use: "av",
+	Use:     "av",
+	Version: config.Version,
 
 	// Don't automatically print errors or usage information (we handle that ourselves).
 	// Cobra still prints usage if you return cmd.Usage() from RunE.
@@ -86,6 +87,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.SetVersionTemplate("{{.Version}}\n")
 	rootCmd.PersistentFlags().BoolVar(
 		&rootFlags.Debug, "debug", false,
 		"enable verbose debug logging",
