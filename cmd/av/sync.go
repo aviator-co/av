@@ -440,7 +440,17 @@ func (m *preAvSyncHookModel) Init() tea.Cmd {
 		return uiutils.ErrCmd(err)
 	}
 	m.hasHook = true
-	cmd := m.repo.Cmd(context.Background(), []string{"hook", "run", "--ignore-missing", "pre-av-sync"}, nil)
+	cmd := m.repo.Cmd(
+		context.Background(),
+		[]string{
+			"hook",
+			"run",
+			"--ignore-missing",
+			"--allow-unknown-hook-name",
+			"pre-av-sync",
+		},
+		nil,
+	)
 	if !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
 		// When not in a terminal, run the hook as a regular subprocess instead of
 		// tea.ExecProcess. ExecProcess tries to suspend and re-initialize bubbletea's
