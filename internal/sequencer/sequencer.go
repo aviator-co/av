@@ -418,8 +418,6 @@ func (seq *Sequencer) RestoreWorktrees(ctx context.Context) []string {
 		if err := git.RestoreWorktreeBranch(ctx, wtPath, branch); err != nil {
 			messages = append(messages,
 				fmt.Sprintf("Failed to restore %s in %s (run 'git -C %s checkout %s' manually)", branch, wtPath, wtPath, branch))
-		} else {
-			messages = append(messages, fmt.Sprintf("Restored %s in %s", branch, wtPath))
 		}
 	}
 	seq.DetachedWorktrees = map[string]string{}

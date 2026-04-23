@@ -373,23 +373,18 @@ func (vm *remoteAdoptViewModel) initGitFetch(prs []actions.RemotePRInfo, chosenT
 }
 
 func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenTargets []plumbing.ReferenceName) tea.Cmd {
+	chosenSet := make(map[string]bool)
+	for _, target := range chosenTargets {
+		chosenSet[target.Short()] = true
+	}
 	prMap := make(map[string]actions.RemotePRInfo)
 	for _, prInfo := range prs {
 		prMap[prInfo.Name] = prInfo
 	}
 	var branches []actions.AdoptingBranch
-	for _, target := range chosenTargets {
-		idx := slices.IndexFunc(prs, func(prInfo actions.RemotePRInfo) bool {
-			return prInfo.Name == target.Short()
-		})
-		if idx == -1 {
-			return uiutils.ErrCmd(fmt.Errorf("internal error: failed to find PR info for branch %s", target.Short()))
-		}
-		pr := prs[idx]
-		ab := actions.AdoptingBranch{
-			Name:        target.Short(),
-			Parent:      pr.Parent,
-			PullRequest: &pr.PullRequest,
+	for _, pr := range slices.Backward(prs) {
+		if !chosenSet[pr.Name] {
+			continue
 		}
 		// If the parent is already merged / closed, change the parent to the trunk branch.
 		for !pr.Parent.Trunk {
@@ -399,7 +394,11 @@ func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenT
 			}
 			pr.Parent = parentPRInfo.Parent
 		}
-		branches = append(branches, ab)
+		branches = append(branches, actions.AdoptingBranch{
+			Name:        pr.Name,
+			Parent:      pr.Parent,
+			PullRequest: &pr.PullRequest,
+		})
 	}
 	return vm.AddView(
 		actions.NewAdoptBranchesModel(

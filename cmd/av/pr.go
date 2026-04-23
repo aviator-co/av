@@ -124,8 +124,7 @@ Examples:
 		tx := db.WriteTx()
 		defer tx.Abort()
 
-		body := prFlags.Body
-		// Special case: ready body from stdin
+		// Special case: read body from stdin
 		if prFlags.Body == "-" {
 			bodyBytes, err := io.ReadAll(os.Stdin)
 			if err != nil {
@@ -133,6 +132,7 @@ Examples:
 			}
 			prFlags.Body = string(bodyBytes)
 		}
+		body := prFlags.Body
 
 		draft := config.Av.PullRequest.Draft
 		if cmd.Flags().Changed("draft") {
@@ -357,7 +357,7 @@ func queue(ctx context.Context) error {
 
 func runPRHook(ctx context.Context, repo *git.Repo, hookType string) error {
 	output, err := repo.Run(ctx, &git.RunOpts{
-		Args:        []string{"hook", "run", "--ignore-missing", "pre-av-pr"},
+		Args:        repo.HookRunArgs(ctx, "pre-av-pr"),
 		Env:         []string{"AV_PR_HOOK_TYPE=" + hookType},
 		Interactive: true,
 		ExitError:   true,

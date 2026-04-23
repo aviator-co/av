@@ -1,10 +1,6 @@
-name: goreleaser
+name: nightly-release
 
 on:
-  push:
-    tags:
-      - "*"
-      - "!*-nightly*"
   workflow_dispatch:
     inputs:
       aviator_deployment_id:
@@ -16,18 +12,18 @@ on:
         required: false
         type: string
       aviator_release_candidate_version:
-        description: "Name of the version (e.g., 0.2.0)"
-        required: false
+        description: "Name of the version (e.g., 0.2.0-rc1)"
+        required: true
         type: string
 
 jobs:
-  goreleaser:
+  nightly:
     runs-on: ubuntu-latest
     permissions:
       contents: "write"
     steps:
       - uses: fjogeleit/http-request-action@551353b829c3646756b2ec2b3694f819d7957495 # v2
-        if: github.event_name == 'workflow_dispatch' && inputs.aviator_deployment_id != ''
+        if: inputs.aviator_deployment_id != ''
         with:
           url: '${{ vars.AVIATOR_API_HOST }}/api/v1/sync-deploy-github-action'
           method: 'POST'
@@ -41,19 +37,17 @@ jobs:
           persist-credentials: false
       - name: fetch tags
         run: git fetch --force --tags
-      - name: create release tag
-        id: create_tag
-        if: github.event_name == 'workflow_dispatch' && inputs.aviator_release_candidate_version != ''
+      - name: create nightly tag
         env:
-          RC_VERSION: ${{ inputs.aviator_release_candidate_version }}
+          VERSION: ${{ inputs.aviator_release_candidate_version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          VERSION="${RC_VERSION%-rc*}"
-          git tag "v${VERSION}"
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push origin "v${VERSION}"
-          echo "release_tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          git tag "v${VERSION}-nightly" 2>/dev/null || echo "Tag v${VERSION}-nightly already exists"
+          git push origin "v${VERSION}-nightly" 2>/dev/null || echo "Tag v${VERSION}-nightly already on remote"
+      - name: configure nightly prerelease
+        run: yq '.release.prerelease = true | del(.git.ignore_tags)' .goreleaser.yaml > /tmp/goreleaser-nightly.yaml
       - name: install go
         uses: actions/setup-go@v6
         with:
@@ -63,9 +57,9 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
-          args: release --clean
+          args: release --clean --config /tmp/goreleaser-nightly.yaml --skip=aur --skip=nfpm
         env:
-          GORELEASER_CURRENT_TAG: ${{ steps.create_tag.outputs.release_tag || github.ref_name }}
+          GORELEASER_CURRENT_TAG: "v${{ inputs.aviator_release_candidate_version }}-nightly"
+          RELEASE_ENV: nightly
           AVIATOR_CO_HOMEBREW_REPO_SSH_KEY: ${{ secrets.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FURY_TOKEN: ${{ secrets.FURY_PUSH_TOKEN }}
