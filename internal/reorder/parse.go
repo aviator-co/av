@@ -20,8 +20,12 @@ func ParseCmd(line string) (Cmd, error) {
 	switch cmdName {
 	case "delete-branch", "db":
 		return parseDeleteBranchCmd(args)
+	case "fixup", "f":
+		return parseFixupCmd(args)
 	case "pick", "p":
 		return parsePickCmd(args)
+	case "squash", "s":
+		return parseSquashCmd(args)
 	case "stack-branch", "sb":
 		return parseStackBranchCmd(args)
 	default:

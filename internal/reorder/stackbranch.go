@@ -90,6 +90,14 @@ func (b StackBranchCmd) Execute(ctx *Context) error {
 	)
 	ctx.State.Branch = b.Name
 
+	// Record the commit the branch was initialized to so PerformSquash can
+	// detect when a squash/fixup would cross the branch boundary.
+	resolvedBase, err := ctx.Repo.RevParse(context.Background(), &git.RevParse{Rev: "HEAD"})
+	if err != nil {
+		return err
+	}
+	ctx.State.BranchBase = resolvedBase
+
 	return tx.Commit()
 }
 
