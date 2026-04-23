@@ -169,7 +169,9 @@ func checkCliVersion() {
 		return
 	}
 	logrus.WithField("latest", latest).Debug("fetched latest released version")
-	if semver.Compare(config.Version, latest) < 0 {
+	currentBase := strings.TrimSuffix(config.Version, semver.Prerelease(config.Version))
+	latestBase := strings.TrimSuffix(latest, semver.Prerelease(latest))
+	if semver.Compare(currentBase, latestBase) < 0 {
 		c := color.New(color.Faint, color.Bold)
 		fmt.Fprint(
 			os.Stderr,
