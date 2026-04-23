@@ -2,7 +2,7 @@ version: 2
 
 git:
   ignore_tags:
-    - ".*-nightly"
+    - "*-nightly"
 
 before:
   hooks:

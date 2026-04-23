@@ -357,7 +357,7 @@ func queue(ctx context.Context) error {
 
 func runPRHook(ctx context.Context, repo *git.Repo, hookType string) error {
 	output, err := repo.Run(ctx, &git.RunOpts{
-		Args:        []string{"hook", "run", "--ignore-missing", "pre-av-pr"},
+		Args:        repo.HookRunArgs(ctx, "pre-av-pr"),
 		Env:         []string{"AV_PR_HOOK_TYPE=" + hookType},
 		Interactive: true,
 		ExitError:   true,
