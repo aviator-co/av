@@ -124,8 +124,7 @@ Examples:
 		tx := db.WriteTx()
 		defer tx.Abort()
 
-		body := prFlags.Body
-		// Special case: ready body from stdin
+		// Special case: read body from stdin
 		if prFlags.Body == "-" {
 			bodyBytes, err := io.ReadAll(os.Stdin)
 			if err != nil {
@@ -133,6 +132,7 @@ Examples:
 			}
 			prFlags.Body = string(bodyBytes)
 		}
+		body := prFlags.Body
 
 		draft := config.Av.PullRequest.Draft
 		if cmd.Flags().Changed("draft") {
