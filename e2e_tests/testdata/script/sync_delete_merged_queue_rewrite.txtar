@@ -1,0 +1,39 @@
+# Test that sync prunes a merged branch when refs/pull/<N>/head diverges from
+# the local tip but the local commits are patch-equivalent to what's in the
+# merge commit. This simulates a merge queue that rewrites the PR head commit
+# before merging (e.g. Aviator MergeQueue doing a rebase merge). Exercises the
+# git-cherry fallback in prune's calculateMergedBranches.
+#
+#     main:    X --------------> 1S
+#     stack-1:  \ -> 1a
+#     refs/pull/42/head: queue-rewritten commit (different sha, same patch)
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+
+# Simulate a merge queue rewriting the PR head by pushing a different commit
+# to refs/pull/42/head.
+exec git checkout --detach
+exec git commit --allow-empty -m 'queue-rewritten 1a'
+exec git push origin HEAD:refs/pull/42/head
+exec git checkout stack-1
+
+# Squash-merge stack-1 into main.
+exec git checkout main
+exec git merge --squash stack-1
+exec git commit --no-edit
+exec git push origin main
+
+# Configure mock PR and av metadata.
+set-branch-pr stack-1 nodeid-42 42 OPEN
+mock-pull stack-1 42 MERGED HEAD
+
+exec git switch stack-1
+exec av sync --prune=yes
+
+# stack-1 should be deleted despite refs/pull/42/head mismatching the local tip.
+! exec git show-ref refs/heads/stack-1
+
+# HEAD should be on main.
+exec git rev-parse --symbolic-full-name HEAD
+stdout '^refs/heads/main$'
