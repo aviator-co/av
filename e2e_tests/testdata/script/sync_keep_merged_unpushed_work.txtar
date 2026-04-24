@@ -1,0 +1,29 @@
+# Test that sync does NOT prune a merged branch when the local branch has
+# unpushed local commits not represented in the merge commit. Both the
+# git-cherry and merge-tree fallbacks should refuse because the unpushed work
+# would be lost.
+#
+#     main:    X --------------> 1S
+#     stack-1:  \ -> 1a -> (unpushed local commit)
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+exec git push origin stack-1:refs/pull/42/head
+
+# Squash-merge stack-1 into main before the user adds any local work.
+exec git checkout main
+exec git merge --squash stack-1
+exec git commit --no-edit
+exec git push origin main
+
+set-branch-pr stack-1 nodeid-42 42 OPEN
+mock-pull stack-1 42 MERGED HEAD
+
+# Now the user adds a local commit on top of stack-1 that was never pushed.
+exec git switch stack-1
+commit-file my-other-file 'unpushed\n' 'Unpushed work'
+
+exec av sync --prune=yes
+
+# stack-1 must still exist: the unpushed commit is not in the merge commit.
+exec git show-ref refs/heads/stack-1
