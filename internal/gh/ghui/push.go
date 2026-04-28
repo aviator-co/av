@@ -37,6 +37,14 @@ const (
 	reasonPRIsClosed        = "PR is closed."
 	reasonParentNotPushed   = "Parent branch is not pushed to remote."
 	reasonNoPR              = "Some branches in a stack do not have a PR."
+
+	// gitPushChunkSize caps how many ref updates we send in a single
+	// `git push` invocation. GitHub rejects pushes with more than 20 ref
+	// updates ("max ref updates exceeded"), so we split the candidate set
+	// into chunks of this size and push each one separately. Each chunk is
+	// still atomic (--atomic), but the operation as a whole is not
+	// (#638).
+	gitPushChunkSize = 20
 )
 
 type pushCandidate struct {
@@ -287,32 +295,46 @@ func (vm *GitHubPushModel) runUpdate() (ret tea.Msg) {
 
 func (vm *GitHubPushModel) runGitPush() error {
 	ctx := context.Background()
-	pushArgs := []string{"push", vm.repo.GetRemoteName(), "--atomic"}
-	for _, branch := range vm.pushCandidates {
-		// Do a compare-and-swap to be strict on what we show as a difference.
-		pushArgs = append(
-			pushArgs,
-			fmt.Sprintf(
-				"--force-with-lease=%s:%s",
-				branch.branch.String(),
-				branch.remoteCommit.Hash.String(),
-			),
-		)
-	}
-	for _, branch := range vm.pushCandidates {
-		// Push the exact commit hash to be strict on what we show as a difference.
-		pushArgs = append(pushArgs,
-			fmt.Sprintf("%s:%s", branch.localCommit.Hash.String(), branch.branch.String()),
-		)
-	}
-	res, err := vm.repo.Run(ctx, &git.RunOpts{
-		Args: pushArgs,
-	})
-	if err != nil {
-		return errors.WrapIff(err, "failed to push branches to GitHub")
-	}
-	if res.ExitCode != 0 {
-		return errors.Errorf("failed to push branches to GitHub\n%s\n%s", res.Stdout, res.Stderr)
+	// Split into chunks so we don't exceed GitHub's per-push ref-update
+	// limit (#638). Each chunk is still atomic on its own; only the
+	// cross-chunk operation is non-atomic.
+	for start := 0; start < len(vm.pushCandidates); start += gitPushChunkSize {
+		end := start + gitPushChunkSize
+		if end > len(vm.pushCandidates) {
+			end = len(vm.pushCandidates)
+		}
+		chunk := vm.pushCandidates[start:end]
+		pushArgs := []string{"push", vm.repo.GetRemoteName(), "--atomic"}
+		for _, branch := range chunk {
+			// Do a compare-and-swap to be strict on what we show as a difference.
+			pushArgs = append(
+				pushArgs,
+				fmt.Sprintf(
+					"--force-with-lease=%s:%s",
+					branch.branch.String(),
+					branch.remoteCommit.Hash.String(),
+				),
+			)
+		}
+		for _, branch := range chunk {
+			// Push the exact commit hash to be strict on what we show as a difference.
+			pushArgs = append(pushArgs,
+				fmt.Sprintf("%s:%s", branch.localCommit.Hash.String(), branch.branch.String()),
+			)
+		}
+		res, err := vm.repo.Run(ctx, &git.RunOpts{
+			Args: pushArgs,
+		})
+		if err != nil {
+			return errors.WrapIff(err, "failed to push branches to GitHub")
+		}
+		if res.ExitCode != 0 {
+			return errors.Errorf(
+				"failed to push branches to GitHub\n%s\n%s",
+				res.Stdout,
+				res.Stderr,
+			)
+		}
 	}
 
 	var errs []error
