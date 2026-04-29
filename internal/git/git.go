@@ -92,6 +92,19 @@ func (r *Repo) AvTmpDir() string {
 	return dir
 }
 
+// IsRebaseInProgress reports whether git has an in-progress rebase. Returns true
+// if either `.git/rebase-merge/` or `.git/rebase-apply/` exists. Both are removed
+// by `git rebase --abort` / `--continue` (when complete), so this is also a way
+// to detect whether a previously-conflicted rebase has since been aborted.
+func (r *Repo) IsRebaseInProgress() bool {
+	for _, name := range []string{"rebase-merge", "rebase-apply"} {
+		if stat, err := os.Stat(filepath.Join(r.GitDir(), name)); err == nil && stat.IsDir() {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *Repo) DefaultBranch() string {
 	return r.defaultBranch.Short()
 }
