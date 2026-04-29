@@ -12,15 +12,18 @@ import (
 )
 
 // CreatePlan creates a reorder plan for the stack rooted at rootBranch.
+// It returns the plan commands, a map from short commit hash to full commit
+// hash for every commit in the plan, and any error encountered.
 func CreatePlan(
 	ctx context.Context,
 	repo *git.Repo,
 	tx meta.ReadTx,
 	rootBranch string,
-) ([]Cmd, error) {
+) ([]Cmd, map[string]string, error) {
 	branchNames := []string{rootBranch}
 	branchNames = append(branchNames, meta.SubsequentBranches(tx, rootBranch)...)
 
+	shortToFull := make(map[string]string)
 	var cmds []Cmd
 	for _, branchName := range branchNames {
 		branch, _ := tx.Branch(branchName)
@@ -39,7 +42,7 @@ func CreatePlan(
 		} else {
 			trunkCommit, err := repo.MergeBase(ctx, branchName, "origin/"+branch.Parent.Name)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			branchCmd.Trunk = branch.Parent.Name + "@" + trunkCommit
 			upstreamCommit = trunkCommit
@@ -52,7 +55,7 @@ func CreatePlan(
 			Reverse:    true,
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// If no commits associated with this branch, bail out early and add a
@@ -67,17 +70,19 @@ func CreatePlan(
 			Revisions: commitIDs,
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		cmds = append(cmds, branchCmd)
 		for _, object := range commitObjects {
 			commit, err := git.ParseCommitContents(object.Contents)
 			if err != nil {
-				return nil, errors.WrapIff(err, "parsing commit %s", object.OID)
+				return nil, nil, errors.WrapIff(err, "parsing commit %s", object.OID)
 			}
+			shortHash := git.ShortSha(object.OID)
+			shortToFull[shortHash] = object.OID
 			cmds = append(cmds, PickCmd{
-				Commit:  git.ShortSha(object.OID),
+				Commit:  shortHash,
 				Comment: commit.MessageTitle(),
 			})
 		}
@@ -85,7 +90,25 @@ func CreatePlan(
 
 	// Reorder fixup!/squash! commits to sit immediately after their targets
 	// across the entire stack, matching git's --autosquash behavior.
-	return autosquashCmds(cmds), nil
+	return autosquashCmds(cmds), shortToFull, nil
+}
+
+// ResolveHashes replaces short commit hashes in PickCmd entries with their
+// full hashes using the provided short-to-full map. Hashes not present in the
+// map (e.g., manually introduced by the user) are left as-is.
+func ResolveHashes(cmds []Cmd, shortToFull map[string]string) []Cmd {
+	resolved := make([]Cmd, len(cmds))
+	for i, cmd := range cmds {
+		if p, ok := cmd.(PickCmd); ok {
+			if full, found := shortToFull[p.Commit]; found {
+				p.Commit = full
+			}
+			resolved[i] = p
+		} else {
+			resolved[i] = cmd
+		}
+	}
+	return resolved
 }
 
 // autosquashCmds reorders fixup!/squash! picks so that each one is placed
