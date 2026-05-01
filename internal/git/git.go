@@ -105,6 +105,15 @@ func (r *Repo) IsRebaseInProgress() bool {
 	return false
 }
 
+// IsCherryPickInProgress reports whether git has an in-progress cherry-pick.
+// `.git/CHERRY_PICK_HEAD` is removed by `git cherry-pick --abort` / `--continue`,
+// so this is also a way to detect whether a previously-conflicted cherry-pick
+// has since been aborted.
+func (r *Repo) IsCherryPickInProgress() bool {
+	stat, err := os.Stat(filepath.Join(r.GitDir(), "CHERRY_PICK_HEAD"))
+	return err == nil && !stat.IsDir()
+}
+
 func (r *Repo) DefaultBranch() string {
 	return r.defaultBranch.Short()
 }
