@@ -92,6 +92,28 @@ func (r *Repo) AvTmpDir() string {
 	return dir
 }
 
+// IsRebaseInProgress reports whether git has an in-progress rebase. Returns true
+// if either `.git/rebase-merge/` or `.git/rebase-apply/` exists. Both are removed
+// by `git rebase --abort` / `--continue` (when complete), so this is also a way
+// to detect whether a previously-conflicted rebase has since been aborted.
+func (r *Repo) IsRebaseInProgress() bool {
+	for _, name := range []string{"rebase-merge", "rebase-apply"} {
+		if stat, err := os.Stat(filepath.Join(r.GitDir(), name)); err == nil && stat.IsDir() {
+			return true
+		}
+	}
+	return false
+}
+
+// IsCherryPickInProgress reports whether git has an in-progress cherry-pick.
+// `.git/CHERRY_PICK_HEAD` is removed by `git cherry-pick --abort` / `--continue`,
+// so this is also a way to detect whether a previously-conflicted cherry-pick
+// has since been aborted.
+func (r *Repo) IsCherryPickInProgress() bool {
+	stat, err := os.Stat(filepath.Join(r.GitDir(), "CHERRY_PICK_HEAD"))
+	return err == nil && !stat.IsDir()
+}
+
 func (r *Repo) DefaultBranch() string {
 	return r.defaultBranch.Short()
 }
