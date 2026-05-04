@@ -198,6 +198,51 @@ func (c *Client) UpdatePullRequest(
 	return &mutation.UpdatePullRequest.PullRequest, nil
 }
 
+// UpdatePullRequestFields are the fields that may be updated on a pull request.
+// A nil field is left untouched. A non-nil field is included in the mutation
+// only if its value differs from the existing pull request.
+type UpdatePullRequestFields struct {
+	Title       *string
+	Body        *string
+	BaseRefName *string
+}
+
+// UpdatePullRequestIfChanged calls UpdatePullRequest only when at least one
+// field in desired differs from existing. Sending unchanged fields (especially
+// BaseRefName) causes GitHub to fire an extra pull_request webhook that
+// duplicates workflow runs, so callers should prefer this over UpdatePullRequest.
+func (c *Client) UpdatePullRequestIfChanged(
+	ctx context.Context,
+	existing *PullRequest,
+	desired UpdatePullRequestFields,
+) (*PullRequest, error) {
+	input := githubv4.UpdatePullRequestInput{PullRequestID: githubv4.ID(existing.ID)}
+	changed := false
+	if desired.Title != nil && *desired.Title != existing.Title {
+		input.Title = Ptr(githubv4.String(*desired.Title))
+		changed = true
+	}
+	if desired.Body != nil {
+		// GitHub sometimes returns bodies with \r\n line endings while
+		// callers compute new bodies with \n, so normalize both sides
+		// before comparing to avoid spurious updates.
+		desiredBody := strings.ReplaceAll(*desired.Body, "\r\n", "\n")
+		existingBody := strings.ReplaceAll(existing.Body, "\r\n", "\n")
+		if desiredBody != existingBody {
+			input.Body = Ptr(githubv4.String(*desired.Body))
+			changed = true
+		}
+	}
+	if desired.BaseRefName != nil && *desired.BaseRefName != existing.BaseBranchName() {
+		input.BaseRefName = Ptr(githubv4.String(*desired.BaseRefName))
+		changed = true
+	}
+	if !changed {
+		return existing, nil
+	}
+	return c.UpdatePullRequest(ctx, input)
+}
+
 // RequestReviews requests reviews from the given users on the given pull
 // request.
 func (c *Client) RequestReviews(

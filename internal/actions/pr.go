@@ -544,11 +544,10 @@ func ensurePR(
 
 	if opts.existingPR != nil {
 		newBody := AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack, tx)
-		updatedPR, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
-			PullRequestID: opts.existingPR.ID,
-			Title:         gh.Ptr(githubv4.String(opts.title)),
-			Body:          gh.Ptr(githubv4.String(newBody)),
-			BaseRefName:   gh.Ptr(githubv4.String(opts.baseRefName)),
+		updatedPR, err := client.UpdatePullRequestIfChanged(ctx, opts.existingPR, gh.UpdatePullRequestFields{
+			Title:       gh.Ptr(opts.title),
+			Body:        gh.Ptr(newBody),
+			BaseRefName: gh.Ptr(opts.baseRefName),
 		})
 		if err != nil {
 			return nil, false, errors.WithStack(err)
@@ -959,11 +958,9 @@ func UpdatePullRequestWithStack(
 	}
 
 	newBody := AddPRMetadataAndStack(body, prMeta, branchName, stackToWrite, tx)
-	_, err = client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
-		PullRequestID: existingPR.ID,
-		Body:          gh.Ptr(githubv4.String(newBody)),
-	})
-	if err != nil {
+	if _, err := client.UpdatePullRequestIfChanged(ctx, existingPR, gh.UpdatePullRequestFields{
+		Body: gh.Ptr(newBody),
+	}); err != nil {
 		return errors.WithStack(err)
 	}
 
