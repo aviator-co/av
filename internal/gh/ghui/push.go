@@ -301,7 +301,8 @@ func (vm *GitHubPushModel) runGitPush() error {
 	}
 	for _, branch := range vm.pushCandidates {
 		// Push the exact commit hash to be strict on what we show as a difference.
-		pushArgs = append(pushArgs,
+		pushArgs = append(
+			pushArgs,
 			fmt.Sprintf("%s:%s", branch.localCommit.Hash.String(), branch.branch.String()),
 		)
 	}

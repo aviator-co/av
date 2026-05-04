@@ -385,7 +385,8 @@ func (r *Repo) BranchesContainCommittish(
 	ctx context.Context,
 	committish string,
 ) ([]BranchAndCommit, error) {
-	lines, err := r.Git(ctx,
+	lines, err := r.Git(
+		ctx,
 		"for-each-ref",
 		"--contains",
 		committish,

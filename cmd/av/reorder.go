@@ -50,7 +50,8 @@ squashed, dropped, or moved within the stack.
 		var continuation reorder.Continuation
 		if err := repo.ReadStateFile(git.StateFileKindReorder, &continuation); os.IsNotExist(err) {
 			if reorderFlags.Continue || reorderFlags.Abort {
-				fmt.Fprint(os.Stderr,
+				fmt.Fprint(
+					os.Stderr,
 					colors.Failure("ERROR: no reorder in progress\n"),
 				)
 				return actions.ErrExitSilently{ExitCode: 127}
@@ -90,7 +91,8 @@ squashed, dropped, or moved within the stack.
 			}
 			if stat != nil {
 				if err := repo.CherryPick(ctx, git.CherryPick{Resume: git.CherryPickContinue}); err != nil {
-					fmt.Fprint(os.Stderr,
+					fmt.Fprint(
+						os.Stderr,
 						colors.Failure("Failed to continue cherry-pick: ", err.Error(), "\n"),
 						colors.Warning("Resolve the conflict and run "),
 						colors.CliCmd("av reorder --continue"),
@@ -126,7 +128,8 @@ squashed, dropped, or moved within the stack.
 					return err
 				}
 				if currentHead == state.Head {
-					fmt.Fprint(os.Stderr,
+					fmt.Fprint(
+						os.Stderr,
 						colors.Failure("ERROR: cannot continue squash/fixup — the cherry-pick was not applied.\n"),
 						colors.Warning("If you aborted or skipped the cherry-pick, run "),
 						colors.CliCmd("av reorder --abort"),
@@ -137,7 +140,8 @@ squashed, dropped, or moved within the stack.
 
 				if err := pickCmd.PerformSquash(ctx, repo, state.BranchBase); err != nil {
 					if errors.Is(err, reorder.ErrEmptySquashMessage) {
-						fmt.Fprint(os.Stderr,
+						fmt.Fprint(
+							os.Stderr,
 							colors.Failure("squash commit message is empty after editing\n"),
 							colors.Warning("Edit the message and run "),
 							colors.CliCmd("av reorder --continue"),
@@ -165,7 +169,8 @@ squashed, dropped, or moved within the stack.
 			state.Head = head
 		} else {
 			if continuation.State != nil {
-				fmt.Fprint(os.Stderr,
+				fmt.Fprint(
+					os.Stderr,
 					colors.Failure("ERROR: reorder already in progress\n"),
 					colors.Failure("	   use --continue or --abort to continue or abort the reorder\n"),
 				)
@@ -178,7 +183,8 @@ squashed, dropped, or moved within the stack.
 			}
 			root, ok := meta.Root(tx, currentBranch)
 			if !ok {
-				fmt.Fprint(os.Stderr,
+				fmt.Fprint(
+					os.Stderr,
 					colors.Failure("ERROR: branch "), colors.UserInput(currentBranch),
 					colors.Failure(" is not part of a stack\n"),
 				)
@@ -215,7 +221,8 @@ squashed, dropped, or moved within the stack.
 			if err := repo.WriteStateFile(git.StateFileKindReorder, nil); err != nil {
 				return err
 			}
-			fmt.Fprint(os.Stderr,
+			fmt.Fprint(
+				os.Stderr,
 				colors.Success("\nThe stack was reordered successfully.\n"),
 			)
 			return nil
@@ -225,7 +232,8 @@ squashed, dropped, or moved within the stack.
 		if err := repo.WriteStateFile(git.StateFileKindReorder, &continuation); err != nil {
 			return err
 		}
-		fmt.Fprint(os.Stderr,
+		fmt.Fprint(
+			os.Stderr,
 			colors.Warning("\nThe reorder was interrupted by a conflict.\n"),
 			colors.Warning("Resolve the conflict and run "),
 			colors.CliCmd("av reorder --continue"),
@@ -255,7 +263,8 @@ edit:
 		return nil, err
 	}
 	if len(plan) == 0 {
-		fmt.Fprint(os.Stderr,
+		fmt.Fprint(
+			os.Stderr,
 			colors.Failure("ERROR: reorder plan is empty\n"),
 		)
 		return nil, actions.ErrExitSilently{ExitCode: 127}

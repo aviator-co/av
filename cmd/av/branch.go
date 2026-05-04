@@ -368,7 +368,8 @@ func createBranch(
 	// On failure, we want to delete the branch we created so that the user
 	// can try again (e.g., to fix issues surfaced by a pre-commit hook).
 	cu.Add(func() {
-		fmt.Fprint(os.Stderr,
+		fmt.Fprint(
+			os.Stderr,
 			colors.Faint("  - Cleaning up branch "),
 			colors.UserInput(branchName),
 			colors.Faint(" because commit was not successful."),
