@@ -115,7 +115,7 @@ func (b StackBranchCmd) String() string {
 		if hasCommit {
 			sb.WriteString(branch)
 			sb.WriteString("@")
-			sb.WriteString(shortCommitHash(commit))
+			sb.WriteString(git.ShortSha(commit))
 		} else {
 			sb.WriteString(b.Trunk)
 		}

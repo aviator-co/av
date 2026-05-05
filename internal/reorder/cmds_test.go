@@ -37,9 +37,9 @@ func TestStateRoundTrip_SquashFixupModes(t *testing.T) {
 		Branch: "feature",
 		Head:   "deadbeef",
 		Commands: []Cmd{
-			PickCmd{Commit: "aaaa1111"},
-			PickCmd{Commit: "abcd1234", Mode: PickModeSquash},
-			PickCmd{Commit: "efgh5678", Mode: PickModeFixup},
+			PickCmd{Commit: "aaaa111"},
+			PickCmd{Commit: "abcd123", Mode: PickModeSquash},
+			PickCmd{Commit: "efgh567", Mode: PickModeFixup},
 		},
 	}
 
@@ -54,16 +54,16 @@ func TestStateRoundTrip_SquashFixupModes(t *testing.T) {
 
 	pick, ok := deserialized.Commands[0].(PickCmd)
 	require.True(t, ok, "commands[0] should be a PickCmd")
-	require.Equal(t, "aaaa1111", pick.Commit)
+	require.Equal(t, "aaaa111", pick.Commit)
 	require.Equal(t, PickModePick, pick.Mode, "plain pick mode should round-trip as PickModePick")
 
 	squash, ok := deserialized.Commands[1].(PickCmd)
 	require.True(t, ok, "commands[1] should be a PickCmd")
-	require.Equal(t, "abcd1234", squash.Commit)
+	require.Equal(t, "abcd123", squash.Commit)
 	require.Equal(t, PickModeSquash, squash.Mode, "squash mode should survive round-trip")
 
 	fixup, ok := deserialized.Commands[2].(PickCmd)
 	require.True(t, ok, "commands[2] should be a PickCmd")
-	require.Equal(t, "efgh5678", fixup.Commit)
+	require.Equal(t, "efgh567", fixup.Commit)
 	require.Equal(t, PickModeFixup, fixup.Mode, "fixup mode should survive round-trip")
 }

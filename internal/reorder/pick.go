@@ -193,7 +193,7 @@ func (p PickCmd) String() string {
 	}
 	sb.WriteString(mode)
 	sb.WriteString(" ")
-	sb.WriteString(shortCommitHash(p.Commit))
+	sb.WriteString(git.ShortSha(p.Commit))
 	if p.Comment != "" {
 		sb.WriteString("  # ")
 		sb.WriteString(p.Comment)
