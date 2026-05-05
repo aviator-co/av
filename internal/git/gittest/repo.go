@@ -142,13 +142,14 @@ func (r *GitTestRepo) Git(t *testing.T, args ...string) string {
 	if err != nil && !errors.As(err, &exitError) {
 		t.Fatal(err)
 	}
-	t.Logf("Running git\n"+
-		"args: %v\n"+
-		"exit code: %v\n"+
-		"stdout:\n"+
-		"%s"+
-		"stderr:\n"+
-		"%s",
+	t.Logf(
+		"Running git\n"+
+			"args: %v\n"+
+			"exit code: %v\n"+
+			"stdout:\n"+
+			"%s"+
+			"stderr:\n"+
+			"%s",
 		args,
 		cmd.ProcessState.ExitCode(),
 		text.Indent(stdout.String(), "  "),

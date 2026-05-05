@@ -419,7 +419,8 @@ func init() {
 	)
 	prCmd.Flags().BoolVar(
 		&prFlags.Current, "current", false,
-		"create pull requests up to the current branch")
+		"create pull requests up to the current branch",
+	)
 	_ = prCmd.Flags().MarkHidden("current")
 
 	deprecatedCreateCmd := deprecateCommand(*prCmd, "av pr", "create")

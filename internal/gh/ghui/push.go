@@ -24,7 +24,6 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/shurcooL/githubv4"
 )
 
 const (
@@ -301,7 +300,8 @@ func (vm *GitHubPushModel) runGitPush() error {
 	}
 	for _, branch := range vm.pushCandidates {
 		// Push the exact commit hash to be strict on what we show as a difference.
-		pushArgs = append(pushArgs,
+		pushArgs = append(
+			pushArgs,
 			fmt.Sprintf("%s:%s", branch.localCommit.Hash.String(), branch.branch.String()),
 		)
 	}
@@ -387,10 +387,9 @@ func (vm *GitHubPushModel) updatePRs(ghPRs map[plumbing.ReferenceName]*gh.PullRe
 			stackToWrite,
 			vm.db.ReadTx(),
 		)
-		if _, err := vm.client.UpdatePullRequest(context.Background(), githubv4.UpdatePullRequestInput{
-			PullRequestID: pr.ID,
-			BaseRefName:   githubv4.NewString(githubv4.String(avbr.Parent.Name)),
-			Body:          githubv4.NewString(githubv4.String(prBody)),
+		if _, err := vm.client.UpdatePullRequestIfChanged(context.Background(), pr, gh.UpdatePullRequestFields{
+			Body:        gh.Ptr(prBody),
+			BaseRefName: gh.Ptr(avbr.Parent.Name),
 		}); err != nil {
 			return err
 		}

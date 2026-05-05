@@ -66,7 +66,8 @@ var switchCmd = &cobra.Command{
 		for _, node := range rootNodes {
 			branchList = append(
 				branchList,
-				switchBranchList(ctx, repo, tx, branches, node)...)
+				switchBranchList(ctx, repo, tx, branches, node)...,
+			)
 		}
 		if len(branchList) == 0 {
 			return errors.New("no branches found")
