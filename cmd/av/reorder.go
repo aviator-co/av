@@ -184,7 +184,7 @@ squashed, dropped, or moved within the stack.
 				)
 				return actions.ErrExitSilently{ExitCode: 127}
 			}
-			initialPlan, shortToFull, err := reorder.CreatePlan(ctx, repo, db.ReadTx(), root)
+			initialPlan, err := reorder.CreatePlan(ctx, repo, db.ReadTx(), root)
 			if err != nil {
 				return err
 			}
@@ -193,7 +193,6 @@ squashed, dropped, or moved within the stack.
 			if err != nil {
 				return err
 			}
-			plan = reorder.ResolveHashes(plan, shortToFull)
 
 			logrus.WithFields(logrus.Fields{
 				"plan":           plan,

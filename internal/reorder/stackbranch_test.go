@@ -18,6 +18,10 @@ func TestStackBranchCmd_String(t *testing.T) {
 		{StackBranchCmd{Name: "feature-one"}, "stack-branch feature-one"},
 		{StackBranchCmd{Name: "feature-one", Parent: "master"}, "stack-branch feature-one --parent master"},
 		{StackBranchCmd{Name: "feature-one", Trunk: "master"}, "stack-branch feature-one --trunk master"},
+		{
+			StackBranchCmd{Name: "feature-one", Trunk: "master@1234567890abcdef1234567890abcdef12345678"},
+			"stack-branch feature-one --trunk master@1234567",
+		},
 	} {
 		t.Run(tt.Output, func(t *testing.T) {
 			assert.Equal(t, tt.Output, tt.Cmd.String())

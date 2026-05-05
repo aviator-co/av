@@ -4,15 +4,15 @@ import (
 	"context"
 	"strings"
 
-	"github.com/aviator-co/av/internal/utils/sliceutils"
-
 	"github.com/aviator-co/av/internal/editor"
 	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/typeutils"
 )
 
 // EditPlan opens the user's editor and allows them to edit the plan.
 func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
+	shortToFull := shortHashMap(plan)
 	text := strings.Builder{}
 	for i, cmd := range plan {
 		if i > 0 && typeutils.Is[StackBranchCmd](cmd) {
@@ -46,10 +46,46 @@ func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 		if err != nil {
 			return nil, err
 		}
-		newPlan = append(newPlan, cmd)
+		newPlan = append(newPlan, resolveHashCmd(cmd, shortToFull))
 	}
 
 	return newPlan, nil
+}
+
+func shortHashMap(plan []Cmd) map[string]string {
+	shortToFull := make(map[string]string)
+	for _, cmd := range plan {
+		switch cmd := cmd.(type) {
+		case PickCmd:
+			shortToFull[git.ShortSha(cmd.Commit)] = cmd.Commit
+		case StackBranchCmd:
+			_, commit, hasCommit := strings.Cut(cmd.Trunk, "@")
+			if hasCommit {
+				shortToFull[git.ShortSha(commit)] = commit
+			}
+		}
+	}
+	return shortToFull
+}
+
+func resolveHashCmd(cmd Cmd, shortToFull map[string]string) Cmd {
+	switch cmd := cmd.(type) {
+	case PickCmd:
+		if full, ok := shortToFull[cmd.Commit]; ok {
+			cmd.Commit = full
+		}
+		return cmd
+	case StackBranchCmd:
+		branch, commit, hasCommit := strings.Cut(cmd.Trunk, "@")
+		if hasCommit {
+			if full, ok := shortToFull[commit]; ok {
+				cmd.Trunk = branch + "@" + full
+			}
+		}
+		return cmd
+	default:
+		return cmd
+	}
 }
 
 type PlanDiff struct {

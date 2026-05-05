@@ -111,7 +111,14 @@ func (b StackBranchCmd) String() string {
 	}
 	if b.Trunk != "" {
 		sb.WriteString(" --trunk ")
-		sb.WriteString(b.Trunk)
+		branch, commit, hasCommit := strings.Cut(b.Trunk, "@")
+		if hasCommit {
+			sb.WriteString(branch)
+			sb.WriteString("@")
+			sb.WriteString(shortCommitHash(commit))
+		} else {
+			sb.WriteString(b.Trunk)
+		}
 	}
 	if b.Comment != "" {
 		sb.WriteString("  # ")
