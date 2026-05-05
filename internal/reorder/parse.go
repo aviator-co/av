@@ -7,7 +7,7 @@ import (
 
 // ParseCmd parses a reorder command from a string.
 // Comments must be stripped from the input before calling this function.
-func ParseCmd(line string) (Cmd, error) {
+func ParseCmd(line string, shortToFull map[string]string) (Cmd, error) {
 	args, err := shlex.Split(line)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid reorder command")
@@ -21,14 +21,21 @@ func ParseCmd(line string) (Cmd, error) {
 	case "delete-branch", "db":
 		return parseDeleteBranchCmd(args)
 	case "fixup", "f":
-		return parseFixupCmd(args)
+		return parseFixupCmd(args, shortToFull)
 	case "pick", "p":
-		return parsePickCmd(args)
+		return parsePickCmd(args, shortToFull)
 	case "squash", "s":
-		return parseSquashCmd(args)
+		return parseSquashCmd(args, shortToFull)
 	case "stack-branch", "sb":
-		return parseStackBranchCmd(args)
+		return parseStackBranchCmd(args, shortToFull)
 	default:
 		return nil, errors.Errorf("unknown reorder command %q", cmdName)
 	}
+}
+
+func resolveHash(hash string, shortToFull map[string]string) string {
+	if full, ok := shortToFull[hash]; ok {
+		return full
+	}
+	return hash
 }

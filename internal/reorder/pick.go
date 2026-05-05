@@ -203,23 +203,23 @@ func (p PickCmd) String() string {
 
 var _ Cmd = &PickCmd{}
 
-func parsePickCmd(args []string) (Cmd, error) {
+func parsePickCmd(args []string, shortToFull map[string]string) (Cmd, error) {
 	if len(args) != 1 {
 		return nil, ErrInvalidCmd{"pick", "exactly one argument is required (the commit to pick)"}
 	}
-	return PickCmd{Commit: args[0]}, nil
+	return PickCmd{Commit: resolveHash(args[0], shortToFull)}, nil
 }
 
-func parseSquashCmd(args []string) (Cmd, error) {
+func parseSquashCmd(args []string, shortToFull map[string]string) (Cmd, error) {
 	if len(args) != 1 {
 		return nil, ErrInvalidCmd{"squash", "exactly one argument is required (the commit to squash)"}
 	}
-	return PickCmd{Commit: args[0], Mode: PickModeSquash}, nil
+	return PickCmd{Commit: resolveHash(args[0], shortToFull), Mode: PickModeSquash}, nil
 }
 
-func parseFixupCmd(args []string) (Cmd, error) {
+func parseFixupCmd(args []string, shortToFull map[string]string) (Cmd, error) {
 	if len(args) != 1 {
 		return nil, ErrInvalidCmd{"fixup", "exactly one argument is required (the commit to fixup)"}
 	}
-	return PickCmd{Commit: args[0], Mode: PickModeFixup}, nil
+	return PickCmd{Commit: resolveHash(args[0], shortToFull), Mode: PickModeFixup}, nil
 }

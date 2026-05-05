@@ -34,7 +34,7 @@ func TestParseCmd(t *testing.T) {
 		{"blarn", nil, true},
 	} {
 		t.Run(tt.Input, func(t *testing.T) {
-			cmd, err := ParseCmd(tt.Input)
+			cmd, err := ParseCmd(tt.Input, nil)
 
 			if tt.Err {
 				if err == nil {
@@ -48,6 +48,48 @@ func TestParseCmd(t *testing.T) {
 
 			if !reflect.DeepEqual(cmd, tt.Cmd) {
 				t.Errorf("got %#v, want %#v", cmd, tt.Cmd)
+			}
+		})
+	}
+}
+
+func TestParseCmdResolvesShortHashes(t *testing.T) {
+	shortToFull := map[string]string{
+		"aaaaaaa": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"bbbbbbb": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+	}
+
+	for _, tt := range []struct {
+		input string
+		cmd   Cmd
+	}{
+		{
+			input: "pick bbbbbbb",
+			cmd:   PickCmd{Commit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+		},
+		{
+			input: "squash bbbbbbb",
+			cmd:   PickCmd{Commit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Mode: PickModeSquash},
+		},
+		{
+			input: "fixup bbbbbbb",
+			cmd:   PickCmd{Commit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Mode: PickModeFixup},
+		},
+		{
+			input: "stack-branch one --trunk main@aaaaaaa",
+			cmd: StackBranchCmd{
+				Name:  "one",
+				Trunk: "main@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			},
+		},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			cmd, err := ParseCmd(tt.input, shortToFull)
+			if err != nil {
+				t.Fatalf("got unexpected err %v", err)
+			}
+			if !reflect.DeepEqual(cmd, tt.cmd) {
+				t.Errorf("got %#v, want %#v", cmd, tt.cmd)
 			}
 		})
 	}

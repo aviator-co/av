@@ -72,7 +72,7 @@ func (s *State) UnmarshalJSON(data []byte) error {
 	}
 	var cmds []Cmd
 	for _, cmdStr := range aux.Commands {
-		cmd, err := ParseCmd(cmdStr)
+		cmd, err := ParseCmd(cmdStr, nil)
 		if err != nil {
 			return err
 		}
@@ -88,6 +88,6 @@ type Cmd interface {
 	Execute(ctx *Context) error
 	// String returns a string representation of the command.
 	// The string representation must be parseable such that
-	// ParseCmd(cmd.String()) == cmd.
+	// ParseCmd(cmd.String(), nil) == cmd.
 	String() string
 }

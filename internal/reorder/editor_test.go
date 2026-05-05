@@ -16,12 +16,6 @@ func TestEditorHashMapping(t *testing.T) {
 
 	shortToFull := shortHashMap(plan)
 
-	require.Equal(t,
-		StackBranchCmd{Name: "one", Trunk: "main@" + fullTrunk},
-		resolveHashCmd(StackBranchCmd{Name: "one", Trunk: "main@aaaaaaa"}, shortToFull),
-	)
-	require.Equal(t,
-		PickCmd{Commit: fullPick},
-		resolveHashCmd(PickCmd{Commit: "bbbbbbb"}, shortToFull),
-	)
+	require.Equal(t, fullTrunk, shortToFull["aaaaaaa"])
+	require.Equal(t, fullPick, shortToFull["bbbbbbb"])
 }

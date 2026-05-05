@@ -129,7 +129,7 @@ func (b StackBranchCmd) String() string {
 
 var _ Cmd = &StackBranchCmd{}
 
-func parseStackBranchCmd(args []string) (Cmd, error) {
+func parseStackBranchCmd(args []string, shortToFull map[string]string) (Cmd, error) {
 	cmd := StackBranchCmd{}
 	fs := pflag.NewFlagSet("stack-branch", pflag.ContinueOnError)
 	fs.StringVar(&cmd.Parent, "parent", "", "parent branch")
@@ -147,5 +147,8 @@ func parseStackBranchCmd(args []string) (Cmd, error) {
 		return nil, ErrInvalidCmd{"stack-branch", "cannot specify both --parent and --trunk"}
 	}
 	cmd.Name = fs.Arg(0)
+	if branch, commit, hasCommit := strings.Cut(cmd.Trunk, "@"); hasCommit {
+		cmd.Trunk = branch + "@" + resolveHash(commit, shortToFull)
+	}
 	return cmd, nil
 }

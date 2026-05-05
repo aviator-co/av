@@ -42,11 +42,11 @@ func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 		if line == "" {
 			continue
 		}
-		cmd, err := ParseCmd(line)
+		cmd, err := ParseCmd(line, shortToFull)
 		if err != nil {
 			return nil, err
 		}
-		newPlan = append(newPlan, resolveHashCmd(cmd, shortToFull))
+		newPlan = append(newPlan, cmd)
 	}
 
 	return newPlan, nil
@@ -66,26 +66,6 @@ func shortHashMap(plan []Cmd) map[string]string {
 		}
 	}
 	return shortToFull
-}
-
-func resolveHashCmd(cmd Cmd, shortToFull map[string]string) Cmd {
-	switch cmd := cmd.(type) {
-	case PickCmd:
-		if full, ok := shortToFull[cmd.Commit]; ok {
-			cmd.Commit = full
-		}
-		return cmd
-	case StackBranchCmd:
-		branch, commit, hasCommit := strings.Cut(cmd.Trunk, "@")
-		if hasCommit {
-			if full, ok := shortToFull[commit]; ok {
-				cmd.Trunk = branch + "@" + full
-			}
-		}
-		return cmd
-	default:
-		return cmd
-	}
 }
 
 type PlanDiff struct {
