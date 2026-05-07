@@ -21,7 +21,7 @@ func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 			// branches.
 			text.WriteString("\n")
 		}
-		text.WriteString(cmd.String())
+		text.WriteString(cmd.EditorString())
 		text.WriteString("\n")
 	}
 	text.WriteString(instructionsText)

@@ -20,13 +20,24 @@ func TestStackBranchCmd_String(t *testing.T) {
 		{StackBranchCmd{Name: "feature-one", Trunk: "master"}, "stack-branch feature-one --trunk master"},
 		{
 			StackBranchCmd{Name: "feature-one", Trunk: "master@1234567890abcdef1234567890abcdef12345678"},
-			"stack-branch feature-one --trunk master@1234567",
+			"stack-branch feature-one --trunk master@1234567890abcdef1234567890abcdef12345678",
 		},
 	} {
 		t.Run(tt.Output, func(t *testing.T) {
 			assert.Equal(t, tt.Output, tt.Cmd.String())
 		})
 	}
+}
+
+func TestStackBranchCmd_EditorString(t *testing.T) {
+	assert.Equal(
+		t,
+		"stack-branch feature-one --trunk master@1234567",
+		StackBranchCmd{
+			Name:  "feature-one",
+			Trunk: "master@1234567890abcdef1234567890abcdef12345678",
+		}.EditorString(),
+	)
 }
 
 func TestStackBranchCmd_ExecuteRejectsCycle(t *testing.T) {

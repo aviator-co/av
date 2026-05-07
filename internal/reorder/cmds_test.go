@@ -8,14 +8,17 @@ import (
 )
 
 func TestState(t *testing.T) {
+	trunkCommit := "1111111111111111111111111111111111111111"
+	firstPick := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	secondPick := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	state := &State{
 		Branch: "main",
 		Head:   "owouwu",
 		Commands: []Cmd{
-			StackBranchCmd{Name: "one", Trunk: "main"},
-			PickCmd{Commit: "abcd"},
+			StackBranchCmd{Name: "one", Trunk: "main@" + trunkCommit},
+			PickCmd{Commit: firstPick},
 			StackBranchCmd{Name: "two", Parent: "one"},
-			PickCmd{Commit: "efgh"},
+			PickCmd{Commit: secondPick},
 		},
 	}
 
@@ -33,13 +36,16 @@ func TestState(t *testing.T) {
 // fixup modes survive a JSON marshal/unmarshal cycle with the correct Mode
 // field restored.
 func TestStateRoundTrip_SquashFixupModes(t *testing.T) {
+	pickCommit := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	squashCommit := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	fixupCommit := "cccccccccccccccccccccccccccccccccccccccc"
 	state := &State{
 		Branch: "feature",
 		Head:   "deadbeef",
 		Commands: []Cmd{
-			PickCmd{Commit: "aaaa111"},
-			PickCmd{Commit: "abcd123", Mode: PickModeSquash},
-			PickCmd{Commit: "efgh567", Mode: PickModeFixup},
+			PickCmd{Commit: pickCommit},
+			PickCmd{Commit: squashCommit, Mode: PickModeSquash},
+			PickCmd{Commit: fixupCommit, Mode: PickModeFixup},
 		},
 	}
 
@@ -54,16 +60,16 @@ func TestStateRoundTrip_SquashFixupModes(t *testing.T) {
 
 	pick, ok := deserialized.Commands[0].(PickCmd)
 	require.True(t, ok, "commands[0] should be a PickCmd")
-	require.Equal(t, "aaaa111", pick.Commit)
+	require.Equal(t, pickCommit, pick.Commit)
 	require.Equal(t, PickModePick, pick.Mode, "plain pick mode should round-trip as PickModePick")
 
 	squash, ok := deserialized.Commands[1].(PickCmd)
 	require.True(t, ok, "commands[1] should be a PickCmd")
-	require.Equal(t, "abcd123", squash.Commit)
+	require.Equal(t, squashCommit, squash.Commit)
 	require.Equal(t, PickModeSquash, squash.Mode, "squash mode should survive round-trip")
 
 	fixup, ok := deserialized.Commands[2].(PickCmd)
 	require.True(t, ok, "commands[2] should be a PickCmd")
-	require.Equal(t, "efgh567", fixup.Commit)
+	require.Equal(t, fixupCommit, fixup.Commit)
 	require.Equal(t, PickModeFixup, fixup.Mode, "fixup mode should survive round-trip")
 }

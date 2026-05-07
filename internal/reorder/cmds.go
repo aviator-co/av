@@ -90,4 +90,6 @@ type Cmd interface {
 	// The string representation must be parseable such that
 	// ParseCmd(cmd.String(), nil) == cmd.
 	String() string
+	// EditorString returns the string representation shown in the editor.
+	EditorString() string
 }

@@ -186,6 +186,14 @@ func getCommitMessage(ctx context.Context, repo *git.Repo, rev string) (string, 
 }
 
 func (p PickCmd) String() string {
+	return p.string(false)
+}
+
+func (p PickCmd) EditorString() string {
+	return p.string(true)
+}
+
+func (p PickCmd) string(shortHash bool) string {
 	sb := strings.Builder{}
 	mode := string(p.Mode)
 	if mode == "" {
@@ -193,7 +201,11 @@ func (p PickCmd) String() string {
 	}
 	sb.WriteString(mode)
 	sb.WriteString(" ")
-	sb.WriteString(git.ShortSha(p.Commit))
+	commit := p.Commit
+	if shortHash {
+		commit = git.ShortSha(commit)
+	}
+	sb.WriteString(commit)
 	if p.Comment != "" {
 		sb.WriteString("  # ")
 		sb.WriteString(p.Comment)
