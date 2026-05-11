@@ -60,6 +60,22 @@ squashed, dropped, or moved within the stack.
 			return err
 		}
 
+		// If state was loaded but no cherry-pick is in progress, the previous
+		// reorder was aborted externally (e.g., via `git cherry-pick --abort`).
+		// Treat the state as orphaned: clear it and proceed as if no state existed.
+		if continuation.State != nil && !repo.IsCherryPickInProgress() {
+			if err := repo.WriteStateFile(git.StateFileKindReorder, nil); err != nil {
+				return err
+			}
+			continuation = reorder.Continuation{}
+			if reorderFlags.Continue || reorderFlags.Abort {
+				fmt.Fprint(os.Stderr,
+					colors.Failure("ERROR: no reorder in progress\n"),
+				)
+				return actions.ErrExitSilently{ExitCode: 127}
+			}
+		}
+
 		var state *reorder.State
 		if reorderFlags.Abort {
 			if continuation.State == nil {

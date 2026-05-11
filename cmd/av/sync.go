@@ -320,6 +320,12 @@ func (vm *syncViewModel) readState() (*savedSyncState, error) {
 	} else if err != nil {
 		return nil, err
 	}
+	if !vm.repo.IsRebaseInProgress() {
+		if err := vm.repo.WriteStateFile(git.StateFileKindSyncV2, nil); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
 	return &state, nil
 }
 
