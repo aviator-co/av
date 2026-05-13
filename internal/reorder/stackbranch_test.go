@@ -30,14 +30,16 @@ func TestStackBranchCmd_String(t *testing.T) {
 }
 
 func TestStackBranchCmd_EditorString(t *testing.T) {
+	shortToFull := make(map[string]string)
 	assert.Equal(
 		t,
 		"stack-branch feature-one --trunk master@1234567",
 		StackBranchCmd{
 			Name:  "feature-one",
 			Trunk: "master@1234567890abcdef1234567890abcdef12345678",
-		}.EditorString(),
+		}.EditorString(shortToFull),
 	)
+	assert.Equal(t, "1234567890abcdef1234567890abcdef12345678", shortToFull["1234567"])
 }
 
 func TestStackBranchCmd_ExecuteRejectsCycle(t *testing.T) {

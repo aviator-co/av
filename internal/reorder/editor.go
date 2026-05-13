@@ -12,7 +12,7 @@ import (
 
 // EditPlan opens the user's editor and allows them to edit the plan.
 func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
-	shortToFull := shortHashMap(plan)
+	shortToFull := make(map[string]string)
 	text := strings.Builder{}
 	for i, cmd := range plan {
 		if i > 0 && typeutils.Is[StackBranchCmd](cmd) {
@@ -21,7 +21,7 @@ func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 			// branches.
 			text.WriteString("\n")
 		}
-		text.WriteString(cmd.EditorString())
+		text.WriteString(cmd.EditorString(shortToFull))
 		text.WriteString("\n")
 	}
 	text.WriteString(instructionsText)
@@ -50,22 +50,6 @@ func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 	}
 
 	return newPlan, nil
-}
-
-func shortHashMap(plan []Cmd) map[string]string {
-	shortToFull := make(map[string]string)
-	for _, cmd := range plan {
-		switch cmd := cmd.(type) {
-		case PickCmd:
-			shortToFull[git.ShortSha(cmd.Commit)] = cmd.Commit
-		case StackBranchCmd:
-			_, commit, hasCommit := strings.Cut(cmd.Trunk, "@")
-			if hasCommit {
-				shortToFull[git.ShortSha(commit)] = commit
-			}
-		}
-	}
-	return shortToFull
 }
 
 type PlanDiff struct {

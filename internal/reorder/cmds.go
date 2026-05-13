@@ -91,5 +91,5 @@ type Cmd interface {
 	// ParseCmd(cmd.String(), nil) == cmd.
 	String() string
 	// EditorString returns the string representation shown in the editor.
-	EditorString() string
+	EditorString(shortToFull map[string]string) string
 }

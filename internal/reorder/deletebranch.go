@@ -75,7 +75,7 @@ func (d DeleteBranchCmd) String() string {
 	return d.string(false)
 }
 
-func (d DeleteBranchCmd) EditorString() string {
+func (d DeleteBranchCmd) EditorString(shortToFull map[string]string) string {
 	return d.string(true)
 }
 

@@ -23,12 +23,17 @@ func TestPickCmd_String(t *testing.T) {
 }
 
 func TestPickCmd_EditorString(t *testing.T) {
-	assert.Equal(t, "pick 1234567", PickCmd{Commit: "1234567890abcdef1234567890abcdef12345678"}.EditorString())
+	shortToFull := make(map[string]string)
+	assert.Equal(t, "pick 1234567", PickCmd{Commit: "1234567890abcdef1234567890abcdef12345678"}.EditorString(shortToFull))
+	assert.Equal(t, "1234567890abcdef1234567890abcdef12345678", shortToFull["1234567"])
+
+	shortToFull = make(map[string]string)
 	assert.Equal(t, "squash 1234567  # a comment", PickCmd{
 		Commit:  "1234567890abcdef1234567890abcdef12345678",
 		Comment: "a comment",
 		Mode:    PickModeSquash,
-	}.EditorString())
+	}.EditorString(shortToFull))
+	assert.Equal(t, "1234567890abcdef1234567890abcdef12345678", shortToFull["1234567"])
 }
 
 func TestPickCmd_Execute(t *testing.T) {

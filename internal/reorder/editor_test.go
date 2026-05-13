@@ -9,12 +9,13 @@ import (
 func TestEditorHashMapping(t *testing.T) {
 	fullTrunk := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	fullPick := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-	plan := []Cmd{
+	shortToFull := make(map[string]string)
+	for _, cmd := range []Cmd{
 		StackBranchCmd{Name: "one", Trunk: "main@" + fullTrunk},
 		PickCmd{Commit: fullPick},
+	} {
+		cmd.EditorString(shortToFull)
 	}
-
-	shortToFull := shortHashMap(plan)
 
 	require.Equal(t, fullTrunk, shortToFull["aaaaaaa"])
 	require.Equal(t, fullPick, shortToFull["bbbbbbb"])

@@ -102,14 +102,14 @@ func (b StackBranchCmd) Execute(ctx *Context) error {
 }
 
 func (b StackBranchCmd) String() string {
-	return b.string(false)
+	return b.string(false, nil)
 }
 
-func (b StackBranchCmd) EditorString() string {
-	return b.string(true)
+func (b StackBranchCmd) EditorString(shortToFull map[string]string) string {
+	return b.string(true, shortToFull)
 }
 
-func (b StackBranchCmd) string(shortHash bool) string {
+func (b StackBranchCmd) string(shortHash bool, shortToFull map[string]string) string {
 	sb := strings.Builder{}
 	sb.WriteString("stack-branch ")
 	sb.WriteString(b.Name)
@@ -124,7 +124,9 @@ func (b StackBranchCmd) string(shortHash bool) string {
 			sb.WriteString(branch)
 			sb.WriteString("@")
 			if shortHash {
+				fullCommit := commit
 				commit = git.ShortSha(commit)
+				shortToFull[commit] = fullCommit
 			}
 			sb.WriteString(commit)
 		} else {
