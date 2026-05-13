@@ -320,6 +320,12 @@ func (vm *syncViewModel) readState() (*savedSyncState, error) {
 	} else if err != nil {
 		return nil, err
 	}
+	if !vm.repo.IsRebaseInProgress() {
+		if err := vm.repo.WriteStateFile(git.StateFileKindSyncV2, nil); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
 	return &state, nil
 }
 
@@ -543,19 +549,22 @@ func init() {
 	syncCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
 
 	// Deprecated flags
-	syncCmd.Flags().Bool("no-fetch", false,
+	syncCmd.Flags().Bool(
+		"no-fetch", false,
 		"(deprecated; use av restack for offline restacking) do not fetch the latest status from GitHub",
 	)
 	_ = syncCmd.Flags().
 		MarkDeprecated("no-fetch", "please use av restack for offline restacking")
 
-	syncCmd.Flags().Bool("trunk", false,
+	syncCmd.Flags().Bool(
+		"trunk", false,
 		"(deprecated; use --rebase-to-trunk to rebase all branches to trunk) rebase the stack on the trunk branch",
 	)
 	_ = syncCmd.Flags().
 		MarkDeprecated("trunk", "please use --rebase-to-trunk to rebase all branches to trunk")
 
-	syncCmd.Flags().String("parent", "",
+	syncCmd.Flags().String(
+		"parent", "",
 		"(deprecated; use 'av adopt' or 'av reparent') parent branch to rebase onto",
 	)
 	_ = syncCmd.Flags().

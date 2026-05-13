@@ -114,7 +114,8 @@ func runCreate(ctx context.Context, repo *git.Repo, db meta.DB) error {
 			ExitError: true,
 		})
 		if err != nil {
-			fmt.Fprint(os.Stderr,
+			fmt.Fprint(
+				os.Stderr,
 				"\n", colors.Failure("Failed to stage files: ", err.Error()), "\n",
 			)
 			return actions.ErrExitSilently{ExitCode: 1}
@@ -217,7 +218,8 @@ func runAmend(
 			ExitError: true,
 		})
 		if err != nil {
-			fmt.Fprint(os.Stderr,
+			fmt.Fprint(
+				os.Stderr,
 				"\n", colors.Failure("Failed to stage files: ", err.Error()), "\n",
 			)
 			return actions.ErrExitSilently{ExitCode: 1}
@@ -292,7 +294,8 @@ func branchAndCommit(
 			ExitError: true,
 		})
 		if err != nil {
-			fmt.Fprint(os.Stderr,
+			fmt.Fprint(
+				os.Stderr,
 				"\n", colors.Failure("Failed to stage files: ", err.Error()), "\n",
 			)
 			return actions.ErrExitSilently{ExitCode: 1}
@@ -309,7 +312,8 @@ func branchAndCommit(
 		ExitError:   true,
 		Interactive: true,
 	}); err != nil {
-		fmt.Fprint(os.Stderr,
+		fmt.Fprint(
+			os.Stderr,
 			"\n", colors.Failure("Failed to create commit."), "\n",
 		)
 		return actions.ErrExitSilently{ExitCode: 1}

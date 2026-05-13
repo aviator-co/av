@@ -32,7 +32,8 @@ func (d DeleteBranchCmd) Execute(ctx *Context) error {
 	}
 
 	if !d.DeleteGitRef {
-		_, _ = fmt.Fprint(os.Stderr,
+		_, _ = fmt.Fprint(
+			os.Stderr,
 			"Orphaned branch ", colors.UserInput(d.Name), ".\n",
 			"  - Run ", colors.CliCmd("git branch --delete ", d.Name),
 			" to delete the branch from your repository.\n",
@@ -47,7 +48,8 @@ func (d DeleteBranchCmd) Execute(ctx *Context) error {
 	if exiterr, ok := errutils.As[*exec.ExitError](err); ok {
 		stderr := string(exiterr.Stderr)
 		if strings.Contains(stderr, "not found") {
-			_, _ = fmt.Fprint(os.Stderr,
+			_, _ = fmt.Fprint(
+				os.Stderr,
 				colors.Warning("Branch "), colors.UserInput(d.Name),
 				colors.Warning(" was already deleted.\n"),
 			)
@@ -65,7 +67,8 @@ func (d DeleteBranchCmd) Execute(ctx *Context) error {
 		return err
 	}
 
-	_, _ = fmt.Fprint(os.Stderr,
+	_, _ = fmt.Fprint(
+		os.Stderr,
 		"Deleted branch ", colors.UserInput(d.Name), ".\n",
 	)
 	return nil

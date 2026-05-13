@@ -163,6 +163,12 @@ func (vm *restackViewModel) readState() (*sequencerui.RestackState, error) {
 	} else if err != nil {
 		return nil, err
 	}
+	if !vm.repo.IsRebaseInProgress() {
+		if err := vm.repo.WriteStateFile(git.StateFileKindRestack, nil); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
 	return &state, nil
 }
 
