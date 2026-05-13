@@ -102,6 +102,14 @@ func (b StackBranchCmd) Execute(ctx *Context) error {
 }
 
 func (b StackBranchCmd) String() string {
+	return b.string(false, nil)
+}
+
+func (b StackBranchCmd) EditorString(shortToFull map[string]string) string {
+	return b.string(true, shortToFull)
+}
+
+func (b StackBranchCmd) string(shortHash bool, shortToFull map[string]string) string {
 	sb := strings.Builder{}
 	sb.WriteString("stack-branch ")
 	sb.WriteString(b.Name)
@@ -111,7 +119,19 @@ func (b StackBranchCmd) String() string {
 	}
 	if b.Trunk != "" {
 		sb.WriteString(" --trunk ")
-		sb.WriteString(b.Trunk)
+		branch, commit, hasCommit := strings.Cut(b.Trunk, "@")
+		if hasCommit {
+			sb.WriteString(branch)
+			sb.WriteString("@")
+			if shortHash {
+				fullCommit := commit
+				commit = git.ShortSha(commit)
+				shortToFull[commit] = fullCommit
+			}
+			sb.WriteString(commit)
+		} else {
+			sb.WriteString(b.Trunk)
+		}
 	}
 	if b.Comment != "" {
 		sb.WriteString("  # ")
@@ -122,7 +142,7 @@ func (b StackBranchCmd) String() string {
 
 var _ Cmd = &StackBranchCmd{}
 
-func parseStackBranchCmd(args []string) (Cmd, error) {
+func parseStackBranchCmd(args []string, shortToFull map[string]string) (Cmd, error) {
 	cmd := StackBranchCmd{}
 	fs := pflag.NewFlagSet("stack-branch", pflag.ContinueOnError)
 	fs.StringVar(&cmd.Parent, "parent", "", "parent branch")
@@ -140,5 +160,8 @@ func parseStackBranchCmd(args []string) (Cmd, error) {
 		return nil, ErrInvalidCmd{"stack-branch", "cannot specify both --parent and --trunk"}
 	}
 	cmd.Name = fs.Arg(0)
+	if branch, commit, hasCommit := strings.Cut(cmd.Trunk, "@"); hasCommit {
+		cmd.Trunk = branch + "@" + resolveHash(commit, shortToFull)
+	}
 	return cmd, nil
 }

@@ -186,6 +186,14 @@ func getCommitMessage(ctx context.Context, repo *git.Repo, rev string) (string, 
 }
 
 func (p PickCmd) String() string {
+	return p.string(false, nil)
+}
+
+func (p PickCmd) EditorString(shortToFull map[string]string) string {
+	return p.string(true, shortToFull)
+}
+
+func (p PickCmd) string(shortHash bool, shortToFull map[string]string) string {
 	sb := strings.Builder{}
 	mode := string(p.Mode)
 	if mode == "" {
@@ -193,7 +201,12 @@ func (p PickCmd) String() string {
 	}
 	sb.WriteString(mode)
 	sb.WriteString(" ")
-	sb.WriteString(p.Commit)
+	commit := p.Commit
+	if shortHash {
+		commit = git.ShortSha(commit)
+		shortToFull[commit] = p.Commit
+	}
+	sb.WriteString(commit)
 	if p.Comment != "" {
 		sb.WriteString("  # ")
 		sb.WriteString(p.Comment)
@@ -203,23 +216,23 @@ func (p PickCmd) String() string {
 
 var _ Cmd = &PickCmd{}
 
-func parsePickCmd(args []string) (Cmd, error) {
+func parsePickCmd(args []string, shortToFull map[string]string) (Cmd, error) {
 	if len(args) != 1 {
 		return nil, ErrInvalidCmd{"pick", "exactly one argument is required (the commit to pick)"}
 	}
-	return PickCmd{Commit: args[0]}, nil
+	return PickCmd{Commit: resolveHash(args[0], shortToFull)}, nil
 }
 
-func parseSquashCmd(args []string) (Cmd, error) {
+func parseSquashCmd(args []string, shortToFull map[string]string) (Cmd, error) {
 	if len(args) != 1 {
 		return nil, ErrInvalidCmd{"squash", "exactly one argument is required (the commit to squash)"}
 	}
-	return PickCmd{Commit: args[0], Mode: PickModeSquash}, nil
+	return PickCmd{Commit: resolveHash(args[0], shortToFull), Mode: PickModeSquash}, nil
 }
 
-func parseFixupCmd(args []string) (Cmd, error) {
+func parseFixupCmd(args []string, shortToFull map[string]string) (Cmd, error) {
 	if len(args) != 1 {
 		return nil, ErrInvalidCmd{"fixup", "exactly one argument is required (the commit to fixup)"}
 	}
-	return PickCmd{Commit: args[0], Mode: PickModeFixup}, nil
+	return PickCmd{Commit: resolveHash(args[0], shortToFull), Mode: PickModeFixup}, nil
 }

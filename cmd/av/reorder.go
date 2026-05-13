@@ -69,7 +69,8 @@ squashed, dropped, or moved within the stack.
 			}
 			continuation = reorder.Continuation{}
 			if reorderFlags.Continue || reorderFlags.Abort {
-				fmt.Fprint(os.Stderr,
+				fmt.Fprint(
+					os.Stderr,
 					colors.Failure("ERROR: no reorder in progress\n"),
 				)
 				return actions.ErrExitSilently{ExitCode: 127}

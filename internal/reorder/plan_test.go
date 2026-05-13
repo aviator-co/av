@@ -3,7 +3,6 @@ package reorder
 import (
 	"testing"
 
-	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -200,7 +199,7 @@ func TestCreatePlan(t *testing.T) {
 			require.Equal(t, wantSb.Name, sb.Name)
 		} else if p, ok := cmd.(PickCmd); ok {
 			wantP := want[i].(PickCmd)
-			require.Equal(t, git.ShortSha(wantP.Commit), p.Commit)
+			require.Equal(t, wantP.Commit, p.Commit)
 		} else {
 			t.Fatalf("unexpected command type: %T", cmd)
 		}

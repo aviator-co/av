@@ -75,6 +75,14 @@ func (d DeleteBranchCmd) Execute(ctx *Context) error {
 }
 
 func (d DeleteBranchCmd) String() string {
+	return d.string()
+}
+
+func (d DeleteBranchCmd) EditorString(shortToFull map[string]string) string {
+	return d.string()
+}
+
+func (d DeleteBranchCmd) string() string {
 	sb := strings.Builder{}
 	sb.WriteString("delete-branch ")
 	sb.WriteString(d.Name)

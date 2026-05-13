@@ -72,7 +72,7 @@ func (s *State) UnmarshalJSON(data []byte) error {
 	}
 	var cmds []Cmd
 	for _, cmdStr := range aux.Commands {
-		cmd, err := ParseCmd(cmdStr)
+		cmd, err := ParseCmd(cmdStr, nil)
 		if err != nil {
 			return err
 		}
@@ -88,6 +88,13 @@ type Cmd interface {
 	Execute(ctx *Context) error
 	// String returns a string representation of the command.
 	// The string representation must be parseable such that
-	// ParseCmd(cmd.String()) == cmd.
+	// ParseCmd(cmd.String(), nil) == cmd.
 	String() string
+	// EditorString returns the string representation shown in the editor.
+	// The string representation must be parseable such that
+	// ParseCmd(cmd.EditorString(shortToFull), shortToFull) == cmd.
+	// Implementations may shorten commit hashes for display; when they do,
+	// they must record the short-to-full mapping in shortToFull so ParseCmd can
+	// resolve edited commands back to full hashes.
+	EditorString(shortToFull map[string]string) string
 }

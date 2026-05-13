@@ -15,10 +15,25 @@ import (
 )
 
 func TestPickCmd_String(t *testing.T) {
-	assert.Equal(t, "pick mycommit", PickCmd{Commit: "mycommit"}.String())
-	assert.Equal(t, "squash mycommit", PickCmd{Commit: "mycommit", Mode: PickModeSquash}.String())
-	assert.Equal(t, "fixup mycommit", PickCmd{Commit: "mycommit", Mode: PickModeFixup}.String())
-	assert.Equal(t, "squash mycommit  # a comment", PickCmd{Commit: "mycommit", Comment: "a comment", Mode: PickModeSquash}.String())
+	assert.Equal(t, "pick commit", PickCmd{Commit: "commit"}.String())
+	assert.Equal(t, "pick 1234567890abcdef1234567890abcdef12345678", PickCmd{Commit: "1234567890abcdef1234567890abcdef12345678"}.String())
+	assert.Equal(t, "squash commit", PickCmd{Commit: "commit", Mode: PickModeSquash}.String())
+	assert.Equal(t, "fixup commit", PickCmd{Commit: "commit", Mode: PickModeFixup}.String())
+	assert.Equal(t, "squash commit  # a comment", PickCmd{Commit: "commit", Comment: "a comment", Mode: PickModeSquash}.String())
+}
+
+func TestPickCmd_EditorString(t *testing.T) {
+	shortToFull := make(map[string]string)
+	assert.Equal(t, "pick 1234567", PickCmd{Commit: "1234567890abcdef1234567890abcdef12345678"}.EditorString(shortToFull))
+	assert.Equal(t, "1234567890abcdef1234567890abcdef12345678", shortToFull["1234567"])
+
+	shortToFull = make(map[string]string)
+	assert.Equal(t, "squash 1234567  # a comment", PickCmd{
+		Commit:  "1234567890abcdef1234567890abcdef12345678",
+		Comment: "a comment",
+		Mode:    PickModeSquash,
+	}.EditorString(shortToFull))
+	assert.Equal(t, "1234567890abcdef1234567890abcdef12345678", shortToFull["1234567"])
 }
 
 func TestPickCmd_Execute(t *testing.T) {

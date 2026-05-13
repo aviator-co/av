@@ -77,7 +77,7 @@ func CreatePlan(
 				return nil, errors.WrapIff(err, "parsing commit %s", object.OID)
 			}
 			cmds = append(cmds, PickCmd{
-				Commit:  git.ShortSha(object.OID),
+				Commit:  object.OID,
 				Comment: commit.MessageTitle(),
 			})
 		}

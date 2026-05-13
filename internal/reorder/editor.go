@@ -4,15 +4,15 @@ import (
 	"context"
 	"strings"
 
-	"github.com/aviator-co/av/internal/utils/sliceutils"
-
 	"github.com/aviator-co/av/internal/editor"
 	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/typeutils"
 )
 
 // EditPlan opens the user's editor and allows them to edit the plan.
 func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
+	shortToFull := make(map[string]string)
 	text := strings.Builder{}
 	for i, cmd := range plan {
 		if i > 0 && typeutils.Is[StackBranchCmd](cmd) {
@@ -21,7 +21,7 @@ func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 			// branches.
 			text.WriteString("\n")
 		}
-		text.WriteString(cmd.String())
+		text.WriteString(cmd.EditorString(shortToFull))
 		text.WriteString("\n")
 	}
 	text.WriteString(instructionsText)
@@ -42,7 +42,7 @@ func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 		if line == "" {
 			continue
 		}
-		cmd, err := ParseCmd(line)
+		cmd, err := ParseCmd(line, shortToFull)
 		if err != nil {
 			return nil, err
 		}
