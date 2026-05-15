@@ -16,8 +16,14 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
 	giturls "github.com/chainguard-dev/git-urls"
+	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5"
+	gogitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/cache"
+	"github.com/go-git/go-git/v5/storage"
+	"github.com/go-git/go-git/v5/storage/filesystem"
+	"github.com/go-git/go-git/v5/storage/filesystem/dotgit"
 	"github.com/sirupsen/logrus"
 )
 
@@ -33,17 +39,14 @@ type Repo struct {
 	defaultBranch plumbing.ReferenceName
 }
 
-func OpenRepo(repoDir string, gitDir string) (*Repo, error) {
-	repo, err := git.PlainOpenWithOptions(repoDir, &git.PlainOpenOptions{
-		DetectDotGit:          true,
-		EnableDotGitCommonDir: true,
-	})
+func OpenRepo(repoDir, gitDir, commonGitDir string) (*Repo, error) {
+	repo, err := openGoGitRepo(repoDir, gitDir, commonGitDir)
 	if err != nil {
 		return nil, errors.Errorf("failed to open git repo: %v", err)
 	}
 	r := &Repo{
 		repoDir:       repoDir,
-		gitDir:        gitDir,
+		gitDir:        commonGitDir,
 		gitRepo:       repo,
 		log:           logrus.WithFields(logrus.Fields{"repo": filepath.Base(repoDir)}),
 		defaultBranch: "",
@@ -66,6 +69,34 @@ func OpenRepo(repoDir string, gitDir string) (*Repo, error) {
 	}
 	r.defaultBranch = plumbing.NewBranchReferenceName(strings.TrimPrefix(ref.Target().String(), fmt.Sprintf("refs/remotes/%s/", remoteName)))
 	return r, nil
+}
+
+type worktreeConfigCompatStorage struct {
+	storage.Storer
+}
+
+func (s worktreeConfigCompatStorage) Config() (*gogitconfig.Config, error) {
+	cfg, err := s.Storer.Config()
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.Raw != nil && cfg.Raw.HasSection("extensions") {
+		cfg.Raw.Section("extensions").RemoveOption("worktreeConfig")
+	}
+
+	return cfg, nil
+}
+
+func openGoGitRepo(repoDir, gitDir, commonGitDir string) (*git.Repository, error) {
+	dot := osfs.New(gitDir)
+	repositoryFS := dot
+	if filepath.Clean(gitDir) != filepath.Clean(commonGitDir) {
+		repositoryFS = dotgit.NewRepositoryFilesystem(dot, osfs.New(commonGitDir))
+	}
+
+	storer := filesystem.NewStorage(repositoryFS, cache.NewObjectLRUDefault())
+	return git.Open(worktreeConfigCompatStorage{Storer: storer}, osfs.New(repoDir))
 }
 
 func (r *Repo) Dir() string {

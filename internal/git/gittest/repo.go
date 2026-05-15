@@ -122,7 +122,7 @@ type GitTestRepo struct {
 }
 
 func (r *GitTestRepo) AsAvGitRepo() *avgit.Repo {
-	repo, err := avgit.OpenRepo(r.RepoDir, r.GitDir)
+	repo, err := avgit.OpenRepo(r.RepoDir, r.GitDir, r.GitDir)
 	if err != nil {
 		panic(fmt.Sprintf("failed to open av git repo: %v", err))
 	}
