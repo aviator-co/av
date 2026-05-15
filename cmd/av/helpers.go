@@ -25,6 +25,7 @@ func getRepo(ctx context.Context) (*git.Repo, error) {
 			"rev-parse",
 			"--path-format=absolute",
 			"--show-toplevel",
+			"--git-dir",
 			"--git-common-dir",
 		)
 
@@ -39,12 +40,12 @@ func getRepo(ctx context.Context) (*git.Repo, error) {
 			)
 		}
 
-		dir, gitDir, found := strings.Cut(strings.TrimSpace(string(paths)), "\n")
-		if !found {
-			return nil, errors.New("Unexpected format, not able to parse toplevel and common dir.")
+		lines := strings.Split(strings.TrimSpace(string(paths)), "\n")
+		if len(lines) != 3 {
+			return nil, errors.New("Unexpected format, not able to parse toplevel, git dir, and common dir.")
 		}
 
-		cachedRepo, err = git.OpenRepo(dir, gitDir)
+		cachedRepo, err = git.OpenRepo(lines[0], lines[1], lines[2])
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to open git repo")
 		}
