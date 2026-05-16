@@ -49,7 +49,7 @@ func TestOrphan(t *testing.T) {
 	require.Contains(t, tree.Stdout, "stack-2")
 	require.Contains(t, tree.Stdout, "stack-3")
 
-	RequireAv(t, "orphan")
+	RequireAv(t, "orphan", "--yes")
 
 	tree = RequireAv(t, "tree")
 	require.NotContains(t, tree.Stdout, "stack-2")
