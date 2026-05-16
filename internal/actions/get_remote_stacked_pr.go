@@ -15,12 +15,14 @@ import (
 )
 
 func NewGetRemoteStackedPRModel(
+	ctx context.Context,
 	repo meta.Repository,
 	ghClient *gh.Client,
 	initialBranchName string,
 	onDone func([]RemotePRInfo) tea.Cmd,
 ) tea.Model {
 	return &GetRemoteStackedPRModel{
+		ctx:               func() context.Context { return ctx },
 		repo:              repo,
 		ghClient:          ghClient,
 		spinner:           spinner.New(spinner.WithSpinner(spinner.Dot)),
@@ -38,6 +40,7 @@ type RemotePRInfo struct {
 }
 
 type GetRemoteStackedPRModel struct {
+	ctx               func() context.Context
 	repo              meta.Repository
 	ghClient          *gh.Client
 	spinner           spinner.Model
@@ -50,13 +53,16 @@ type GetRemoteStackedPRModel struct {
 
 func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, func() tea.Msg {
-		ctx := context.Background()
 		nextPRNumber := int64(0)
 		for {
+			if err := m.ctx().Err(); err != nil {
+				m.failed = true
+				return err
+			}
 			var pr *gh.PullRequest
 			if nextPRNumber == 0 {
 				// Initial branch is searched based on the branch name.
-				page, err := m.ghClient.GetPullRequests(ctx, gh.GetPullRequestsInput{
+				page, err := m.ghClient.GetPullRequests(m.ctx(), gh.GetPullRequestsInput{
 					Owner:       m.repo.Owner,
 					Repo:        m.repo.Name,
 					HeadRefName: m.initialBranchName,
@@ -77,7 +83,7 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 			} else {
 				// Otherwise, we can fetch based on the PR number.
 				var err error
-				pr, err = m.ghClient.GetPullRequestByNumber(ctx, gh.GetPullRequestByNumberInput{
+				pr, err = m.ghClient.GetPullRequestByNumber(m.ctx(), gh.GetPullRequestByNumberInput{
 					Owner:  m.repo.Owner,
 					Repo:   m.repo.Name,
 					Number: nextPRNumber,
