@@ -9,7 +9,6 @@ import (
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -51,13 +50,25 @@ type GetRemoteStackedPRModel struct {
 	prs               []RemotePRInfo
 }
 
+// remoteStackedPRFailedMsg signals that PR fetching failed. State is mutated
+// in Update() so it stays on the Bubble Tea main thread; the Init() goroutine
+// only emits messages.
+type remoteStackedPRFailedMsg struct{ err error }
+
+// remoteStackedPRDoneMsg carries the fully-collected list and the post-done
+// command, delivered to Update() once the goroutine finishes.
+type remoteStackedPRDoneMsg struct {
+	prs []RemotePRInfo
+	cmd tea.Cmd
+}
+
 func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, func() tea.Msg {
+		var collected []RemotePRInfo
 		nextPRNumber := int64(0)
 		for {
 			if err := m.ctx().Err(); err != nil {
-				m.failed = true
-				return err
+				return remoteStackedPRFailedMsg{err: err}
 			}
 			var pr *gh.PullRequest
 			if nextPRNumber == 0 {
@@ -68,16 +79,17 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 					HeadRefName: m.initialBranchName,
 				})
 				if err != nil {
-					m.failed = true
-					return err
+					return remoteStackedPRFailedMsg{err: err}
 				}
 				if len(page.PullRequests) == 0 {
-					m.failed = true
-					return errors.New("cannot find PR for branch " + m.initialBranchName)
+					return remoteStackedPRFailedMsg{
+						err: errors.New("cannot find PR for branch " + m.initialBranchName),
+					}
 				}
 				if len(page.PullRequests) > 1 {
-					m.failed = true
-					return errors.New("multiple PRs found for branch " + m.initialBranchName)
+					return remoteStackedPRFailedMsg{
+						err: errors.New("multiple PRs found for branch " + m.initialBranchName),
+					}
 				}
 				pr = &page.PullRequests[0]
 			} else {
@@ -89,8 +101,9 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 					Number: nextPRNumber,
 				})
 				if err != nil {
-					m.failed = true
-					return errors.Wrapf(err, "failed to get PR %d", nextPRNumber)
+					return remoteStackedPRFailedMsg{
+						err: errors.Wrapf(err, "failed to get PR %d", nextPRNumber),
+					}
 				}
 			}
 			prMeta, err := ReadPRMetadata(pr.Body)
@@ -102,8 +115,9 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 					ParentPull: 0,
 				}
 			} else if err != nil {
-				m.failed = true
-				return errors.Wrapf(err, "failed to read metadata for PR %d", pr.Number)
+				return remoteStackedPRFailedMsg{
+					err: errors.Wrapf(err, "failed to read metadata for PR %d", pr.Number),
+				}
 			}
 			remotePRInfo := RemotePRInfo{
 				Name: strings.TrimPrefix(pr.HeadRefName, "refs/heads/"),
@@ -121,14 +135,13 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 				MergeCommit: pr.GetMergeCommit(),
 				Title:       pr.Title,
 			}
-			m.prs = append(m.prs, remotePRInfo)
+			collected = append(collected, remotePRInfo)
 			if remotePRInfo.Parent.Trunk {
 				break
 			}
 			nextPRNumber = prMeta.ParentPull
 		}
-		m.done = true
-		return uiutils.SimpleCommandMsg{Cmd: m.onDone(m.prs)}
+		return remoteStackedPRDoneMsg{prs: collected, cmd: m.onDone(collected)}
 	})
 }
 
@@ -138,6 +151,13 @@ func (m *GetRemoteStackedPRModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
+	case remoteStackedPRFailedMsg:
+		m.failed = true
+		return m, func() tea.Msg { return msg.err }
+	case remoteStackedPRDoneMsg:
+		m.prs = msg.prs
+		m.done = true
+		return m, msg.cmd
 	}
 	return m, nil
 }
