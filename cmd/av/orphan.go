@@ -13,7 +13,14 @@ import (
 var orphanCmd = &cobra.Command{
 	Use:   "orphan",
 	Short: "Orphan branches that are managed by av",
-	Args:  cobra.NoArgs,
+	Long: strings.TrimSpace(`
+Orphan the currently checked-out branch and any child branches that are managed by av.
+
+When run from the trunk branch, this orphans every av-managed branch because all managed
+branches descend from trunk. A separate warning for this behavior is tracked in #733.
+
+To manage orphaned branches with av again, re-adopt them one at a time with "av adopt".`),
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		ctx := cmd.Context()
 		repo, err := getRepo(ctx)
