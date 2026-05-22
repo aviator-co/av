@@ -17,9 +17,9 @@ var orphanCmd = &cobra.Command{
 Orphan the currently checked-out branch and any child branches that are managed by av.
 
 When run from the trunk branch, this orphans every av-managed branch because all managed
-branches descend from trunk. A separate warning for this behavior is tracked in #733.
+branches descend from trunk.
 
-To manage orphaned branches with av again, re-adopt them one at a time with "av adopt".`),
+To manage orphaned branches with av again, re-adopt them with "av adopt".`),
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		ctx := cmd.Context()
