@@ -74,12 +74,14 @@ Examples:
 			}
 		}
 
-		_, _ = fmt.Fprint(os.Stderr,
+		_, _ = fmt.Fprint(
+			os.Stderr,
 			"Executing command ", colors.CliCmd(executils.FormatCommandLine(args)),
 			" for ", colors.UserInput(len(branches)), " branches:\n",
 		)
 		for _, branch := range branches {
-			_, _ = fmt.Fprint(os.Stderr,
+			_, _ = fmt.Fprint(
+				os.Stderr,
 				"  - switching to branch ", colors.UserInput(branch), "\n",
 			)
 			if _, err := repo.CheckoutBranch(ctx, &git.CheckoutBranch{Name: branch}); err != nil {

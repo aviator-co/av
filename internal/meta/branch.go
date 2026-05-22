@@ -122,12 +122,22 @@ func PreviousBranches(tx ReadTx, name string) ([]string, error) {
 // If the tree is not a straight line (which isn't explicitly supported!), the
 // branches will be returned in depth-first traversal order.
 func SubsequentBranches(tx ReadTx, name string) []string {
+	visited := map[string]bool{name: true}
+	return subsequentBranches(tx, name, visited)
+}
+
+func subsequentBranches(tx ReadTx, name string, visited map[string]bool) []string {
 	logrus.Debugf("finding subsequent branches for %q", name)
 	var res []string
 	children := Children(tx, name)
 	for _, child := range children {
+		if visited[child.Name] {
+			logrus.Warnf("cycle detected in branch graph: %q already visited while traversing children of %q", child.Name, name)
+			continue
+		}
+		visited[child.Name] = true
 		res = append(res, child.Name)
-		res = append(res, SubsequentBranches(tx, child.Name)...)
+		res = append(res, subsequentBranches(tx, child.Name, visited)...)
 	}
 	return res
 }
@@ -136,17 +146,27 @@ func SubsequentBranches(tx ReadTx, name string) []string {
 // name in "dependency order", optionally skipping branches that are excluded
 // from sync --all and their descendants.
 func SubsequentBranchesFiltered(tx ReadTx, name string, skipExcluded bool) []string {
+	visited := map[string]bool{name: true}
+	return subsequentBranchesFiltered(tx, name, skipExcluded, visited)
+}
+
+func subsequentBranchesFiltered(tx ReadTx, name string, skipExcluded bool, visited map[string]bool) []string {
 	logrus.Debugf("finding subsequent branches for %q (skipExcluded=%v)", name, skipExcluded)
 	var res []string
 	children := Children(tx, name)
 	for _, child := range children {
+		if visited[child.Name] {
+			logrus.Warnf("cycle detected in branch graph: %q already visited while traversing children of %q", child.Name, name)
+			continue
+		}
 		if skipExcluded && child.ExcludeFromSyncAll {
 			// Skip this branch and its entire subtree
 			logrus.Debugf("skipping excluded branch %q and its descendants", child.Name)
 			continue
 		}
+		visited[child.Name] = true
 		res = append(res, child.Name)
-		res = append(res, SubsequentBranchesFiltered(tx, child.Name, skipExcluded)...)
+		res = append(res, subsequentBranchesFiltered(tx, child.Name, skipExcluded, visited)...)
 	}
 	return res
 }

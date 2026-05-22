@@ -1,0 +1,10 @@
+# Test that creating a commit on a merged branch is rejected.
+
+exec av branch one
+
+# Mark branch as merged in av metadata.
+set-branch-pr one nodeid-42 42 MERGED
+
+# Attempt to commit on a merged branch should fail.
+commit-file one.txt one
+! exec av commit -m two

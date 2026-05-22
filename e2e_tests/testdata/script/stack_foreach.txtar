@@ -1,0 +1,11 @@
+# Test that av stack for-each runs a command on each branch in the stack.
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+exec av branch stack-2
+commit-file my-file '2a\n' 'Commit 2a'
+exec av branch stack-3
+commit-file my-file '3a\n' 'Commit 3a'
+
+exec av stack for-each -- git show --format=%s --quiet HEAD --
+stdout 'Commit 1a\nCommit 2a\nCommit 3a'

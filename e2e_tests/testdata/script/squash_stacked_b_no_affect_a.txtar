@@ -1,0 +1,56 @@
+# Test that squashing branch-b does not affect branch-a.
+exec git fetch
+
+# Create branch-a with 3 commits.
+exec av branch branch-a
+commit-file a1.txt 'content a1' 'branch A commit 1'
+commit-file a2.txt 'content a2' 'branch A commit 2'
+commit-file a3.txt 'content a3' 'branch A commit 3'
+
+# Create branch-b on top with 3 commits.
+exec av branch branch-b
+commit-file b1.txt 'content b1' 'branch B commit 1'
+commit-file b2.txt 'content b2' 'branch B commit 2'
+commit-file b3.txt 'content b3' 'branch B commit 3'
+
+# Verify initial state.
+exec av switch branch-a
+exec git rev-list --count branch-a ^main
+stdout '^3$'
+exec av switch branch-b
+exec git rev-list --count branch-b ^main
+stdout '^6$'
+exec git rev-list --count branch-b ^branch-a
+stdout '^3$'
+
+# Squash branch-b.
+exec av squash
+stderr 'Successfully squashed 3 commits'
+
+# branch-a should be unchanged.
+exec av switch branch-a
+exec git rev-list --count branch-a ^main
+stdout '^3$'
+exec git log --format=%s branch-a ^main
+stdout 'branch A commit 1'
+stdout 'branch A commit 2'
+stdout 'branch A commit 3'
+
+# branch-b: 4 total (3 from A + 1 squashed from B).
+exec av switch branch-b
+exec git rev-list --count branch-b ^main
+stdout '^4$'
+exec git rev-list --count branch-b ^branch-a
+stdout '^1$'
+
+# The squashed commit should have branch-b's first commit message.
+exec git log --format=%s -1 branch-b ^branch-a
+stdout '^branch B commit 1$'
+
+# All files should be present.
+exists a1.txt
+exists a2.txt
+exists a3.txt
+exists b1.txt
+exists b2.txt
+exists b3.txt

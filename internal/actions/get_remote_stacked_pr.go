@@ -103,7 +103,7 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 				Name: strings.TrimPrefix(pr.HeadRefName, "refs/heads/"),
 				Parent: meta.BranchState{
 					Name:                     prMeta.Parent,
-					Trunk:                    prMeta.Trunk == prMeta.Parent,
+					Trunk:                    prMeta.Trunk == prMeta.Parent || prMeta.ParentPull == 0,
 					BranchingPointCommitHash: prMeta.ParentHead,
 				},
 				PullRequest: meta.PullRequest{

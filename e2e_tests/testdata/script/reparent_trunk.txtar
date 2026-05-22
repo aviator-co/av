@@ -1,0 +1,12 @@
+# Test reparenting onto trunk when local main is deleted.
+
+exec av branch foo
+commit-file foo.txt foo
+
+exec av branch bar
+commit-file bar.txt bar
+
+# Delete the local main. av should use the remote tracking branch.
+exec git branch -D main
+
+exec av reparent --parent main

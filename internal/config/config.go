@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"emperror.dev/errors"
 	"github.com/sirupsen/logrus"
@@ -43,6 +44,12 @@ type PullRequest struct {
 	WriteStack bool
 }
 
+type Sync struct {
+	// If true, fast-forward the local trunk branch to match the remote
+	// tracking branch after syncing.
+	FastForwardTrunk bool
+}
+
 type Aviator struct {
 	// The base URL of the Aviator API to use.
 	// By default, this is https://aviator.co, but for on-prem installations
@@ -57,6 +64,7 @@ var Av = struct {
 	PullRequest             PullRequest
 	GitHub                  GitHub
 	Aviator                 Aviator
+	Sync                    Sync
 	AdditionalTrunkBranches []string
 	Remote                  string
 }{
@@ -98,7 +106,9 @@ func loadFromFile(repoConfigDir string) error {
 	config.AddConfigPath("$XDG_CONFIG_HOME/av")
 	config.AddConfigPath("$HOME/.config/av")
 	config.AddConfigPath("$HOME/.av")
-	config.AddConfigPath("$AV_HOME")
+	if strings.TrimSpace(os.Getenv("AV_HOME")) != "" {
+		config.AddConfigPath("$AV_HOME")
+	}
 	if err := config.ReadInConfig(); err != nil {
 		// We can ignore config file not exist case.
 		if !errors.As(err, &viper.ConfigFileNotFoundError{}) {

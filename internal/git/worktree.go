@@ -2,7 +2,10 @@ package git
 
 import (
 	"context"
+	"os/exec"
 	"strings"
+
+	"emperror.dev/errors"
 )
 
 type WorktreeInfo struct {
@@ -43,4 +46,29 @@ func (r *Repo) WorktreeList(ctx context.Context) ([]WorktreeInfo, error) {
 		worktrees = append(worktrees, current)
 	}
 	return worktrees, nil
+}
+
+func DetachWorktreeHEAD(ctx context.Context, worktreePath string) error {
+	cmd := exec.CommandContext(ctx, "git", "-C", worktreePath, "checkout", "--detach")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return errors.Errorf("failed to detach HEAD in %s: %s", worktreePath, string(out))
+	}
+	return nil
+}
+
+func RestoreWorktreeBranch(ctx context.Context, worktreePath, branch string) error {
+	cmd := exec.CommandContext(ctx, "git", "-C", worktreePath, "checkout", branch)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return errors.Errorf("failed to checkout %s in %s: %s", branch, worktreePath, string(out))
+	}
+	return nil
+}
+
+func IsWorktreeClean(ctx context.Context, worktreePath string) (bool, error) {
+	cmd := exec.CommandContext(ctx, "git", "-C", worktreePath, "status", "--porcelain")
+	out, err := cmd.Output()
+	if err != nil {
+		return false, errors.Errorf("failed to check worktree status in %s: %v", worktreePath, err)
+	}
+	return strings.TrimSpace(string(out)) == "", nil
 }

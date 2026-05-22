@@ -74,3 +74,12 @@ $ av pr --title "Implement fancy feature" --body - <<EOF
 > Can you please review it?
 > EOF
 ```
+
+## SUBCOMMANDS
+
+`av pr status`
+: Get the status of the associated pull request. See av-pr-status(1).
+
+## SEE ALSO
+
+av-pr-status(1)

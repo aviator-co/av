@@ -1,0 +1,10 @@
+# Test that empty prefix results in no prefix on branch names.
+cp $WORK/test.txt test.txt
+exec git add test.txt
+exec av commit -b -m 'test without prefix'
+
+exec git branch --show-current
+stdout '^test-without-prefix$'
+
+-- test.txt --
+test content

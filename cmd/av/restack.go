@@ -163,6 +163,12 @@ func (vm *restackViewModel) readState() (*sequencerui.RestackState, error) {
 	} else if err != nil {
 		return nil, err
 	}
+	if !vm.repo.IsRebaseInProgress() {
+		if err := vm.repo.WriteStateFile(git.StateFileKindRestack, nil); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
 	return &state, nil
 }
 
@@ -187,6 +193,9 @@ func (vm *restackViewModel) createState() (*sequencerui.RestackState, error) {
 	if restackFlags.All {
 		state.RestackingAll = true
 	} else {
+		if currentBranch == "" {
+			return nil, errors.New("not on any branch (detached HEAD state); please checkout a branch first")
+		}
 		if _, exist := vm.db.ReadTx().Branch(currentBranch); !exist {
 			return nil, errors.New("current branch is not adopted to av")
 		}

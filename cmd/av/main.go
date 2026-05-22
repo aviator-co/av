@@ -31,7 +31,8 @@ var rootFlags struct {
 }
 
 var rootCmd = &cobra.Command{
-	Use: "av",
+	Use:     "av",
+	Version: config.Version,
 
 	// Don't automatically print errors or usage information (we handle that ourselves).
 	// Cobra still prints usage if you return cmd.Usage() from RunE.
@@ -86,6 +87,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.SetVersionTemplate("{{.Version}}\n")
 	rootCmd.PersistentFlags().BoolVar(
 		&rootFlags.Debug, "debug", false,
 		"enable verbose debug logging",
@@ -167,7 +169,9 @@ func checkCliVersion() {
 		return
 	}
 	logrus.WithField("latest", latest).Debug("fetched latest released version")
-	if semver.Compare(config.Version, latest) < 0 {
+	currentBase := strings.TrimSuffix(config.Version, semver.Prerelease(config.Version))
+	latestBase := strings.TrimSuffix(latest, semver.Prerelease(latest))
+	if semver.Compare(currentBase, latestBase) < 0 {
 		c := color.New(color.Faint, color.Bold)
 		fmt.Fprint(
 			os.Stderr,

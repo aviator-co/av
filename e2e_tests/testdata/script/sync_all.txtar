@@ -1,0 +1,24 @@
+# Test that sync --all syncs all branches in the repository.
+#
+#     main:    X  -> X2
+#     stack-1:  \ -> 1a
+#     stack-2:  \ -> 2a
+
+exec git switch main
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+
+exec git switch main
+exec av branch stack-2
+commit-file my-file '2a\n' 'Commit 2a'
+
+# Add a commit to main and push.
+exec git switch main
+commit-file other-file 'X2\n' 'Commit X2'
+exec git push origin main
+
+exec av sync --all --rebase-to-trunk
+
+# Both branches should now be on top of main.
+exec git merge-base --is-ancestor main stack-1
+exec git merge-base --is-ancestor main stack-2

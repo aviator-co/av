@@ -1,0 +1,19 @@
+# Test reparenting when the new parent's commits are a subset of current branch.
+#
+# test1 and test2 both start on main. test2 was created on top of test1 with
+# plain git, then adopted as a child of main. Reparenting test2 onto test1
+# should be a no-op for git while updating the metadata.
+
+exec av branch test1
+commit-file test.txt 1
+commit-file test.txt 2
+
+# Create test2 on top of test1 with plain git.
+exec git checkout -b test2
+commit-file test.txt 3
+
+# Adopt test2 as a child of main.
+exec av adopt --parent main
+
+# Reparent test2 onto test1.
+exec av reparent --parent test1

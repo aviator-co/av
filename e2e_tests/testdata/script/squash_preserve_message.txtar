@@ -1,0 +1,11 @@
+# Test that squash preserves the first commit message.
+exec git fetch
+
+exec av branch feature-branch
+commit-file file1.txt content1 'first commit message'
+commit-file file2.txt content2 'second commit message'
+
+exec av squash
+
+exec git log --format=%s -1
+stdout '^first commit message$'

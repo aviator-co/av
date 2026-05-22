@@ -1,0 +1,15 @@
+# Test that squash fails with a dirty working directory.
+exec git fetch
+
+exec av branch feature-branch
+commit-file file1.txt content1 'first commit'
+commit-file file2.txt content2 'second commit'
+
+# Create uncommitted changes.
+cp $WORK/dirty.txt dirty.txt
+
+! exec av squash
+stderr 'the working directory is not clean'
+
+-- dirty.txt --
+uncommitted changes

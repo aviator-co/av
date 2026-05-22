@@ -20,4 +20,4 @@ man/
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 cmd/av/av
-.claude/settings.local.json
+.claude/

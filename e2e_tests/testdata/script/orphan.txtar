@@ -1,0 +1,29 @@
+# Test that orphaning a branch removes it and its children from the tree.
+#
+#     stack-1: main -> 1a -> 1b
+#     stack-2:                \ -> 2a -> 2b
+#     stack-3:                            \ -> 3a -> 3b
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+commit-file my-file '1a\n1b\n' 'Commit 1b'
+exec av branch stack-2
+commit-file my-file '1a\n1b\n2a\n' 'Commit 2a'
+commit-file my-file '1a\n1b\n2a\n2b\n' 'Commit 2b'
+exec av branch stack-3
+commit-file my-file '1a\n1b\n2a\n2b\n3a\n' 'Commit 3a'
+commit-file my-file '1a\n1b\n2a\n2b\n3a\n3b\n' 'Commit 3b'
+
+# Go to stack-2 and verify it appears in the tree.
+exec av prev
+exec av tree
+stdout stack-2
+stdout stack-3
+
+# Orphan stack-2 (and its child stack-3).
+exec av orphan
+
+# Tree should no longer contain stack-2 or stack-3.
+exec av tree
+! stdout stack-2
+! stdout stack-3

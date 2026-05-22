@@ -50,6 +50,9 @@ var reparentCmd = &cobra.Command{
 			return errors.New("missing parent branch name")
 		}
 		reparentFlags.Parent = stripRemoteRefPrefixes(repo, reparentFlags.Parent)
+		if reparentFlags.Parent == "HEAD" {
+			reparentFlags.Parent = repo.DefaultBranch()
+		}
 
 		return uiutils.RunBubbleTea(&reparentViewModel{repo: repo, db: db})
 	},

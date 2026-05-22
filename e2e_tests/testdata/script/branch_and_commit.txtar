@@ -1,0 +1,32 @@
+# Test av commit -b with --all-changes and --all flags.
+
+# --all-changes: stages and commits all changes including untracked files.
+cp $WORK/myfile-v1.txt myfile.txt
+exec av commit -b --all-changes -m 'branch one'
+exec git status --porcelain
+! stdout .
+
+# --all: only stages tracked (modified) files, not untracked ones.
+cp $WORK/myfile-v2.txt myfile.txt
+cp $WORK/yourfile.txt yourfile.txt
+exec av commit -b --all -m 'branch two'
+
+# Workdir should not be clean (yourfile.txt is untracked).
+exec git status --porcelain
+stdout .
+
+# myfile.txt should be committed (no diff).
+exec git diff myfile.txt
+! stdout .
+
+# yourfile.txt should not be tracked.
+exec git ls-files yourfile.txt
+! stdout .
+
+-- myfile-v1.txt --
+hello
+-- myfile-v2.txt --
+hello
+world
+-- yourfile.txt --
+bonjour

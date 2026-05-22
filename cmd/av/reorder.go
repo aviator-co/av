@@ -50,13 +50,31 @@ squashed, dropped, or moved within the stack.
 		var continuation reorder.Continuation
 		if err := repo.ReadStateFile(git.StateFileKindReorder, &continuation); os.IsNotExist(err) {
 			if reorderFlags.Continue || reorderFlags.Abort {
-				fmt.Fprint(os.Stderr,
+				fmt.Fprint(
+					os.Stderr,
 					colors.Failure("ERROR: no reorder in progress\n"),
 				)
 				return actions.ErrExitSilently{ExitCode: 127}
 			}
 		} else if err != nil {
 			return err
+		}
+
+		// If state was loaded but no cherry-pick is in progress, the previous
+		// reorder was aborted externally (e.g., via `git cherry-pick --abort`).
+		// Treat the state as orphaned: clear it and proceed as if no state existed.
+		if continuation.State != nil && !repo.IsCherryPickInProgress() {
+			if err := repo.WriteStateFile(git.StateFileKindReorder, nil); err != nil {
+				return err
+			}
+			continuation = reorder.Continuation{}
+			if reorderFlags.Continue || reorderFlags.Abort {
+				fmt.Fprint(
+					os.Stderr,
+					colors.Failure("ERROR: no reorder in progress\n"),
+				)
+				return actions.ErrExitSilently{ExitCode: 127}
+			}
 		}
 
 		var state *reorder.State
@@ -66,7 +84,11 @@ squashed, dropped, or moved within the stack.
 				return errors.New("no reorder in progress")
 			}
 
-			if stat, _ := os.Stat(filepath.Join(repo.GitDir(), "CHERRY_PICK_HEAD")); stat != nil {
+			stat, err := os.Stat(filepath.Join(repo.GitDir(), "CHERRY_PICK_HEAD"))
+			if err != nil && !os.IsNotExist(err) {
+				return errors.WrapIf(err, "failed to check CHERRY_PICK_HEAD status")
+			}
+			if stat != nil {
 				if err := repo.CherryPick(ctx, git.CherryPick{Resume: git.CherryPickAbort}); err != nil {
 					return errors.WrapIf(err, "failed to abort in-progress cherry-pick")
 				}
@@ -80,15 +102,71 @@ squashed, dropped, or moved within the stack.
 			state = continuation.State
 
 			// Handle any in-progress cherry-pick from the previous conflict.
-			if stat, _ := os.Stat(filepath.Join(repo.GitDir(), "CHERRY_PICK_HEAD")); stat != nil {
+			stat, err := os.Stat(filepath.Join(repo.GitDir(), "CHERRY_PICK_HEAD"))
+			if err != nil && !os.IsNotExist(err) {
+				return errors.WrapIf(err, "failed to check CHERRY_PICK_HEAD status")
+			}
+			if stat != nil {
 				if err := repo.CherryPick(ctx, git.CherryPick{Resume: git.CherryPickContinue}); err != nil {
-					fmt.Fprint(os.Stderr,
+					fmt.Fprint(
+						os.Stderr,
 						colors.Failure("Failed to continue cherry-pick: ", err.Error(), "\n"),
 						colors.Warning("Resolve the conflict and run "),
 						colors.CliCmd("av reorder --continue"),
 						colors.Warning(" to continue.\n"),
 					)
 					return actions.ErrExitSilently{ExitCode: 1}
+				}
+			}
+
+			// If the conflicting command was a squash or fixup, the cherry-pick
+			// has now produced a standalone commit that must be folded into the
+			// previous commit before we advance state. Only do this when the
+			// continuation explicitly recorded that a squash/fixup was pending —
+			// this avoids double-squashing when the user already resolved the
+			// conflict manually before calling --continue.
+			if continuation.SquashPending && len(state.Commands) > 0 {
+				pickCmd, ok := state.Commands[0].(reorder.PickCmd)
+				if !ok || pickCmd.Mode == reorder.PickModePick {
+					// SquashPending should never be true for a non-squash/fixup
+					// command. Treat this as corrupted state.
+					return errors.New(
+						"internal error: SquashPending is set but the pending command is not a squash/fixup — " +
+							"reorder state may be corrupted; run 'av reorder --abort' and restart",
+					)
+				}
+
+				// Verify that HEAD has actually advanced past the pre-conflict
+				// position. If the user ran 'git cherry-pick --abort' or
+				// '--skip', CHERRY_PICK_HEAD is gone but HEAD is still at
+				// state.Head — PerformSquash would then amend the wrong commit.
+				currentHead, err := repo.RevParse(ctx, &git.RevParse{Rev: "HEAD"})
+				if err != nil {
+					return err
+				}
+				if currentHead == state.Head {
+					fmt.Fprint(
+						os.Stderr,
+						colors.Failure("ERROR: cannot continue squash/fixup — the cherry-pick was not applied.\n"),
+						colors.Warning("If you aborted or skipped the cherry-pick, run "),
+						colors.CliCmd("av reorder --abort"),
+						colors.Warning(" and restart the reorder.\n"),
+					)
+					return actions.ErrExitSilently{ExitCode: 1}
+				}
+
+				if err := pickCmd.PerformSquash(ctx, repo, state.BranchBase); err != nil {
+					if errors.Is(err, reorder.ErrEmptySquashMessage) {
+						fmt.Fprint(
+							os.Stderr,
+							colors.Failure("squash commit message is empty after editing\n"),
+							colors.Warning("Edit the message and run "),
+							colors.CliCmd("av reorder --continue"),
+							colors.Warning(" to retry.\n"),
+						)
+						return actions.ErrExitSilently{ExitCode: 1}
+					}
+					return errors.WrapIf(err, "failed to squash commit after conflict resolution")
 				}
 			}
 
@@ -108,7 +186,8 @@ squashed, dropped, or moved within the stack.
 			state.Head = head
 		} else {
 			if continuation.State != nil {
-				fmt.Fprint(os.Stderr,
+				fmt.Fprint(
+					os.Stderr,
 					colors.Failure("ERROR: reorder already in progress\n"),
 					colors.Failure("	   use --continue or --abort to continue or abort the reorder\n"),
 				)
@@ -121,7 +200,8 @@ squashed, dropped, or moved within the stack.
 			}
 			root, ok := meta.Root(tx, currentBranch)
 			if !ok {
-				fmt.Fprint(os.Stderr,
+				fmt.Fprint(
+					os.Stderr,
 					colors.Failure("ERROR: branch "), colors.UserInput(currentBranch),
 					colors.Failure(" is not part of a stack\n"),
 				)
@@ -145,7 +225,7 @@ squashed, dropped, or moved within the stack.
 			state = &reorder.State{Commands: plan}
 		}
 
-		state, err = reorder.Reorder(reorder.Context{
+		newContinuation, err := reorder.Reorder(reorder.Context{
 			Repo:   repo,
 			DB:     db,
 			State:  state,
@@ -154,21 +234,23 @@ squashed, dropped, or moved within the stack.
 		if err != nil {
 			return err
 		}
-		if state == nil {
+		if newContinuation == nil {
 			if err := repo.WriteStateFile(git.StateFileKindReorder, nil); err != nil {
 				return err
 			}
-			fmt.Fprint(os.Stderr,
+			fmt.Fprint(
+				os.Stderr,
 				colors.Success("\nThe stack was reordered successfully.\n"),
 			)
 			return nil
 		}
 
-		continuation = reorder.Continuation{State: state}
+		continuation = *newContinuation
 		if err := repo.WriteStateFile(git.StateFileKindReorder, &continuation); err != nil {
 			return err
 		}
-		fmt.Fprint(os.Stderr,
+		fmt.Fprint(
+			os.Stderr,
 			colors.Warning("\nThe reorder was interrupted by a conflict.\n"),
 			colors.Warning("Resolve the conflict and run "),
 			colors.CliCmd("av reorder --continue"),
@@ -198,7 +280,8 @@ edit:
 		return nil, err
 	}
 	if len(plan) == 0 {
-		fmt.Fprint(os.Stderr,
+		fmt.Fprint(
+			os.Stderr,
 			colors.Failure("ERROR: reorder plan is empty\n"),
 		)
 		return nil, actions.ErrExitSilently{ExitCode: 127}

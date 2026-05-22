@@ -1,0 +1,41 @@
+# Test squashing a parent branch in a stack.
+exec git fetch
+
+# Create branch-a with 3 commits.
+exec av branch branch-a
+commit-file a1.txt 'content a1' 'branch A commit 1'
+commit-file a2.txt 'content a2' 'branch A commit 2'
+commit-file a3.txt 'content a3' 'branch A commit 3'
+
+# Create branch-b on top of branch-a with 2 commits.
+exec av branch branch-b
+commit-file b1.txt 'content b1' 'branch B commit 1'
+commit-file b2.txt 'content b2' 'branch B commit 2'
+
+# Verify initial state.
+exec av switch branch-a
+exec git rev-list --count branch-a ^main
+stdout '^3$'
+exec av switch branch-b
+exec git rev-list --count branch-b ^main
+stdout '^5$'
+
+# Squash branch-a.
+exec av switch branch-a
+exec av squash
+stderr 'Successfully squashed 3 commits'
+
+exec git rev-list --count branch-a ^main
+stdout '^1$'
+
+# branch-b should still work.
+exec av switch branch-b
+exists a1.txt
+exists a2.txt
+exists a3.txt
+exists b1.txt
+exists b2.txt
+
+# branch-b should have 3 commits total: 1 squashed from A + 2 from B.
+exec git rev-list --count branch-b ^main
+stdout '^3$'

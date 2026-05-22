@@ -7,6 +7,8 @@ import (
 	"os"
 
 	"github.com/aviator-co/av/internal/avgql"
+	"github.com/aviator-co/av/internal/config"
+	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/timeutils"
 	"github.com/shurcooL/githubv4"
@@ -21,181 +23,284 @@ var prStatusCmd = &cobra.Command{
 	Args:         cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		ctx := cmd.Context()
-		variables, err := getQueryVariables(ctx)
-		if err != nil {
-			return err
-		}
 
-		client, err := avgql.NewClient(ctx)
-		if err != nil {
-			return err
+		if config.Av.Aviator.APIToken != "" {
+			return prStatusAviator(ctx)
 		}
+		return prStatusGitHub(ctx)
+	},
+}
 
-		var query struct {
-			avgql.ViewerSubquery
-			GithubRepository struct {
-				PullRequest struct {
-					Number       graphql.Int
-					Title        graphql.String
-					Status       graphql.String
-					StatusReason graphql.String
-					Author       struct {
-						Login graphql.String
+func prStatusAviator(ctx context.Context) error {
+	variables, err := getQueryVariables(ctx)
+	if err != nil {
+		return err
+	}
+
+	client, err := avgql.NewClient(ctx)
+	if err != nil {
+		return err
+	}
+
+	var query struct {
+		avgql.ViewerSubquery
+		GithubRepository struct {
+			PullRequest struct {
+				Number       graphql.Int
+				Title        graphql.String
+				Status       graphql.String
+				StatusReason graphql.String
+				Author       struct {
+					Login graphql.String
+				}
+				CreatedAt             githubv4.DateTime
+				QueuedAt              githubv4.DateTime
+				MergedAt              githubv4.DateTime
+				BaseBranchName        graphql.String
+				HeadBranchName        graphql.String
+				RequiredCheckStatuses []struct {
+					RequiredCheck struct {
+						Pattern graphql.String
 					}
-					CreatedAt             githubv4.DateTime
-					QueuedAt              githubv4.DateTime
-					MergedAt              githubv4.DateTime
-					BaseBranchName        graphql.String
-					HeadBranchName        graphql.String
+					Result graphql.String
+				}
+
+				BotPullRequest struct {
+					Number                graphql.Int
 					RequiredCheckStatuses []struct {
 						RequiredCheck struct {
 							Pattern graphql.String
 						}
 						Result graphql.String
 					}
+				}
+			} `graphql:"pullRequest(number: $prNumber)"`
+		} `graphql:"githubRepository(owner: $repoOwner, name:$repoName)"`
+	}
+	if err := client.Query(ctx, &query, variables); err != nil {
+		return err
+	}
+	if err := query.CheckViewer(); err != nil {
+		return err
+	}
 
-					BotPullRequest struct {
-						Number                graphql.Int
-						RequiredCheckStatuses []struct {
-							RequiredCheck struct {
-								Pattern graphql.String
-							}
-							Result graphql.String
-						}
-					}
-				} `graphql:"pullRequest(number: $prNumber)"`
-			} `graphql:"githubRepository(owner: $repoOwner, name:$repoName)"`
-		}
-		if err := client.Query(context.Background(), &query, variables); err != nil {
-			return err
-		}
-		if err := query.CheckViewer(); err != nil {
-			return err
-		}
+	pr := query.GithubRepository.PullRequest
+	if pr.Number == 0 {
+		return errors.New("pull request not found")
+	}
 
-		pr := query.GithubRepository.PullRequest
-		if pr.Number == 0 {
-			return errors.New("pull request not found")
-		}
+	// Print PR info
+	indent := "    "
+	fmt.Fprint(
+		os.Stderr,
+		"#",
+		variables["prNumber"],
+		" ",
+		colors.UserInput(pr.Title),
+		"\n",
+	)
+	fmt.Fprint(os.Stderr, indent, "Status: ", colors.UserInput(pr.Status))
 
-		// Print PR info
-		indent := "    "
+	if pr.Status == "PENDING" || pr.Status == "BLOCKED" {
 		fmt.Fprint(
 			os.Stderr,
-			"#",
-			variables["prNumber"],
+			indent,
+			" (",
+			colors.UserInput(query.GithubRepository.PullRequest.StatusReason),
+			")",
+		)
+	}
+	fmt.Fprint(os.Stderr, "\n")
+
+	fmt.Fprint(
+		os.Stderr,
+		indent,
+		"Author: ",
+		colors.UserInput(query.GithubRepository.PullRequest.Author.Login),
+		"\n",
+	)
+	fmt.Fprint(
+		os.Stderr,
+		indent,
+		"Created at: ",
+		colors.UserInput(
+			timeutils.FormatLocal(query.GithubRepository.PullRequest.CreatedAt.Time),
+		),
+		"\n",
+	)
+
+	if pr.Status == "QUEUED" {
+		fmt.Fprint(
+			os.Stderr,
+			indent,
+			"Queued at: ",
+			colors.UserInput(
+				timeutils.FormatLocal(query.GithubRepository.PullRequest.QueuedAt.Time),
+			),
+			"\n",
+		)
+	}
+	if pr.Status == "MERGED" {
+		fmt.Fprint(
+			os.Stderr,
+			indent,
+			"Merged at: ",
+			colors.UserInput(
+				timeutils.FormatLocal(query.GithubRepository.PullRequest.MergedAt.Time),
+			),
+			"\n",
+		)
+	}
+
+	fmt.Fprint(
+		os.Stderr,
+		indent,
+		"Base branch: ",
+		colors.UserInput(
+			query.GithubRepository.PullRequest.BaseBranchName,
+			" <- ",
+			query.GithubRepository.PullRequest.HeadBranchName,
+		),
+		"\n\n",
+	)
+
+	// Required checks section
+	fmt.Fprint(os.Stderr, "Required Checks\n")
+	requiredCheckStatuses := query.GithubRepository.PullRequest.RequiredCheckStatuses
+	for index := range requiredCheckStatuses {
+		result := requiredCheckStatuses[index].Result
+		requiredCheckName := requiredCheckStatuses[index].RequiredCheck.Pattern
+		fmt.Fprint(
+			os.Stderr,
+			indent,
+			emojiForRequiredCheckResult(string(result)),
 			" ",
-			colors.UserInput(pr.Title),
+			colors.UserInput(requiredCheckName),
 			"\n",
 		)
-		fmt.Fprint(os.Stderr, indent, "Status: ", colors.UserInput(pr.Status))
+	}
 
-		if pr.Status == "PENDING" || pr.Status == "BLOCKED" {
-			fmt.Fprint(
-				os.Stderr,
-				indent,
-				" (",
-				colors.UserInput(query.GithubRepository.PullRequest.StatusReason),
-				")",
-			)
-		}
-		fmt.Fprint(os.Stderr, "\n")
-
-		fmt.Fprint(
-			os.Stderr,
-			indent,
-			"Author: ",
-			colors.UserInput(query.GithubRepository.PullRequest.Author.Login),
-			"\n",
-		)
-		fmt.Fprint(
-			os.Stderr,
-			indent,
-			"Created at: ",
-			colors.UserInput(
-				timeutils.FormatLocal(query.GithubRepository.PullRequest.CreatedAt.Time),
-			),
-			"\n",
-		)
-
-		if pr.Status == "QUEUED" {
-			fmt.Fprint(
-				os.Stderr,
-				indent,
-				"Queued at: ",
-				colors.UserInput(
-					timeutils.FormatLocal(query.GithubRepository.PullRequest.QueuedAt.Time),
-				),
-				"\n",
-			)
-		}
-		if pr.Status == "MERGED" {
-			fmt.Fprint(
-				os.Stderr,
-				indent,
-				"Merged at: ",
-				colors.UserInput(
-					timeutils.FormatLocal(query.GithubRepository.PullRequest.MergedAt.Time),
-				),
-				"\n",
-			)
-		}
-
-		fmt.Fprint(
-			os.Stderr,
-			indent,
-			"Base branch: ",
-			colors.UserInput(
-				query.GithubRepository.PullRequest.BaseBranchName,
-				" <- ",
-				query.GithubRepository.PullRequest.HeadBranchName,
-			),
-			"\n\n",
-		)
-
-		// Required checks section
-		fmt.Fprint(os.Stderr, "Required Checks\n")
-		requiredCheckStatuses := query.GithubRepository.PullRequest.RequiredCheckStatuses
-		for index := range requiredCheckStatuses {
-			result := requiredCheckStatuses[index].Result
-			requiredCheckName := requiredCheckStatuses[index].RequiredCheck.Pattern
-			fmt.Fprint(
-				os.Stderr,
-				indent,
-				emojiForRequiredCheckResult(string(result)),
-				" ",
-				colors.UserInput(requiredCheckName),
-				"\n",
-			)
-		}
-
-		// Get Bot Pull Request info
-		botPullRequest := query.GithubRepository.PullRequest.BotPullRequest
-		if botPullRequest.Number == 0 {
-			// no bot pull request info
-			return nil
-		}
-
-		fmt.Fprint(
-			os.Stderr,
-			"Bot Pull Request #",
-			botPullRequest.Number,
-			" Required Checks\n",
-		)
-
-		botRequiredCheckStatuses := query.GithubRepository.PullRequest.BotPullRequest.RequiredCheckStatuses
-		for _, status := range botRequiredCheckStatuses {
-			fmt.Fprint(
-				os.Stderr,
-				indent,
-				emojiForRequiredCheckResult(string(status.Result)),
-				" ",
-				colors.UserInput(status.RequiredCheck.Pattern),
-				"\n",
-			)
-		}
+	// Get Bot Pull Request info
+	botPullRequest := query.GithubRepository.PullRequest.BotPullRequest
+	if botPullRequest.Number == 0 {
+		// no bot pull request info
 		return nil
-	},
+	}
+
+	fmt.Fprint(
+		os.Stderr,
+		"Bot Pull Request #",
+		botPullRequest.Number,
+		" Required Checks\n",
+	)
+
+	botRequiredCheckStatuses := query.GithubRepository.PullRequest.BotPullRequest.RequiredCheckStatuses
+	for _, status := range botRequiredCheckStatuses {
+		fmt.Fprint(
+			os.Stderr,
+			indent,
+			emojiForRequiredCheckResult(string(status.Result)),
+			" ",
+			colors.UserInput(status.RequiredCheck.Pattern),
+			"\n",
+		)
+	}
+	return nil
+}
+
+func prStatusGitHub(ctx context.Context) error {
+	repo, err := getRepo(ctx)
+	if err != nil {
+		return err
+	}
+
+	db, err := getDB(ctx, repo)
+	if err != nil {
+		return err
+	}
+
+	tx := db.ReadTx()
+
+	currentBranchName, err := repo.CurrentBranchName()
+	if err != nil {
+		return err
+	}
+
+	branch, _ := tx.Branch(currentBranchName)
+	if branch.PullRequest == nil {
+		return errors.New(
+			"this branch has no associated pull request (run 'av pr' to create one)",
+		)
+	}
+
+	repository := tx.Repository()
+	ghClient, err := getGitHubClient(ctx)
+	if err != nil {
+		return err
+	}
+
+	pr, err := ghClient.GetPullRequestByNumber(ctx, gh.GetPullRequestByNumberInput{
+		Owner:  repository.Owner,
+		Repo:   repository.Name,
+		Number: branch.PullRequest.Number,
+	})
+	if err != nil {
+		return err
+	}
+
+	indent := "    "
+	fmt.Fprint(
+		os.Stderr,
+		"#",
+		pr.Number,
+		" ",
+		colors.UserInput(pr.Title),
+		"\n",
+	)
+	fmt.Fprint(
+		os.Stderr,
+		indent,
+		"State: ",
+		colors.UserInput(pr.State),
+		"\n",
+	)
+	if pr.IsDraft {
+		fmt.Fprint(os.Stderr, indent, "Draft: ", colors.UserInput("true"), "\n")
+	}
+	fmt.Fprint(
+		os.Stderr,
+		indent,
+		"Author: ",
+		colors.UserInput(pr.Author.Login),
+		"\n",
+	)
+	fmt.Fprint(
+		os.Stderr,
+		indent,
+		"Created at: ",
+		colors.UserInput(timeutils.FormatLocal(pr.CreatedAt)),
+		"\n",
+	)
+	fmt.Fprint(
+		os.Stderr,
+		indent,
+		"Base branch: ",
+		colors.UserInput(pr.BaseBranchName(), " <- ", pr.HeadBranchName()),
+		"\n",
+	)
+	fmt.Fprint(
+		os.Stderr,
+		indent,
+		"URL: ",
+		colors.UserInput(pr.Permalink),
+		"\n",
+	)
+
+	fmt.Fprint(
+		os.Stderr,
+		"\nNote: Configure Aviator API token for queue status and check details.\n",
+	)
+	return nil
 }
 
 func getQueryVariables(ctx context.Context) (map[string]any, error) {

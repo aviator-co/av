@@ -1,0 +1,7 @@
+# Test that squash fails when there are no commits on the branch.
+exec git fetch
+
+exec av branch feature-branch
+
+! exec av squash
+stderr 'no commits to squash'

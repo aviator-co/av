@@ -1,0 +1,14 @@
+# Test squash of exactly two commits.
+exec git fetch
+
+commit-file base.txt 'base commit'
+
+exec av branch feature-branch
+commit-file file1.txt content1 'first commit'
+commit-file file2.txt content2 'second commit'
+
+exec av squash
+stderr 'Successfully squashed 2 commits'
+
+exec git rev-list --count feature-branch ^main
+stdout '^1$'
