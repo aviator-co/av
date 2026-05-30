@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"emperror.dev/errors"
@@ -130,9 +132,13 @@ func main() {
 	// runtime and various packages (e.g., package init functions).
 	startTime := time.Now()
 	colors.SetupBackgroundColorTypeFromEnv()
-	err := rootCmd.Execute()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	err := rootCmd.ExecuteContext(ctx)
 	logrus.WithField("duration", time.Since(startTime)).Debug("command exited")
-	checkCliVersion()
+	if ctx.Err() == nil {
+		checkCliVersion()
+	}
 	var exitSilently actions.ErrExitSilently
 	if errors.As(err, &exitSilently) {
 		os.Exit(exitSilently.ExitCode)

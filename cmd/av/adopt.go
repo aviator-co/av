@@ -70,14 +70,16 @@ The command will adopt the stack of pull requests starting from the specified br
 			if err != nil {
 				return err
 			}
-			return uiutils.RunBubbleTea(&remoteAdoptViewModel{
+			return uiutils.RunBubbleTeaWithContext(ctx, &remoteAdoptViewModel{
+				ctx:        func() context.Context { return ctx },
 				repo:       repo,
 				db:         db,
 				ghClient:   client,
 				branchName: adoptFlags.RemoteBranchName,
 			})
 		}
-		return uiutils.RunBubbleTea(&adoptViewModel{
+		return uiutils.RunBubbleTeaWithContext(ctx, &adoptViewModel{
+			ctx:               func() context.Context { return ctx },
 			repo:              repo,
 			db:                db,
 			currentHEADBranch: plumbing.NewBranchReferenceName(currentBranch),
@@ -143,6 +145,7 @@ func adoptForceAdoption(
 }
 
 type adoptViewModel struct {
+	ctx               func() context.Context
 	repo              *git.Repo
 	db                meta.DB
 	currentHEADBranch plumbing.ReferenceName
@@ -162,6 +165,7 @@ func (vm *adoptViewModel) Init() tea.Cmd {
 func (vm *adoptViewModel) initModel() tea.Cmd {
 	return vm.AddView(
 		actions.NewFindAdoptableLocalBranchesModel(
+			vm.ctx(),
 			vm.repo,
 			vm.db,
 			vm.initTreeSelector,
@@ -247,6 +251,7 @@ func (vm *adoptViewModel) initAdoption(chosenTargets []plumbing.ReferenceName) t
 	}
 	return vm.AddView(
 		actions.NewAdoptBranchesModel(
+			vm.ctx(),
 			vm.db,
 			branches,
 			func() tea.Cmd { return tea.Quit },
@@ -262,6 +267,7 @@ func (vm *adoptViewModel) ExitError() error {
 }
 
 type remoteAdoptViewModel struct {
+	ctx        func() context.Context
 	repo       *git.Repo
 	db         meta.DB
 	ghClient   *gh.Client
@@ -281,6 +287,7 @@ func (vm *remoteAdoptViewModel) Init() tea.Cmd {
 func (vm *remoteAdoptViewModel) initModel() tea.Cmd {
 	return vm.AddView(
 		actions.NewGetRemoteStackedPRModel(
+			vm.ctx(),
 			vm.db.ReadTx().Repository(),
 			vm.ghClient,
 			vm.branchName,
@@ -366,7 +373,7 @@ func (vm *remoteAdoptViewModel) initGitFetch(prs []actions.RemotePRInfo, chosenT
 		refspecs = append(refspecs, fmt.Sprintf("refs/heads/%s:refs/heads/%s", target.Short(), target.Short()))
 	}
 	return vm.AddView(
-		actions.NewGitFetchModel(vm.repo, refspecs, func() tea.Cmd {
+		actions.NewGitFetchModel(vm.ctx(), vm.repo, refspecs, func() tea.Cmd {
 			return vm.initAdoption(prs, chosenTargets)
 		}),
 	)
@@ -402,6 +409,7 @@ func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenT
 	}
 	return vm.AddView(
 		actions.NewAdoptBranchesModel(
+			vm.ctx(),
 			vm.db,
 			branches,
 			func() tea.Cmd {
@@ -412,7 +420,7 @@ func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenT
 				for _, ab := range branches {
 					if !hasChild[ab.Name] {
 						// Check out the leaf branch. This can fail if the workspace is dirty. In that case, just quietly exit.
-						_, _ = vm.repo.Git(context.Background(), "switch", ab.Name, "--quiet")
+						_, _ = vm.repo.Git(vm.ctx(), "switch", ab.Name, "--quiet")
 						break
 					}
 				}

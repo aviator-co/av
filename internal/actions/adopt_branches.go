@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"strings"
 
 	"github.com/aviator-co/av/internal/meta"
@@ -17,11 +18,13 @@ type AdoptingBranch struct {
 }
 
 func NewAdoptBranchesModel(
+	ctx context.Context,
 	db meta.DB,
 	branches []AdoptingBranch,
 	onDone func() tea.Cmd,
 ) tea.Model {
 	return &AdoptBranchesModel{
+		ctx:      func() context.Context { return ctx },
 		db:       db,
 		spinner:  spinner.New(spinner.WithSpinner(spinner.Dot)),
 		branches: branches,
@@ -30,6 +33,7 @@ func NewAdoptBranchesModel(
 }
 
 type AdoptBranchesModel struct {
+	ctx      func() context.Context
 	db       meta.DB
 	spinner  spinner.Model
 	branches []AdoptingBranch
@@ -68,6 +72,9 @@ func (m *AdoptBranchesModel) View() string {
 func (m *AdoptBranchesModel) adoptBranches() tea.Msg {
 	tx := m.db.WriteTx()
 	for _, branch := range m.branches {
+		if err := m.ctx().Err(); err != nil {
+			return err
+		}
 		bi, _ := tx.Branch(branch.Name)
 		bi.Parent = branch.Parent
 		bi.PullRequest = branch.PullRequest
@@ -75,6 +82,9 @@ func (m *AdoptBranchesModel) adoptBranches() tea.Msg {
 			return err
 		}
 		tx.SetBranch(bi)
+	}
+	if err := m.ctx().Err(); err != nil {
+		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return err

@@ -15,6 +15,7 @@ import (
 )
 
 type GitFetchModel struct {
+	ctx      func() context.Context
 	repo     *git.Repo
 	spinner  spinner.Model
 	refspecs []string
@@ -27,11 +28,13 @@ type GitFetchModel struct {
 }
 
 func NewGitFetchModel(
+	ctx context.Context,
 	repo *git.Repo,
 	refspecs []string,
 	onDone func() tea.Cmd,
 ) tea.Model {
 	return &GitFetchModel{
+		ctx:      func() context.Context { return ctx },
 		repo:     repo,
 		spinner:  spinner.New(spinner.WithSpinner(spinner.Dot)),
 		refspecs: refspecs,
@@ -80,7 +83,7 @@ func (m *GitFetchModel) fetchBranches() tea.Msg {
 		m.repo.GetRemoteName(),
 	}
 	args = append(args, m.refspecs...)
-	cmd := exec.CommandContext(context.Background(), "git", args...)
+	cmd := exec.CommandContext(m.ctx(), "git", args...)
 	cmd.Stdout = &m.stdout
 	cmd.Stderr = &m.stderr
 	if err := cmd.Run(); err != nil {

@@ -1,6 +1,7 @@
 package uiutils
 
 import (
+	"context"
 	"os"
 	"strings"
 
@@ -27,6 +28,25 @@ func RunBubbleTea(model BubbleTeaModelWithExitHandling) error {
 			tea.WithInput(strings.NewReader("")),
 		}
 	}
+	p := tea.NewProgram(model, opts...)
+	finalModel, err := p.Run()
+	if err != nil {
+		return err
+	}
+	if err := finalModel.(BubbleTeaModelWithExitHandling).ExitError(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func RunBubbleTeaWithContext(ctx context.Context, model BubbleTeaModelWithExitHandling) error {
+	var opts []tea.ProgramOption
+	if !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
+		opts = []tea.ProgramOption{
+			tea.WithInput(nil),
+		}
+	}
+	opts = append(opts, tea.WithContext(ctx))
 	p := tea.NewProgram(model, opts...)
 	finalModel, err := p.Run()
 	if err != nil {
