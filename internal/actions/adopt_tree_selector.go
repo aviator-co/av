@@ -4,12 +4,12 @@ import (
 	"slices"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
@@ -64,7 +64,7 @@ func (m *AdoptTreeSelectorModel) Init() tea.Cmd {
 
 func (m *AdoptTreeSelectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "q":
 			return m, tea.Quit
@@ -72,7 +72,7 @@ func (m *AdoptTreeSelectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.currentCursor = m.getPreviousBranch()
 		case "down", "j", "ctrl+n":
 			m.currentCursor = m.getNextBranch()
-		case " ":
+		case "space":
 			m.toggleAdoption(m.currentCursor)
 		case "enter":
 			m.done = true
@@ -86,7 +86,7 @@ func (m *AdoptTreeSelectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *AdoptTreeSelectorModel) View() string {
+func (m *AdoptTreeSelectorModel) View() tea.View {
 	var ss []string
 	if m.done {
 		ss = append(ss, colors.SuccessStyle.Render("✓ Choose which branches to adopt"))
@@ -114,7 +114,7 @@ func (m *AdoptTreeSelectorModel) View() string {
 	if !m.done {
 		ss = append(ss, m.help.ShortHelpView(promptKeys))
 	}
-	return strings.Join(ss, "\n")
+	return tea.NewView(strings.Join(ss, "\n"))
 }
 
 func (m *AdoptTreeSelectorModel) renderBranch(branch plumbing.ReferenceName, isTrunk bool) string {

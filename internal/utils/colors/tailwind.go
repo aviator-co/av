@@ -9,7 +9,7 @@ package colors
 // Since lipgloss (or termenv) automatically converts hex colors to 256 colors if the terminal
 // doesn't support it, we don't need to worry about the 256 color palette / xterm colors.
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 var (
 	Black      = lipgloss.Color("#000")

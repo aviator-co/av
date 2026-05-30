@@ -1,6 +1,6 @@
 package uiutils
 
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
 type SimpleCommandMsg struct {
 	Cmd tea.Cmd

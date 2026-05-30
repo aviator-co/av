@@ -4,6 +4,9 @@ import (
 	"context"
 	"os"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
@@ -12,9 +15,6 @@ import (
 	"github.com/aviator-co/av/internal/sequencer/planner"
 	"github.com/aviator-co/av/internal/sequencer/sequencerui"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 )
@@ -109,7 +109,7 @@ func (vm *restackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		vm.restackModel, cmd = vm.restackModel.Update(msg)
 		return vm, cmd
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			return vm, tea.Quit
@@ -121,10 +121,10 @@ func (vm *restackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm *restackViewModel) View() string {
+func (vm *restackViewModel) View() tea.View {
 	var ss []string
 	if vm.restackModel != nil {
-		ss = append(ss, vm.restackModel.View())
+		ss = append(ss, vm.restackModel.View().Content)
 	}
 
 	var ret string
@@ -139,7 +139,7 @@ func (vm *restackViewModel) View() string {
 		}
 		ret += uiutils.RenderError(vm.err)
 	}
-	return ret
+	return tea.NewView(ret)
 }
 
 func (vm *restackViewModel) ExitError() error {

@@ -4,14 +4,14 @@ import (
 	"context"
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/sequencer"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
@@ -127,7 +127,7 @@ func (vm *RestackModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm *RestackModel) View() string {
+func (vm *RestackModel) View() tea.View {
 	sb := strings.Builder{}
 	if vm.state != nil && vm.state.Seq != nil {
 		if vm.state.Seq.CurrentSyncRef != "" {
@@ -231,7 +231,7 @@ func (vm *RestackModel) View() string {
 			),
 		)
 	}
-	return sb.String()
+	return tea.NewView(sb.String())
 }
 
 func (vm *RestackModel) runSeqWithContinuationFlags() tea.Msg {

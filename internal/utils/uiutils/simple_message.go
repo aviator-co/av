@@ -1,13 +1,13 @@
 package uiutils
 
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
 type SimpleMessageView struct {
 	Message string
 }
 
-func (s SimpleMessageView) View() string {
-	return s.Message
+func (s SimpleMessageView) View() tea.View {
+	return tea.NewView(s.Message)
 }
 
 func (s SimpleMessageView) Init() tea.Cmd {

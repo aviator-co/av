@@ -9,6 +9,10 @@ import (
 	"strconv"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
@@ -16,10 +20,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
@@ -192,7 +192,7 @@ func (vm switchViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		vm.checkingOut = false
 		vm.checkedOut = true
 		return vm, tea.Quit
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if !vm.checkingOut && !vm.checkedOut {
 			switch msg.String() {
 			case "ctrl+c":
@@ -201,7 +201,7 @@ func (vm switchViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				vm.currentChosenBranch = vm.getPreviousBranch()
 			case "down", "j", "ctrl+n":
 				vm.currentChosenBranch = vm.getNextBranch()
-			case "enter", " ":
+			case "enter", "space":
 				vm.checkingOut = true
 				return vm, vm.checkoutBranch
 			}
@@ -252,7 +252,7 @@ func (vm switchViewModel) getNextBranch() string {
 	return vm.currentChosenBranch
 }
 
-func (vm switchViewModel) View() string {
+func (vm switchViewModel) View() tea.View {
 	var ss []string
 	if vm.checkingOut {
 		ss = append(
@@ -301,7 +301,7 @@ func (vm switchViewModel) View() string {
 	if vm.err != nil {
 		ret += uiutils.RenderError(vm.err)
 	}
-	return ret
+	return tea.NewView(ret)
 }
 
 func (switchViewModel) renderBranchInfo(

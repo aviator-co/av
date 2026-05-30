@@ -3,7 +3,7 @@ package stackutils
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 func RenderTree(

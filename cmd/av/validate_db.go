@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"charm.land/lipgloss/v2"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -46,7 +46,7 @@ branch dependencies and missing parents.`,
 			return err
 		}
 
-		fmt.Print(renderValidation(issues))
+		_, _ = lipgloss.Print(renderValidation(issues))
 		return nil
 	},
 }

@@ -6,16 +6,16 @@ import (
 	"os/exec"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/errutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/erikgeiser/promptkit/selection"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -115,7 +115,7 @@ func (vm *PruneBranchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			vm.done = true
 			return vm, vm.onDone()
 		}
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if vm.askingForConfirmation {
 			switch msg.String() {
 			case "enter":
@@ -147,9 +147,9 @@ func (vm *PruneBranchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm *PruneBranchModel) View() string {
+func (vm *PruneBranchModel) View() tea.View {
 	if vm.calculatingCandidates {
-		return colors.ProgressStyle.Render(vm.spinner.View() + "Finding the changed branches...\n")
+		return tea.NewView(colors.ProgressStyle.Render(vm.spinner.View() + "Finding the changed branches...\n"))
 	}
 
 	sb := strings.Builder{}
@@ -188,10 +188,10 @@ func (vm *PruneBranchModel) View() string {
 
 	if vm.deletePrompt != nil {
 		sb.WriteString("\n")
-		sb.WriteString(vm.deletePrompt.View())
+		sb.WriteString(vm.deletePrompt.View().Content)
 		sb.WriteString(vm.help.ShortHelpView(uiutils.PromptKeys))
 	}
-	return sb.String()
+	return tea.NewView(sb.String())
 }
 
 func (vm *PruneBranchModel) viewCandidates() string {

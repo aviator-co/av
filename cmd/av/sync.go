@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/config"
@@ -20,7 +21,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
@@ -483,11 +483,11 @@ func (m *preAvSyncHookModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *preAvSyncHookModel) View() string {
+func (m *preAvSyncHookModel) View() tea.View {
 	if !m.hasHook {
 		// Do not even render anything if there is no hook for simplicity. We show the
 		// status only when the hook exists.
-		return ""
+		return tea.NewView("")
 	}
 	// NOTE: It is tempting to add a spinner here, but because the hook runs with a terminal
 	// control, the spinner actually doesn't render / updated until the hook is done. Because
@@ -497,13 +497,13 @@ func (m *preAvSyncHookModel) View() string {
 	// Due to this, we will have a better visual experience by not showing a spinner at all
 	// here.
 	if m.complete {
-		return colors.SuccessStyle.Render("✓ pre-av-sync hook completed")
+		return tea.NewView(colors.SuccessStyle.Render("✓ pre-av-sync hook completed"))
 	}
 	// We don't have to render anything here because the pre-av-sync failure message will be
 	// rendered through error. The stdout / stderr of the hook will be shown directly in the
 	// terminal as bubbletea won't erase the terminal content prior to the terminal control
 	// take over.
-	return ""
+	return tea.NewView("")
 }
 
 func init() {
