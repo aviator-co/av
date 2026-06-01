@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/gh"
@@ -11,8 +13,6 @@ import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -101,7 +101,7 @@ func (vm *GitHubFetchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm *GitHubFetchModel) View() string {
+func (vm *GitHubFetchModel) View() tea.View {
 	sb := strings.Builder{}
 	showTree := false
 	if vm.runningGitFetch {
@@ -170,7 +170,7 @@ func (vm *GitHubFetchModel) View() string {
 			}
 		}
 	}
-	return sb.String()
+	return tea.NewView(sb.String())
 }
 
 func (vm *GitHubFetchModel) runGitFetch() tea.Msg {

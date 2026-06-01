@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
@@ -11,8 +13,6 @@ import (
 	"github.com/aviator-co/av/internal/sequencer/planner"
 	"github.com/aviator-co/av/internal/sequencer/sequencerui"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
@@ -69,7 +69,7 @@ func (vm *postCommitRestackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		vm.restackModel, cmd = vm.restackModel.Update(msg)
 		return vm, cmd
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			return vm, tea.Quit
@@ -81,15 +81,15 @@ func (vm *postCommitRestackViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm *postCommitRestackViewModel) View() string {
+func (vm *postCommitRestackViewModel) View() tea.View {
 	sb := strings.Builder{}
 	if vm.restackModel != nil {
-		sb.WriteString(vm.restackModel.View())
+		sb.WriteString(vm.restackModel.View().Content)
 	}
 	if vm.err != nil {
 		sb.WriteString(vm.err.Error() + "\n")
 	}
-	return sb.String()
+	return tea.NewView(sb.String())
 }
 
 func (vm *postCommitRestackViewModel) ExitError() error {

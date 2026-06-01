@@ -1,12 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -88,7 +87,7 @@ does not delete Git branches.
 				lipgloss.JoinVertical(0, ss...),
 			) + "\n"
 		}
-		fmt.Print(ret)
+		_, _ = lipgloss.Print(ret)
 
 		return nil
 	},
