@@ -360,10 +360,13 @@ func (vm *remoteAdoptViewModel) initGitFetch(prs []actions.RemotePRInfo, chosenT
 			tea.Quit,
 		)
 	}
+	remote := vm.repo.GetRemoteName()
 	refspecs := []string{}
 	for _, target := range chosenTargets {
-		// Directly clone as a local branch.
+		// Clone as a local branch, and create the remote-tracking ref so we can
+		// set upstream tracking after adoption.
 		refspecs = append(refspecs, fmt.Sprintf("refs/heads/%s:refs/heads/%s", target.Short(), target.Short()))
+		refspecs = append(refspecs, fmt.Sprintf("refs/heads/%s:refs/remotes/%s/%s", target.Short(), remote, target.Short()))
 	}
 	return vm.AddView(
 		actions.NewGitFetchModel(vm.repo, refspecs, func() tea.Cmd {
@@ -405,9 +408,11 @@ func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenT
 			vm.db,
 			branches,
 			func() tea.Cmd {
+				remote := vm.repo.GetRemoteName()
 				hasChild := make(map[string]bool)
 				for _, ab := range branches {
 					hasChild[ab.Parent.Name] = true
+					_ = vm.repo.BranchSetUpstream(context.Background(), ab.Name, remote)
 				}
 				for _, ab := range branches {
 					if !hasChild[ab.Name] {
