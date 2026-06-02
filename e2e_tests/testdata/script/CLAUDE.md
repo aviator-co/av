@@ -20,7 +20,7 @@ Use `cp $WORK/fixture.txt target.txt` to copy archive files into the repo.
 | `branch-children` | `branch-children <branch> [children...]` | Assert child branch names. |
 | `set-branch-pr` | `set-branch-pr <branch> <id> <number> <state>` | Set PR metadata in av database. |
 | `set-branch-merge-commit` | `set-branch-merge-commit <branch> <ref>` | Set MergeCommit field; ref is resolved via `git rev-parse`. |
-| `mock-pull` | `mock-pull <head> <number> <state> [mergeCommitRef]` | Add a mock PR to the GitHub server. |
+| `mock-pull` | `mock-pull <head> <number> <state> [mergeCommitRef] [base=<ref>] [body=<file>]` | Add a mock PR to the GitHub server. `body=` loads the PR body from a fixture (e.g. av PR metadata). |
 | `set-branch-prefix` | `set-branch-prefix <prefix>` | Update `branchNamePrefix` in av config. |
 
 ## Conventions
