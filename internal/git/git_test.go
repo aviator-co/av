@@ -86,12 +86,14 @@ func TestWorktreeStateIsolation(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 }
 
-// TestReadStateFileLegacyFallback ensures an in-flight sync persisted under
-// the old shared AvDir survives an upgrade.
-func TestReadStateFileLegacyFallback(t *testing.T) {
+// TestLinkedWorktreeIgnoresCommonState ensures a linked worktree never reads
+// or deletes state living in the shared common dir — that path is the main
+// worktree's private state, not a legacy file to fall back to. Resolving it
+// here would let one worktree clobber another's in-progress sync.
+func TestLinkedWorktreeIgnoresCommonState(t *testing.T) {
 	main := gittest.NewTempRepo(t)
 	worktreeDir := filepath.Join(t.TempDir(), "wt")
-	main.Git(t, "worktree", "add", "-b", "wt-legacy", worktreeDir)
+	main.Git(t, "worktree", "add", "-b", "wt-isolated", worktreeDir)
 
 	gitCommonDir := strings.TrimSpace(
 		runGitIn(t, worktreeDir, "rev-parse", "--path-format=absolute", "--git-common-dir"),
@@ -102,13 +104,22 @@ func TestReadStateFileLegacyFallback(t *testing.T) {
 	repo, err := git.OpenRepo(worktreeDir, gitCommonDir, worktreeGitDir)
 	require.NoError(t, err)
 
-	legacy := filepath.Join(gitCommonDir, "av", string(git.StateFileKindSyncV2))
-	require.NoError(t, os.MkdirAll(filepath.Dir(legacy), 0o755))
-	require.NoError(t, os.WriteFile(legacy, []byte(`{"Msg":"legacy"}`), 0o644))
+	// Stand in for the main worktree's live state.
+	common := filepath.Join(gitCommonDir, "av", string(git.StateFileKindSyncV2))
+	require.NoError(t, os.MkdirAll(filepath.Dir(common), 0o755))
+	require.NoError(t, os.WriteFile(common, []byte(`{"Msg":"main"}`), 0o644))
 
+	// The linked worktree has no state of its own: a read must miss, not
+	// resolve to the common dir.
 	var loaded struct{ Msg string }
-	require.NoError(t, repo.ReadStateFile(git.StateFileKindSyncV2, &loaded))
-	require.Equal(t, "legacy", loaded.Msg)
+	err = repo.ReadStateFile(git.StateFileKindSyncV2, &loaded)
+	require.True(t, os.IsNotExist(err))
+
+	// Clearing the linked worktree's (absent) state must leave the common
+	// file untouched.
+	require.NoError(t, repo.WriteStateFile(git.StateFileKindSyncV2, nil))
+	_, err = os.Stat(common)
+	require.NoError(t, err)
 }
 
 func runGitIn(t *testing.T, dir string, args ...string) string {

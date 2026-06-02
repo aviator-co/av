@@ -19,21 +19,16 @@ func (r *Repo) stateFilePath(kind StateFileKind) string {
 	return filepath.Join(r.WorktreeAvDir(), string(kind))
 }
 
+// ReadStateFile reads the per-worktree state file. Each worktree (including
+// the main checkout) operates only on its own WorktreeAvDir(); we deliberately
+// do NOT fall back to the shared common-dir path. In the main checkout
+// WorktreeAvDir() *is* the common dir, so a pre-upgrade state file is read
+// directly. In a linked worktree the common dir now holds the main worktree's
+// private state — reading it here would resolve another worktree's live sync
+// as our own and the orphan check would then delete it.
 func (r *Repo) ReadStateFile(kind StateFileKind, msg any) error {
 	bs, err := os.ReadFile(r.stateFilePath(kind))
 	if err != nil {
-		// Fall back to the legacy shared-AvDir path so in-flight syncs from
-		// an older av version remain resumable after upgrade.
-		if os.IsNotExist(err) {
-			legacy := filepath.Join(r.AvDir(), string(kind))
-			if legacy != r.stateFilePath(kind) {
-				bs, err = os.ReadFile(legacy)
-				if err != nil {
-					return err
-				}
-				return json.Unmarshal(bs, msg)
-			}
-		}
 		return err
 	}
 	return json.Unmarshal(bs, msg)
@@ -41,17 +36,8 @@ func (r *Repo) ReadStateFile(kind StateFileKind, msg any) error {
 
 func (r *Repo) WriteStateFile(kind StateFileKind, msg any) error {
 	if msg == nil {
-		// Clear both the new and legacy locations. In a non-worktree repo
-		// these resolve to the same path; only remove once.
-		worktreePath := r.stateFilePath(kind)
-		if err := os.Remove(worktreePath); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(r.stateFilePath(kind)); err != nil && !os.IsNotExist(err) {
 			return err
-		}
-		legacyPath := filepath.Join(r.AvDir(), string(kind))
-		if legacyPath != worktreePath {
-			if err := os.Remove(legacyPath); err != nil && !os.IsNotExist(err) {
-				return err
-			}
 		}
 		return nil
 	}

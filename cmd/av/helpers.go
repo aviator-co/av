@@ -45,7 +45,7 @@ func getRepo(ctx context.Context) (*git.Repo, error) {
 
 		parts := strings.Split(strings.TrimSpace(string(paths)), "\n")
 		if len(parts) < 3 {
-			return nil, errors.New("Unexpected format, not able to parse toplevel, common dir, and git dir.")
+			return nil, errors.New("unexpected format, not able to parse toplevel, common dir, and git dir")
 		}
 		// Trim each part — on Windows git may emit \r\n, leaving stray \r on
 		// intermediate lines after the outer TrimSpace.
