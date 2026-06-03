@@ -1,0 +1,38 @@
+# Test non-interactive remote adoption with --include ancestors.
+#
+# Remote stack:  main -> feat-a (PR1) -> feat-b (PR2)
+#
+# `av adopt --remote feat-b --include ancestors` should adopt feat-b and its
+# ancestor feat-a without opening the interactive picker. Here we use --dry-run
+# to assert the adoption plan.
+
+# --include requires --remote.
+! exec av adopt --include ancestors
+stderr '--include can only be used together with --remote'
+
+# --include only accepts known values.
+! exec av adopt --remote feat-b --include cousins
+stderr 'invalid value for --include'
+
+# Model the remote PR stack: each PR body carries av stack metadata so the
+# walk can climb from feat-b up to the trunk.
+mock-pull feat-a 1 OPEN base=main body=$WORK/feat-a-body.txt
+mock-pull feat-b 2 OPEN base=feat-a body=$WORK/feat-b-body.txt
+
+exec av adopt --remote feat-b --include ancestors --dry-run
+stdout 'Would adopt:'
+stdout 'feat-b \(parent: feat-a\)'
+stdout 'feat-a \(parent: main\)'
+
+-- feat-a-body.txt --
+<!-- av pr metadata
+```
+{"parent":"main","trunk":"main"}
+```
+-->
+-- feat-b-body.txt --
+<!-- av pr metadata
+```
+{"parent":"feat-a","parentPull":1,"trunk":"main"}
+```
+-->

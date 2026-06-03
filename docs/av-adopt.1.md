@@ -7,7 +7,7 @@ av-adopt - Adopt branches that are not managed by `av`
 ## SYNOPSIS
 
 ```synopsis
-av adopt [--dry-run] [--parent=<parent> | --remote=<branch>]
+av adopt [--dry-run] [--parent=<parent> | --remote=<branch> [--include=ancestors]]
 ```
 
 ## DESCRIPTION
@@ -43,6 +43,12 @@ You can also adopt branches from a remote repository by using the
 `--remote` option. This option fetches the specified remote branch and adopts
 it along with its parent branches.
 
+By default `--remote` opens an interactive picker to choose which branches to
+adopt. Pass `--include=ancestors` to skip the picker and non-interactively adopt
+the named branch together with its ancestor branches up to the trunk. This is
+useful for scripts and agents that want to mirror a remote stack locally without
+a prompt. Combine with `--dry-run` to print the adoption plan without applying it.
+
 ## OPTIONS
 
 `--parent=<parent>`
@@ -53,6 +59,11 @@ it along with its parent branches.
 
 `--remote=<branch>`
 : Specify a remote branch to adopt from.
+
+`--include=<set>`
+: With `--remote`, non-interactively adopt the named branch and a related set of
+branches instead of opening the picker. The only supported value is `ancestors`,
+which adopts the named branch and its ancestors up to the trunk.
 
 ## SEE ALSO
 
