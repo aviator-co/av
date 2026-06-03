@@ -19,6 +19,9 @@ var cachedRepo *git.Repo
 
 func getRepo(ctx context.Context) (*git.Repo, error) {
 	if cachedRepo == nil {
+		// --git-common-dir is shared (av.db lives there); --git-dir is
+		// per-worktree (rebase state, sync state files). They diverge in
+		// additional worktrees.
 		cmd := exec.CommandContext(
 			ctx,
 			"git",
@@ -26,6 +29,7 @@ func getRepo(ctx context.Context) (*git.Repo, error) {
 			"--path-format=absolute",
 			"--show-toplevel",
 			"--git-common-dir",
+			"--git-dir",
 		)
 
 		if rootFlags.Directory != "" {
@@ -39,12 +43,17 @@ func getRepo(ctx context.Context) (*git.Repo, error) {
 			)
 		}
 
-		dir, gitDir, found := strings.Cut(strings.TrimSpace(string(paths)), "\n")
-		if !found {
-			return nil, errors.New("Unexpected format, not able to parse toplevel and common dir.")
+		parts := strings.Split(strings.TrimSpace(string(paths)), "\n")
+		if len(parts) < 3 {
+			return nil, errors.New("unexpected format, not able to parse toplevel, common dir, and git dir")
 		}
+		// Trim each part — on Windows git may emit \r\n, leaving stray \r on
+		// intermediate lines after the outer TrimSpace.
+		dir := strings.TrimSpace(parts[0])
+		gitDir := strings.TrimSpace(parts[1])
+		worktreeGitDir := strings.TrimSpace(parts[2])
 
-		cachedRepo, err = git.OpenRepo(dir, gitDir)
+		cachedRepo, err = git.OpenRepo(dir, gitDir, worktreeGitDir)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to open git repo")
 		}

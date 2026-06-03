@@ -15,8 +15,19 @@ const (
 	StateFileKindSyncV2  StateFileKind = "stack-sync-v2.state.json"
 )
 
+func (r *Repo) stateFilePath(kind StateFileKind) string {
+	return filepath.Join(r.WorktreeAvDir(), string(kind))
+}
+
+// ReadStateFile reads the per-worktree state file. Each worktree (including
+// the main checkout) operates only on its own WorktreeAvDir(); we deliberately
+// do NOT fall back to the shared common-dir path. In the main checkout
+// WorktreeAvDir() *is* the common dir, so a pre-upgrade state file is read
+// directly. In a linked worktree the common dir now holds the main worktree's
+// private state — reading it here would resolve another worktree's live sync
+// as our own and the orphan check would then delete it.
 func (r *Repo) ReadStateFile(kind StateFileKind, msg any) error {
-	bs, err := os.ReadFile(filepath.Join(r.AvDir(), string(kind)))
+	bs, err := os.ReadFile(r.stateFilePath(kind))
 	if err != nil {
 		return err
 	}
@@ -25,8 +36,7 @@ func (r *Repo) ReadStateFile(kind StateFileKind, msg any) error {
 
 func (r *Repo) WriteStateFile(kind StateFileKind, msg any) error {
 	if msg == nil {
-		if err := os.Remove(filepath.Join(r.AvDir(), string(kind))); err != nil &&
-			!os.IsNotExist(err) {
+		if err := os.Remove(r.stateFilePath(kind)); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 		return nil
@@ -36,5 +46,8 @@ func (r *Repo) WriteStateFile(kind StateFileKind, msg any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(r.AvDir(), string(kind)), bs, 0o644)
+	if err := os.MkdirAll(r.WorktreeAvDir(), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(r.stateFilePath(kind), bs, 0o644)
 }

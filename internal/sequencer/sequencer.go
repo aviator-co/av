@@ -134,7 +134,7 @@ func (seq *Sequencer) runFromInterruptedState(
 	}
 	if seqAbort {
 		// Abort the rebase if we need to
-		if stat, _ := os.Stat(filepath.Join(repo.GitDir(), "REBASE_HEAD")); stat != nil {
+		if stat, _ := os.Stat(filepath.Join(repo.WorktreeGitDir(), "REBASE_HEAD")); stat != nil {
 			if _, err := repo.Rebase(ctx, git.RebaseOpts{Abort: true}); err != nil {
 				return nil, errors.Errorf("failed to abort in-progress rebase: %v", err)
 			}

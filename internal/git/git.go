@@ -26,14 +26,19 @@ var ErrRemoteNotFound = errors.Sentinel("this repository doesn't have a remote o
 const DEFAULT_REMOTE_NAME = "origin"
 
 type Repo struct {
-	repoDir       string
-	gitDir        string
-	gitRepo       *git.Repository
-	log           logrus.FieldLogger
-	defaultBranch plumbing.ReferenceName
+	repoDir        string
+	gitDir         string
+	worktreeGitDir string
+	gitRepo        *git.Repository
+	log            logrus.FieldLogger
+	defaultBranch  plumbing.ReferenceName
 }
 
-func OpenRepo(repoDir string, gitDir string) (*Repo, error) {
+// OpenRepo opens a Git repository for av. `gitDir` is the common git
+// directory (--git-common-dir), `worktreeGitDir` is the per-worktree one
+// (--git-dir); they're identical in the main checkout but diverge in
+// additional worktrees.
+func OpenRepo(repoDir string, gitDir string, worktreeGitDir string) (*Repo, error) {
 	repo, err := git.PlainOpenWithOptions(repoDir, &git.PlainOpenOptions{
 		DetectDotGit:          true,
 		EnableDotGitCommonDir: true,
@@ -41,12 +46,16 @@ func OpenRepo(repoDir string, gitDir string) (*Repo, error) {
 	if err != nil {
 		return nil, errors.Errorf("failed to open git repo: %v", err)
 	}
+	if worktreeGitDir == "" {
+		worktreeGitDir = gitDir
+	}
 	r := &Repo{
-		repoDir:       repoDir,
-		gitDir:        gitDir,
-		gitRepo:       repo,
-		log:           logrus.WithFields(logrus.Fields{"repo": filepath.Base(repoDir)}),
-		defaultBranch: "",
+		repoDir:        repoDir,
+		gitDir:         gitDir,
+		worktreeGitDir: worktreeGitDir,
+		gitRepo:        repo,
+		log:            logrus.WithFields(logrus.Fields{"repo": filepath.Base(repoDir)}),
+		defaultBranch:  "",
 	}
 
 	// Fill the default branch now so that we can error early if it can't be
@@ -76,8 +85,20 @@ func (r *Repo) GitDir() string {
 	return r.gitDir
 }
 
+// WorktreeGitDir returns the per-worktree git directory (where git stores
+// rebase-merge, CHERRY_PICK_HEAD, etc.).
+func (r *Repo) WorktreeGitDir() string {
+	return r.worktreeGitDir
+}
+
 func (r *Repo) AvDir() string {
 	return filepath.Join(r.GitDir(), "av")
+}
+
+// WorktreeAvDir holds per-worktree state files (sync, restack, reorder),
+// distinct from AvDir() which holds the shared av.db.
+func (r *Repo) WorktreeAvDir() string {
+	return filepath.Join(r.WorktreeGitDir(), "av")
 }
 
 func (r *Repo) GoGitRepo() *git.Repository {
@@ -98,7 +119,7 @@ func (r *Repo) AvTmpDir() string {
 // to detect whether a previously-conflicted rebase has since been aborted.
 func (r *Repo) IsRebaseInProgress() bool {
 	for _, name := range []string{"rebase-merge", "rebase-apply"} {
-		if stat, err := os.Stat(filepath.Join(r.GitDir(), name)); err == nil && stat.IsDir() {
+		if stat, err := os.Stat(filepath.Join(r.WorktreeGitDir(), name)); err == nil && stat.IsDir() {
 			return true
 		}
 	}
@@ -110,7 +131,7 @@ func (r *Repo) IsRebaseInProgress() bool {
 // so this is also a way to detect whether a previously-conflicted cherry-pick
 // has since been aborted.
 func (r *Repo) IsCherryPickInProgress() bool {
-	stat, err := os.Stat(filepath.Join(r.GitDir(), "CHERRY_PICK_HEAD"))
+	stat, err := os.Stat(filepath.Join(r.WorktreeGitDir(), "CHERRY_PICK_HEAD"))
 	return err == nil && !stat.IsDir()
 }
 
