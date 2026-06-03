@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/utils/colors"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // FastForwardTrunkModel is a Bubbletea model that fast-forward merges the local
@@ -111,15 +111,15 @@ func (m *FastForwardTrunkModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *FastForwardTrunkModel) View() string {
+func (m *FastForwardTrunkModel) View() tea.View {
 	if m.skipped {
-		return ""
+		return tea.NewView("")
 	}
 	if m.diverged {
-		return colors.ProgressStyle.Render(fmt.Sprintf("  Could not fast-forward %s (local branch has diverged from remote)", m.trunk)) + "\n"
+		return tea.NewView(colors.ProgressStyle.Render(fmt.Sprintf("  Could not fast-forward %s (local branch has diverged from remote)", m.trunk)) + "\n")
 	}
 	if m.done {
-		return colors.SuccessStyle.Render(fmt.Sprintf("✓ Fast-forwarded %s to match remote", m.trunk)) + "\n"
+		return tea.NewView(colors.SuccessStyle.Render(fmt.Sprintf("✓ Fast-forwarded %s to match remote", m.trunk)) + "\n")
 	}
-	return ""
+	return tea.NewView("")
 }

@@ -3,10 +3,10 @@ package uiutils
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/erikgeiser/promptkit/selection"
 )
 
@@ -56,22 +56,22 @@ func (m *PromptModel) Init() tea.Cmd {
 	return m.prompt.Init()
 }
 
-func (m *PromptModel) View() string {
+func (m *PromptModel) View() tea.View {
 	// The base prompt has a new line. Leave the caller to decide whether to add a new line
 	// after.
-	ret := strings.TrimSpace(m.prompt.View())
+	ret := strings.TrimSpace(m.prompt.View().Content)
 	if !m.quitting {
 		// Do not show help after finishing the selection.
 		ret = lipgloss.JoinVertical(lipgloss.Top, ret, m.help.ShortHelpView(PromptKeys))
 	}
-	return ret
+	return tea.NewView(ret)
 }
 
 func (m *PromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
-		case " ", "enter":
+		case "space", "enter":
 			m.prompt.Update(msg)
 			m.quitting = true
 			c, err := m.prompt.Value()

@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	avconfig "github.com/aviator-co/av/internal/config"
@@ -15,10 +19,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/ghutils"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/dustin/go-humanize"
 	"github.com/erikgeiser/promptkit/selection"
 	"github.com/go-git/go-git/v5/config"
@@ -144,7 +144,7 @@ func (vm *GitHubPushModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			vm.done = true
 			return vm, vm.onDone()
 		}
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if vm.askingForConfirmation {
 			switch msg.String() {
 			case "enter":
@@ -176,9 +176,9 @@ func (vm *GitHubPushModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm *GitHubPushModel) View() string {
+func (vm *GitHubPushModel) View() tea.View {
 	if vm.calculatingCandidates {
-		return colors.ProgressStyle.Render(vm.spinner.View() + "Finding the changed branches...")
+		return tea.NewView(colors.ProgressStyle.Render(vm.spinner.View() + "Finding the changed branches..."))
 	}
 
 	sb := strings.Builder{}
@@ -221,10 +221,10 @@ func (vm *GitHubPushModel) View() string {
 
 	if vm.pushPrompt != nil {
 		sb.WriteString("\n")
-		sb.WriteString(vm.pushPrompt.View())
+		sb.WriteString(vm.pushPrompt.View().Content)
 		sb.WriteString(vm.help.ShortHelpView(uiutils.PromptKeys))
 	}
-	return sb.String()
+	return tea.NewView(sb.String())
 }
 
 func (vm *GitHubPushModel) viewPushCandidates() string {

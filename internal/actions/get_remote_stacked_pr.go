@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 func NewGetRemoteStackedPRModel(
@@ -136,9 +136,9 @@ func (m *GetRemoteStackedPRModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *GetRemoteStackedPRModel) View() string {
+func (m *GetRemoteStackedPRModel) View() tea.View {
 	if m.done {
-		return colors.SuccessStyle.Render("✓ Found adoptable branches on remote.")
+		return tea.NewView(colors.SuccessStyle.Render("✓ Found adoptable branches on remote."))
 	}
 	message := ""
 	if len(m.prs) == 1 {
@@ -148,12 +148,12 @@ func (m *GetRemoteStackedPRModel) View() string {
 	}
 	message = "Finding adoptable branches on remote" + message + "..."
 	if m.failed {
-		return colors.FailureStyle.Render("✗ " + message)
+		return tea.NewView(colors.FailureStyle.Render("✗ " + message))
 	}
 	var lines []string
 	lines = append(lines, colors.ProgressStyle.Render(m.spinner.View()+message), "")
 	for _, prInfo := range m.prs {
 		lines = append(lines, fmt.Sprintf("  * %s (%s)", prInfo.Title, prInfo.PullRequest.Permalink))
 	}
-	return strings.Join(lines, "\n")
+	return tea.NewView(strings.Join(lines, "\n"))
 }

@@ -1,7 +1,7 @@
 package colors
 
 import (
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/fatih/color"
 )
 
@@ -27,8 +27,8 @@ var (
 
 var (
 	ProgressStyle = lipgloss.NewStyle().Foreground(Amber600)
-	SuccessStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color('2'))
-	FailureStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color('1'))
+	SuccessStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	FailureStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
 	QuestionStyle = lipgloss.NewStyle().Bold(true)
 
 	// Aligned with promptkit
