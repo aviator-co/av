@@ -21,9 +21,9 @@ import (
 	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/dustin/go-humanize"
 	"github.com/erikgeiser/promptkit/selection"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/object"
 )
 
 const (

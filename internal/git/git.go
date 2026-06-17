@@ -16,8 +16,8 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
 	giturls "github.com/chainguard-dev/git-urls"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,8 +40,7 @@ type Repo struct {
 // additional worktrees.
 func OpenRepo(repoDir string, gitDir string, worktreeGitDir string) (*Repo, error) {
 	repo, err := git.PlainOpenWithOptions(repoDir, &git.PlainOpenOptions{
-		DetectDotGit:          true,
-		EnableDotGitCommonDir: true,
+		DetectDotGit: true,
 	})
 	if err != nil {
 		return nil, errors.Errorf("failed to open git repo: %v", err)
@@ -103,6 +102,13 @@ func (r *Repo) WorktreeAvDir() string {
 
 func (r *Repo) GoGitRepo() *git.Repository {
 	return r.gitRepo
+}
+
+// Close releases file handles held by the underlying go-git repository (e.g.
+// open pack .idx files). go-git v6 requires this to avoid leaking file
+// descriptors, which on Windows also blocks removal of temporary directories.
+func (r *Repo) Close() error {
+	return r.gitRepo.Close()
 }
 
 func (r *Repo) AvTmpDir() string {

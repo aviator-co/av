@@ -125,17 +125,28 @@ func init() {
 	)
 }
 
+// main keeps os.Exit in a thin wrapper so that run's defers (e.g. closing the
+// git repo) always fire before the process exits.
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	// Note: this doesn't include whatever time is spent in initializing the
 	// runtime and various packages (e.g., package init functions).
 	startTime := time.Now()
 	colors.SetupBackgroundColorTypeFromEnv()
+	defer func() {
+		if cachedRepo != nil {
+			_ = cachedRepo.Close()
+		}
+	}()
 	err := rootCmd.Execute()
 	logrus.WithField("duration", time.Since(startTime)).Debug("command exited")
 	checkCliVersion()
 	var exitSilently actions.ErrExitSilently
 	if errors.As(err, &exitSilently) {
-		os.Exit(exitSilently.ExitCode)
+		return exitSilently.ExitCode
 	}
 	if err != nil {
 		// In debug mode, show more detailed information about the error
@@ -147,8 +158,9 @@ func main() {
 			fmt.Fprint(os.Stderr, uiutils.RenderError(err))
 		}
 
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 func checkCliVersion() {

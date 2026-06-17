@@ -17,8 +17,8 @@ import (
 	"github.com/aviator-co/av/internal/utils/errutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
 	"github.com/erikgeiser/promptkit/selection"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing"
 )
 
 const (

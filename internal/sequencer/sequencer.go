@@ -9,8 +9,8 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,7 +26,7 @@ type RestackOp struct {
 	// The new parent branch's hash. If not specified, the sequencer will use the new parent's
 	// branch hash if the new parent is not trunk. Or if the new parent is trunk, the sequencer
 	// will use the remote tracking branch's hash.
-	NewParentHash plumbing.Hash
+	NewParentHash string
 }
 
 type branchSnapshot struct {
@@ -39,7 +39,7 @@ type branchSnapshot struct {
 	// Commit hash that the branch was branched off from the parent. This
 	// can be empty when the parent branch is trunk, but this can be
 	// specified in some circumstances even if the parent is trunk.
-	BranchingPointCommitHash plumbing.Hash
+	BranchingPointCommitHash string
 }
 
 // Sequencer re-stacks the specified branches.
@@ -55,7 +55,7 @@ type Sequencer struct {
 	// ref.
 	CurrentSyncRef plumbing.ReferenceName
 	// If the rebase is stopped, these fields are set.
-	SequenceInterruptedNewParentHash plumbing.Hash
+	SequenceInterruptedNewParentHash string
 
 	Operations []RestackOp
 
@@ -87,9 +87,7 @@ func getBranchSnapshots(db meta.DB) map[plumbing.ReferenceName]*branchSnapshot {
 		}
 		ret[snapshot.Name] = snapshot
 		snapshot.IsParentTrunk = avbr.Parent.Trunk
-		if avbr.Parent.BranchingPointCommitHash != "" {
-			snapshot.BranchingPointCommitHash = plumbing.NewHash(avbr.Parent.BranchingPointCommitHash)
-		}
+		snapshot.BranchingPointCommitHash = avbr.Parent.BranchingPointCommitHash
 	}
 	return ret
 }
@@ -129,7 +127,7 @@ func (seq *Sequencer) runFromInterruptedState(
 	if seq.CurrentSyncRef == "" {
 		return nil, errors.New("no sync in progress")
 	}
-	if seq.SequenceInterruptedNewParentHash.IsZero() {
+	if seq.SequenceInterruptedNewParentHash == "" {
 		panic("broken interruption state: no new parent hash")
 	}
 	if seqAbort {
@@ -140,7 +138,7 @@ func (seq *Sequencer) runFromInterruptedState(
 			}
 		}
 		seq.CurrentSyncRef = ""
-		seq.SequenceInterruptedNewParentHash = plumbing.ZeroHash
+		seq.SequenceInterruptedNewParentHash = ""
 		return nil, nil
 	}
 	if seqContinue {
@@ -190,7 +188,7 @@ func (seq *Sequencer) rebaseBranch(
 	}
 
 	var branchingPoint plumbing.Hash
-	if snapshot.BranchingPointCommitHash.IsZero() {
+	if snapshot.BranchingPointCommitHash == "" {
 		// If the branching point is not specified, find the merge-base with the parent's remote-tracking branch.
 		rtb, err := seq.getRemoteTrackingBranch(repo, snapshot.ParentBranch)
 		if err != nil {
@@ -202,11 +200,11 @@ func (seq *Sequencer) rebaseBranch(
 		}
 		branchingPoint = plumbing.NewHash(mb)
 	} else {
-		branchingPoint = snapshot.BranchingPointCommitHash
+		branchingPoint = plumbing.NewHash(snapshot.BranchingPointCommitHash)
 	}
 
 	var newParentHash plumbing.Hash
-	if op.NewParentHash.IsZero() {
+	if op.NewParentHash == "" {
 		if op.NewParentIsTrunk {
 			var err error
 			newParentHash, err = seq.getRemoteTrackingBranchCommit(repo, op.NewParent)
@@ -221,7 +219,7 @@ func (seq *Sequencer) rebaseBranch(
 			}
 		}
 	} else {
-		newParentHash = op.NewParentHash
+		newParentHash = plumbing.NewHash(op.NewParentHash)
 	}
 
 	// Handle a special case: If the current branch is already based on the new parent, and if
@@ -262,7 +260,7 @@ func (seq *Sequencer) rebaseBranch(
 				op.NewParent,
 				branchingPoint.String()[:7],
 			) + result.ErrorHeadline
-			seq.SequenceInterruptedNewParentHash = newParentHash
+			seq.SequenceInterruptedNewParentHash = newParentHash.String()
 			return result, nil
 		}
 	} else {
@@ -270,7 +268,7 @@ func (seq *Sequencer) rebaseBranch(
 			Status: git.RebaseAlreadyUpToDate,
 		}
 	}
-	if err := seq.postRebaseBranchUpdate(db, newParentHash); err != nil {
+	if err := seq.postRebaseBranchUpdate(db, newParentHash.String()); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -424,14 +422,14 @@ func (seq *Sequencer) RestoreWorktrees(ctx context.Context) []string {
 	return messages
 }
 
-func (seq *Sequencer) postRebaseBranchUpdate(db meta.DB, newParentHash plumbing.Hash) error {
+func (seq *Sequencer) postRebaseBranchUpdate(db meta.DB, newParentHash string) error {
 	op := seq.getCurrentOp()
 	newParentBranchState := meta.BranchState{
 		Name:  op.NewParent.Short(),
 		Trunk: op.NewParentIsTrunk,
 	}
 	if !op.NewParentIsTrunk {
-		newParentBranchState.BranchingPointCommitHash = newParentHash.String()
+		newParentBranchState.BranchingPointCommitHash = newParentHash
 	}
 
 	tx := db.WriteTx()
@@ -441,7 +439,7 @@ func (seq *Sequencer) postRebaseBranchUpdate(db meta.DB, newParentHash plumbing.
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	seq.SequenceInterruptedNewParentHash = plumbing.ZeroHash
+	seq.SequenceInterruptedNewParentHash = ""
 	for i, op := range seq.Operations {
 		if op.Name == seq.CurrentSyncRef {
 			if i+1 < len(seq.Operations) {
