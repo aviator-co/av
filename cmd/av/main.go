@@ -136,11 +136,7 @@ func run() int {
 	// runtime and various packages (e.g., package init functions).
 	startTime := time.Now()
 	colors.SetupBackgroundColorTypeFromEnv()
-	defer func() {
-		if cachedRepo != nil {
-			_ = cachedRepo.Close()
-		}
-	}()
+	defer func() { _ = cachedRepo.Close() }()
 	err := rootCmd.Execute()
 	logrus.WithField("duration", time.Since(startTime)).Debug("command exited")
 	checkCliVersion()

@@ -108,6 +108,9 @@ func (r *Repo) GoGitRepo() *git.Repository {
 // open pack .idx files). go-git v6 requires this to avoid leaking file
 // descriptors, which on Windows also blocks removal of temporary directories.
 func (r *Repo) Close() error {
+	if r == nil || r.gitRepo == nil {
+		return nil
+	}
 	return r.gitRepo.Close()
 }
 
