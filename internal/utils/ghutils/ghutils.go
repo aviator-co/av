@@ -1,6 +1,8 @@
 package ghutils
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -8,8 +10,13 @@ import (
 )
 
 func HasCodeowners(repo *git.Repo) bool {
-	if stat, _ := os.Stat(filepath.Join(repo.Dir(), ".github/CODEOWNERS")); stat != nil {
+	_, err := os.Stat(filepath.Join(repo.Dir(), ".github/CODEOWNERS"))
+	if err == nil {
 		return true
 	}
-	return false
+	if errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	// For permission/IO errors, assume the file exists to be safe.
+	return true
 }
