@@ -30,7 +30,7 @@ jobs:
           bearerToken: ${{ secrets.AVIATOR_API_TOKEN }}
           data: '{"deployment_id": "${{ inputs.aviator_deployment_id }}", "workflow_run_id": "${{ github.run_id }}"}'
       - name: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: "${{ inputs.aviator_release_cut_commit_hash || github.ref }}"
           fetch-depth: 0
