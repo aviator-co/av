@@ -309,23 +309,19 @@ func (r *Repo) DoesRefExist(ctx context.Context, ref string) (bool, error) {
 	return false, nil
 }
 
-func (r *Repo) LsRemote(ctx context.Context, remote string) (map[string]string, error) {
-	out, err := r.Run(ctx, &RunOpts{
-		Args:      []string{"ls-remote", remote},
-		ExitError: true,
-	})
-	if err != nil {
-		return nil, errors.Errorf("failed to get remote branches: %v", err)
+// FetchRemoteRef fetches the given fully-qualified ref from the remote and
+// returns its commit SHA. This is intentionally not implemented with
+// ls-remote: ls-remote patterns cannot filter the server-side ref
+// advertisement (only --heads/--tags can), so on remotes with a very large
+// number of refs (e.g. GitHub repositories with hundreds of thousands of
+// refs/pull/* refs) it downloads the entire advertisement, whereas git fetch
+// sends protocol v2 ref-prefix filters so that the server advertises only
+// the requested ref.
+func (r *Repo) FetchRemoteRef(ctx context.Context, remote string, ref string) (string, error) {
+	if _, err := r.Git(ctx, "fetch", "--no-tags", remote, ref); err != nil {
+		return "", err
 	}
-	ret := make(map[string]string)
-	for _, line := range out.Lines() {
-		ss := strings.Split(line, "\t")
-		if len(ss) != 2 {
-			return nil, errors.Errorf("failed to parse the ls-remote output: %q", line)
-		}
-		ret[ss[1]] = ss[0]
-	}
-	return ret, nil
+	return r.Git(ctx, "rev-parse", "FETCH_HEAD")
 }
 
 type CheckoutBranch struct {

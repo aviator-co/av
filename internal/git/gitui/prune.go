@@ -19,6 +19,7 @@ import (
 	"github.com/erikgeiser/promptkit/selection"
 	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -27,7 +28,7 @@ const (
 
 	reasonNoPullRequest     = "PR not found."
 	reasonHasChild          = "PR is already merged, but still have a child."
-	reasonPRHeadNotFound    = "PR is already merged, but we cannot find which commit is merged."
+	reasonPRHeadFetchFailed = "PR is already merged, but failed to fetch the merged commit from the remote."
 	reasonPRHeadIsDifferent = "PR is already merged, but the local branch points to a different commit than the merged commit."
 )
 
@@ -153,18 +154,16 @@ func (vm *PruneBranchModel) View() tea.View {
 	}
 
 	sb := strings.Builder{}
-	if len(vm.deleteCandidates) == 0 {
+	if vm.chooseNoPrune {
+		sb.WriteString(colors.SuccessStyle.Render("✓ Not deleting merged branches\n"))
+	} else if len(vm.deleteCandidates) == 0 {
 		sb.WriteString(colors.SuccessStyle.Render("✓ No merged branches to delete\n"))
 	} else if vm.askingForConfirmation {
 		sb.WriteString("Confirming the deletion of merged branches\n")
 	} else if vm.runningDeletion {
 		sb.WriteString(colors.ProgressStyle.Render(vm.spinner.View() + "Deleting merged branches...\n"))
 	} else if vm.done {
-		if vm.chooseNoPrune {
-			sb.WriteString(colors.SuccessStyle.Render("✓ Not deleting merged branches\n"))
-		} else {
-			sb.WriteString(colors.SuccessStyle.Render("✓ Deleted the merged branches\n"))
-		}
+		sb.WriteString(colors.SuccessStyle.Render("✓ Deleted the merged branches\n"))
 	}
 
 	if len(vm.noDeleteBranches) > 0 {
@@ -341,9 +340,8 @@ func (vm *PruneBranchModel) CheckoutInitialState() error {
 }
 
 func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
-	remoteBranches, err := vm.repo.LsRemote(context.Background(), vm.repo.GetRemoteName())
-	if err != nil {
-		return err
+	if vm.chooseNoPrune {
+		return &PruneBranchProgress{candidateCalculationDone: true}
 	}
 	var noDeleteBranches []noDeleteBranch
 	var deleteCandidates []deleteCandidate
@@ -366,11 +364,17 @@ func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
 			)
 			continue
 		}
-		remoteHash, ok := remoteBranches[fmt.Sprintf("refs/pull/%d/head", avbr.PullRequest.Number)]
-		if !ok {
+		remoteHash, err := vm.repo.FetchRemoteRef(
+			context.Background(),
+			vm.repo.GetRemoteName(),
+			fmt.Sprintf("refs/pull/%d/head", avbr.PullRequest.Number),
+		)
+		if err != nil {
+			logrus.WithError(err).
+				Debugf("failed to fetch the PR head ref for %q from the remote", br.Short())
 			noDeleteBranches = append(
 				noDeleteBranches,
-				noDeleteBranch{branch: br, reason: reasonPRHeadNotFound},
+				noDeleteBranch{branch: br, reason: reasonPRHeadFetchFailed},
 			)
 			continue
 		}

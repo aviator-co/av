@@ -2,6 +2,7 @@ package ghui
 
 import (
 	"context"
+	"maps"
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
@@ -15,7 +16,6 @@ import (
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
-	"github.com/go-git/go-git/v6/plumbing/object"
 )
 
 func NewGitHubFetchModel(
@@ -203,12 +203,15 @@ func (vm *GitHubFetchModel) runGitHubAPIFetch() tea.Msg {
 }
 
 func (vm *GitHubFetchModel) updateMergeCommitsFromCommitMessage() tea.Msg {
-	trunkRefs := map[plumbing.ReferenceName]bool{}
+	ctx := context.Background()
+	trunkBranches := map[plumbing.ReferenceName][]string{}
 	for _, br := range vm.targetBranches {
-		avbr, _ := vm.db.ReadTx().Branch(br.Short())
-		if avbr.Parent.Trunk {
-			trunkRefs[plumbing.NewBranchReferenceName(avbr.Parent.Name)] = true
+		trunk, ok := meta.Trunk(vm.db.ReadTx(), br.Short())
+		if !ok {
+			continue
 		}
+		trunkRef := plumbing.NewBranchReferenceName(trunk)
+		trunkBranches[trunkRef] = append(trunkBranches[trunkRef], br.Short())
 	}
 
 	repo := vm.repo.GoGitRepo()
@@ -218,15 +221,8 @@ func (vm *GitHubFetchModel) updateMergeCommitsFromCommitMessage() tea.Msg {
 	}
 	remoteConfig := remote.Config()
 
-	// For each trunk commits, look first 10000 commits to find the recently merge
-	// commit. If we want to do this properly, we should look into the commits between
-	// tip of the trunks and the merge bases of the branches. However, without
-	// pre-calculated generation numbers (which is available in commit-graph), this
-	// anyway would require a full history traversal.
-	//
-	// This is anyway a best-effort approach, so we just look into the first 10000.
-	mergedPRs := map[int64]plumbing.Hash{}
-	for trunkRef := range trunkRefs {
+	mergedPRs := map[int64]string{}
+	for trunkRef, branches := range trunkBranches {
 		rtb := mapToRemoteTrackingBranch(remoteConfig, trunkRef)
 		if rtb == nil {
 			// No remote tracking branch. Skip.
@@ -236,25 +232,26 @@ func (vm *GitHubFetchModel) updateMergeCommitsFromCommitMessage() tea.Msg {
 		if err != nil {
 			return errors.Errorf("failed to get reference %q: %v", rtb, err)
 		}
-		c, err := repo.CommitObject(ref.Hash())
-		if err != nil {
-			return errors.Errorf("failed to get commit %q: %v", ref.Hash(), err)
+		tip := ref.Hash().String()
+
+		// A commit that closes a PR of one of the target branches cannot be
+		// older than the point where their stacks forked from the trunk, so
+		// only that range of the trunk history needs to be scanned. The
+		// commit count cap is a best-effort safety valve for when the fork
+		// point is very old (or cannot be determined).
+		revisionRange := []string{"--max-count=10000", tip}
+		mergeBaseArgs := append([]string{"merge-base", "--octopus", tip}, branches...)
+		if base, err := vm.repo.Git(ctx, mergeBaseArgs...); err == nil {
+			if base == tip {
+				continue
+			}
+			revisionRange = []string{"--max-count=10000", base + ".." + tip}
 		}
-		visited := 0
-		_ = object.NewCommitPreorderIter(c, nil, nil).ForEach(func(c *object.Commit) error {
-			m := git.FindClosesPullRequestComments([]*git.CommitInfo{{
-				Hash: c.Hash.String(),
-				Body: c.Message,
-			}})
-			for pr := range m {
-				mergedPRs[pr] = c.Hash
-			}
-			visited += 1
-			if visited >= 10000 {
-				return errors.New("stop")
-			}
-			return nil
-		})
+		cis, err := vm.repo.Log(ctx, git.LogOpts{RevisionRange: revisionRange})
+		if err != nil {
+			return errors.Errorf("failed to read the commit history of %q: %v", rtb, err)
+		}
+		maps.Copy(mergedPRs, git.FindClosesPullRequestComments(cis))
 	}
 	for _, br := range vm.targetBranches {
 		tx := vm.db.WriteTx()
@@ -265,7 +262,7 @@ func (vm *GitHubFetchModel) updateMergeCommitsFromCommitMessage() tea.Msg {
 		}
 		if avbr.PullRequest != nil && avbr.PullRequest.Number != 0 {
 			if hash, ok := mergedPRs[avbr.PullRequest.Number]; ok {
-				avbr.MergeCommit = hash.String()
+				avbr.MergeCommit = hash
 				tx.SetBranch(avbr)
 			}
 		}
