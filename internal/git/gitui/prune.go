@@ -379,17 +379,81 @@ func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
 			return err
 		}
 		if ref.Hash().String() != remoteHash {
-			noDeleteBranches = append(
-				noDeleteBranches,
-				noDeleteBranch{branch: br, reason: reasonPRHeadIsDifferent},
-			)
-			continue
+			// Merge queues (e.g. Aviator MergeQueue) rebase or squash PR commits
+			// before merging, so refs/pull/<N>/head diverges from the local tip
+			// by SHA even when the work is identical. Two fallbacks capture the
+			// common cases: patch-id equivalence handles rebase merges, and a
+			// merge-tree comparison handles squash merges. If neither matches,
+			// the branch truly has work not represented in the merge.
+			if !vm.branchFullyPatchMerged(br, avbr.MergeCommit) &&
+				!vm.branchSquashMergedByTree(ref.Hash(), avbr.MergeCommit) {
+				noDeleteBranches = append(
+					noDeleteBranches,
+					noDeleteBranch{branch: br, reason: reasonPRHeadIsDifferent},
+				)
+				continue
+			}
 		}
 		deleteCandidates = append(deleteCandidates, deleteCandidate{branch: br, commit: ref.Hash()})
 	}
 	vm.noDeleteBranches = noDeleteBranches
 	vm.deleteCandidates = deleteCandidates
 	return &PruneBranchProgress{candidateCalculationDone: true}
+}
+
+func (vm *PruneBranchModel) branchFullyPatchMerged(
+	br plumbing.ReferenceName,
+	mergeCommitSHA string,
+) bool {
+	if mergeCommitSHA == "" {
+		return false
+	}
+	out, err := vm.repo.Run(context.Background(), &git.RunOpts{
+		Args: []string{"cherry", mergeCommitSHA, br.String()},
+	})
+	if err != nil || out.ExitCode != 0 {
+		return false
+	}
+	for line := range strings.SplitSeq(string(out.Stdout), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "+") {
+			return false
+		}
+	}
+	return true
+}
+
+func (vm *PruneBranchModel) branchSquashMergedByTree(
+	localHash plumbing.Hash,
+	mergeCommitSHA string,
+) bool {
+	if mergeCommitSHA == "" {
+		return false
+	}
+	ctx := context.Background()
+	mergeParent := mergeCommitSHA + "^"
+	mb, err := vm.repo.MergeBase(ctx, localHash.String(), mergeParent)
+	if err != nil || mb == "" {
+		return false
+	}
+	out, err := vm.repo.Run(ctx, &git.RunOpts{
+		Args: []string{
+			"merge-tree", "--write-tree",
+			"--merge-base=" + mb,
+			mergeParent, localHash.String(),
+		},
+	})
+	if err != nil || out.ExitCode != 0 {
+		return false
+	}
+	mergedTree := strings.TrimSpace(strings.SplitN(string(out.Stdout), "\n", 2)[0])
+	if mergedTree == "" {
+		return false
+	}
+	mc, err := vm.repo.GoGitRepo().CommitObject(plumbing.NewHash(mergeCommitSHA))
+	if err != nil {
+		return false
+	}
+	return mergedTree == mc.TreeHash.String()
 }
 
 func (vm *PruneBranchModel) hasOpenChildren(br plumbing.ReferenceName) bool {
