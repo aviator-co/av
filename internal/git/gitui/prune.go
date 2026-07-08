@@ -27,7 +27,7 @@ const (
 
 	reasonNoPullRequest     = "PR not found."
 	reasonHasChild          = "PR is already merged, but still have a child."
-	reasonPRHeadNotFound    = "PR is already merged, but we cannot find which commit is merged."
+	reasonPRHeadFetchFailed = "PR is already merged, but failed to fetch the merged commit from the remote."
 	reasonPRHeadIsDifferent = "PR is already merged, but the local branch points to a different commit than the merged commit."
 )
 
@@ -153,18 +153,16 @@ func (vm *PruneBranchModel) View() tea.View {
 	}
 
 	sb := strings.Builder{}
-	if len(vm.deleteCandidates) == 0 {
+	if vm.chooseNoPrune {
+		sb.WriteString(colors.SuccessStyle.Render("✓ Not deleting merged branches\n"))
+	} else if len(vm.deleteCandidates) == 0 {
 		sb.WriteString(colors.SuccessStyle.Render("✓ No merged branches to delete\n"))
 	} else if vm.askingForConfirmation {
 		sb.WriteString("Confirming the deletion of merged branches\n")
 	} else if vm.runningDeletion {
 		sb.WriteString(colors.ProgressStyle.Render(vm.spinner.View() + "Deleting merged branches...\n"))
 	} else if vm.done {
-		if vm.chooseNoPrune {
-			sb.WriteString(colors.SuccessStyle.Render("✓ Not deleting merged branches\n"))
-		} else {
-			sb.WriteString(colors.SuccessStyle.Render("✓ Deleted the merged branches\n"))
-		}
+		sb.WriteString(colors.SuccessStyle.Render("✓ Deleted the merged branches\n"))
 	}
 
 	if len(vm.noDeleteBranches) > 0 {
@@ -341,12 +339,15 @@ func (vm *PruneBranchModel) CheckoutInitialState() error {
 }
 
 func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
-	remoteBranches, err := vm.repo.LsRemote(context.Background(), vm.repo.GetRemoteName())
-	if err != nil {
-		return err
+	if vm.chooseNoPrune {
+		return &PruneBranchProgress{candidateCalculationDone: true}
+	}
+	type mergedBranch struct {
+		branch   plumbing.ReferenceName
+		prNumber int64
 	}
 	var noDeleteBranches []noDeleteBranch
-	var deleteCandidates []deleteCandidate
+	var mergedBranches []mergedBranch
 	for _, br := range vm.targetBranches {
 		avbr, _ := vm.db.ReadTx().Branch(br.Short())
 		if avbr.MergeCommit == "" {
@@ -366,26 +367,51 @@ func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
 			)
 			continue
 		}
-		remoteHash, ok := remoteBranches[fmt.Sprintf("refs/pull/%d/head", avbr.PullRequest.Number)]
-		if !ok {
-			noDeleteBranches = append(
-				noDeleteBranches,
-				noDeleteBranch{branch: br, reason: reasonPRHeadNotFound},
-			)
-			continue
+		mergedBranches = append(
+			mergedBranches,
+			mergedBranch{branch: br, prNumber: avbr.PullRequest.Number},
+		)
+	}
+
+	var deleteCandidates []deleteCandidate
+	if len(mergedBranches) > 0 {
+		refs := make([]string, 0, len(mergedBranches))
+		for _, mb := range mergedBranches {
+			refs = append(refs, fmt.Sprintf("refs/pull/%d/head", mb.prNumber))
 		}
-		ref, err := vm.repo.GoGitRepo().Reference(br, true)
+		remoteRefs, err := vm.repo.FetchRemoteRefs(
+			context.Background(),
+			vm.repo.GetRemoteName(),
+			refs,
+		)
 		if err != nil {
 			return err
 		}
-		if ref.Hash().String() != remoteHash {
-			noDeleteBranches = append(
-				noDeleteBranches,
-				noDeleteBranch{branch: br, reason: reasonPRHeadIsDifferent},
+		for _, mb := range mergedBranches {
+			remoteHash, ok := remoteRefs[fmt.Sprintf("refs/pull/%d/head", mb.prNumber)]
+			if !ok {
+				noDeleteBranches = append(
+					noDeleteBranches,
+					noDeleteBranch{branch: mb.branch, reason: reasonPRHeadFetchFailed},
+				)
+				continue
+			}
+			ref, err := vm.repo.GoGitRepo().Reference(mb.branch, true)
+			if err != nil {
+				return err
+			}
+			if ref.Hash().String() != remoteHash {
+				noDeleteBranches = append(
+					noDeleteBranches,
+					noDeleteBranch{branch: mb.branch, reason: reasonPRHeadIsDifferent},
+				)
+				continue
+			}
+			deleteCandidates = append(
+				deleteCandidates,
+				deleteCandidate{branch: mb.branch, commit: ref.Hash()},
 			)
-			continue
 		}
-		deleteCandidates = append(deleteCandidates, deleteCandidate{branch: br, commit: ref.Hash()})
 	}
 	vm.noDeleteBranches = noDeleteBranches
 	vm.deleteCandidates = deleteCandidates

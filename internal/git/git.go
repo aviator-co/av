@@ -309,23 +309,76 @@ func (r *Repo) DoesRefExist(ctx context.Context, ref string) (bool, error) {
 	return false, nil
 }
 
-func (r *Repo) LsRemote(ctx context.Context, remote string) (map[string]string, error) {
+const tempFetchRefPrefix = "refs/av/fetch"
+
+func tempFetchRef(ref string) string {
+	return tempFetchRefPrefix + "/" + strings.TrimPrefix(ref, "refs/")
+}
+
+// FetchRemoteRefs fetches the given fully-qualified refs from the remote in a
+// single round trip and returns a map of ref name to commit SHA. Refs that do
+// not exist on the remote (or otherwise fail to fetch) are omitted from the
+// result.
+//
+// This is intentionally not implemented with ls-remote: ls-remote patterns
+// cannot filter the server-side ref advertisement (only --heads/--tags can),
+// so on remotes with a very large number of refs (e.g. GitHub repositories
+// with hundreds of thousands of refs/pull/* refs) it downloads the entire
+// advertisement, whereas git fetch sends protocol v2 ref-prefix filters so
+// that the server advertises only the requested refs.
+func (r *Repo) FetchRemoteRefs(
+	ctx context.Context,
+	remote string,
+	refs []string,
+) (map[string]string, error) {
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	args := []string{"fetch", "--no-tags", remote}
+	for _, ref := range refs {
+		args = append(args, "+"+ref+":"+tempFetchRef(ref))
+	}
+	if _, err := r.Git(ctx, args...); err != nil {
+		// A single missing ref fails the entire batch fetch. Fall back to
+		// fetching individually, omitting the refs that fail.
+		ret := make(map[string]string)
+		for _, ref := range refs {
+			sha, err := r.FetchRemoteRef(ctx, remote, ref)
+			if err != nil {
+				r.log.WithError(err).Debugf("failed to fetch remote ref %q", ref)
+				continue
+			}
+			ret[ref] = sha
+		}
+		return ret, nil
+	}
 	out, err := r.Run(ctx, &RunOpts{
-		Args:      []string{"ls-remote", remote},
+		Args:      []string{"for-each-ref", "--format=%(objectname)%00%(refname)", tempFetchRefPrefix},
 		ExitError: true,
 	})
 	if err != nil {
-		return nil, errors.Errorf("failed to get remote branches: %v", err)
+		return nil, errors.Errorf("failed to read the fetched refs: %v", err)
 	}
 	ret := make(map[string]string)
 	for _, line := range out.Lines() {
-		ss := strings.Split(line, "\t")
-		if len(ss) != 2 {
-			return nil, errors.Errorf("failed to parse the ls-remote output: %q", line)
+		objectName, refName, ok := strings.Cut(line, "\x00")
+		if !ok {
+			return nil, errors.Errorf("failed to parse the for-each-ref output: %q", line)
 		}
-		ret[ss[1]] = ss[0]
+		ret["refs/"+strings.TrimPrefix(refName, tempFetchRefPrefix+"/")] = objectName
+		_, _ = r.Git(ctx, "update-ref", "-d", refName)
 	}
 	return ret, nil
+}
+
+// FetchRemoteRef fetches a single fully-qualified ref from the remote and
+// returns its commit SHA. See FetchRemoteRefs for why this uses git fetch
+// rather than ls-remote.
+func (r *Repo) FetchRemoteRef(ctx context.Context, remote string, ref string) (string, error) {
+	if _, err := r.Git(ctx, "fetch", "--no-tags", remote, ref); err != nil {
+		return "", err
+	}
+	return r.Git(ctx, "rev-parse", "FETCH_HEAD")
 }
 
 type CheckoutBranch struct {
