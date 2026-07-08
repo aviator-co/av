@@ -19,7 +19,6 @@ import (
 	"github.com/erikgeiser/promptkit/selection"
 	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -343,8 +342,12 @@ func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
 	if vm.chooseNoPrune {
 		return &PruneBranchProgress{candidateCalculationDone: true}
 	}
+	type mergedBranch struct {
+		branch   plumbing.ReferenceName
+		prNumber int64
+	}
 	var noDeleteBranches []noDeleteBranch
-	var deleteCandidates []deleteCandidate
+	var mergedBranches []mergedBranch
 	for _, br := range vm.targetBranches {
 		avbr, _ := vm.db.ReadTx().Branch(br.Short())
 		if avbr.MergeCommit == "" {
@@ -364,32 +367,51 @@ func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
 			)
 			continue
 		}
-		remoteHash, err := vm.repo.FetchRemoteRef(
+		mergedBranches = append(
+			mergedBranches,
+			mergedBranch{branch: br, prNumber: avbr.PullRequest.Number},
+		)
+	}
+
+	var deleteCandidates []deleteCandidate
+	if len(mergedBranches) > 0 {
+		refs := make([]string, 0, len(mergedBranches))
+		for _, mb := range mergedBranches {
+			refs = append(refs, fmt.Sprintf("refs/pull/%d/head", mb.prNumber))
+		}
+		remoteRefs, err := vm.repo.FetchRemoteRefs(
 			context.Background(),
 			vm.repo.GetRemoteName(),
-			fmt.Sprintf("refs/pull/%d/head", avbr.PullRequest.Number),
+			refs,
 		)
-		if err != nil {
-			logrus.WithError(err).
-				Debugf("failed to fetch the PR head ref for %q from the remote", br.Short())
-			noDeleteBranches = append(
-				noDeleteBranches,
-				noDeleteBranch{branch: br, reason: reasonPRHeadFetchFailed},
-			)
-			continue
-		}
-		ref, err := vm.repo.GoGitRepo().Reference(br, true)
 		if err != nil {
 			return err
 		}
-		if ref.Hash().String() != remoteHash {
-			noDeleteBranches = append(
-				noDeleteBranches,
-				noDeleteBranch{branch: br, reason: reasonPRHeadIsDifferent},
+		for _, mb := range mergedBranches {
+			remoteHash, ok := remoteRefs[fmt.Sprintf("refs/pull/%d/head", mb.prNumber)]
+			if !ok {
+				noDeleteBranches = append(
+					noDeleteBranches,
+					noDeleteBranch{branch: mb.branch, reason: reasonPRHeadFetchFailed},
+				)
+				continue
+			}
+			ref, err := vm.repo.GoGitRepo().Reference(mb.branch, true)
+			if err != nil {
+				return err
+			}
+			if ref.Hash().String() != remoteHash {
+				noDeleteBranches = append(
+					noDeleteBranches,
+					noDeleteBranch{branch: mb.branch, reason: reasonPRHeadIsDifferent},
+				)
+				continue
+			}
+			deleteCandidates = append(
+				deleteCandidates,
+				deleteCandidate{branch: mb.branch, commit: ref.Hash()},
 			)
-			continue
 		}
-		deleteCandidates = append(deleteCandidates, deleteCandidate{branch: br, commit: ref.Hash()})
 	}
 	vm.noDeleteBranches = noDeleteBranches
 	vm.deleteCandidates = deleteCandidates
