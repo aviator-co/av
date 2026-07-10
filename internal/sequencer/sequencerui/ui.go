@@ -181,9 +181,19 @@ func (vm *RestackModel) View() tea.View {
 					if avbr.MergeCommit != "" {
 						suffix += " (merged)"
 					}
-					hash, err := vm.repo.GoGitRepo().ResolveRevision(plumbing.Revision(branchName))
-					if err == nil && hash != nil {
-						suffix += " " + hash.String()[:7]
+					// Look up the branch ref directly instead of using
+					// ResolveRevision: revision resolution attempts hash-prefix
+					// expansion, which scans the entire pack index and is
+					// extremely slow on large repositories — especially here,
+					// where View is evaluated on every render frame.
+					ref, err := vm.repo.GoGitRepo().Reference(plumbing.NewBranchReferenceName(branchName), true)
+					if err != nil {
+						// The trunk may not exist as a local branch; fall back
+						// to its remote tracking branch.
+						ref, err = vm.repo.GoGitRepo().Reference(plumbing.NewRemoteReferenceName(vm.repo.GetRemoteName(), branchName), true)
+					}
+					if err == nil {
+						suffix += " " + ref.Hash().String()[:7]
 					}
 
 					bn := plumbing.NewBranchReferenceName(branchName)
