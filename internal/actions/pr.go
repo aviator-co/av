@@ -783,6 +783,21 @@ func filterStackToBranchesWithPR(
 	}}
 }
 
+func nearestParentPullRequest(tx meta.ReadTx, branch meta.Branch) *meta.PullRequest {
+	parentName := branch.Parent.Name
+	for parentName != "" {
+		parent, ok := tx.Branch(parentName)
+		if !ok {
+			return nil
+		}
+		if parent.PullRequest != nil {
+			return parent.PullRequest
+		}
+		parentName = parent.Parent.Name
+	}
+	return nil
+}
+
 func walkStack(
 	tx meta.ReadTx,
 	stacks []*stackutils.StackTreeNode,
@@ -923,10 +938,11 @@ func AddPRMetadataAndStack(
 		sb.WriteString("\n<table><tr><td>")
 		sb.WriteString("<details><summary>")
 		if !bi.Parent.Trunk {
-			parentBi, _ := tx.Branch(bi.Parent.Name)
-			sb.WriteString("<b>Depends on #")
-			sb.WriteString(strconv.FormatInt(parentBi.PullRequest.Number, 10))
-			sb.WriteString(".</b> ")
+			if parentPR := nearestParentPullRequest(tx, bi); parentPR != nil {
+				sb.WriteString("<b>Depends on #")
+				sb.WriteString(strconv.FormatInt(parentPR.Number, 10))
+				sb.WriteString(".</b> ")
+			}
 		}
 		sb.WriteString(
 			"This PR is part of a stack created with <a href=\"https://github.com/aviator-co/av\">Aviator</a>.",
