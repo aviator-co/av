@@ -763,7 +763,32 @@ func ReadPRMetadata(body string) (PRMetadata, error) {
 	return prMeta, err
 }
 
-func walkStack(tx meta.ReadTx, stack *stackutils.StackTreeNode, branchName string) string {
+func filterStackToBranchesWithPR(
+	tx meta.ReadTx,
+	node *stackutils.StackTreeNode,
+) []*stackutils.StackTreeNode {
+	var children []*stackutils.StackTreeNode
+	for _, child := range node.Children {
+		children = append(children, filterStackToBranchesWithPR(tx, child)...)
+	}
+
+	branch, _ := tx.Branch(node.Branch.BranchName)
+	if branch.PullRequest == nil {
+		return children
+	}
+
+	return []*stackutils.StackTreeNode{{
+		Branch:   node.Branch,
+		Children: children,
+	}}
+}
+
+func walkStack(
+	tx meta.ReadTx,
+	stacks []*stackutils.StackTreeNode,
+	branchName string,
+	onlyPullRequests bool,
+) string {
 	ssb := strings.Builder{}
 
 	// For simple stacks (i.e., degenerate trees) print them top-down. For example:
@@ -781,7 +806,7 @@ func walkStack(tx meta.ReadTx, stack *stackutils.StackTreeNode, branchName strin
 
 		ssb.WriteString("* ")
 
-		if depth == 0 || bi.PullRequest == nil {
+		if (!onlyPullRequests && depth == 0) || bi.PullRequest == nil {
 			ssb.WriteString("`")
 			ssb.WriteString(node.Branch.BranchName)
 			ssb.WriteString("`")
@@ -803,7 +828,7 @@ func walkStack(tx meta.ReadTx, stack *stackutils.StackTreeNode, branchName strin
 	//   - #3
 	var visitComplex func(node *stackutils.StackTreeNode, depth int)
 	visitComplex = func(node *stackutils.StackTreeNode, depth int) {
-		if depth == 0 {
+		if depth == 0 && !onlyPullRequests {
 			ssb.WriteString("* ")
 			ssb.WriteString("`")
 			ssb.WriteString(node.Branch.BranchName)
@@ -842,11 +867,20 @@ func walkStack(tx meta.ReadTx, stack *stackutils.StackTreeNode, branchName strin
 		return false
 	}
 
+	hasMultipleRoots := len(stacks) > 1
+	for _, stack := range stacks {
+		hasMultipleRoots = hasMultipleRoots || hasMultipleChildren(stack)
+	}
+
 	// Optimize navigation within a stack by making sure the output has the same shape everywhere.
-	if hasMultipleChildren(stack) {
-		visitComplex(stack, 0)
+	if hasMultipleRoots {
+		for _, stack := range stacks {
+			visitComplex(stack, 0)
+		}
 	} else {
-		visitSimple(stack, 0)
+		for _, stack := range stacks {
+			visitSimple(stack, 0)
+		}
 	}
 
 	return ssb.String()
@@ -867,12 +901,20 @@ func AddPRMetadataAndStack(
 
 	sb := strings.Builder{}
 
+	stacks := []*stackutils.StackTreeNode{}
+	if stack != nil {
+		stacks = append(stacks, stack)
+	}
+	if config.Av.PullRequest.WriteStackOnlyPRs && stack != nil {
+		stacks = filterStackToBranchesWithPR(tx, stack)
+	}
+
 	// Don't write out a stack unless there is more than one PR in it.
 	hasMultilevelStack := stack != nil && len(stack.Children) > 0 &&
 		len(stack.Children[0].Children) > 0
 	if hasMultilevelStack {
 		bi, _ := tx.Branch(branchName)
-		stackString := walkStack(tx, stack, branchName)
+		stackString := walkStack(tx, stacks, branchName, config.Av.PullRequest.WriteStackOnlyPRs)
 		sb.WriteString(PRStackCommentStart)
 
 		// Enclose this stack summary in a table for two reasons:

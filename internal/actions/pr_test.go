@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/maputils"
 	"github.com/aviator-co/av/internal/utils/stackutils"
@@ -244,6 +245,61 @@ This information is embedded by the av CLI when creating PRs to track the status
 `+"```"+`
 -->
 `, body1)
+}
+
+func TestPRWithStackOnlyPRs(t *testing.T) {
+	previousValue := config.Av.PullRequest.WriteStackOnlyPRs
+	config.Av.PullRequest.WriteStackOnlyPRs = true
+	t.Cleanup(func() { config.Av.PullRequest.WriteStackOnlyPRs = previousValue })
+
+	tx := fakeReadTx{
+		"base": {
+			Name: "base",
+			Parent: meta.BranchState{
+				Name:  "main",
+				Trunk: true,
+			},
+			PullRequest: &meta.PullRequest{
+				Number:    1001,
+				Permalink: "https://github.com/org/repo/pull/1001",
+			},
+		},
+		"feature": {
+			Name: "feature",
+			Parent: meta.BranchState{
+				Name: "base",
+			},
+			PullRequest: &meta.PullRequest{
+				Number:    1002,
+				Permalink: "https://github.com/org/repo/pull/1002",
+			},
+		},
+	}
+	stack := &stackutils.StackTreeNode{
+		Branch: &stackutils.StackTreeBranchInfo{BranchName: "main"},
+		Children: []*stackutils.StackTreeNode{{
+			Branch: &stackutils.StackTreeBranchInfo{BranchName: "base"},
+			Children: []*stackutils.StackTreeNode{{
+				Branch: &stackutils.StackTreeBranchInfo{BranchName: "feature"},
+				Children: []*stackutils.StackTreeNode{{
+					Branch:   &stackutils.StackTreeBranchInfo{BranchName: "unsubmitted"},
+					Children: []*stackutils.StackTreeNode{},
+				}},
+			}},
+		}},
+	}
+
+	body := actions.AddPRMetadataAndStack(
+		"PR body",
+		actions.PRMetadata{},
+		"feature",
+		stack,
+		tx,
+	)
+
+	assert.Contains(t, body, "* ➡️ **#1002**\n* **#1001**\n")
+	assert.NotContains(t, body, "`main`")
+	assert.NotContains(t, body, "`unsubmitted`")
 }
 
 type fakeReadTx map[string]meta.Branch
