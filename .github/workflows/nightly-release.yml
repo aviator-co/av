@@ -32,7 +32,7 @@ jobs:
           ref: "${{ inputs.aviator_release_cut_commit_hash || github.ref }}"
           fetch-depth: 0
           persist-credentials: false
-      - uses: fjogeleit/http-request-action@551353b829c3646756b2ec2b3694f819d7957495 # v2.0.0
+      - uses: fjogeleit/http-request-action@f98bb26551cd1af7d3eb2674578a80754ece88db # v2.0.1
         if: inputs.aviator_deployment_id != ''
         with:
           url: '${{ vars.AVIATOR_API_HOST }}/api/v1/sync-deploy-github-action'
@@ -60,7 +60,7 @@ jobs:
       - name: configure nightly prerelease
         run: yq '.release.prerelease = true | del(.git.ignore_tags)' .goreleaser.yaml > /tmp/goreleaser-nightly.yaml
       - name: install go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           cache: false
           go-version-file: go.mod
