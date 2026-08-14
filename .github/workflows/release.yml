@@ -23,22 +23,26 @@ on:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: "write"
     steps:
-      - uses: fjogeleit/http-request-action@551353b829c3646756b2ec2b3694f819d7957495 # v2
-        if: github.event_name == 'workflow_dispatch' && inputs.aviator_deployment_id != ''
-        with:
-          url: '${{ vars.AVIATOR_API_HOST }}/api/v1/sync-deploy-github-action'
-          method: 'POST'
-          bearerToken: ${{ secrets.AVIATOR_API_TOKEN }}
-          data: '{"deployment_id": "${{ inputs.aviator_deployment_id }}", "workflow_run_id": "${{ github.run_id }}"}'
+      # Checkout has to come first: the notify-deploy steps below are a local
+      # action, so anything failing before this point reports nothing to Slack.
+      # fetch-depth 0 also brings tags, which goreleaser needs.
       - name: checkout
         uses: actions/checkout@v7
         with:
           ref: "${{ inputs.aviator_release_cut_commit_hash || github.ref }}"
           fetch-depth: 0
           persist-credentials: false
+      - uses: fjogeleit/http-request-action@551353b829c3646756b2ec2b3694f819d7957495 # v2.0.0
+        if: github.event_name == 'workflow_dispatch' && inputs.aviator_deployment_id != ''
+        with:
+          url: '${{ vars.AVIATOR_API_HOST }}/api/v1/sync-deploy-github-action'
+          method: 'POST'
+          bearerToken: ${{ secrets.AVIATOR_API_TOKEN }}
+          data: '{"deployment_id": "${{ inputs.aviator_deployment_id }}", "workflow_run_id": "${{ github.run_id }}"}'
       - name: fetch tags
         run: git fetch --force --tags
       - name: create release tag
@@ -54,6 +58,13 @@ jobs:
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push origin "v${VERSION}"
           echo "release_tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+      - name: Notify release start
+        uses: ./.github/actions/notify-deploy
+        with:
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_PROD_DEPLOY_UPDATES }}
+          state: start
+          subject: "av release"
+          version: ${{ steps.create_tag.outputs.release_tag || github.ref_name }}
       - name: install go
         uses: actions/setup-go@v6
         with:
@@ -69,3 +80,20 @@ jobs:
           AVIATOR_CO_HOMEBREW_REPO_SSH_KEY: ${{ secrets.AVIATOR_CO_HOMEBREW_REPO_SSH_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FURY_TOKEN: ${{ secrets.FURY_PUSH_TOKEN }}
+
+      - name: Notify release success
+        uses: ./.github/actions/notify-deploy
+        with:
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_PROD_DEPLOY_UPDATES }}
+          state: success
+          subject: "av release"
+          version: ${{ steps.create_tag.outputs.release_tag || github.ref_name }}
+      - name: Notify release failure
+        # This includes cancellation.
+        if: ${{ !success() }}
+        uses: ./.github/actions/notify-deploy
+        with:
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_PROD_DEPLOY_UPDATES }}
+          state: failure
+          subject: "av release"
+          version: ${{ steps.create_tag.outputs.release_tag || github.ref_name }}
