@@ -13,14 +13,14 @@ repos:
         entry: sh -c 'go run mvdan.cc/gofumpt@latest -l -w .'
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
       - id: no-commit-to-branch
         args: ['--branch', 'master']
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.37.4
+    rev: 0.38.0
     hooks:
       - id: check-dependabot
       - id: check-github-actions
