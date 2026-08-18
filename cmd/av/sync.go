@@ -233,6 +233,16 @@ func (vm *syncViewModel) initGitFetch() tea.Cmd {
 		vm.client,
 		currentBranchRef,
 		targetBranches,
+		func() tea.Cmd {
+			return vm.initFastForwardBranches(targetBranches)
+		},
+	))
+}
+
+func (vm *syncViewModel) initFastForwardBranches(targetBranches []plumbing.ReferenceName) tea.Cmd {
+	return vm.AddView(gitui.NewFastForwardBranchesModel(
+		vm.repo,
+		targetBranches,
 		vm.initSequencerState,
 	))
 }
