@@ -347,16 +347,18 @@ func cmdSetBranchMergeCommit(ts *testscript.TestScript, neg bool, args []string)
 	}
 }
 
-// mock-pull <headRefName> <number> <state> [mergeCommitRef]
+// mock-pull <headRefName> <number> <state> [mergeCommitRef] [base=<ref>] [body=<file>]
 //
-// Adds a mock PR to the GitHub server. If mergeCommitRef is provided,
-// it is resolved via git rev-parse.
+// Adds a mock PR to the GitHub server. If mergeCommitRef is provided (a bare
+// positional arg), it is resolved via git rev-parse. base=<ref> sets the PR's
+// base branch and body=<file> loads the PR body from a fixture file (used to
+// model av stack metadata for remote-adoption tests).
 func cmdMockPull(ts *testscript.TestScript, neg bool, args []string) {
 	if neg {
 		ts.Fatalf("mock-pull does not support negation")
 	}
 	if len(args) < 3 {
-		ts.Fatalf("usage: mock-pull <headRefName> <number> <state> [mergeCommitRef]")
+		ts.Fatalf("usage: mock-pull <headRefName> <number> <state> [mergeCommitRef] [base=<ref>] [body=<file>]")
 	}
 	number, err := strconv.Atoi(args[1])
 	if err != nil {
@@ -368,13 +370,32 @@ func cmdMockPull(ts *testscript.TestScript, neg bool, args []string) {
 		HeadRefName: args[0],
 		State:       args[2],
 	}
-	if len(args) >= 4 && args[3] != "" {
-		dir := ts.MkAbs(".")
-		oid, err := resolveRef(dir, args[3])
-		if err != nil {
-			ts.Fatalf("%v", err)
+	for _, arg := range args[3:] {
+		if arg == "" {
+			continue
 		}
-		pr.MergeCommitOID = oid
+		key, value, ok := strings.Cut(arg, "=")
+		if !ok {
+			// Bare positional: merge commit ref.
+			oid, err := resolveRef(ts.MkAbs("."), arg)
+			if err != nil {
+				ts.Fatalf("%v", err)
+			}
+			pr.MergeCommitOID = oid
+			continue
+		}
+		switch key {
+		case "base":
+			pr.BaseRefName = value
+		case "body":
+			body, err := os.ReadFile(ts.MkAbs(value))
+			if err != nil {
+				ts.Fatalf("read body file: %v", err)
+			}
+			pr.Body = string(body)
+		default:
+			ts.Fatalf("unknown mock-pull argument %q", arg)
+		}
 	}
 	server := ts.Value(mockServerKey{}).(*mockGitHubServer)
 	server.pulls = append(server.pulls, pr)

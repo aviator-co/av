@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -71,9 +72,50 @@ func (s *mockGitHubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	if strings.Contains(req.Query, "pullRequest(number") {
+		s.t.Logf("Received PR-by-number query: %s", req.Variables)
+		if err := json.NewEncoder(w).Encode(s.handlePRByNumberQuery(req)); err != nil {
+			s.t.Logf("Failed to encode response: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
 
 	s.t.Logf("Received unexpected query: %s", req.Query)
 	w.WriteHeader(http.StatusInternalServerError)
+}
+
+func (s *mockGitHubServer) prToGQL(pr mockPR) map[string]any {
+	gqlpr := map[string]any{
+		"id":          pr.ID,
+		"number":      pr.Number,
+		"headRefName": pr.HeadRefName,
+		"baseRefName": pr.BaseRefName,
+		"isDraft":     pr.IsDraft,
+		"permalink":   fmt.Sprintf("https://github.invalid/mock/mock/pulls/%d", pr.Number),
+		"state":       pr.State,
+		"title":       pr.Title,
+		"body":        pr.Body,
+		"author":      map[string]string{"login": "mock-user"},
+		"createdAt":   "2026-01-01T00:00:00Z",
+	}
+	if pr.MergeCommitOID != "" {
+		gqlpr["mergeCommit"] = map[string]string{"oid": pr.MergeCommitOID}
+	}
+	if pr.ClosedCommitOID != "" {
+		gqlpr["timelineItems"] = map[string]any{
+			"nodes": []any{
+				map[string]any{
+					"__typename": "ClosedEvent",
+					"closer": map[string]any{
+						"__typename": "Commit",
+						"oid":        pr.ClosedCommitOID,
+					},
+				},
+			},
+		}
+	}
+	return gqlpr
 }
 
 func (s *mockGitHubServer) handlePRQuery(req graphqlRequest) graphqlResponse {
@@ -83,36 +125,7 @@ func (s *mockGitHubServer) handlePRQuery(req graphqlRequest) graphqlResponse {
 		if pr.HeadRefName != headRefName {
 			continue
 		}
-		gqlpr := map[string]any{
-			"id":          pr.ID,
-			"number":      pr.Number,
-			"headRefName": pr.HeadRefName,
-			"baseRefName": pr.BaseRefName,
-			"isDraft":     pr.IsDraft,
-			"permalink":   fmt.Sprintf("https://github.invalid/mock/mock/pulls/%d", pr.Number),
-			"state":       pr.State,
-			"title":       pr.Title,
-			"body":        pr.Body,
-			"author":      map[string]string{"login": "mock-user"},
-			"createdAt":   "2026-01-01T00:00:00Z",
-		}
-		if pr.MergeCommitOID != "" {
-			gqlpr["mergeCommit"] = map[string]string{"oid": pr.MergeCommitOID}
-		}
-		if pr.ClosedCommitOID != "" {
-			gqlpr["timelineItems"] = map[string]any{
-				"nodes": []any{
-					map[string]any{
-						"__typename": "ClosedEvent",
-						"closer": map[string]any{
-							"__typename": "Commit",
-							"oid":        pr.ClosedCommitOID,
-						},
-					},
-				},
-			}
-		}
-		prs = append(prs, gqlpr)
+		prs = append(prs, s.prToGQL(pr))
 	}
 	return graphqlResponse{
 		Data: map[string]any{
@@ -120,6 +133,25 @@ func (s *mockGitHubServer) handlePRQuery(req graphqlRequest) graphqlResponse {
 				"pullRequests": map[string]any{
 					"nodes": prs,
 				},
+			},
+		},
+	}
+}
+
+func (s *mockGitHubServer) handlePRByNumberQuery(req graphqlRequest) graphqlResponse {
+	// JSON numbers decode to float64.
+	number := int(req.Variables["number"].(float64))
+	var pr any
+	for _, candidate := range s.pulls {
+		if candidate.Number == number {
+			pr = s.prToGQL(candidate)
+			break
+		}
+	}
+	return graphqlResponse{
+		Data: map[string]any{
+			"repository": map[string]any{
+				"pullRequest": pr,
 			},
 		},
 	}
