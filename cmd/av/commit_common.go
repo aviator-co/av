@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
@@ -19,7 +20,17 @@ import (
 var nothingToRestackError = errors.Sentinel("nothing to restack")
 
 func runPostCommitRestack(repo *git.Repo, db meta.DB) error {
-	return uiutils.RunBubbleTea(&postCommitRestackViewModel{repo: repo, db: db})
+	vm := &postCommitRestackViewModel{repo: repo, db: db}
+	state, err := vm.createState()
+	if errors.Is(err, nothingToRestackError) {
+		fmt.Println(nothingToRestackError)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	vm.state = state
+	return uiutils.RunBubbleTea(vm)
 }
 
 type postCommitRestackViewModel struct {
@@ -34,11 +45,6 @@ type postCommitRestackViewModel struct {
 }
 
 func (vm *postCommitRestackViewModel) Init() tea.Cmd {
-	var err error
-	vm.state, err = vm.createState()
-	if err != nil {
-		return uiutils.ErrCmd(err)
-	}
 	vm.restackModel = sequencerui.NewRestackModel(vm.repo, vm.db, vm.state, sequencerui.RestackStateOptions{
 		OnConflict: func() tea.Cmd {
 			if err := vm.writeState(vm.state); err != nil {

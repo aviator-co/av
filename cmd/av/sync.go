@@ -103,11 +103,20 @@ but can still be synced explicitly.
 			return err
 		}
 
-		return uiutils.RunBubbleTea(&syncViewModel{
+		vm := &syncViewModel{
 			repo:   repo,
 			db:     db,
 			client: client,
-		})
+		}
+		savedState, err := vm.readState()
+		if err != nil {
+			return err
+		}
+		if savedState == nil && (syncFlags.Abort || syncFlags.Continue || syncFlags.Skip) {
+			return errors.New("no restack in progress")
+		}
+		vm.savedState = savedState
+		return uiutils.RunBubbleTea(vm)
 	},
 }
 
@@ -128,6 +137,7 @@ type syncViewModel struct {
 	db     meta.DB
 	client *gh.Client
 
+	savedState   *savedSyncState
 	state        *syncState
 	restackState *sequencerui.RestackState
 
@@ -145,15 +155,8 @@ func (vm *syncViewModel) Init() tea.Cmd {
 }
 
 func (vm *syncViewModel) initSync() tea.Cmd {
-	state, err := vm.readState()
-	if err != nil {
-		return uiutils.ErrCmd(err)
-	}
-	if state != nil {
-		return vm.continueWithState(state)
-	}
-	if syncFlags.Abort || syncFlags.Continue || syncFlags.Skip {
-		return uiutils.ErrCmd(errors.New("no restack in progress"))
+	if vm.savedState != nil {
+		return vm.continueWithState(vm.savedState)
 	}
 
 	isTrunkBranch, err := vm.repo.IsCurrentBranchTrunk()
