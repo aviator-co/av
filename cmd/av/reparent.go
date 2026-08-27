@@ -54,7 +54,13 @@ var reparentCmd = &cobra.Command{
 			reparentFlags.Parent = repo.DefaultBranch()
 		}
 
-		return uiutils.RunBubbleTea(&reparentViewModel{repo: repo, db: db})
+		vm := &reparentViewModel{repo: repo, db: db}
+		state, err := vm.createState()
+		if err != nil {
+			return err
+		}
+		vm.state = state
+		return uiutils.RunBubbleTea(vm)
 	},
 }
 
@@ -70,11 +76,6 @@ type reparentViewModel struct {
 }
 
 func (vm *reparentViewModel) Init() tea.Cmd {
-	var err error
-	vm.state, err = vm.createState()
-	if err != nil {
-		return uiutils.ErrCmd(err)
-	}
 	vm.restackModel = sequencerui.NewRestackModel(vm.repo, vm.db, vm.state, sequencerui.RestackStateOptions{
 		OnConflict: func() tea.Cmd {
 			if err := vm.writeState(vm.state); err != nil {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"charm.land/bubbles/v2/spinner"
@@ -42,7 +43,26 @@ var restackCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return uiutils.RunBubbleTea(&restackViewModel{repo: repo, db: db})
+		vm := &restackViewModel{repo: repo, db: db}
+		state, err := vm.readState()
+		if err != nil {
+			return err
+		}
+		if state == nil {
+			if restackFlags.Abort || restackFlags.Continue || restackFlags.Skip {
+				return errors.New("no restack in progress")
+			}
+			state, err = vm.createState()
+			if err != nil {
+				return err
+			}
+		}
+		if state == nil {
+			fmt.Println(nothingToRestackError)
+			return nil
+		}
+		vm.state = state
+		return uiutils.RunBubbleTea(vm)
 	},
 }
 
@@ -58,23 +78,6 @@ type restackViewModel struct {
 }
 
 func (vm *restackViewModel) Init() tea.Cmd {
-	var err error
-	vm.state, err = vm.readState()
-	if err != nil {
-		return uiutils.ErrCmd(err)
-	}
-	if vm.state == nil {
-		if restackFlags.Abort || restackFlags.Continue || restackFlags.Skip {
-			return uiutils.ErrCmd(errors.New("no restack in progress"))
-		}
-		vm.state, err = vm.createState()
-		if err != nil {
-			return uiutils.ErrCmd(err)
-		}
-	}
-	if vm.state == nil {
-		return uiutils.ErrCmd(nothingToRestackError)
-	}
 	vm.restackModel = sequencerui.NewRestackModel(vm.repo, vm.db, vm.state, sequencerui.RestackStateOptions{
 		Abort:    restackFlags.Abort,
 		Continue: restackFlags.Continue,
