@@ -39,6 +39,14 @@ func TestTrunkBranches(t *testing.T) {
 	require.Equal(t, branches, []string{"main", "develop", "staging"})
 }
 
+func TestOpenRepoStaleRemoteHEAD(t *testing.T) {
+	repo := gittest.NewTempRepo(t)
+	repo.Git(t, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master")
+
+	_, err := git.OpenRepo(repo.RepoDir, repo.GitDir, repo.GitDir)
+	require.ErrorContains(t, err, "refs/remotes/origin/master")
+}
+
 // TestWorktreeStateIsolation verifies rebase detection and state-file I/O
 // target the per-worktree git dir, not the shared common dir.
 func TestWorktreeStateIsolation(t *testing.T) {
