@@ -25,7 +25,11 @@ var adoptFlags struct {
 	Parent           string
 	DryRun           bool
 	RemoteBranchName string
+	Include          string
 }
+
+// adoptIncludeValues are the valid values for the --include flag.
+var adoptIncludeValues = []string{"ancestors"}
 
 var adoptCmd = &cobra.Command{
 	Use:   "adopt",
@@ -42,10 +46,22 @@ the parent.
 
 If you want to adopt branches on the remote repository, use --remote $BRANCH_NAME to adopt branches.
 The command will adopt the stack of pull requests starting from the specified branch name.
+
+By default --remote opens an interactive picker. Pass --include ancestors to skip the picker and
+non-interactively adopt the named branch together with its ancestor branches up to the trunk.
 `),
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		ctx := cmd.Context()
+		if adoptFlags.Include != "" {
+			if adoptFlags.RemoteBranchName == "" {
+				return errors.New("--include can only be used together with --remote")
+			}
+			if !slices.Contains(adoptIncludeValues, adoptFlags.Include) {
+				return errors.New("invalid value for --include; must be one of " +
+					strings.Join(adoptIncludeValues, ", "))
+			}
+		}
 		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
@@ -71,10 +87,11 @@ The command will adopt the stack of pull requests starting from the specified br
 				return err
 			}
 			return uiutils.RunBubbleTea(&remoteAdoptViewModel{
-				repo:       repo,
-				db:         db,
-				ghClient:   client,
-				branchName: adoptFlags.RemoteBranchName,
+				repo:           repo,
+				db:             db,
+				ghClient:       client,
+				branchName:     adoptFlags.RemoteBranchName,
+				nonInteractive: adoptFlags.Include != "",
 			})
 		}
 		return uiutils.RunBubbleTea(&adoptViewModel{
@@ -262,10 +279,11 @@ func (vm *adoptViewModel) ExitError() error {
 }
 
 type remoteAdoptViewModel struct {
-	repo       *git.Repo
-	db         meta.DB
-	ghClient   *gh.Client
-	branchName string
+	repo           *git.Repo
+	db             meta.DB
+	ghClient       *gh.Client
+	branchName     string
+	nonInteractive bool
 
 	uiutils.BaseStackedView
 }
@@ -310,6 +328,26 @@ func (vm *remoteAdoptViewModel) initTreeSelector(prs []actions.RemotePRInfo) tea
 			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch to adopt")}),
 			tea.Quit,
 		)
+	}
+	if vm.nonInteractive {
+		// --include ancestors: adopt the named branch and its ancestors without
+		// prompting. adoptionTargets already holds that chain (the open, not-yet
+		// adopted PRs walked up from the named branch to the trunk).
+		if adoptFlags.DryRun {
+			parents := make(map[string]string, len(prs))
+			for _, prInfo := range prs {
+				parents[prInfo.Name] = prInfo.Parent.Name
+			}
+			lines := []string{"Would adopt:"}
+			for _, target := range adoptionTargets {
+				lines = append(lines, fmt.Sprintf("  %s (parent: %s)", target.Short(), parents[target.Short()]))
+			}
+			return tea.Batch(
+				vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render(strings.Join(lines, "\n"))}),
+				tea.Quit,
+			)
+		}
+		return vm.initGitFetch(prs, adoptionTargets)
 	}
 	var lastNode *stackutils.StackTreeNode
 	for _, prInfo := range prs {
@@ -447,12 +485,22 @@ func init() {
 		&adoptFlags.RemoteBranchName, "remote", "",
 		"adopt branches from remote pull requests, starting from the specified branch",
 	)
+	adoptCmd.Flags().StringVar(
+		&adoptFlags.Include, "include", "",
+		"with --remote, non-interactively adopt the named branch and related branches\n(ancestors)",
+	)
 
 	_ = adoptCmd.RegisterFlagCompletionFunc(
 		"parent",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			branches, _ := allBranches(cmd.Context())
 			return branches, cobra.ShellCompDirectiveNoFileComp
+		},
+	)
+	_ = adoptCmd.RegisterFlagCompletionFunc(
+		"include",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return adoptIncludeValues, cobra.ShellCompDirectiveNoFileComp
 		},
 	)
 }
