@@ -234,6 +234,18 @@ Extract the archive and add the executable to your PATH.
    av init
    ```
 
+## Configuration
+
+To write stack summaries that list only branches with associated pull requests,
+enable both options in `~/.config/av/config.yaml` (or the repository's
+`.git/av/config.yaml`):
+
+```yaml
+pullRequest:
+  writeStack: true
+  writeStackOnlyPRs: true
+```
+
 # Upgrade
 
 ## macOS (Homebrew)
