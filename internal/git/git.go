@@ -60,11 +60,11 @@ func OpenRepo(repoDir string, gitDir string, worktreeGitDir string) (*Repo, erro
 	// Fill the default branch now so that we can error early if it can't be
 	// determined.
 	remoteName := r.GetRemoteName()
-	ref, err := r.GoGitRepo().Reference(plumbing.NewRemoteHEADReferenceName(remoteName), false)
+	remoteHEADName := plumbing.NewRemoteHEADReferenceName(remoteName)
+	ref, err := r.GoGitRepo().Reference(remoteHEADName, false)
 	if err != nil {
 		logrus.WithError(err).Debug("failed to determine remote HEAD")
-		// This `git remote set-head --auto origin` communicates with
-		// the remote, so we probably don't want to run it here inline,
+		// This `git remote set-head --auto origin` communicates with		// the remote, so we probably don't want to run it here inline,
 		// but we suggest it to the user in order to fix this situation.
 		logrus.Warn(
 			"Failed to determine repository default branch. " +
@@ -72,10 +72,29 @@ func OpenRepo(repoDir string, gitDir string, worktreeGitDir string) (*Repo, erro
 		)
 		return nil, fmt.Errorf("failed to determine remote HEAD: %v", err)
 	}
-	r.defaultBranch = plumbing.NewBranchReferenceName(strings.TrimPrefix(ref.Target().String(), fmt.Sprintf("refs/remotes/%s/", remoteName)))
+	remoteBranchPrefix := fmt.Sprintf("refs/remotes/%s/", remoteName)
+	target := ref.Target().String()
+	if !strings.HasPrefix(target, remoteBranchPrefix) {
+		logrus.Debugf("%s does not point to a remote branch: %q", remoteHEADName, target)
+		logrus.Warnf(
+			"Failed to determine repository default branch. "+
+				"Try running `git remote set-head --auto %s` to fix this.",
+			remoteName,
+		)
+		return nil, fmt.Errorf("%s does not point to a %s branch: %q", remoteHEADName, remoteName, target)
+	}
+	if _, err := r.GoGitRepo().Reference(ref.Target(), true); err != nil {
+		logrus.WithError(err).Debugf("%s points to a nonexistent ref %s", remoteHEADName, target)
+		logrus.Warnf(
+			"Repository default branch %q doesn't exist (it was probably renamed or deleted). "+
+				"Try running `git remote set-head --auto %s` to fix this.",
+			strings.TrimPrefix(target, remoteBranchPrefix), remoteName,
+		)
+		return nil, fmt.Errorf("%s points to nonexistent ref %s: %v", remoteHEADName, target, err)
+	}
+	r.defaultBranch = plumbing.NewBranchReferenceName(strings.TrimPrefix(target, remoteBranchPrefix))
 	return r, nil
 }
-
 func (r *Repo) Dir() string {
 	return r.repoDir
 }
