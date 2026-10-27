@@ -68,6 +68,7 @@ To manage orphaned branches with av again, re-adopt them with "av adopt".`),
 	},
 }
 
+// orphanConfirmViewModel asks before orphaning more than one branch.
 type orphanConfirmViewModel struct {
 	db               meta.DB
 	branchesToOrphan []string
@@ -75,8 +76,10 @@ type orphanConfirmViewModel struct {
 	uiutils.BaseStackedView
 }
 
+// orphanedBranchesMsg reports that the branches were orphaned.
 type orphanedBranchesMsg struct{}
 
+// Init shows the Yes/No prompt; No quits without orphaning.
 func (vm *orphanConfirmViewModel) Init() tea.Cmd {
 	return vm.AddView(&uiutils.NewlineModel{Model: uiutils.NewPromptModel(
 		orphanConfirmPrompt(vm.branchesToOrphan),
@@ -90,6 +93,7 @@ func (vm *orphanConfirmViewModel) Init() tea.Cmd {
 	)})
 }
 
+// Update quits once the branches are orphaned.
 func (vm *orphanConfirmViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
 	case orphanedBranchesMsg:
@@ -98,10 +102,12 @@ func (vm *orphanConfirmViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, vm.BaseStackedView.Update(msg)
 }
 
+// View renders the stacked prompt view.
 func (vm *orphanConfirmViewModel) View() tea.View {
 	return vm.BaseStackedView.View()
 }
 
+// ExitError exits non-zero when orphaning failed; the error was already shown.
 func (vm *orphanConfirmViewModel) ExitError() error {
 	if vm.Err != nil {
 		return actions.ErrExitSilently{ExitCode: 1}
@@ -109,6 +115,7 @@ func (vm *orphanConfirmViewModel) ExitError() error {
 	return nil
 }
 
+// orphanBranches orphans the branches off the UI goroutine.
 func (vm *orphanConfirmViewModel) orphanBranches() tea.Cmd {
 	return func() tea.Msg {
 		if err := orphanBranches(vm.db, vm.branchesToOrphan); err != nil {
@@ -118,6 +125,7 @@ func (vm *orphanConfirmViewModel) orphanBranches() tea.Cmd {
 	}
 }
 
+// orphanConfirmPrompt names every branch the confirmation would orphan.
 func orphanConfirmPrompt(branchesToOrphan []string) string {
 	return fmt.Sprintf(
 		"Orphaning %d branches will stop av from tracking: %s. Re-adoption is one-by-one. Continue?",
@@ -126,6 +134,8 @@ func orphanConfirmPrompt(branchesToOrphan []string) string {
 	)
 }
 
+// collectBranchesToOrphan returns the current branch followed by its
+// managed descendants.
 func collectBranchesToOrphan(repo *git.Repo, tx meta.ReadTx) ([]string, error) {
 	currentBranch, err := repo.CurrentBranchName()
 	if err != nil {
@@ -137,6 +147,8 @@ func collectBranchesToOrphan(repo *git.Repo, tx meta.ReadTx) ([]string, error) {
 	return branchesToOrphan, nil
 }
 
+// orphanBranches deletes the branches' av metadata in one transaction; the
+// git branches themselves are left alone.
 func orphanBranches(db meta.DB, branchesToOrphan []string) error {
 	tx := db.WriteTx()
 	defer tx.Abort()
