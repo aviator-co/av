@@ -48,8 +48,10 @@ To manage orphaned branches with av again, re-adopt them with "av adopt".`),
 		}
 
 		if len(branchesToOrphan) > 1 && !orphanFlags.Yes {
-			if !isatty.IsTerminal(os.Stdin.Fd()) {
-				// No one can answer the prompt, so refuse rather than wait on it.
+			if !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
+				// Without a terminal on both ends the prompt is either unanswerable
+				// or invisible (RunBubbleTea drops the renderer), so refuse rather
+				// than let Enter pick the default unseen.
 				return errors.Errorf(
 					"refusing to orphan %d branches without confirmation; pass --yes to orphan %s",
 					len(branchesToOrphan),
