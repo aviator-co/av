@@ -20,6 +20,17 @@ exec av tree
 stdout stack-2
 stdout stack-3
 
+# From trunk, orphan would cover every branch, so it asks first. With no
+# terminal to answer, it refuses and orphans nothing.
+exec git checkout main
+! exec av orphan
+stderr 'refusing to orphan 4 branches without confirmation; pass --yes'
+exec av tree
+stdout stack-1
+stdout stack-2
+stdout stack-3
+exec git checkout stack-2
+
 # Orphan stack-2 (and its child stack-3). Two branches would prompt, so pass --yes.
 exec av orphan --yes
 

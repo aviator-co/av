@@ -11,6 +11,7 @@ import (
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/uiutils"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -47,6 +48,14 @@ To manage orphaned branches with av again, re-adopt them with "av adopt".`),
 		}
 
 		if len(branchesToOrphan) > 1 && !orphanFlags.Yes {
+			if !isatty.IsTerminal(os.Stdin.Fd()) {
+				// No one can answer the prompt, so refuse rather than wait on it.
+				return errors.Errorf(
+					"refusing to orphan %d branches without confirmation; pass --yes to orphan %s",
+					len(branchesToOrphan),
+					strings.Join(branchesToOrphan, ", "),
+				)
+			}
 			return uiutils.RunBubbleTea(&orphanConfirmViewModel{
 				db:               db,
 				branchesToOrphan: branchesToOrphan,
