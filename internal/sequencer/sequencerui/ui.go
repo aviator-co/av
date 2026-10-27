@@ -4,15 +4,15 @@ import (
 	"context"
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/sequencer"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6/plumbing"
 )
 
 type RestackStateOptions struct {
@@ -66,6 +66,7 @@ type RestackModel struct {
 	rebaseConflictErrorHeadline string
 	rebaseConflictHint          string
 	abortedBranch               plumbing.ReferenceName
+	worktreeMessages            []string
 }
 
 func (vm *RestackModel) Init() tea.Cmd {
@@ -87,10 +88,22 @@ func (vm *RestackModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *RestackProgress:
 		if msg.err == nil && msg.result == nil {
 			// Finished the sequence.
+			// Checkout the initial branch BEFORE restoring worktrees.
+			// After rebasing, the last rebased branch is left checked out
+			// in the current worktree. Checking out the initial branch
+			// first frees that branch so it can be restored to its
+			// original worktree.
+			ctx := context.Background()
+			var cleanupErr error
 			if vm.state.InitialBranch != "" {
-				if _, err := vm.repo.CheckoutBranch(context.Background(), &git.CheckoutBranch{Name: vm.state.InitialBranch}); err != nil {
-					return vm, uiutils.ErrCmd(err)
-				}
+				_, cleanupErr = vm.repo.CheckoutBranch(ctx, &git.CheckoutBranch{Name: vm.state.InitialBranch})
+			} else if len(vm.state.Seq.DetachedWorktrees) > 0 {
+				cleanupErr = vm.repo.Detach(ctx)
+			}
+			restoreMessages := vm.state.Seq.RestoreWorktrees(ctx)
+			vm.worktreeMessages = append(vm.worktreeMessages, restoreMessages...)
+			if cleanupErr != nil {
+				return vm, uiutils.ErrCmd(cleanupErr)
 			}
 			if vm.abortedBranch != "" {
 				return vm, vm.options.OnAbort()
@@ -114,7 +127,7 @@ func (vm *RestackModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm *RestackModel) View() string {
+func (vm *RestackModel) View() tea.View {
 	sb := strings.Builder{}
 	if vm.state != nil && vm.state.Seq != nil {
 		if vm.state.Seq.CurrentSyncRef != "" {
@@ -168,12 +181,25 @@ func (vm *RestackModel) View() string {
 					if avbr.MergeCommit != "" {
 						suffix += " (merged)"
 					}
-					hash, err := vm.repo.GoGitRepo().ResolveRevision(plumbing.Revision(branchName))
-					if err == nil && hash != nil {
-						suffix += " " + hash.String()[:7]
+					// Look up the branch ref directly instead of using
+					// ResolveRevision: revision resolution attempts hash-prefix
+					// expansion, which scans the entire pack index and is
+					// extremely slow on large repositories — especially here,
+					// where View is evaluated on every render frame.
+					ref, err := vm.repo.GoGitRepo().Reference(plumbing.NewBranchReferenceName(branchName), true)
+					if err != nil {
+						// The trunk may not exist as a local branch; fall back
+						// to its remote tracking branch.
+						ref, err = vm.repo.GoGitRepo().Reference(plumbing.NewRemoteReferenceName(vm.repo.GetRemoteName(), branchName), true)
+					}
+					if err == nil {
+						suffix += " " + ref.Hash().String()[:7]
 					}
 
 					bn := plumbing.NewBranchReferenceName(branchName)
+					if reason, ok := vm.state.Seq.SkippedBranches[branchName]; ok {
+						return colors.ProgressStyle.Render("⚠ " + branchName + suffix + " (skipped: " + reason + ")")
+					}
 					if syncedBranches[bn] {
 						return colors.SuccessStyle.Render("✓ " + branchName + suffix)
 					}
@@ -190,6 +216,12 @@ func (vm *RestackModel) View() string {
 				}))
 			}
 			sb.WriteString("\n")
+		}
+	}
+	if len(vm.worktreeMessages) > 0 {
+		sb.WriteString("\n")
+		for _, msg := range vm.worktreeMessages {
+			sb.WriteString(colors.Faint(msg) + "\n")
 		}
 	}
 	if vm.rebaseConflictErrorHeadline != "" {
@@ -209,7 +241,7 @@ func (vm *RestackModel) View() string {
 			),
 		)
 	}
-	return sb.String()
+	return tea.NewView(sb.String())
 }
 
 func (vm *RestackModel) runSeqWithContinuationFlags() tea.Msg {

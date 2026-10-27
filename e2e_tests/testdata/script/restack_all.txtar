@@ -1,0 +1,29 @@
+# Test that restack --all restacks all branches in the repository.
+#
+#     main:    X
+#     stack-1:  \ -> 1 -> 2
+#     stack-1a:      \ -> 1a
+#     stack-1b:      \ -> 1b
+
+exec git switch main
+exec av branch stack-1
+commit-file my-file '1\n' 'Commit 1'
+
+exec git switch stack-1
+exec av branch stack-1a
+commit-file my-file '1a\n' 'Commit 1a'
+
+exec git switch stack-1
+exec av branch stack-1b
+commit-file my-file '1b\n' 'Commit 1b'
+
+exec git switch stack-1
+commit-file other-file '2\n' 'Commit 2'
+
+# After restacking from stack-1a, all branches should be updated.
+exec git switch stack-1a
+exec av restack --all
+
+# Both stack-1a and stack-1b should now be on top of stack-1 (including commit 2).
+exec git merge-base --is-ancestor stack-1 stack-1a
+exec git merge-base --is-ancestor stack-1 stack-1b

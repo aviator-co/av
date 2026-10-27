@@ -24,6 +24,14 @@ The CLI follows a flat command structure where commands are added as root-level 
 
 Some legacy subcommands remain (e.g., `av stack foreach`, `av pr status`) but new features should follow the flat structure.
 
+## Development Workflow
+
+After making code changes, always run the following checks and fix any issues before committing:
+
+1. Build: `go build ./...`
+2. Lint: `go tool golangci-lint run`
+3. Test (if relevant): `go test -v --vet=all ./...` or the specific package you changed
+
 ## Build and Development Commands
 
 ### Running the CLI
@@ -51,10 +59,10 @@ go test ./e2e_tests/...
 
 ### Linting
 
-The project uses golangci-lint for code quality checks:
+The project uses golangci-lint for code quality checks (pinned via `tool` directive in `go.mod`):
 
 ```bash
-golangci-lint run
+go tool golangci-lint run
 ```
 
 ### CLI Smoke Test
@@ -96,7 +104,7 @@ go run ./cmd/av --help
 
 ### Dependencies
 
-- Built with Go 1.24
+- Built with Go 1.26
 - **Cobra**: CLI framework for command structure and flag parsing
 - **githubv4**: GitHub GraphQL API client for PR and repository operations
 - **go-git**: Git operations library, supplemented with direct git command execution for complex operations

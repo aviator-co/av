@@ -6,12 +6,12 @@ import (
 	"os/exec"
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type GitFetchModel struct {
@@ -53,7 +53,7 @@ func (m *GitFetchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *GitFetchModel) View() string {
+func (m *GitFetchModel) View() tea.View {
 	var lines []string
 	if m.done {
 		if m.failed {
@@ -70,7 +70,7 @@ func (m *GitFetchModel) View() string {
 	if out := m.stderr.String(); out != "" {
 		lines = append(lines, "", lipgloss.NewStyle().MarginLeft(4).Render(out))
 	}
-	return strings.Join(lines, "\n")
+	return tea.NewView(strings.Join(lines, "\n"))
 }
 
 func (m *GitFetchModel) fetchBranches() tea.Msg {

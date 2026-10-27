@@ -4,34 +4,35 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
-// SetupBackgroundColorTypeFromEnv initializes the background color setting based on
-// AV_HAS_LIGHT_BG environment variable.
-//
-// Technically, if terminal sets COLORFGBG environment variable, lipgloss will use it to determine
-// if the background color is darker or lighter, but this doesn't necessarily work always, so we
-// provide a way to force the background color type.
+// hasDarkBackground is initialized once by SetupBackgroundColorTypeFromEnv
+// before the Bubble Tea loop starts and read via HasDarkBackground.
+var hasDarkBackground = true
+
+// SetupBackgroundColorTypeFromEnv determines whether the terminal has a dark
+// background and caches it in hasDarkBackground. Terminal detection isn't always
+// reliable, so AV_HAS_LIGHT_BG can force the result.
 func SetupBackgroundColorTypeFromEnv() {
 	envvar := strings.ToLower(os.Getenv("AV_HAS_LIGHT_BG"))
 	switch envvar {
 	case "true", "1", "yes", "y", "on":
-		lipgloss.SetHasDarkBackground(false)
+		hasDarkBackground = false
 	case "false", "0", "no", "n", "off":
-		lipgloss.SetHasDarkBackground(true)
+		hasDarkBackground = true
 	default:
-		// Otherwise, let lipgloss determine the background color based on the terminal.
+		// Query the terminal once, here, before any Bubble Tea program runs.
+		// lipgloss.HasDarkBackground does synchronous terminal I/O (raw-mode stdin,
+		// an OSC 11 write to stdout, then reads the reply), so it must not run while
+		// a program owns the terminal, and RenderError consumes the result from
+		// inside a View. v2's lipgloss doesn't cache it, so we store it ourselves.
+		hasDarkBackground = lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
 	}
-	// Workaround for lipgloss / MacOS Terminal.app issue.
-	//
-	// Inside HasDarkBackground() function, it'll eventually use termStatusReport(11) to get the
-	// current terminal background color.
-	//
-	// https://github.com/muesli/termenv/blob/98d742f6907a4622ef2e2f190123c86b6ec19b7b/termenv_unix.go#L95
-	//
-	// There are multiple locks in place until this call, but somehow if this is called in the
-	// Bubbletea loop, it'll deadlock / hang the program. So, we call it here before the loop
-	// starts, and once this is called, it'll be cached, so it'll never be called again.
-	lipgloss.HasDarkBackground()
+}
+
+// HasDarkBackground reports whether the terminal has a dark background, as
+// determined by SetupBackgroundColorTypeFromEnv.
+func HasDarkBackground() bool {
+	return hasDarkBackground
 }

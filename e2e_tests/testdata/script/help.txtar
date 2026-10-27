@@ -1,0 +1,3 @@
+# Smoke test: av --help should succeed and print usage.
+exec av --help
+stdout 'Usage:'

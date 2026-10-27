@@ -5,12 +5,12 @@ import (
 	"os"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +21,14 @@ var orphanFlags struct {
 var orphanCmd = &cobra.Command{
 	Use:   "orphan",
 	Short: "Orphan branches that are managed by av",
-	Args:  cobra.NoArgs,
+	Long: strings.TrimSpace(`
+Orphan the currently checked-out branch and any child branches that are managed by av.
+
+When run from the trunk branch, this orphans every av-managed branch because all managed
+branches descend from trunk.
+
+To manage orphaned branches with av again, re-adopt them with "av adopt".`),
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		ctx := cmd.Context()
 		repo, err := getRepo(ctx)
@@ -80,7 +87,7 @@ func (vm *orphanConfirmViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, vm.BaseStackedView.Update(msg)
 }
 
-func (vm *orphanConfirmViewModel) View() string {
+func (vm *orphanConfirmViewModel) View() tea.View {
 	return vm.BaseStackedView.View()
 }
 

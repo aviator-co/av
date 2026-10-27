@@ -1,0 +1,36 @@
+# Test that aborting a sync restores original state.
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+exec av branch stack-2
+cp $WORK/file-2a.txt my-file
+exec git add my-file
+exec git commit -m 'Commit 2a'
+
+# Introduce a conflicting commit on stack-1.
+exec git checkout stack-1
+cp $WORK/file-1b.txt my-file
+exec git add my-file
+exec git commit -m 'Commit 1b'
+
+# Sync should fail with conflict.
+! exec av sync --push=no --prune=no
+exists .git/REBASE_HEAD
+
+# Abort the sync.
+exec av sync --abort
+! exists .git/REBASE_HEAD
+
+# Should be back on stack-1 (starting branch).
+exec git rev-parse --abbrev-ref HEAD
+stdout '^stack-1$'
+
+# stack-2 parent metadata should be unchanged.
+branch-parent stack-2 stack-1
+
+-- file-2a.txt --
+1a
+2a
+-- file-1b.txt --
+1a
+1b

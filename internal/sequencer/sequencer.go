@@ -9,8 +9,8 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,7 +26,7 @@ type RestackOp struct {
 	// The new parent branch's hash. If not specified, the sequencer will use the new parent's
 	// branch hash if the new parent is not trunk. Or if the new parent is trunk, the sequencer
 	// will use the remote tracking branch's hash.
-	NewParentHash plumbing.Hash
+	NewParentHash string
 }
 
 type branchSnapshot struct {
@@ -39,7 +39,7 @@ type branchSnapshot struct {
 	// Commit hash that the branch was branched off from the parent. This
 	// can be empty when the parent branch is trunk, but this can be
 	// specified in some circumstances even if the parent is trunk.
-	BranchingPointCommitHash plumbing.Hash
+	BranchingPointCommitHash string
 }
 
 // Sequencer re-stacks the specified branches.
@@ -55,9 +55,14 @@ type Sequencer struct {
 	// ref.
 	CurrentSyncRef plumbing.ReferenceName
 	// If the rebase is stopped, these fields are set.
-	SequenceInterruptedNewParentHash plumbing.Hash
+	SequenceInterruptedNewParentHash string
 
 	Operations []RestackOp
+
+	// Worktrees that were detached before rebasing. Maps branch name (short) to worktree path.
+	DetachedWorktrees map[string]string
+	// Branches skipped due to dirty worktrees. Maps branch name (short) to reason.
+	SkippedBranches map[string]string
 }
 
 func NewSequencer(remoteName string, db meta.DB, ops []RestackOp) *Sequencer {
@@ -82,9 +87,7 @@ func getBranchSnapshots(db meta.DB) map[plumbing.ReferenceName]*branchSnapshot {
 		}
 		ret[snapshot.Name] = snapshot
 		snapshot.IsParentTrunk = avbr.Parent.Trunk
-		if avbr.Parent.BranchingPointCommitHash != "" {
-			snapshot.BranchingPointCommitHash = plumbing.NewHash(avbr.Parent.BranchingPointCommitHash)
-		}
+		snapshot.BranchingPointCommitHash = avbr.Parent.BranchingPointCommitHash
 	}
 	return ret
 }
@@ -102,6 +105,16 @@ func (seq *Sequencer) Run(
 	if seq.CurrentSyncRef == "" {
 		return nil, nil
 	}
+
+	if seq.DetachedWorktrees == nil {
+		if _, err := seq.PrepareWorktrees(ctx, repo); err != nil {
+			return nil, err
+		}
+		if seq.CurrentSyncRef == "" {
+			return nil, nil
+		}
+	}
+
 	return seq.rebaseBranch(ctx, repo, db)
 }
 
@@ -114,23 +127,26 @@ func (seq *Sequencer) runFromInterruptedState(
 	if seq.CurrentSyncRef == "" {
 		return nil, errors.New("no sync in progress")
 	}
-	if seq.SequenceInterruptedNewParentHash.IsZero() {
+	if seq.SequenceInterruptedNewParentHash == "" {
 		panic("broken interruption state: no new parent hash")
 	}
 	if seqAbort {
 		// Abort the rebase if we need to
-		if stat, _ := os.Stat(filepath.Join(repo.GitDir(), "REBASE_HEAD")); stat != nil {
+		if stat, _ := os.Stat(filepath.Join(repo.WorktreeGitDir(), "REBASE_HEAD")); stat != nil {
 			if _, err := repo.Rebase(ctx, git.RebaseOpts{Abort: true}); err != nil {
 				return nil, errors.Errorf("failed to abort in-progress rebase: %v", err)
 			}
 		}
 		seq.CurrentSyncRef = ""
-		seq.SequenceInterruptedNewParentHash = plumbing.ZeroHash
+		seq.SequenceInterruptedNewParentHash = ""
 		return nil, nil
 	}
 	if seqContinue {
 		if err := seq.checkNoUnstagedChanges(ctx, repo); err != nil {
-			return nil, err
+			return nil, errors.Errorf(
+				"refusing to sync: there are unstaged changes in the working tree at %s (use `git add` to stage changes)",
+				repo.Dir(),
+			)
 		}
 		result, err := repo.RebaseParse(ctx, git.RebaseOpts{Continue: true})
 		if err != nil {
@@ -172,7 +188,7 @@ func (seq *Sequencer) rebaseBranch(
 	}
 
 	var branchingPoint plumbing.Hash
-	if snapshot.BranchingPointCommitHash.IsZero() {
+	if snapshot.BranchingPointCommitHash == "" {
 		// If the branching point is not specified, find the merge-base with the parent's remote-tracking branch.
 		rtb, err := seq.getRemoteTrackingBranch(repo, snapshot.ParentBranch)
 		if err != nil {
@@ -184,11 +200,11 @@ func (seq *Sequencer) rebaseBranch(
 		}
 		branchingPoint = plumbing.NewHash(mb)
 	} else {
-		branchingPoint = snapshot.BranchingPointCommitHash
+		branchingPoint = plumbing.NewHash(snapshot.BranchingPointCommitHash)
 	}
 
 	var newParentHash plumbing.Hash
-	if op.NewParentHash.IsZero() {
+	if op.NewParentHash == "" {
 		if op.NewParentIsTrunk {
 			var err error
 			newParentHash, err = seq.getRemoteTrackingBranchCommit(repo, op.NewParent)
@@ -203,7 +219,7 @@ func (seq *Sequencer) rebaseBranch(
 			}
 		}
 	} else {
-		newParentHash = op.NewParentHash
+		newParentHash = plumbing.NewHash(op.NewParentHash)
 	}
 
 	// Handle a special case: If the current branch is already based on the new parent, and if
@@ -244,7 +260,7 @@ func (seq *Sequencer) rebaseBranch(
 				op.NewParent,
 				branchingPoint.String()[:7],
 			) + result.ErrorHeadline
-			seq.SequenceInterruptedNewParentHash = newParentHash
+			seq.SequenceInterruptedNewParentHash = newParentHash.String()
 			return result, nil
 		}
 	} else {
@@ -252,7 +268,7 @@ func (seq *Sequencer) rebaseBranch(
 			Status: git.RebaseAlreadyUpToDate,
 		}
 	}
-	if err := seq.postRebaseBranchUpdate(db, newParentHash); err != nil {
+	if err := seq.postRebaseBranchUpdate(db, newParentHash.String()); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -271,14 +287,149 @@ func (seq *Sequencer) checkNoUnstagedChanges(ctx context.Context, repo *git.Repo
 	return nil
 }
 
-func (seq *Sequencer) postRebaseBranchUpdate(db meta.DB, newParentHash plumbing.Hash) error {
+func (seq *Sequencer) PrepareWorktrees(ctx context.Context, repo *git.Repo) ([]string, error) {
+	seq.DetachedWorktrees = map[string]string{}
+	seq.SkippedBranches = map[string]string{}
+
+	worktrees, err := repo.WorktreeList(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	opBranches := map[string]bool{}
+	for _, op := range seq.Operations {
+		opBranches[op.Name.Short()] = true
+	}
+
+	skippedSet := map[string]bool{}
+
+	// Check if the main worktree is dirty. If so, skip its checked-out branch
+	// (and descendants) instead of hard-failing.
+	diff, err := repo.Diff(ctx, &git.DiffOpts{Quiet: true})
+	if err != nil {
+		return nil, err
+	}
+	if !diff.Empty {
+		mainBranch, err := repo.CurrentBranchName()
+		if err == nil && opBranches[mainBranch] {
+			reason := fmt.Sprintf("dirty working tree at %s", repo.Dir())
+			seq.SkippedBranches[mainBranch] = reason
+			skippedSet[mainBranch] = true
+		}
+	}
+
+	for _, wt := range worktrees {
+		if wt.Path == repo.Dir() || wt.Branch == "" {
+			continue
+		}
+		if !opBranches[wt.Branch] {
+			continue
+		}
+		clean, err := git.IsWorktreeClean(ctx, wt.Path)
+		if err != nil {
+			return nil, err
+		}
+		if !clean {
+			reason := fmt.Sprintf("dirty worktree at %s", wt.Path)
+			seq.SkippedBranches[wt.Branch] = reason
+			skippedSet[wt.Branch] = true
+		}
+	}
+
+	if len(skippedSet) > 0 {
+		seq.skipDescendants(skippedSet)
+		seq.removeSkippedOps()
+	}
+
+	var messages []string
+	for _, wt := range worktrees {
+		if wt.Path == repo.Dir() || wt.Branch == "" {
+			continue
+		}
+		if !opBranches[wt.Branch] || skippedSet[wt.Branch] {
+			continue
+		}
+		if err := git.DetachWorktreeHEAD(ctx, wt.Path); err != nil {
+			return nil, err
+		}
+		seq.DetachedWorktrees[wt.Branch] = wt.Path
+		messages = append(messages, fmt.Sprintf("Detached %s in %s", wt.Branch, wt.Path))
+	}
+
+	if seq.CurrentSyncRef != "" && seq.SkippedBranches[seq.CurrentSyncRef.Short()] != "" {
+		seq.advancePastSkipped()
+	}
+
+	return messages, nil
+}
+
+func (seq *Sequencer) skipDescendants(skippedSet map[string]bool) {
+	changed := true
+	for changed {
+		changed = false
+		for _, op := range seq.Operations {
+			branch := op.Name.Short()
+			if skippedSet[branch] {
+				continue
+			}
+			snapshot, ok := seq.OriginalBranchSnapshots[op.Name]
+			if !ok {
+				continue
+			}
+			parentShort := snapshot.ParentBranch.Short()
+			if skippedSet[parentShort] {
+				reason := fmt.Sprintf("parent %s was skipped", parentShort)
+				seq.SkippedBranches[branch] = reason
+				skippedSet[branch] = true
+				changed = true
+			}
+		}
+	}
+}
+
+func (seq *Sequencer) removeSkippedOps() {
+	var filtered []RestackOp
+	for _, op := range seq.Operations {
+		if seq.SkippedBranches[op.Name.Short()] == "" {
+			filtered = append(filtered, op)
+		}
+	}
+	seq.Operations = filtered
+}
+
+func (seq *Sequencer) advancePastSkipped() {
+	for _, op := range seq.Operations {
+		if seq.SkippedBranches[op.Name.Short()] == "" {
+			seq.CurrentSyncRef = op.Name
+			return
+		}
+	}
+	seq.CurrentSyncRef = ""
+}
+
+func (seq *Sequencer) RestoreWorktrees(ctx context.Context) []string {
+	if len(seq.DetachedWorktrees) == 0 {
+		return nil
+	}
+	var messages []string
+	for branch, wtPath := range seq.DetachedWorktrees {
+		if err := git.RestoreWorktreeBranch(ctx, wtPath, branch); err != nil {
+			messages = append(messages,
+				fmt.Sprintf("Failed to restore %s in %s (run 'git -C %s checkout %s' manually)", branch, wtPath, wtPath, branch))
+		}
+	}
+	seq.DetachedWorktrees = map[string]string{}
+	return messages
+}
+
+func (seq *Sequencer) postRebaseBranchUpdate(db meta.DB, newParentHash string) error {
 	op := seq.getCurrentOp()
 	newParentBranchState := meta.BranchState{
 		Name:  op.NewParent.Short(),
 		Trunk: op.NewParentIsTrunk,
 	}
 	if !op.NewParentIsTrunk {
-		newParentBranchState.BranchingPointCommitHash = newParentHash.String()
+		newParentBranchState.BranchingPointCommitHash = newParentHash
 	}
 
 	tx := db.WriteTx()
@@ -288,7 +439,7 @@ func (seq *Sequencer) postRebaseBranchUpdate(db meta.DB, newParentHash plumbing.
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	seq.SequenceInterruptedNewParentHash = plumbing.ZeroHash
+	seq.SequenceInterruptedNewParentHash = ""
 	for i, op := range seq.Operations {
 		if op.Name == seq.CurrentSyncRef {
 			if i+1 < len(seq.Operations) {

@@ -6,19 +6,19 @@ import (
 	"os/exec"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/errutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/erikgeiser/promptkit/selection"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing"
 )
 
 const (
@@ -27,7 +27,7 @@ const (
 
 	reasonNoPullRequest     = "PR not found."
 	reasonHasChild          = "PR is already merged, but still have a child."
-	reasonPRHeadNotFound    = "PR is already merged, but we cannot find which commit is merged."
+	reasonPRHeadFetchFailed = "PR is already merged, but failed to fetch the merged commit from the remote."
 	reasonPRHeadIsDifferent = "PR is already merged, but the local branch points to a different commit than the merged commit."
 )
 
@@ -115,7 +115,7 @@ func (vm *PruneBranchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			vm.done = true
 			return vm, vm.onDone()
 		}
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if vm.askingForConfirmation {
 			switch msg.String() {
 			case "enter":
@@ -147,24 +147,22 @@ func (vm *PruneBranchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm *PruneBranchModel) View() string {
+func (vm *PruneBranchModel) View() tea.View {
 	if vm.calculatingCandidates {
-		return colors.ProgressStyle.Render(vm.spinner.View() + "Finding the changed branches...\n")
+		return tea.NewView(colors.ProgressStyle.Render(vm.spinner.View() + "Finding the changed branches...\n"))
 	}
 
 	sb := strings.Builder{}
-	if len(vm.deleteCandidates) == 0 {
+	if vm.chooseNoPrune {
+		sb.WriteString(colors.SuccessStyle.Render("✓ Not deleting merged branches\n"))
+	} else if len(vm.deleteCandidates) == 0 {
 		sb.WriteString(colors.SuccessStyle.Render("✓ No merged branches to delete\n"))
 	} else if vm.askingForConfirmation {
 		sb.WriteString("Confirming the deletion of merged branches\n")
 	} else if vm.runningDeletion {
 		sb.WriteString(colors.ProgressStyle.Render(vm.spinner.View() + "Deleting merged branches...\n"))
 	} else if vm.done {
-		if vm.chooseNoPrune {
-			sb.WriteString(colors.SuccessStyle.Render("✓ Not deleting merged branches\n"))
-		} else {
-			sb.WriteString(colors.SuccessStyle.Render("✓ Deleted the merged branches\n"))
-		}
+		sb.WriteString(colors.SuccessStyle.Render("✓ Deleted the merged branches\n"))
 	}
 
 	if len(vm.noDeleteBranches) > 0 {
@@ -188,10 +186,10 @@ func (vm *PruneBranchModel) View() string {
 
 	if vm.deletePrompt != nil {
 		sb.WriteString("\n")
-		sb.WriteString(vm.deletePrompt.View())
+		sb.WriteString(vm.deletePrompt.View().Content)
 		sb.WriteString(vm.help.ShortHelpView(uiutils.PromptKeys))
 	}
-	return sb.String()
+	return tea.NewView(sb.String())
 }
 
 func (vm *PruneBranchModel) viewCandidates() string {
@@ -227,17 +225,23 @@ func (vm *PruneBranchModel) runDelete() tea.Msg {
 	for i := len(vm.deleteCandidates) - 1; i >= 0; i-- {
 		branch := vm.deleteCandidates[i]
 		if err := vm.repo.BranchDelete(context.Background(), branch.branch.Short()); err != nil {
-			// Check if the error is due to the branch being checked out in a worktree
-			if exiterr, ok := errutils.As[*exec.ExitError](err); ok &&
-				strings.Contains(string(exiterr.Stderr), "used by worktree") {
-				// Collect worktree branches but continue deleting others
+			var stderr string
+			if exiterr, ok := errutils.As[*exec.ExitError](err); ok {
+				stderr = strings.TrimSpace(string(exiterr.Stderr))
+			}
+			// Branches checked out in a worktree fail here; collect them and keep going.
+			if strings.Contains(stderr, "used by worktree") {
 				worktreeBranches = append(worktreeBranches, branch.branch.Short())
 				continue
-			} else {
-				// Other errors are fatal
-				deletionErr = errors.Errorf("cannot delete merged branch %q: %v", branch.branch.Short(), err)
-				break
 			}
+			// Other errors are fatal. Surface the git stderr so users see the
+			// actual cause rather than just "exit status 1".
+			errMsg := err.Error()
+			if stderr != "" {
+				errMsg = stderr
+			}
+			deletionErr = errors.Errorf("cannot delete merged branch %q: %s", branch.branch.Short(), errMsg)
+			break
 		}
 		tx := vm.db.WriteTx()
 		tx.DeleteBranch(branch.branch.Short())
@@ -335,12 +339,15 @@ func (vm *PruneBranchModel) CheckoutInitialState() error {
 }
 
 func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
-	remoteBranches, err := vm.repo.LsRemote(context.Background(), vm.repo.GetRemoteName())
-	if err != nil {
-		return err
+	if vm.chooseNoPrune {
+		return &PruneBranchProgress{candidateCalculationDone: true}
+	}
+	type mergedBranch struct {
+		branch   plumbing.ReferenceName
+		prNumber int64
 	}
 	var noDeleteBranches []noDeleteBranch
-	var deleteCandidates []deleteCandidate
+	var mergedBranches []mergedBranch
 	for _, br := range vm.targetBranches {
 		avbr, _ := vm.db.ReadTx().Branch(br.Short())
 		if avbr.MergeCommit == "" {
@@ -360,26 +367,51 @@ func (vm *PruneBranchModel) calculateMergedBranches() tea.Msg {
 			)
 			continue
 		}
-		remoteHash, ok := remoteBranches[fmt.Sprintf("refs/pull/%d/head", avbr.PullRequest.Number)]
-		if !ok {
-			noDeleteBranches = append(
-				noDeleteBranches,
-				noDeleteBranch{branch: br, reason: reasonPRHeadNotFound},
-			)
-			continue
+		mergedBranches = append(
+			mergedBranches,
+			mergedBranch{branch: br, prNumber: avbr.PullRequest.Number},
+		)
+	}
+
+	var deleteCandidates []deleteCandidate
+	if len(mergedBranches) > 0 {
+		refs := make([]string, 0, len(mergedBranches))
+		for _, mb := range mergedBranches {
+			refs = append(refs, fmt.Sprintf("refs/pull/%d/head", mb.prNumber))
 		}
-		ref, err := vm.repo.GoGitRepo().Reference(br, true)
+		remoteRefs, err := vm.repo.FetchRemoteRefs(
+			context.Background(),
+			vm.repo.GetRemoteName(),
+			refs,
+		)
 		if err != nil {
 			return err
 		}
-		if ref.Hash().String() != remoteHash {
-			noDeleteBranches = append(
-				noDeleteBranches,
-				noDeleteBranch{branch: br, reason: reasonPRHeadIsDifferent},
+		for _, mb := range mergedBranches {
+			remoteHash, ok := remoteRefs[fmt.Sprintf("refs/pull/%d/head", mb.prNumber)]
+			if !ok {
+				noDeleteBranches = append(
+					noDeleteBranches,
+					noDeleteBranch{branch: mb.branch, reason: reasonPRHeadFetchFailed},
+				)
+				continue
+			}
+			ref, err := vm.repo.GoGitRepo().Reference(mb.branch, true)
+			if err != nil {
+				return err
+			}
+			if ref.Hash().String() != remoteHash {
+				noDeleteBranches = append(
+					noDeleteBranches,
+					noDeleteBranch{branch: mb.branch, reason: reasonPRHeadIsDifferent},
+				)
+				continue
+			}
+			deleteCandidates = append(
+				deleteCandidates,
+				deleteCandidate{branch: mb.branch, commit: ref.Hash()},
 			)
-			continue
 		}
-		deleteCandidates = append(deleteCandidates, deleteCandidate{branch: br, commit: ref.Hash()})
 	}
 	vm.noDeleteBranches = noDeleteBranches
 	vm.deleteCandidates = deleteCandidates

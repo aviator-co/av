@@ -6,8 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/config"
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/gh/ghui"
 	"github.com/aviator-co/av/internal/git"
@@ -19,20 +21,21 @@ import (
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
 var syncFlags struct {
-	All           bool
-	RebaseToTrunk bool
-	Current       bool
-	Abort         bool
-	Continue      bool
-	Skip          bool
-	Push          string
-	Prune         string
+	All              bool
+	RebaseToTrunk    bool
+	Current          bool
+	Abort            bool
+	Continue         bool
+	Skip             bool
+	Push             string
+	Prune            string
+	FastForwardTrunk bool
 }
 
 var syncCmd = &cobra.Command{
@@ -84,6 +87,9 @@ but can still be synced explicitly.
 		if cmd.Flags().Changed("parent") {
 			return actions.ErrExitSilently{ExitCode: 1}
 		}
+		if !cmd.Flags().Changed("ff-trunk") {
+			syncFlags.FastForwardTrunk = config.Av.Sync.FastForwardTrunk
+		}
 		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
@@ -111,9 +117,10 @@ type savedSyncState struct {
 }
 
 type syncState struct {
-	TargetBranches []plumbing.ReferenceName
-	Prune          string
-	Push           string
+	TargetBranches   []plumbing.ReferenceName
+	Prune            string
+	Push             string
+	FastForwardTrunk bool
 }
 
 type syncViewModel struct {
@@ -289,6 +296,16 @@ func (vm *syncViewModel) initPruneBranches() tea.Cmd {
 		vm.state.Prune,
 		vm.state.TargetBranches,
 		vm.restackState.InitialBranch,
+		vm.initFastForwardTrunk,
+	))
+}
+
+func (vm *syncViewModel) initFastForwardTrunk() tea.Cmd {
+	if !vm.state.FastForwardTrunk {
+		return tea.Quit
+	}
+	return vm.AddView(gitui.NewFastForwardTrunkModel(
+		vm.repo,
 		func() tea.Cmd {
 			return tea.Quit
 		},
@@ -302,6 +319,12 @@ func (vm *syncViewModel) readState() (*savedSyncState, error) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
+	}
+	if !vm.repo.IsRebaseInProgress() {
+		if err := vm.repo.WriteStateFile(git.StateFileKindSyncV2, nil); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	}
 	return &state, nil
 }
@@ -321,8 +344,9 @@ func (vm *syncViewModel) createState() (*savedSyncState, error) {
 	state := savedSyncState{
 		RestackState: &sequencerui.RestackState{},
 		SyncState: &syncState{
-			Push:  syncFlags.Push,
-			Prune: syncFlags.Prune,
+			Push:             syncFlags.Push,
+			Prune:            syncFlags.Prune,
+			FastForwardTrunk: syncFlags.FastForwardTrunk,
 		},
 	}
 	status, err := vm.repo.Status(ctx)
@@ -422,7 +446,24 @@ func (m *preAvSyncHookModel) Init() tea.Cmd {
 		return uiutils.ErrCmd(err)
 	}
 	m.hasHook = true
-	cmd := m.repo.Cmd(context.Background(), []string{"hook", "run", "--ignore-missing", "pre-av-sync"}, nil)
+	ctx := context.Background()
+	cmd := m.repo.Cmd(ctx, m.repo.HookRunArgs(ctx, "pre-av-sync"), nil)
+	if !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
+		// When not in a terminal, run the hook as a regular subprocess instead of
+		// tea.ExecProcess. ExecProcess tries to suspend and re-initialize bubbletea's
+		// terminal reader after the process exits, which causes a nil pointer
+		// dereference when there is no TTY (e.g., running from an IDE or script).
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return func() tea.Msg {
+			if err := cmd.Run(); err != nil {
+				return errors.Errorf("pre-av-sync hook failed: %v", err)
+			}
+			m.complete = true
+			return preAvSyncHookProgress{}
+		}
+	}
 	// Use tea.ExecProcess so that the hook can take over the terminal, allowing user to create
 	// an interactive hook.
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
@@ -442,11 +483,11 @@ func (m *preAvSyncHookModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *preAvSyncHookModel) View() string {
+func (m *preAvSyncHookModel) View() tea.View {
 	if !m.hasHook {
 		// Do not even render anything if there is no hook for simplicity. We show the
 		// status only when the hook exists.
-		return ""
+		return tea.NewView("")
 	}
 	// NOTE: It is tempting to add a spinner here, but because the hook runs with a terminal
 	// control, the spinner actually doesn't render / updated until the hook is done. Because
@@ -456,13 +497,13 @@ func (m *preAvSyncHookModel) View() string {
 	// Due to this, we will have a better visual experience by not showing a spinner at all
 	// here.
 	if m.complete {
-		return colors.SuccessStyle.Render("✓ pre-av-sync hook completed")
+		return tea.NewView(colors.SuccessStyle.Render("✓ pre-av-sync hook completed"))
 	}
 	// We don't have to render anything here because the pre-av-sync failure message will be
 	// rendered through error. The stdout / stderr of the hook will be shown directly in the
 	// terminal as bubbletea won't erase the terminal content prior to the terminal control
 	// take over.
-	return ""
+	return tea.NewView("")
 }
 
 func init() {
@@ -487,6 +528,10 @@ func init() {
 		&syncFlags.RebaseToTrunk, "rebase-to-trunk", false,
 		"rebase the branches to the latest trunk always",
 	)
+	syncCmd.Flags().BoolVar(
+		&syncFlags.FastForwardTrunk, "ff-trunk", false,
+		"fast-forward the local trunk branch to match the remote",
+	)
 
 	syncCmd.Flags().BoolVar(
 		&syncFlags.Continue, "continue", false,
@@ -504,19 +549,22 @@ func init() {
 	syncCmd.MarkFlagsMutuallyExclusive("continue", "abort", "skip")
 
 	// Deprecated flags
-	syncCmd.Flags().Bool("no-fetch", false,
+	syncCmd.Flags().Bool(
+		"no-fetch", false,
 		"(deprecated; use av restack for offline restacking) do not fetch the latest status from GitHub",
 	)
 	_ = syncCmd.Flags().
 		MarkDeprecated("no-fetch", "please use av restack for offline restacking")
 
-	syncCmd.Flags().Bool("trunk", false,
+	syncCmd.Flags().Bool(
+		"trunk", false,
 		"(deprecated; use --rebase-to-trunk to rebase all branches to trunk) rebase the stack on the trunk branch",
 	)
 	_ = syncCmd.Flags().
 		MarkDeprecated("trunk", "please use --rebase-to-trunk to rebase all branches to trunk")
 
-	syncCmd.Flags().String("parent", "",
+	syncCmd.Flags().String(
+		"parent", "",
 		"(deprecated; use 'av adopt' or 'av reparent') parent branch to rebase onto",
 	)
 	_ = syncCmd.Flags().

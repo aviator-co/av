@@ -1,0 +1,20 @@
+# Test adopting branches when an av-managed stack root exists.
+#
+# stack-1 is created with av, then stack-2..4 created with plain git.
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+commit-file my-file '1b\n' 'Commit 1b'
+
+exec git checkout -b stack-2
+commit-file my-file '2a\n' 'Commit 2a'
+commit-file my-file '2b\n' 'Commit 2b'
+exec git checkout -b stack-3
+commit-file my-file '3a\n' 'Commit 3a'
+commit-file my-file '3b\n' 'Commit 3b'
+exec git switch stack-1
+exec git checkout -b stack-4
+commit-file my-file '4a\n' 'Commit 4a'
+commit-file my-file '4b\n' 'Commit 4b'
+
+exec git switch stack-1
+exec av adopt --dry-run

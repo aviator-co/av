@@ -1,8 +1,8 @@
 package uiutils
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type BaseStackedView struct {
@@ -20,7 +20,7 @@ func (vm *BaseStackedView) Update(msg tea.Msg) tea.Cmd {
 	// in its own Update, and return itself as the model. This method only
 	// handles updating the internal view stack and returns a command.
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return tea.Quit
 		}
@@ -39,10 +39,10 @@ func (vm *BaseStackedView) Update(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
-func (vm *BaseStackedView) View() string {
+func (vm *BaseStackedView) View() tea.View {
 	var ss []string
 	for _, v := range vm.views {
-		r := v.View()
+		r := v.View().Content
 		if r != "" {
 			ss = append(ss, r)
 		}
@@ -61,7 +61,7 @@ func (vm *BaseStackedView) View() string {
 	if len(ret) > 0 && ret[len(ret)-1] != '\n' {
 		ret += "\n"
 	}
-	return ret
+	return tea.NewView(ret)
 }
 
 func (vm *BaseStackedView) AddView(m tea.Model) tea.Cmd {

@@ -1,0 +1,42 @@
+# Test sync when multiple branches are merged together into main.
+#
+#     stack-1: main -> 1a -> 1b
+#     stack-2:                \ -> 2a -> 2b
+#     stack-3:                            \ -> 3a -> 3b
+#
+# Both stack-1 and stack-2 are squash-merged into main together.
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+commit-file my-file '1a\n1b\n' 'Commit 1b'
+exec av branch stack-2
+commit-file my-file '1a\n1b\n2a\n' 'Commit 2a'
+commit-file my-file '1a\n1b\n2a\n2b\n' 'Commit 2b'
+exec av branch stack-3
+commit-file my-file '1a\n1b\n2a\n2b\n3a\n' 'Commit 3a'
+commit-file my-file '1a\n1b\n2a\n2b\n3a\n3b\n' 'Commit 3b'
+
+exec av sync
+
+# Squash-merge stack-2 (which includes stack-1) into main.
+exec git checkout main
+exec git merge --squash stack-2
+exec git commit --no-edit
+exec git push origin main
+
+# Mark both stack-1 and stack-2 as having the same merge commit.
+set-branch-merge-commit stack-1 main
+set-branch-merge-commit stack-2 main
+
+# Verify squash commit is NOT yet an ancestor of stack-3.
+! exec git merge-base --is-ancestor main stack-3
+
+# Must be on a stack branch to avoid "sync all stacks?" prompt.
+exec git checkout stack-3
+exec av sync
+
+# After sync, main should be an ancestor of stack-3.
+exec git merge-base --is-ancestor main stack-3
+
+# stack-3 should be re-rooted onto main.
+branch-parent stack-3 main

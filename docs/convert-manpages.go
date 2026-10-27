@@ -106,7 +106,7 @@ func previewMarkdown(fp string) error {
 
 	switch runtime.GOOS {
 	case "darwin", "freebsd":
-		cmd := exec.CommandContext(context.Background(), "mandoc", "-a")
+		cmd := exec.CommandContext(context.Background(), "mandoc")
 		cmd.Stdin = bytes.NewBuffer(roff)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

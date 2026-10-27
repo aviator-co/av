@@ -31,7 +31,8 @@ var rootFlags struct {
 }
 
 var rootCmd = &cobra.Command{
-	Use: "av",
+	Use:     "av",
+	Version: config.Version,
 
 	// Don't automatically print errors or usage information (we handle that ourselves).
 	// Cobra still prints usage if you return cmd.Usage() from RunE.
@@ -86,6 +87,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.SetVersionTemplate("{{.Version}}\n")
 	rootCmd.PersistentFlags().BoolVar(
 		&rootFlags.Debug, "debug", false,
 		"enable verbose debug logging",
@@ -123,17 +125,24 @@ func init() {
 	)
 }
 
+// main keeps os.Exit in a thin wrapper so that run's defers (e.g. closing the
+// git repo) always fire before the process exits.
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	// Note: this doesn't include whatever time is spent in initializing the
 	// runtime and various packages (e.g., package init functions).
 	startTime := time.Now()
 	colors.SetupBackgroundColorTypeFromEnv()
+	defer func() { _ = cachedRepo.Close() }()
 	err := rootCmd.Execute()
 	logrus.WithField("duration", time.Since(startTime)).Debug("command exited")
 	checkCliVersion()
 	var exitSilently actions.ErrExitSilently
 	if errors.As(err, &exitSilently) {
-		os.Exit(exitSilently.ExitCode)
+		return exitSilently.ExitCode
 	}
 	if err != nil {
 		// In debug mode, show more detailed information about the error
@@ -145,8 +154,9 @@ func main() {
 			fmt.Fprint(os.Stderr, uiutils.RenderError(err))
 		}
 
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 func checkCliVersion() {
@@ -167,7 +177,9 @@ func checkCliVersion() {
 		return
 	}
 	logrus.WithField("latest", latest).Debug("fetched latest released version")
-	if semver.Compare(config.Version, latest) < 0 {
+	currentBase := strings.TrimSuffix(config.Version, semver.Prerelease(config.Version))
+	latestBase := strings.TrimSuffix(latest, semver.Prerelease(latest))
+	if semver.Compare(currentBase, latestBase) < 0 {
 		c := color.New(color.Faint, color.Bold)
 		fmt.Fprint(
 			os.Stderr,

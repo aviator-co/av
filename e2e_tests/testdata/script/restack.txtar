@@ -1,0 +1,68 @@
+# Test restacking a four-branch stack with conflicts.
+#
+#     stack-1: main -> 1a
+#     stack-2:           \ -> 2a
+#     stack-3:           |    \ -> 3a
+#     stack-4:           \ -> 4a
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+exec av branch stack-2
+commit-file my-file '1a\n2a\n' 'Commit 2a'
+exec av branch stack-3
+commit-file different-file '1a\n2a\n3a\n' 'Commit 3a'
+exec git checkout stack-1
+exec av branch stack-4
+commit-file another-file '1a\n4a\n' 'Commit 4a'
+exec git checkout stack-3
+
+# Up to date: restack should be a no-op.
+exec av restack
+
+# Add a conflicting commit to stack-1.
+exec git checkout stack-1
+commit-file my-file '1a\n1b\n' 'Commit 1b'
+exec git checkout stack-3
+
+# Restack should hit a conflict on stack-2.
+! exec av restack
+stdout 'error: could not apply'
+stdout 'av restack --continue'
+
+# Continuing without resolving should fail.
+! exec av restack --continue
+
+# Resolve conflict and continue.
+cp $WORK/resolved.txt my-file
+exec git add my-file
+exec av restack --continue
+
+# stack-3 should have exactly 1 commit beyond stack-2.
+exec git log --oneline stack-2..stack-3
+stdout 'Commit 3a'
+! stdout 'Commit 2a'
+
+# stack-2 should be up to date with stack-1.
+exec git merge-base --is-ancestor stack-1 stack-2
+
+# Further restack should be a no-op.
+exec av restack
+stdout 'Restack is done'
+
+# 4 total commits from main to stack-3 (1a, 1b, 2a, 3a).
+exec git rev-list --count stack-3 ^main
+stdout '^4$'
+
+# Verify metadata.
+branch-parent stack-1 main
+branch-parent stack-2 stack-1
+branch-parent-hash stack-2 stack-1
+branch-parent stack-3 stack-2
+branch-parent-hash stack-3 stack-2
+branch-parent stack-4 stack-1
+branch-parent-hash stack-4 stack-1
+
+-- resolved.txt --
+1a
+1b
+2a

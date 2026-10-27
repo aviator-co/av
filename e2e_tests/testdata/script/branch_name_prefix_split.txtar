@@ -1,0 +1,11 @@
+# Test that av branch --split applies the configured branch name prefix.
+set-branch-prefix feature/
+
+exec av branch base-branch
+commit-file file1.txt content1
+commit-file file2.txt content2
+
+exec av branch --split
+
+exec git branch --show-current
+stdout '^feature/write-file2-txt$'

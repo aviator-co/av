@@ -1,0 +1,9 @@
+# Test that squash fails on a branch not managed by av.
+exec git fetch
+
+exec git checkout -b unmanaged-branch
+commit-file file1.txt content1 'first commit'
+commit-file file2.txt content2 'second commit'
+
+! exec av squash
+stderr 'current branch does not exist in the database'

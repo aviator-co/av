@@ -3,9 +3,9 @@ package main
 import (
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/aviator-co/av/internal/git/gittest"
 	"github.com/aviator-co/av/internal/meta"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,11 +40,11 @@ func TestOrphanFromTrunkDeniedPromptDoesNotOrphanBranches(t *testing.T) {
 		_ = cmd()
 	}
 
-	_, cmd := vm.Update(tea.KeyMsg{Type: tea.KeyDown})
+	_, cmd := vm.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if cmd != nil {
 		_ = cmd()
 	}
-	_, cmd = vm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd = vm.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
 		_ = cmd()
 	}

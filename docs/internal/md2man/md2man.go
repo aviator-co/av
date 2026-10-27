@@ -10,7 +10,8 @@ var returns = regexp.MustCompile(`\n+`)
 
 func RenderToRoff(text []byte, section int, version, source, volume string) []byte {
 	renderer := NewRoffRenderer(section, version, source, volume)
-	bs := blackfriday.Run(text,
+	bs := blackfriday.Run(
+		text,
 		[]blackfriday.Option{
 			blackfriday.WithRenderer(renderer),
 			blackfriday.WithExtensions(renderer.GetExtensions()),

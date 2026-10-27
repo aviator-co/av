@@ -21,7 +21,8 @@ func AddPullRequestReviewers(
 	prID githubv4.ID,
 	reviewers []string,
 ) error {
-	_, _ = fmt.Fprint(os.Stderr,
+	_, _ = fmt.Fprint(
+		os.Stderr,
 		"  - adding ", colors.UserInput(len(reviewers)), " reviewer(s) to pull request\n",
 	)
 

@@ -1,0 +1,24 @@
+# Test basic squash of multiple commits.
+exec git fetch
+
+exec av branch feature-branch
+commit-file file1.txt content1 'first commit'
+commit-file file2.txt content2 'second commit'
+commit-file file3.txt content3 'third commit'
+
+# Should have 3 commits.
+exec git rev-list --count feature-branch ^main
+stdout '^3$'
+
+# Squash all commits.
+exec av squash
+stderr 'Successfully squashed 3 commits'
+
+# Should have 1 commit now.
+exec git rev-list --count feature-branch ^main
+stdout '^1$'
+
+# All files should still exist.
+exists file1.txt
+exists file2.txt
+exists file3.txt

@@ -1,0 +1,12 @@
+# Test that av commit -b applies the configured branch name prefix.
+set-branch-prefix user/myname/
+
+cp $WORK/test.txt test.txt
+exec git add test.txt
+exec av commit -b -m 'test branch creation'
+
+exec git branch --show-current
+stdout '^user/myname/test-branch-creation$'
+
+-- test.txt --
+test content

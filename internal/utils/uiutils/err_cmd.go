@@ -1,6 +1,6 @@
 package uiutils
 
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
 // ErrCmd wraps an error into a tea.Cmd that returns the error as a message.
 //

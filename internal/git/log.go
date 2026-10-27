@@ -87,7 +87,7 @@ func trimNUL(s string) string {
 func FindClosesPullRequestComments(cis []*CommitInfo) map[int64]string {
 	ret := map[int64]string{}
 	for _, ci := range cis {
-		matches := closeCommitPattern.FindAllStringSubmatch(ci.Body, -1)
+		matches := closeCommitPattern.FindAllStringSubmatch(ci.Subject+"\n"+ci.Body, -1)
 		for _, match := range matches {
 			prNum, _ := strconv.ParseInt(match[1], 10, 64)
 			ret[prNum] = ci.Hash

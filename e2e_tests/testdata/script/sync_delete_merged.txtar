@@ -1,0 +1,37 @@
+# Test that sync deletes merged branches.
+#
+#     main:    X
+#     stack-1:  \ -> 1a -> 1b
+#     stack-2:              \ -> 2a -> 2b
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+commit-file my-file '1a\n1b\n' 'Commit 1b'
+exec av branch stack-2
+commit-file my-file '1a\n1b\n2a\n' 'Commit 2a'
+commit-file my-file '1a\n1b\n2a\n2b\n' 'Commit 2b'
+
+exec av sync --push=no --prune=no
+
+# Simulate the pull branch ref on the remote.
+exec git push origin stack-1:refs/pull/42/head
+
+# Squash-merge stack-1 into main.
+exec git checkout main
+exec git merge --squash stack-1
+exec git commit --no-edit
+exec git push origin main
+
+# Configure mock PR and av metadata.
+set-branch-pr stack-1 nodeid-42 42 OPEN
+mock-pull stack-1 42 MERGED HEAD
+
+exec git switch stack-1
+exec av sync --prune=yes
+
+# stack-1 should be deleted.
+! exec git show-ref refs/heads/stack-1
+
+# HEAD should be on main.
+exec git rev-parse --symbolic-full-name HEAD
+stdout '^refs/heads/main$'

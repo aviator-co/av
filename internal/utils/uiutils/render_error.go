@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/styles"
-	"github.com/charmbracelet/lipgloss"
 )
 
 var (
@@ -35,7 +35,7 @@ Please run ` + "`av adopt`" + ` to adopt the parent branch first.
 
 func RenderError(err error) string {
 	var style string
-	if lipgloss.HasDarkBackground() {
+	if colors.HasDarkBackground() {
 		style = styles.DarkStyle
 	} else {
 		style = styles.LightStyle

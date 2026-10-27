@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	avconfig "github.com/aviator-co/av/internal/config"
@@ -15,16 +19,11 @@ import (
 	"github.com/aviator-co/av/internal/utils/ghutils"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/dustin/go-humanize"
 	"github.com/erikgeiser/promptkit/selection"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/shurcooL/githubv4"
+	"github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/object"
 )
 
 const (
@@ -37,6 +36,14 @@ const (
 	reasonPRIsClosed        = "PR is closed."
 	reasonParentNotPushed   = "Parent branch is not pushed to remote."
 	reasonNoPR              = "Some branches in a stack do not have a PR."
+
+	// gitPushChunkSize caps how many ref updates we send in a single
+	// `git push` invocation. GitHub rejects pushes with more than 20 ref
+	// updates ("max ref updates exceeded"), so we split the candidate set
+	// into chunks of this size and push each one separately. Each chunk is
+	// still atomic (--atomic), but the operation as a whole is not
+	// (#638).
+	gitPushChunkSize = 20
 )
 
 type pushCandidate struct {
@@ -137,7 +144,7 @@ func (vm *GitHubPushModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			vm.done = true
 			return vm, vm.onDone()
 		}
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if vm.askingForConfirmation {
 			switch msg.String() {
 			case "enter":
@@ -169,9 +176,9 @@ func (vm *GitHubPushModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return vm, nil
 }
 
-func (vm *GitHubPushModel) View() string {
+func (vm *GitHubPushModel) View() tea.View {
 	if vm.calculatingCandidates {
-		return colors.ProgressStyle.Render(vm.spinner.View() + "Finding the changed branches...")
+		return tea.NewView(colors.ProgressStyle.Render(vm.spinner.View() + "Finding the changed branches..."))
 	}
 
 	sb := strings.Builder{}
@@ -214,10 +221,10 @@ func (vm *GitHubPushModel) View() string {
 
 	if vm.pushPrompt != nil {
 		sb.WriteString("\n")
-		sb.WriteString(vm.pushPrompt.View())
+		sb.WriteString(vm.pushPrompt.View().Content)
 		sb.WriteString(vm.help.ShortHelpView(uiutils.PromptKeys))
 	}
-	return sb.String()
+	return tea.NewView(sb.String())
 }
 
 func (vm *GitHubPushModel) viewPushCandidates() string {
@@ -287,32 +294,47 @@ func (vm *GitHubPushModel) runUpdate() (ret tea.Msg) {
 
 func (vm *GitHubPushModel) runGitPush() error {
 	ctx := context.Background()
-	pushArgs := []string{"push", vm.repo.GetRemoteName(), "--atomic"}
-	for _, branch := range vm.pushCandidates {
-		// Do a compare-and-swap to be strict on what we show as a difference.
-		pushArgs = append(
-			pushArgs,
-			fmt.Sprintf(
-				"--force-with-lease=%s:%s",
-				branch.branch.String(),
-				branch.remoteCommit.Hash.String(),
-			),
-		)
-	}
-	for _, branch := range vm.pushCandidates {
-		// Push the exact commit hash to be strict on what we show as a difference.
-		pushArgs = append(pushArgs,
-			fmt.Sprintf("%s:%s", branch.localCommit.Hash.String(), branch.branch.String()),
-		)
-	}
-	res, err := vm.repo.Run(ctx, &git.RunOpts{
-		Args: pushArgs,
-	})
-	if err != nil {
-		return errors.WrapIff(err, "failed to push branches to GitHub")
-	}
-	if res.ExitCode != 0 {
-		return errors.Errorf("failed to push branches to GitHub\n%s\n%s", res.Stdout, res.Stderr)
+	// Split into chunks so we don't exceed GitHub's per-push ref-update
+	// limit (#638). Each chunk is still atomic on its own; only the
+	// cross-chunk operation is non-atomic.
+	for start := 0; start < len(vm.pushCandidates); start += gitPushChunkSize {
+		end := start + gitPushChunkSize
+		if end > len(vm.pushCandidates) {
+			end = len(vm.pushCandidates)
+		}
+		chunk := vm.pushCandidates[start:end]
+		pushArgs := []string{"push", vm.repo.GetRemoteName(), "--atomic"}
+		for _, branch := range chunk {
+			// Do a compare-and-swap to be strict on what we show as a difference.
+			pushArgs = append(
+				pushArgs,
+				fmt.Sprintf(
+					"--force-with-lease=%s:%s",
+					branch.branch.String(),
+					branch.remoteCommit.Hash.String(),
+				),
+			)
+		}
+		for _, branch := range chunk {
+			// Push the exact commit hash to be strict on what we show as a difference.
+			pushArgs = append(
+				pushArgs,
+				fmt.Sprintf("%s:%s", branch.localCommit.Hash.String(), branch.branch.String()),
+			)
+		}
+		res, err := vm.repo.Run(ctx, &git.RunOpts{
+			Args: pushArgs,
+		})
+		if err != nil {
+			return errors.WrapIff(err, "failed to push branches to GitHub")
+		}
+		if res.ExitCode != 0 {
+			return errors.Errorf(
+				"failed to push branches to GitHub\n%s\n%s",
+				res.Stdout,
+				res.Stderr,
+			)
+		}
 	}
 
 	var errs []error
@@ -387,10 +409,9 @@ func (vm *GitHubPushModel) updatePRs(ghPRs map[plumbing.ReferenceName]*gh.PullRe
 			stackToWrite,
 			vm.db.ReadTx(),
 		)
-		if _, err := vm.client.UpdatePullRequest(context.Background(), githubv4.UpdatePullRequestInput{
-			PullRequestID: pr.ID,
-			BaseRefName:   githubv4.NewString(githubv4.String(avbr.Parent.Name)),
-			Body:          githubv4.NewString(githubv4.String(prBody)),
+		if _, err := vm.client.UpdatePullRequestIfChanged(context.Background(), pr, gh.UpdatePullRequestFields{
+			Body:        gh.Ptr(prBody),
+			BaseRefName: gh.Ptr(avbr.Parent.Name),
 		}); err != nil {
 			return err
 		}

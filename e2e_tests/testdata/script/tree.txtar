@@ -1,0 +1,13 @@
+# Test that av tree runs successfully with a multi-branch stack.
+
+exec av branch foo
+commit-file foo foo
+
+exec av branch bar
+commit-file bar bar
+
+exec git checkout main
+exec av branch spam
+commit-file spam spam
+
+exec av tree

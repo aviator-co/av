@@ -4,15 +4,15 @@ import (
 	"context"
 	"strings"
 
-	"github.com/aviator-co/av/internal/utils/sliceutils"
-
 	"github.com/aviator-co/av/internal/editor"
 	"github.com/aviator-co/av/internal/git"
+	"github.com/aviator-co/av/internal/utils/sliceutils"
 	"github.com/aviator-co/av/internal/utils/typeutils"
 )
 
 // EditPlan opens the user's editor and allows them to edit the plan.
 func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
+	shortToFull := make(map[string]string)
 	text := strings.Builder{}
 	for i, cmd := range plan {
 		if i > 0 && typeutils.Is[StackBranchCmd](cmd) {
@@ -21,7 +21,7 @@ func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 			// branches.
 			text.WriteString("\n")
 		}
-		text.WriteString(cmd.String())
+		text.WriteString(cmd.EditorString(shortToFull))
 		text.WriteString("\n")
 	}
 	text.WriteString(instructionsText)
@@ -42,7 +42,7 @@ func EditPlan(ctx context.Context, repo *git.Repo, plan []Cmd) ([]Cmd, error) {
 		if line == "" {
 			continue
 		}
-		cmd, err := ParseCmd(line)
+		cmd, err := ParseCmd(line, shortToFull)
 		if err != nil {
 			return nil, err
 		}
@@ -91,4 +91,14 @@ const instructionsText = `
 # p, pick <commit-id>
 #         Pick a commit to be included in the stack. Only valid after a
 #         stack-branch command.
+# s, squash <commit-id>
+#         Like pick, but squash the commit into the previous commit. The editor
+#         will open to combine the two commit messages.
+# f, fixup <commit-id>
+#         Like squash, but discard the commit message and keep only the previous
+#         commit's message.
+#
+# Commits with a "fixup!" or "squash!" message prefix (created by
+# "git commit --fixup" or "git commit --squash") are automatically placed
+# after their target commit and set to the appropriate action.
 `

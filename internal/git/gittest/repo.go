@@ -12,9 +12,9 @@ import (
 	avgit "github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/meta/jsonfiledb"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/kr/text"
 	"github.com/stretchr/testify/require"
 )
@@ -122,7 +122,7 @@ type GitTestRepo struct {
 }
 
 func (r *GitTestRepo) AsAvGitRepo() *avgit.Repo {
-	repo, err := avgit.OpenRepo(r.RepoDir, r.GitDir)
+	repo, err := avgit.OpenRepo(r.RepoDir, r.GitDir, r.GitDir)
 	if err != nil {
 		panic(fmt.Sprintf("failed to open av git repo: %v", err))
 	}
@@ -142,13 +142,14 @@ func (r *GitTestRepo) Git(t *testing.T, args ...string) string {
 	if err != nil && !errors.As(err, &exitError) {
 		t.Fatal(err)
 	}
-	t.Logf("Running git\n"+
-		"args: %v\n"+
-		"exit code: %v\n"+
-		"stdout:\n"+
-		"%s"+
-		"stderr:\n"+
-		"%s",
+	t.Logf(
+		"Running git\n"+
+			"args: %v\n"+
+			"exit code: %v\n"+
+			"stdout:\n"+
+			"%s"+
+			"stderr:\n"+
+			"%s",
 		args,
 		cmd.ProcessState.ExitCode(),
 		text.Indent(stdout.String(), "  "),

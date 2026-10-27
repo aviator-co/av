@@ -1,0 +1,39 @@
+# Test that aborting a rebase via `git rebase --abort` (instead of `av restack --abort`)
+# does not leave behind a stale sequencer state file that breaks subsequent commands.
+#
+#     stack-1: main -> 1a
+#     stack-2:           \ -> 2a
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+exec av branch stack-2
+commit-file my-file '1a\n2a\n' 'Commit 2a'
+
+# Introduce a conflicting commit on stack-1 so the next restack of stack-2 fails.
+exec git checkout stack-1
+commit-file my-file '1a\n1b\n' 'Commit 1b'
+exec git checkout stack-2
+
+# Restack should hit a conflict and persist sequencer state.
+! exec av restack
+exists .git/REBASE_HEAD
+exists .git/av/stack-restack.state.json
+
+# User aborts the rebase via git directly, not via `av restack --abort`.
+# This clears REBASE_HEAD but leaves the av sequencer state file orphaned.
+exec git rebase --abort
+! exists .git/REBASE_HEAD
+
+# Switch to stack-1. A fresh `av restack --current` from here is a no-op
+# (no children to restack, trunk hasn't moved).
+#
+# Without the fix: the orphaned state file is read and its cached
+# CurrentSyncRef=stack-2 is honored, so av tries to re-run the same
+# stale rebase and conflicts again.
+#
+# With the fix: the orphan is detected (no rebase in progress) and cleared,
+# so the fresh `--current` plan runs and reports done.
+exec git checkout stack-1
+exec av restack --current
+stdout 'Restack is done'
+! exists .git/av/stack-restack.state.json

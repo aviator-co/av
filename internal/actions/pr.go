@@ -157,14 +157,16 @@ func CreatePullRequest(
 		var err error
 		existingPR, err = getExistingOpenPR(ctx, client, repoMeta, branchMeta, opts.BranchName)
 		if closed, ok := errutils.As[errPullRequestClosed](err); ok {
-			_, _ = fmt.Fprint(os.Stderr,
+			_, _ = fmt.Fprint(
+				os.Stderr,
 				colors.Failure("Existing pull request for branch "),
 				colors.UserInput(opts.BranchName),
 				colors.Failure(" is "), colors.UserInput(closed.State),
 				colors.Failure(": "), colors.UserInput(closed.Permalink),
 				"\n",
 			)
-			_, _ = fmt.Fprint(os.Stderr,
+			_, _ = fmt.Fprint(
+				os.Stderr,
 				colors.Faint("  - use "), colors.CliCmd("av pr --force"),
 				colors.Faint(" to create a new pull request for this branch\n"),
 			)
@@ -183,7 +185,8 @@ func CreatePullRequest(
 	if existingPR != nil {
 		verb = "Updating"
 	}
-	_, _ = fmt.Fprint(os.Stderr,
+	_, _ = fmt.Fprint(
+		os.Stderr,
 		verb, " pull request for branch ", colors.UserInput(opts.BranchName), ":",
 		"\n",
 	)
@@ -203,7 +206,8 @@ func CreatePullRequest(
 		pushFlags = append(pushFlags, remote, opts.BranchName)
 		logrus.Debug("pushing latest changes")
 
-		_, _ = fmt.Fprint(os.Stderr,
+		_, _ = fmt.Fprint(
+			os.Stderr,
 			"  - pushing to ", color.CyanString("%s/%s", remote, opts.BranchName),
 			"\n",
 		)
@@ -220,7 +224,8 @@ func CreatePullRequest(
 			return nil, err
 		}
 	} else {
-		_, _ = fmt.Fprint(os.Stderr,
+		_, _ = fmt.Fprint(
+			os.Stderr,
 			"  - skipping push to GitHub",
 			"\n",
 		)
@@ -403,7 +408,8 @@ func CreatePullRequest(
 		existingPR:  existingPR,
 	})
 	if err != nil {
-		_, _ = fmt.Fprint(os.Stderr,
+		_, _ = fmt.Fprint(
+			os.Stderr,
 			colors.Failure("  - failed to create pull request: "), err, "\n",
 		)
 		return nil, errors.WrapIf(err, "failed to create PR")
@@ -422,7 +428,8 @@ func CreatePullRequest(
 	} else {
 		action = "synchronized"
 	}
-	_, _ = fmt.Fprint(os.Stderr,
+	_, _ = fmt.Fprint(
+		os.Stderr,
 		"  - ", action, " pull request ",
 		colors.UserInput(pull.Permalink), "\n",
 	)
@@ -437,7 +444,8 @@ func CreatePullRequest(
 
 func OpenPullRequestInBrowser(ctx context.Context, pullRequestLink string) {
 	if err := browser.Open(ctx, pullRequestLink); err != nil {
-		_, _ = fmt.Fprint(os.Stderr,
+		_, _ = fmt.Fprint(
+			os.Stderr,
 			"  - couldn't open browser ",
 			colors.UserInput(err),
 			" for pull request link ",
@@ -452,7 +460,8 @@ func savePRDescriptionToTemporaryFile(saveFile string, contents string) {
 			Error("failed to write pull request description to temporary file")
 		return
 	}
-	_, _ = fmt.Fprint(os.Stderr,
+	_, _ = fmt.Fprint(
+		os.Stderr,
 		"  - saved pull request description to ", colors.UserInput(saveFile),
 		" (it will be automatically re-used if you try again)\n",
 	)
@@ -535,11 +544,10 @@ func ensurePR(
 
 	if opts.existingPR != nil {
 		newBody := AddPRMetadataAndStack(opts.body, opts.meta, opts.headRefName, initialStack, tx)
-		updatedPR, err := client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
-			PullRequestID: opts.existingPR.ID,
-			Title:         gh.Ptr(githubv4.String(opts.title)),
-			Body:          gh.Ptr(githubv4.String(newBody)),
-			BaseRefName:   gh.Ptr(githubv4.String(opts.baseRefName)),
+		updatedPR, err := client.UpdatePullRequestIfChanged(ctx, opts.existingPR, gh.UpdatePullRequestFields{
+			Title:       gh.Ptr(opts.title),
+			Body:        gh.Ptr(newBody),
+			BaseRefName: gh.Ptr(opts.baseRefName),
 		})
 		if err != nil {
 			return nil, false, errors.WithStack(err)
@@ -950,11 +958,9 @@ func UpdatePullRequestWithStack(
 	}
 
 	newBody := AddPRMetadataAndStack(body, prMeta, branchName, stackToWrite, tx)
-	_, err = client.UpdatePullRequest(ctx, githubv4.UpdatePullRequestInput{
-		PullRequestID: existingPR.ID,
-		Body:          gh.Ptr(githubv4.String(newBody)),
-	})
-	if err != nil {
+	if _, err := client.UpdatePullRequestIfChanged(ctx, existingPR, gh.UpdatePullRequestFields{
+		Body: gh.Ptr(newBody),
+	}); err != nil {
 		return errors.WithStack(err)
 	}
 

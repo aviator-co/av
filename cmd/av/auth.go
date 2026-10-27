@@ -44,7 +44,8 @@ func checkAviatorAuthStatus(ctx context.Context) error {
 		return errors.Wrap(err, "Failed to query Aviator")
 	}
 
-	fmt.Fprint(os.Stderr,
+	fmt.Fprint(
+		os.Stderr,
 		"Logged in to Aviator as ", colors.UserInput(query.Viewer.FullName),
 		" (", colors.UserInput(query.Viewer.Email), ").\n",
 	)
@@ -69,7 +70,8 @@ func checkGitHubAuthStatus(ctx context.Context) error {
 		return errors.Wrap(err, "Failed to query GitHub")
 	}
 
-	fmt.Fprint(os.Stderr,
+	fmt.Fprint(
+		os.Stderr,
 		"Logged in to GitHub as ", colors.UserInput(viewer.Name),
 		" (", colors.UserInput(viewer.Login), ").\n",
 	)

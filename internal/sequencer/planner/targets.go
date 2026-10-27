@@ -5,7 +5,7 @@ import (
 
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6/plumbing"
 )
 
 type TargetBranchMode int
@@ -43,11 +43,17 @@ func GetTargetBranches(
 				continue
 			}
 			if includeStackRoots {
-				ret = append(ret, plumbing.NewBranchReferenceName(br.Name))
+				ref := plumbing.NewBranchReferenceName(br.Name)
+				if exists, _ := repo.DoesRefExist(ctx, ref.String()); exists {
+					ret = append(ret, ref)
+				}
 			}
 			// Use filtered traversal to skip excluded branches and their descendants
 			for _, n := range meta.SubsequentBranchesFiltered(tx, br.Name, true) {
-				ret = append(ret, plumbing.NewBranchReferenceName(n))
+				ref := plumbing.NewBranchReferenceName(n)
+				if exists, _ := repo.DoesRefExist(ctx, ref.String()); exists {
+					ret = append(ret, ref)
+				}
 			}
 		}
 		return ret, nil

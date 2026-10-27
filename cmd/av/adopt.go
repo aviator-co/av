@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/gh"
@@ -15,8 +16,7 @@ import (
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -360,10 +360,13 @@ func (vm *remoteAdoptViewModel) initGitFetch(prs []actions.RemotePRInfo, chosenT
 			tea.Quit,
 		)
 	}
+	remote := vm.repo.GetRemoteName()
 	refspecs := []string{}
 	for _, target := range chosenTargets {
-		// Directly clone as a local branch.
+		// Clone as a local branch, and create the remote-tracking ref so we can
+		// set upstream tracking after adoption.
 		refspecs = append(refspecs, fmt.Sprintf("refs/heads/%s:refs/heads/%s", target.Short(), target.Short()))
+		refspecs = append(refspecs, fmt.Sprintf("refs/heads/%s:refs/remotes/%s/%s", target.Short(), remote, target.Short()))
 	}
 	return vm.AddView(
 		actions.NewGitFetchModel(vm.repo, refspecs, func() tea.Cmd {
@@ -373,23 +376,18 @@ func (vm *remoteAdoptViewModel) initGitFetch(prs []actions.RemotePRInfo, chosenT
 }
 
 func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenTargets []plumbing.ReferenceName) tea.Cmd {
+	chosenSet := make(map[string]bool)
+	for _, target := range chosenTargets {
+		chosenSet[target.Short()] = true
+	}
 	prMap := make(map[string]actions.RemotePRInfo)
 	for _, prInfo := range prs {
 		prMap[prInfo.Name] = prInfo
 	}
 	var branches []actions.AdoptingBranch
-	for _, target := range chosenTargets {
-		idx := slices.IndexFunc(prs, func(prInfo actions.RemotePRInfo) bool {
-			return prInfo.Name == target.Short()
-		})
-		if idx == -1 {
-			return uiutils.ErrCmd(fmt.Errorf("internal error: failed to find PR info for branch %s", target.Short()))
-		}
-		pr := prs[idx]
-		ab := actions.AdoptingBranch{
-			Name:        target.Short(),
-			Parent:      pr.Parent,
-			PullRequest: &pr.PullRequest,
+	for _, pr := range slices.Backward(prs) {
+		if !chosenSet[pr.Name] {
+			continue
 		}
 		// If the parent is already merged / closed, change the parent to the trunk branch.
 		for !pr.Parent.Trunk {
@@ -399,16 +397,22 @@ func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenT
 			}
 			pr.Parent = parentPRInfo.Parent
 		}
-		branches = append(branches, ab)
+		branches = append(branches, actions.AdoptingBranch{
+			Name:        pr.Name,
+			Parent:      pr.Parent,
+			PullRequest: &pr.PullRequest,
+		})
 	}
 	return vm.AddView(
 		actions.NewAdoptBranchesModel(
 			vm.db,
 			branches,
 			func() tea.Cmd {
+				remote := vm.repo.GetRemoteName()
 				hasChild := make(map[string]bool)
 				for _, ab := range branches {
 					hasChild[ab.Parent.Name] = true
+					_ = vm.repo.BranchSetUpstream(context.Background(), ab.Name, remote)
 				}
 				for _, ab := range branches {
 					if !hasChild[ab.Name] {

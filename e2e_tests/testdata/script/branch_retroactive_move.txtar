@@ -1,0 +1,21 @@
+# Test that retroactive rename (renaming with plain git, then telling av)
+# correctly updates metadata.
+#
+# Setup: create a one -> two -> three stack.
+exec av branch one
+commit-file one.txt one
+exec av branch two
+commit-file two.txt two
+exec av branch three
+commit-file three.txt three
+
+# Rename branch with plain git (av doesn't know about it yet).
+exec git checkout one
+exec git branch -m un
+
+# Tell av about the rename after the fact.
+exec av branch --rename one:un
+
+# Verify metadata: un should have two as child, and "one" should be gone.
+branch-parent un main
+branch-children un two
