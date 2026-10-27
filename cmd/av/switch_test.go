@@ -1,10 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 
+	"charm.land/bubbles/v2/help"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func makeNode(name string, children ...*stackutils.StackTreeNode) *stackutils.StackTreeNode {
@@ -66,4 +71,69 @@ func TestPruneDeletedBranches(t *testing.T) {
 		result := pruneDeletedBranches(nodes, branches)
 		assert.Equal(t, []string{"child1"}, branchNames(result))
 	})
+}
+
+func TestSwitchViewScrollsToChosenBranch(t *testing.T) {
+	names := []string{"development", "bugfix/login-flow"}
+	for i := 1; i <= 10; i++ {
+		names = append(names, fmt.Sprintf("av-stack-%02d", i))
+	}
+	branches := map[string]*stackTreeBranchInfo{}
+	var root *stackutils.StackTreeNode
+	for i := len(names) - 1; i >= 0; i-- {
+		branches[names[i]] = &stackTreeBranchInfo{BranchName: names[i]}
+		if root == nil {
+			root = makeNode(names[i])
+		} else {
+			root = makeNode(names[i], root)
+		}
+	}
+	var branchList []*stackTreeBranchInfo
+	for i := len(names) - 1; i >= 0; i-- {
+		branchList = append(branchList, branches[names[i]])
+	}
+
+	const termHeight = 20
+	var model tea.Model = switchViewModel{
+		help:                help.New(),
+		currentHEADBranch:   "av-stack-10",
+		currentChosenBranch: "av-stack-10",
+		rootNodes:           []*stackutils.StackTreeNode{root},
+		branchList:          branchList,
+		branches:            branches,
+	}
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: termHeight})
+
+	assertVisible := func(branch string) {
+		t.Helper()
+		view := model.View().Content
+		require.LessOrEqual(t, lipgloss.Height(view), termHeight)
+		assert.Contains(t, view, branch)
+		assert.Contains(t, view, "Choose which branch to check out")
+	}
+
+	assertVisible("av-stack-10")
+	for i := len(names) - 2; i >= 0; i-- {
+		model, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+		assertVisible(names[i])
+	}
+	for i := 1; i < len(names); i++ {
+		model, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+		assertVisible(names[i])
+	}
+}
+
+func TestSwitchViewEscCancels(t *testing.T) {
+	var model tea.Model = switchViewModel{
+		help:                help.New(),
+		currentHEADBranch:   "main",
+		currentChosenBranch: "main",
+		rootNodes:           []*stackutils.StackTreeNode{makeNode("main")},
+		branchList:          []*stackTreeBranchInfo{{BranchName: "main"}},
+		branches:            map[string]*stackTreeBranchInfo{"main": {BranchName: "main"}},
+	}
+	model, cmd := model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	require.NotNil(t, cmd)
+	assert.IsType(t, tea.QuitMsg{}, cmd())
+	assert.False(t, model.(switchViewModel).checkingOut)
 }

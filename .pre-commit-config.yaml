@@ -13,20 +13,20 @@ repos:
         entry: sh -c 'go run mvdan.cc/gofumpt@latest -l -w .'
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
       - id: no-commit-to-branch
         args: ['--branch', 'master']
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.33.0
+    rev: 0.38.0
     hooks:
       - id: check-dependabot
       - id: check-github-actions
       - id: check-github-workflows
 
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.9.0
+    rev: v1.29.0
     hooks:
       - id: zizmor

@@ -3,15 +3,15 @@ package actions
 import (
 	"context"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/treedetector"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6/plumbing"
 )
 
 func NewFindAdoptableLocalBranchesModel(
@@ -87,11 +87,11 @@ func (m *FindAdoptableLocalBranchesModel) Update(msg tea.Msg) (tea.Model, tea.Cm
 	return m, nil
 }
 
-func (m *FindAdoptableLocalBranchesModel) View() string {
+func (m *FindAdoptableLocalBranchesModel) View() tea.View {
 	if m.done {
-		return ""
+		return tea.NewView("")
 	}
-	return colors.ProgressStyle.Render(m.spinner.View() + "Finding adoptable branches...")
+	return tea.NewView(colors.ProgressStyle.Render(m.spinner.View() + "Finding adoptable branches..."))
 }
 
 func (m *FindAdoptableLocalBranchesModel) getUnmanagedBranches() ([]plumbing.ReferenceName, error) {

@@ -3,7 +3,7 @@ package treedetector
 import (
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/stackutils"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6/plumbing"
 )
 
 // GetChildren returns the children of the given branch.

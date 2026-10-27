@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"strconv"
 
+	"charm.land/bubbles/v2/help"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/help"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/erikgeiser/promptkit/selection"
 	"github.com/spf13/cobra"
 )
@@ -154,10 +154,10 @@ func (m stackNextModel) Init() tea.Cmd {
 	return m.nextBranch
 }
 
-func (vm stackNextModel) View() string {
+func (vm stackNextModel) View() tea.View {
 	var ss []string
 	if vm.selection != nil {
-		ss = append(ss, vm.selection.View()+vm.help.ShortHelpView(uiutils.PromptKeys))
+		ss = append(ss, vm.selection.View().Content+vm.help.ShortHelpView(uiutils.PromptKeys))
 	}
 
 	var ret string
@@ -172,7 +172,7 @@ func (vm stackNextModel) View() string {
 		}
 		ret += uiutils.RenderError(vm.err)
 	}
-	return ret
+	return tea.NewView(ret)
 }
 
 func (m stackNextModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -196,7 +196,7 @@ func (m stackNextModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 		return m, m.selection.Init()
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if m.selection != nil {
 			switch msg.String() {
 			case "enter":

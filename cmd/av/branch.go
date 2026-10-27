@@ -14,7 +14,7 @@ import (
 	"github.com/aviator-co/av/internal/utils/cleanup"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

@@ -1,6 +1,6 @@
 package uiutils
 
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
 type NewlineModel struct {
 	Model tea.Model
@@ -16,6 +16,6 @@ func (m *NewlineModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *NewlineModel) View() string {
-	return m.Model.View() + "\n"
+func (m *NewlineModel) View() tea.View {
+	return tea.NewView(m.Model.View().Content + "\n")
 }

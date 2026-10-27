@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/stackutils"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -79,7 +79,7 @@ var treeCmd = &cobra.Command{
 				lipgloss.JoinVertical(0, ss...),
 			) + "\n"
 		}
-		fmt.Print(ret)
+		_, _ = lipgloss.Print(ret)
 		return nil
 	},
 }

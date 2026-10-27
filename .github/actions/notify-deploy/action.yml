@@ -1,0 +1,92 @@
+name: "Notify deploy"
+description: >
+  Post a release notification to the deploy-bot Slack channel. Handles start /
+  success / failure messaging with consistent formatting (:tada: on success,
+  :rotating_light: on failure) and an optional <!here> ping on failure.
+
+inputs:
+  state:
+    description: "One of: start, success, failure"
+    required: true
+  subject:
+    description: "Noun phrase for what's happening (e.g. 'CLI release', 'nightly release')."
+    required: false
+    default: "release"
+  version:
+    description: "Version being released. Omit when no version is meaningful."
+    required: false
+    default: ""
+  ping_at_here:
+    description: "Include <!here> on failure"
+    required: false
+    default: "false"
+  webhook_url:
+    description: "Slack incoming-webhook URL. Pass the secrets.SLACK_WEBHOOK_PROD_DEPLOY_UPDATES expression from the caller."
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      env:
+        STATE: ${{ inputs.state }}
+        SUBJECT: ${{ inputs.subject }}
+        VERSION: ${{ inputs.version }}
+        PING_AT_HERE: ${{ inputs.ping_at_here }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        WEBHOOK_URL: ${{ inputs.webhook_url }}
+      run: |
+        # A notification is never worth failing a release over, so a missing
+        # webhook variable warns instead of erroring.
+        if [ -z "$WEBHOOK_URL" ]; then
+          echo "::warning::SLACK_WEBHOOK_PROD_DEPLOY_UPDATES is not set, skipping notification"
+          exit 0
+        fi
+
+        if [ -n "$VERSION" ]; then
+          VER_MD=" \`${VERSION}\`"
+          VER_PLAIN=" ${VERSION}"
+        else
+          VER_MD=""
+          VER_PLAIN=""
+        fi
+
+        case "$STATE" in
+          start)
+            PREFIX=""
+            HEADLINE="Starting ${SUBJECT}${VER_MD}."
+            FALLBACK="Starting ${SUBJECT}${VER_PLAIN}"
+            ;;
+          success)
+            PREFIX=":tada: "
+            HEADLINE="${SUBJECT}${VER_MD} succeeded."
+            FALLBACK="${SUBJECT}${VER_PLAIN} succeeded"
+            ;;
+          failure)
+            if [ "$PING_AT_HERE" = "true" ]; then
+              PREFIX=":rotating_light: <!here> "
+            else
+              PREFIX=":rotating_light: "
+            fi
+            HEADLINE="${SUBJECT}${VER_MD} failed."
+            FALLBACK="${SUBJECT}${VER_PLAIN} failed"
+            ;;
+          *)
+            echo "Unknown state: $STATE (expected start|success|failure)" >&2
+            exit 1
+            ;;
+        esac
+
+        BODY="${PREFIX}${HEADLINE} <${RUN_URL}|View run>"
+        PAYLOAD=$(jq -n --arg text "$FALLBACK" --arg body "$BODY" '{
+          text: $text,
+          blocks: [{ type: "section", text: { type: "mrkdwn", text: $body } }]
+        }')
+
+        if ! curl --fail --silent --show-error \
+          --connect-timeout 5 --max-time 15 \
+          -X POST -H 'Content-type: application/json' \
+          --data-binary "$PAYLOAD" \
+          "$WEBHOOK_URL"; then
+          echo "::warning::Slack notification failed"
+        fi

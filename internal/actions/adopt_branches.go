@@ -4,11 +4,11 @@ import (
 	"context"
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 type AdoptingBranch struct {
@@ -55,7 +55,7 @@ func (m *AdoptBranchesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *AdoptBranchesModel) View() string {
+func (m *AdoptBranchesModel) View() tea.View {
 	var ss []string
 	if m.done {
 		ss = append(ss, colors.SuccessStyle.Render("✓ Adoption complete"))
@@ -66,7 +66,7 @@ func (m *AdoptBranchesModel) View() string {
 	for _, branch := range m.branches {
 		ss = append(ss, "  * "+branch.Name+" → "+branch.Parent.Name)
 	}
-	return strings.Join(ss, "\n")
+	return tea.NewView(strings.Join(ss, "\n"))
 }
 
 func (m *AdoptBranchesModel) adoptBranches() tea.Msg {
