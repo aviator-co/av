@@ -140,7 +140,7 @@ func orphanBranches(db meta.DB, branchesToOrphan []string) error {
 
 	fmt.Fprintf(
 		os.Stderr,
-		"These branched are orphaned: %s\n",
+		"These branches are orphaned: %s\n",
 		strings.Join(branchesToOrphan, ", "),
 	)
 
