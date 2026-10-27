@@ -55,11 +55,11 @@ type GetRemoteStackedPRModel struct {
 // only emits messages.
 type remoteStackedPRFailedMsg struct{ err error }
 
-// remoteStackedPRDoneMsg carries the fully-collected list and the post-done
-// command, delivered to Update() once the goroutine finishes.
+// remoteStackedPRDoneMsg carries the fully-collected list, delivered to
+// Update() once the goroutine finishes. onDone runs in Update() because it
+// may change the view stack.
 type remoteStackedPRDoneMsg struct {
 	prs []RemotePRInfo
-	cmd tea.Cmd
 }
 
 func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
@@ -141,7 +141,7 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 			}
 			nextPRNumber = prMeta.ParentPull
 		}
-		return remoteStackedPRDoneMsg{prs: collected, cmd: m.onDone(collected)}
+		return remoteStackedPRDoneMsg{prs: collected}
 	})
 }
 
@@ -157,7 +157,7 @@ func (m *GetRemoteStackedPRModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case remoteStackedPRDoneMsg:
 		m.prs = msg.prs
 		m.done = true
-		return m, msg.cmd
+		return m, m.onDone(msg.prs)
 	}
 	return m, nil
 }

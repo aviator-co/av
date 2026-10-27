@@ -20,6 +20,14 @@ type BubbleTeaModelWithExitHandling interface {
 }
 
 func RunBubbleTea(model BubbleTeaModelWithExitHandling) error {
+	return runBubbleTea(model)
+}
+
+func RunBubbleTeaWithContext(ctx context.Context, model BubbleTeaModelWithExitHandling) error {
+	return runBubbleTea(model, tea.WithContext(ctx))
+}
+
+func runBubbleTea(model BubbleTeaModelWithExitHandling, extra ...tea.ProgramOption) error {
 	// Handle input and output independently: the renderer writes to stdout, while
 	// input is read from stdin.
 	stdinIsTTY := isatty.IsTerminal(os.Stdin.Fd())
@@ -37,6 +45,7 @@ func RunBubbleTea(model BubbleTeaModelWithExitHandling) error {
 		// output stays clean and complete.
 		opts = append(opts, tea.WithoutRenderer())
 	}
+	opts = append(opts, extra...)
 	p := tea.NewProgram(model, opts...)
 	finalModel, err := p.Run()
 	if err != nil {
@@ -47,25 +56,6 @@ func RunBubbleTea(model BubbleTeaModelWithExitHandling) error {
 		// renderer, so use lipgloss's fmt drop-in, which downsamples color to the
 		// output's profile (stripping ANSI entirely for non-terminals).
 		_, _ = lipgloss.Fprint(os.Stdout, finalModel.View().Content)
-	}
-	if err := finalModel.(BubbleTeaModelWithExitHandling).ExitError(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func RunBubbleTeaWithContext(ctx context.Context, model BubbleTeaModelWithExitHandling) error {
-	var opts []tea.ProgramOption
-	if !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
-		opts = []tea.ProgramOption{
-			tea.WithInput(nil),
-		}
-	}
-	opts = append(opts, tea.WithContext(ctx))
-	p := tea.NewProgram(model, opts...)
-	finalModel, err := p.Run()
-	if err != nil {
-		return err
 	}
 	if err := finalModel.(BubbleTeaModelWithExitHandling).ExitError(); err != nil {
 		return err
