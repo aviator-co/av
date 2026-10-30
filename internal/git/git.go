@@ -16,8 +16,8 @@ import (
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/config"
 	giturls "github.com/chainguard-dev/git-urls"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,27 +26,35 @@ var ErrRemoteNotFound = errors.Sentinel("this repository doesn't have a remote o
 const DEFAULT_REMOTE_NAME = "origin"
 
 type Repo struct {
-	repoDir       string
-	gitDir        string
-	gitRepo       *git.Repository
-	log           logrus.FieldLogger
-	defaultBranch plumbing.ReferenceName
+	repoDir        string
+	gitDir         string
+	worktreeGitDir string
+	gitRepo        *git.Repository
+	log            logrus.FieldLogger
+	defaultBranch  plumbing.ReferenceName
 }
 
-func OpenRepo(repoDir string, gitDir string) (*Repo, error) {
+// OpenRepo opens a Git repository for av. `gitDir` is the common git
+// directory (--git-common-dir), `worktreeGitDir` is the per-worktree one
+// (--git-dir); they're identical in the main checkout but diverge in
+// additional worktrees.
+func OpenRepo(repoDir string, gitDir string, worktreeGitDir string) (*Repo, error) {
 	repo, err := git.PlainOpenWithOptions(repoDir, &git.PlainOpenOptions{
-		DetectDotGit:          true,
-		EnableDotGitCommonDir: true,
+		DetectDotGit: true,
 	})
 	if err != nil {
 		return nil, errors.Errorf("failed to open git repo: %v", err)
 	}
+	if worktreeGitDir == "" {
+		worktreeGitDir = gitDir
+	}
 	r := &Repo{
-		repoDir:       repoDir,
-		gitDir:        gitDir,
-		gitRepo:       repo,
-		log:           logrus.WithFields(logrus.Fields{"repo": filepath.Base(repoDir)}),
-		defaultBranch: "",
+		repoDir:        repoDir,
+		gitDir:         gitDir,
+		worktreeGitDir: worktreeGitDir,
+		gitRepo:        repo,
+		log:            logrus.WithFields(logrus.Fields{"repo": filepath.Base(repoDir)}),
+		defaultBranch:  "",
 	}
 
 	// Fill the default branch now so that we can error early if it can't be
@@ -76,12 +84,34 @@ func (r *Repo) GitDir() string {
 	return r.gitDir
 }
 
+// WorktreeGitDir returns the per-worktree git directory (where git stores
+// rebase-merge, CHERRY_PICK_HEAD, etc.).
+func (r *Repo) WorktreeGitDir() string {
+	return r.worktreeGitDir
+}
+
 func (r *Repo) AvDir() string {
 	return filepath.Join(r.GitDir(), "av")
 }
 
+// WorktreeAvDir holds per-worktree state files (sync, restack, reorder),
+// distinct from AvDir() which holds the shared av.db.
+func (r *Repo) WorktreeAvDir() string {
+	return filepath.Join(r.WorktreeGitDir(), "av")
+}
+
 func (r *Repo) GoGitRepo() *git.Repository {
 	return r.gitRepo
+}
+
+// Close releases file handles held by the underlying go-git repository (e.g.
+// open pack .idx files). go-git v6 requires this to avoid leaking file
+// descriptors, which on Windows also blocks removal of temporary directories.
+func (r *Repo) Close() error {
+	if r == nil || r.gitRepo == nil {
+		return nil
+	}
+	return r.gitRepo.Close()
 }
 
 func (r *Repo) AvTmpDir() string {
@@ -98,7 +128,7 @@ func (r *Repo) AvTmpDir() string {
 // to detect whether a previously-conflicted rebase has since been aborted.
 func (r *Repo) IsRebaseInProgress() bool {
 	for _, name := range []string{"rebase-merge", "rebase-apply"} {
-		if stat, err := os.Stat(filepath.Join(r.GitDir(), name)); err == nil && stat.IsDir() {
+		if stat, err := os.Stat(filepath.Join(r.WorktreeGitDir(), name)); err == nil && stat.IsDir() {
 			return true
 		}
 	}
@@ -110,7 +140,7 @@ func (r *Repo) IsRebaseInProgress() bool {
 // so this is also a way to detect whether a previously-conflicted cherry-pick
 // has since been aborted.
 func (r *Repo) IsCherryPickInProgress() bool {
-	stat, err := os.Stat(filepath.Join(r.GitDir(), "CHERRY_PICK_HEAD"))
+	stat, err := os.Stat(filepath.Join(r.WorktreeGitDir(), "CHERRY_PICK_HEAD"))
 	return err == nil && !stat.IsDir()
 }
 
@@ -279,23 +309,76 @@ func (r *Repo) DoesRefExist(ctx context.Context, ref string) (bool, error) {
 	return false, nil
 }
 
-func (r *Repo) LsRemote(ctx context.Context, remote string) (map[string]string, error) {
+const tempFetchRefPrefix = "refs/av/fetch"
+
+func tempFetchRef(ref string) string {
+	return tempFetchRefPrefix + "/" + strings.TrimPrefix(ref, "refs/")
+}
+
+// FetchRemoteRefs fetches the given fully-qualified refs from the remote in a
+// single round trip and returns a map of ref name to commit SHA. Refs that do
+// not exist on the remote (or otherwise fail to fetch) are omitted from the
+// result.
+//
+// This is intentionally not implemented with ls-remote: ls-remote patterns
+// cannot filter the server-side ref advertisement (only --heads/--tags can),
+// so on remotes with a very large number of refs (e.g. GitHub repositories
+// with hundreds of thousands of refs/pull/* refs) it downloads the entire
+// advertisement, whereas git fetch sends protocol v2 ref-prefix filters so
+// that the server advertises only the requested refs.
+func (r *Repo) FetchRemoteRefs(
+	ctx context.Context,
+	remote string,
+	refs []string,
+) (map[string]string, error) {
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	args := []string{"fetch", "--no-tags", remote}
+	for _, ref := range refs {
+		args = append(args, "+"+ref+":"+tempFetchRef(ref))
+	}
+	if _, err := r.Git(ctx, args...); err != nil {
+		// A single missing ref fails the entire batch fetch. Fall back to
+		// fetching individually, omitting the refs that fail.
+		ret := make(map[string]string)
+		for _, ref := range refs {
+			sha, err := r.FetchRemoteRef(ctx, remote, ref)
+			if err != nil {
+				r.log.WithError(err).Debugf("failed to fetch remote ref %q", ref)
+				continue
+			}
+			ret[ref] = sha
+		}
+		return ret, nil
+	}
 	out, err := r.Run(ctx, &RunOpts{
-		Args:      []string{"ls-remote", remote},
+		Args:      []string{"for-each-ref", "--format=%(objectname)%00%(refname)", tempFetchRefPrefix},
 		ExitError: true,
 	})
 	if err != nil {
-		return nil, errors.Errorf("failed to get remote branches: %v", err)
+		return nil, errors.Errorf("failed to read the fetched refs: %v", err)
 	}
 	ret := make(map[string]string)
 	for _, line := range out.Lines() {
-		ss := strings.Split(line, "\t")
-		if len(ss) != 2 {
-			return nil, errors.Errorf("failed to parse the ls-remote output: %q", line)
+		objectName, refName, ok := strings.Cut(line, "\x00")
+		if !ok {
+			return nil, errors.Errorf("failed to parse the for-each-ref output: %q", line)
 		}
-		ret[ss[1]] = ss[0]
+		ret["refs/"+strings.TrimPrefix(refName, tempFetchRefPrefix+"/")] = objectName
+		_, _ = r.Git(ctx, "update-ref", "-d", refName)
 	}
 	return ret, nil
+}
+
+// FetchRemoteRef fetches a single fully-qualified ref from the remote and
+// returns its commit SHA. See FetchRemoteRefs for why this uses git fetch
+// rather than ls-remote.
+func (r *Repo) FetchRemoteRef(ctx context.Context, remote string, ref string) (string, error) {
+	if _, err := r.Git(ctx, "fetch", "--no-tags", remote, ref); err != nil {
+		return "", err
+	}
+	return r.Git(ctx, "rev-parse", "FETCH_HEAD")
 }
 
 type CheckoutBranch struct {

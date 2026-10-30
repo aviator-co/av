@@ -13,7 +13,7 @@ import (
 	"github.com/aviator-co/av/internal/sequencer/planner"
 	"github.com/aviator-co/av/internal/sequencer/sequencerui"
 	"github.com/aviator-co/av/internal/utils/uiutils"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6/plumbing"
 )
 
 var nothingToRestackError = errors.Sentinel("nothing to restack")

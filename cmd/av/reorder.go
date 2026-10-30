@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"emperror.dev/errors"
@@ -84,11 +83,7 @@ squashed, dropped, or moved within the stack.
 				return errors.New("no reorder in progress")
 			}
 
-			stat, err := os.Stat(filepath.Join(repo.GitDir(), "CHERRY_PICK_HEAD"))
-			if err != nil && !os.IsNotExist(err) {
-				return errors.WrapIf(err, "failed to check CHERRY_PICK_HEAD status")
-			}
-			if stat != nil {
+			if repo.IsCherryPickInProgress() {
 				if err := repo.CherryPick(ctx, git.CherryPick{Resume: git.CherryPickAbort}); err != nil {
 					return errors.WrapIf(err, "failed to abort in-progress cherry-pick")
 				}
@@ -102,11 +97,7 @@ squashed, dropped, or moved within the stack.
 			state = continuation.State
 
 			// Handle any in-progress cherry-pick from the previous conflict.
-			stat, err := os.Stat(filepath.Join(repo.GitDir(), "CHERRY_PICK_HEAD"))
-			if err != nil && !os.IsNotExist(err) {
-				return errors.WrapIf(err, "failed to check CHERRY_PICK_HEAD status")
-			}
-			if stat != nil {
+			if repo.IsCherryPickInProgress() {
 				if err := repo.CherryPick(ctx, git.CherryPick{Resume: git.CherryPickContinue}); err != nil {
 					fmt.Fprint(
 						os.Stderr,

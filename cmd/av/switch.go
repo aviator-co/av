@@ -6,10 +6,12 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -162,6 +164,14 @@ func parsePullRequestURL(tx meta.ReadTx, prURL string) (string, error) {
 	return "", fmt.Errorf("failed to detect branch from pull request URL:%s", prURL)
 }
 
+var switchKeys = append(
+	slices.Clone(uiutils.PromptKeys[:3]),
+	key.NewBinding(
+		key.WithKeys("esc", "ctrl+c"),
+		key.WithHelp("esc", "cancel"),
+	),
+)
+
 type switchViewModel struct {
 	currentChosenBranch string
 	checkingOut         bool
@@ -175,6 +185,9 @@ type switchViewModel struct {
 	rootNodes         []*stackutils.StackTreeNode
 	branchList        []*stackTreeBranchInfo
 	branches          map[string]*stackTreeBranchInfo
+
+	height       int
+	scrollOffset int
 }
 
 func (vm switchViewModel) Init() tea.Cmd {
@@ -192,15 +205,20 @@ func (vm switchViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		vm.checkingOut = false
 		vm.checkedOut = true
 		return vm, tea.Quit
+	case tea.WindowSizeMsg:
+		vm.height = msg.Height
+		vm.scrollOffset = vm.adjustScrollOffset()
 	case tea.KeyPressMsg:
 		if !vm.checkingOut && !vm.checkedOut {
 			switch msg.String() {
-			case "ctrl+c":
+			case "ctrl+c", "esc":
 				return vm, tea.Quit
 			case "up", "k", "ctrl+p":
 				vm.currentChosenBranch = vm.getPreviousBranch()
+				vm.scrollOffset = vm.adjustScrollOffset()
 			case "down", "j", "ctrl+n":
 				vm.currentChosenBranch = vm.getNextBranch()
+				vm.scrollOffset = vm.adjustScrollOffset()
 			case "enter", "space":
 				vm.checkingOut = true
 				return vm, vm.checkoutBranch
@@ -253,6 +271,19 @@ func (vm switchViewModel) getNextBranch() string {
 }
 
 func (vm switchViewModel) View() tea.View {
+	treeLines, _ := vm.renderTree()
+	if visible := vm.visibleTreeHeight(len(treeLines)); visible < len(treeLines) {
+		offset := min(max(vm.scrollOffset, 0), len(treeLines)-visible)
+		treeLines = treeLines[offset : offset+visible]
+	}
+	ret := vm.renderFrame(treeLines)
+	if vm.err != nil {
+		ret += uiutils.RenderError(vm.err)
+	}
+	return tea.NewView(ret)
+}
+
+func (vm switchViewModel) renderFrame(treeLines []string) string {
 	var ss []string
 	if vm.checkingOut {
 		ss = append(
@@ -265,10 +296,27 @@ func (vm switchViewModel) View() tea.View {
 		ss = append(ss, colors.QuestionStyle.Render("Choose which branch to check out"))
 	}
 	ss = append(ss, "")
+	ss = append(ss, treeLines...)
+	ss = append(ss, "")
+	if vm.checkingOut {
+		ss = append(ss, "Checking out branch "+vm.currentChosenBranch+"...")
+	} else if vm.checkedOut {
+		ss = append(ss, "Checked out branch "+vm.currentChosenBranch)
+	} else {
+		ss = append(ss, vm.help.ShortHelpView(switchKeys))
+	}
+	return lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
+		lipgloss.JoinVertical(0, ss...),
+	) + "\n"
+}
+
+func (vm switchViewModel) renderTree() ([]string, map[string]stackutils.LineRange) {
+	var lines []string
+	ranges := map[string]stackutils.LineRange{}
 	for _, node := range vm.rootNodes {
-		ss = append(
-			ss,
-			stackutils.RenderTree(node, func(branchName string, isTrunk bool) string {
+		out, nodeRanges := stackutils.RenderTreeWithLineRanges(
+			node,
+			func(branchName string, isTrunk bool) string {
 				stbi := vm.branches[branchName]
 				out := vm.renderBranchInfo(
 					stbi,
@@ -280,28 +328,37 @@ func (vm switchViewModel) View() tea.View {
 					out = colors.PromptChoice.Render(out)
 				}
 				return out
-			}),
+			},
 		)
+		for name, r := range nodeRanges {
+			ranges[name] = stackutils.LineRange{Start: len(lines) + r.Start, End: len(lines) + r.End}
+		}
+		lines = append(lines, strings.Split(out, "\n")...)
 	}
-	ss = append(ss, "")
-	if vm.checkingOut {
-		ss = append(ss, "Checking out branch "+vm.currentChosenBranch+"...")
-	} else if vm.checkedOut {
-		ss = append(ss, "Checked out branch "+vm.currentChosenBranch)
-	} else {
-		ss = append(ss, vm.help.ShortHelpView(uiutils.PromptKeys))
-	}
+	return lines, ranges
+}
 
-	var ret string
-	if len(ss) != 0 {
-		ret = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).MarginLeft(2).Render(
-			lipgloss.JoinVertical(0, ss...),
-		) + "\n"
+func (vm switchViewModel) visibleTreeHeight(treeHeight int) int {
+	if vm.height <= 0 {
+		return treeHeight
 	}
-	if vm.err != nil {
-		ret += uiutils.RenderError(vm.err)
+	chrome := lipgloss.Height(vm.renderFrame(nil))
+	return min(treeHeight, max(vm.height-chrome, 1))
+}
+
+func (vm switchViewModel) adjustScrollOffset() int {
+	lines, ranges := vm.renderTree()
+	visible := vm.visibleTreeHeight(len(lines))
+	offset := vm.scrollOffset
+	if r, ok := ranges[vm.currentChosenBranch]; ok {
+		if r.End > offset+visible {
+			offset = r.End - visible
+		}
+		if r.Start < offset {
+			offset = r.Start
+		}
 	}
-	return tea.NewView(ret)
+	return min(max(offset, 0), len(lines)-visible)
 }
 
 func (switchViewModel) renderBranchInfo(
