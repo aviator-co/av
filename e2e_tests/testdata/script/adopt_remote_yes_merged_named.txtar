@@ -1,0 +1,29 @@
+# Test that --yes fails when the named branch's PR is not open.
+#
+# Remote stack:  main -> feat-a (PR1) -> feat-b (PR2, merged)
+#
+# feat-b is merged, so `av adopt --remote feat-b --yes` must fail instead of
+# quietly adopting only feat-a.
+
+mock-pull feat-a 1 OPEN base=main body=$WORK/feat-a-body.txt
+mock-pull feat-b 2 MERGED main base=feat-a body=$WORK/feat-b-body.txt
+
+! exec av adopt --remote feat-b --yes --dry-run
+stdout 'pull request for feat-b is merged'
+
+! exec av adopt --remote feat-b --yes
+stdout 'pull request for feat-b is merged'
+! exec git rev-parse --verify refs/heads/feat-a
+
+-- feat-a-body.txt --
+<!-- av pr metadata
+```
+{"parent":"main","trunk":"main"}
+```
+-->
+-- feat-b-body.txt --
+<!-- av pr metadata
+```
+{"parent":"feat-a","parentPull":1,"trunk":"main"}
+```
+-->

@@ -1,0 +1,59 @@
+# Test non-interactive remote adoption when an ancestor PR is already merged.
+#
+# Remote stack:  main -> feat-a (PR1, merged) -> feat-b (PR2)
+#
+# feat-a is squash-merged and main has since edited the same lines, so only
+# feat-b is adopted, reparented onto main, and keeps feat-a's head as its
+# branching point. A later sync must replay only feat-b's commit.
+
+exec git checkout -b feat-a
+commit-file a.txt 'a1\n' 'Commit a1'
+commit-file a.txt 'a1\na2\n' 'Commit a2'
+exec git checkout -b feat-b
+commit-file b.txt 'b\n' 'Commit b'
+exec git push origin feat-a feat-b
+exec sh $WORK/feat-b-body.sh
+cp stdout $WORK/feat-b-body.txt
+
+# Squash-merge feat-a into main, then edit the same lines on main.
+exec git checkout main
+exec git merge --squash feat-a
+exec git commit --no-edit
+mock-pull feat-a 1 MERGED main base=main body=$WORK/feat-a-body.txt
+mock-pull feat-b 2 OPEN base=feat-a body=$WORK/feat-b-body.txt
+commit-file a.txt 'a1\na2 edited on main\n' 'Edit a.txt on main'
+exec git push origin main
+exec git branch -D feat-a feat-b
+
+exec av adopt --remote feat-b --yes --dry-run
+stdout 'feat-b \(parent: main\)'
+! stdout 'feat-a \(parent'
+
+exec av adopt --remote feat-b --yes
+branch-parent feat-b main
+branch-parent-hash feat-b origin/feat-a
+! exec git rev-parse --verify refs/heads/feat-a
+exec git rev-parse --abbrev-ref HEAD
+stdout '^feat-b$'
+exec git rev-parse --abbrev-ref feat-b@{upstream}
+stdout '^origin/feat-b$'
+
+exec av sync --rebase-to-trunk --push=no --prune=no
+exec git log --format=%s main..feat-b
+stdout '^Commit b$'
+! stdout 'Commit a'
+
+-- feat-a-body.txt --
+<!-- av pr metadata
+```
+{"parent":"main","trunk":"main"}
+```
+-->
+-- feat-b-body.sh --
+cat <<EOF
+<!-- av pr metadata
+\`\`\`
+{"parent":"feat-a","parentHead":"$(git rev-parse feat-a)","parentPull":1,"trunk":"main"}
+\`\`\`
+-->
+EOF

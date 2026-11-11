@@ -25,6 +25,7 @@ var adoptFlags struct {
 	Parent           string
 	DryRun           bool
 	RemoteBranchName string
+	Yes              bool
 }
 
 var adoptCmd = &cobra.Command{
@@ -42,10 +43,21 @@ the parent.
 
 If you want to adopt branches on the remote repository, use --remote $BRANCH_NAME to adopt branches.
 The command will adopt the stack of pull requests starting from the specified branch name.
+
+By default --remote opens an interactive picker. Pass --yes to skip the picker and adopt what it
+selects by default: the named branch and each open, not-yet-adopted ancestor PR found by following
+av's PR metadata. Merged or closed ancestors are skipped and their child is reparented onto the next
+open ancestor or the trunk. With --yes, the command fails if the named branch's pull request is not
+open, or if a pull request in the stack has no av metadata while its base branch has its own open
+pull request. After adopting, av switches to the top
+adopted branch when the working tree allows it.
 `),
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		ctx := cmd.Context()
+		if adoptFlags.Yes && adoptFlags.RemoteBranchName == "" {
+			return errors.New("--yes can only be used together with --remote")
+		}
 		repo, err := getRepo(ctx)
 		if err != nil {
 			return err
@@ -71,10 +83,11 @@ The command will adopt the stack of pull requests starting from the specified br
 				return err
 			}
 			return uiutils.RunBubbleTea(&remoteAdoptViewModel{
-				repo:       repo,
-				db:         db,
-				ghClient:   client,
-				branchName: adoptFlags.RemoteBranchName,
+				repo:           repo,
+				db:             db,
+				ghClient:       client,
+				branchName:     adoptFlags.RemoteBranchName,
+				nonInteractive: adoptFlags.Yes,
 			})
 		}
 		return uiutils.RunBubbleTea(&adoptViewModel{
@@ -262,10 +275,11 @@ func (vm *adoptViewModel) ExitError() error {
 }
 
 type remoteAdoptViewModel struct {
-	repo       *git.Repo
-	db         meta.DB
-	ghClient   *gh.Client
-	branchName string
+	repo           *git.Repo
+	db             meta.DB
+	ghClient       *gh.Client
+	branchName     string
+	nonInteractive bool
 
 	uiutils.BaseStackedView
 }
@@ -305,11 +319,42 @@ func (vm *remoteAdoptViewModel) initTreeSelector(prs []actions.RemotePRInfo) tea
 			Body:      prInfo.PullRequest.Permalink,
 		}
 	}
+	if vm.nonInteractive {
+		if prs[0].PullRequest.State != githubv4.PullRequestStateOpen {
+			return errorCmd(errors.Errorf(
+				"pull request for %s is %s; --yes only adopts open pull requests",
+				prs[0].Name, strings.ToLower(string(prs[0].PullRequest.State)),
+			))
+		}
+		if last := prs[len(prs)-1]; last.UnlinkedParentPull != 0 {
+			return errorCmd(errors.Errorf(
+				"pull request #%d for %s has no av metadata, so --yes can't follow it to %s (#%d)",
+				last.PullRequest.Number, last.Name, last.Parent.Name, last.UnlinkedParentPull,
+			))
+		}
+	}
 	if len(adoptionTargets) == 0 {
 		return tea.Batch(
 			vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render("✓ No branch to adopt")}),
 			tea.Quit,
 		)
+	}
+	if vm.nonInteractive {
+		if adoptFlags.DryRun {
+			branches, err := remoteAdoptingBranches(prs, adoptionTargets)
+			if err != nil {
+				return errorCmd(err)
+			}
+			lines := []string{"Would adopt:"}
+			for _, ab := range branches {
+				lines = append(lines, fmt.Sprintf("  %s (parent: %s)", ab.Name, ab.Parent.Name))
+			}
+			return tea.Batch(
+				vm.AddView(uiutils.SimpleMessageView{Message: colors.SuccessStyle.Render(strings.Join(lines, "\n"))}),
+				tea.Quit,
+			)
+		}
+		return vm.initGitFetch(prs, adoptionTargets)
 	}
 	var lastNode *stackutils.StackTreeNode
 	for _, prInfo := range prs {
@@ -360,22 +405,30 @@ func (vm *remoteAdoptViewModel) initGitFetch(prs []actions.RemotePRInfo, chosenT
 			tea.Quit,
 		)
 	}
+	branches, err := remoteAdoptingBranches(prs, chosenTargets)
+	if err != nil {
+		return errorCmd(err)
+	}
 	remote := vm.repo.GetRemoteName()
 	refspecs := []string{}
-	for _, target := range chosenTargets {
+	for _, ab := range branches {
 		// Clone as a local branch, and create the remote-tracking ref so we can
 		// set upstream tracking after adoption.
-		refspecs = append(refspecs, fmt.Sprintf("refs/heads/%s:refs/heads/%s", target.Short(), target.Short()))
-		refspecs = append(refspecs, fmt.Sprintf("refs/heads/%s:refs/remotes/%s/%s", target.Short(), remote, target.Short()))
+		refspecs = append(refspecs, fmt.Sprintf("refs/heads/%s:refs/heads/%s", ab.Name, ab.Name))
+		refspecs = append(refspecs, fmt.Sprintf("refs/heads/%s:refs/remotes/%s/%s", ab.Name, remote, ab.Name))
 	}
 	return vm.AddView(
 		actions.NewGitFetchModel(vm.repo, refspecs, func() tea.Cmd {
-			return vm.initAdoption(prs, chosenTargets)
+			return vm.initAdoption(branches)
 		}),
 	)
 }
 
-func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenTargets []plumbing.ReferenceName) tea.Cmd {
+func errorCmd(err error) tea.Cmd {
+	return func() tea.Msg { return err }
+}
+
+func remoteAdoptingBranches(prs []actions.RemotePRInfo, chosenTargets []plumbing.ReferenceName) ([]actions.AdoptingBranch, error) {
 	chosenSet := make(map[string]bool)
 	for _, target := range chosenTargets {
 		chosenSet[target.Short()] = true
@@ -391,11 +444,19 @@ func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenT
 		}
 		// If the parent is already merged / closed, change the parent to the trunk branch.
 		for !pr.Parent.Trunk {
-			parentPRInfo := prMap[pr.Parent.Name]
+			parentPRInfo, ok := prMap[pr.Parent.Name]
+			if !ok {
+				return nil, errors.Errorf("cannot find the pull request for %s, the parent of %s", pr.Parent.Name, pr.Name)
+			}
 			if parentPRInfo.PullRequest.State == githubv4.PullRequestStateOpen {
 				break
 			}
-			pr.Parent = parentPRInfo.Parent
+			if parentPRInfo.PullRequest.State == githubv4.PullRequestStateMerged {
+				pr.Parent.Name = parentPRInfo.Parent.Name
+				pr.Parent.Trunk = parentPRInfo.Parent.Trunk
+			} else {
+				pr.Parent = parentPRInfo.Parent
+			}
 		}
 		branches = append(branches, actions.AdoptingBranch{
 			Name:        pr.Name,
@@ -403,6 +464,10 @@ func (vm *remoteAdoptViewModel) initAdoption(prs []actions.RemotePRInfo, chosenT
 			PullRequest: &pr.PullRequest,
 		})
 	}
+	return branches, nil
+}
+
+func (vm *remoteAdoptViewModel) initAdoption(branches []actions.AdoptingBranch) tea.Cmd {
 	return vm.AddView(
 		actions.NewAdoptBranchesModel(
 			vm.db,
@@ -447,6 +512,11 @@ func init() {
 		&adoptFlags.RemoteBranchName, "remote", "",
 		"adopt branches from remote pull requests, starting from the specified branch",
 	)
+	adoptCmd.Flags().BoolVar(
+		&adoptFlags.Yes, "yes", false,
+		"with --remote, adopt the named branch and its open ancestors without prompting",
+	)
+	adoptCmd.MarkFlagsMutuallyExclusive("parent", "remote")
 
 	_ = adoptCmd.RegisterFlagCompletionFunc(
 		"parent",
