@@ -443,8 +443,7 @@ func (vm *GitHubPushModel) calculateChangedBranches() tea.Msg {
 
 	for _, br := range vm.targetBranches {
 		avbr, _ := vm.db.ReadTx().Branch(br.Short())
-		if avbr.MergeCommit != "" ||
-			(avbr.PullRequest != nil && avbr.PullRequest.State == "MERGED") {
+		if avbr.IsMerged() {
 			noPushBranches = append(noPushBranches, noPushBranch{
 				branch: br,
 				reason: reasonPRIsMerged,
