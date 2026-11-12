@@ -1,6 +1,7 @@
 package uiutils
 
 import (
+	"context"
 	"os"
 	"strings"
 
@@ -19,6 +20,14 @@ type BubbleTeaModelWithExitHandling interface {
 }
 
 func RunBubbleTea(model BubbleTeaModelWithExitHandling) error {
+	return runBubbleTea(model)
+}
+
+func RunBubbleTeaWithContext(ctx context.Context, model BubbleTeaModelWithExitHandling) error {
+	return runBubbleTea(model, tea.WithContext(ctx))
+}
+
+func runBubbleTea(model BubbleTeaModelWithExitHandling, extra ...tea.ProgramOption) error {
 	// Handle input and output independently: the renderer writes to stdout, while
 	// input is read from stdin.
 	stdinIsTTY := isatty.IsTerminal(os.Stdin.Fd())
@@ -36,6 +45,7 @@ func RunBubbleTea(model BubbleTeaModelWithExitHandling) error {
 		// output stays clean and complete.
 		opts = append(opts, tea.WithoutRenderer())
 	}
+	opts = append(opts, extra...)
 	p := tea.NewProgram(model, opts...)
 	finalModel, err := p.Run()
 	if err != nil {

@@ -39,6 +39,9 @@ func DetectBranches(
 
 	ret := map[plumbing.ReferenceName]*BranchPiece{}
 	for _, bn := range unmanagedBranches {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		currentHash := refToHashMap[bn]
 		nearestTrunkCommit, err := getNearestTrunkCommit(ctx, repo, bn)
 		if err != nil {
@@ -49,7 +52,7 @@ func DetectBranches(
 			// don't have to adopt it.
 			continue
 		}
-		bp, err := traverseUntilTrunk(repo, bn, nearestTrunkCommit, hashToRefMap, refToHashMap)
+		bp, err := traverseUntilTrunk(ctx, repo, bn, nearestTrunkCommit, hashToRefMap, refToHashMap)
 		if err != nil {
 			return nil, err
 		}
@@ -59,6 +62,7 @@ func DetectBranches(
 }
 
 func traverseUntilTrunk(
+	ctx context.Context,
 	repo *avgit.Repo,
 	branch plumbing.ReferenceName,
 	nearestTrunkCommit plumbing.Hash,
@@ -75,6 +79,9 @@ func traverseUntilTrunk(
 	// Do a commit traversal. We can stop the traversal when we hit the trunk or if we find a
 	// commit that has multiple parents.
 	err = object.NewCommitPreorderIter(commit, nil, nil).ForEach(func(c *object.Commit) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if c.Hash == nearestTrunkCommit {
 			trunk := repo.DefaultBranch()
 			ret.Parent = plumbing.NewBranchReferenceName(trunk)
