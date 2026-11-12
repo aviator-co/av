@@ -485,7 +485,7 @@ func (vm *remoteAdoptViewModel) initAdoption(branches []actions.AdoptingBranch) 
 				hasChild := make(map[string]bool)
 				for _, ab := range branches {
 					hasChild[ab.Parent.Name] = true
-					_ = vm.repo.BranchSetUpstream(context.Background(), ab.Name, remote)
+					_ = vm.repo.BranchSetUpstream(vm.ctx(), ab.Name, remote)
 				}
 				for _, ab := range branches {
 					if !hasChild[ab.Name] {
