@@ -54,18 +54,24 @@ func (tx *writeTx) Commit() error {
 	if tx.db == nil {
 		panic("cannot commit transaction: already finalized")
 	}
-	// Always unlock the database even if there is an error.
-	defer tx.db.stateMu.Unlock()
+	// Always finalize the transaction and unlock the database, even if there
+	// is an error, so a later Abort does not unlock the mutex a second time.
+	db := tx.db
+	tx.db = nil
+	defer db.stateMu.Unlock()
+
+	// Lock, read and write the real file if av.db is a symlink.
+	fp := resolveStatePath(db.filepath)
 
 	// The file lock serializes commits across av processes, for example in
 	// two git worktrees that share one av.db.
-	unlock, err := lockFile(tx.db.filepath)
+	unlock, err := lockFile(fp)
 	if err != nil {
 		return err
 	}
 	defer unlock()
 
-	fresh, err := readState(tx.db.filepath)
+	fresh, err := readState(fp)
 	if err != nil {
 		return errors.WrapIff(err, "failed to re-read av state file before commit")
 	}
@@ -74,12 +80,11 @@ func (tx *writeTx) Commit() error {
 		for _, op := range tx.ops {
 			op(fresh)
 		}
-		if err := fresh.write(tx.db.filepath); err != nil {
+		if err := fresh.write(fp); err != nil {
 			return err
 		}
 	}
-	*tx.db.state = *fresh
-	tx.db = nil
+	*db.state = *fresh
 	return nil
 }
 
