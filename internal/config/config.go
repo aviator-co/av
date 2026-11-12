@@ -42,6 +42,10 @@ type PullRequest struct {
 	// If true, the CLI will automatically add/update a comment to all PRs linking other PRs in the stack.
 	// False by default, since Aviator's MergeQueue also adds a similar comment.
 	WriteStack bool
+
+	// If true, stack summaries include only branches that have an associated pull request.
+	// This setting has no effect unless WriteStack is enabled.
+	WriteStackOnlyPRs bool
 }
 
 type Sync struct {
