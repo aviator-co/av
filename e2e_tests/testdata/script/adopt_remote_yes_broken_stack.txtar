@@ -1,0 +1,35 @@
+# Test that --yes fails when av can't follow the remote stack to the trunk.
+#
+# Stack without av metadata:  main -> feat-a (PR1) -> feat-b (PR2)
+# Stale parent name:          main -> feat-x (PR3) -> feat-y (PR4, metadata says parent old-feat-x)
+
+mock-pull feat-a 1 OPEN base=main
+mock-pull feat-b 2 OPEN base=feat-a
+
+! exec av adopt --remote feat-b --yes --dry-run
+stdout 'pull request #2 for feat-b has no av metadata, so --yes can.t follow it to feat-a \(#1\)'
+! exec av adopt --remote feat-b --yes
+stdout 'pull request #2 for feat-b has no av metadata'
+! exec git rev-parse --verify refs/heads/feat-b
+
+mock-pull feat-x 3 OPEN base=main body=$WORK/feat-x-body.txt
+mock-pull feat-y 4 OPEN base=feat-x body=$WORK/feat-y-body.txt
+
+! exec av adopt --remote feat-y --yes --dry-run
+stdout 'cannot find the pull request for old-feat-x, the parent of feat-y'
+! exec av adopt --remote feat-y --yes
+stdout 'cannot find the pull request for old-feat-x, the parent of feat-y'
+! exec git rev-parse --verify refs/heads/feat-y
+
+-- feat-x-body.txt --
+<!-- av pr metadata
+```
+{"parent":"main","trunk":"main"}
+```
+-->
+-- feat-y-body.txt --
+<!-- av pr metadata
+```
+{"parent":"old-feat-x","parentPull":3,"trunk":"main"}
+```
+-->

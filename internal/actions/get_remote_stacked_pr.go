@@ -11,6 +11,7 @@ import (
 	"github.com/aviator-co/av/internal/gh"
 	"github.com/aviator-co/av/internal/meta"
 	"github.com/aviator-co/av/internal/utils/colors"
+	"github.com/shurcooL/githubv4"
 )
 
 func NewGetRemoteStackedPRModel(
@@ -31,11 +32,12 @@ func NewGetRemoteStackedPRModel(
 }
 
 type RemotePRInfo struct {
-	Name        string
-	Parent      meta.BranchState
-	PullRequest meta.PullRequest
-	MergeCommit string
-	Title       string
+	Name               string
+	Parent             meta.BranchState
+	PullRequest        meta.PullRequest
+	MergeCommit        string
+	Title              string
+	UnlinkedParentPull int64
 }
 
 type GetRemoteStackedPRModel struct {
@@ -107,12 +109,27 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 				}
 			}
 			prMeta, err := ReadPRMetadata(pr.Body)
+			var unlinkedParentPull int64
 			if errors.Is(err, ErrNoPRMetadata) {
 				prMeta = PRMetadata{
 					Parent:     pr.BaseBranchName(),
 					Trunk:      pr.BaseBranchName(),
 					ParentHead: "",
 					ParentPull: 0,
+				}
+				parentPage, err := m.ghClient.GetPullRequests(m.ctx(), gh.GetPullRequestsInput{
+					Owner:       m.repo.Owner,
+					Repo:        m.repo.Name,
+					HeadRefName: pr.BaseBranchName(),
+					States:      []githubv4.PullRequestState{githubv4.PullRequestStateOpen},
+				})
+				if err != nil {
+					return remoteStackedPRFailedMsg{
+						err: errors.Wrapf(err, "failed to look up PR for %s", pr.BaseBranchName()),
+					}
+				}
+				if len(parentPage.PullRequests) > 0 {
+					unlinkedParentPull = parentPage.PullRequests[0].Number
 				}
 			} else if err != nil {
 				return remoteStackedPRFailedMsg{
@@ -132,8 +149,9 @@ func (m *GetRemoteStackedPRModel) Init() tea.Cmd {
 					Permalink: pr.Permalink,
 					State:     pr.State,
 				},
-				MergeCommit: pr.GetMergeCommit(),
-				Title:       pr.Title,
+				MergeCommit:        pr.GetMergeCommit(),
+				Title:              pr.Title,
+				UnlinkedParentPull: unlinkedParentPull,
 			}
 			collected = append(collected, remotePRInfo)
 			if remotePRInfo.Parent.Trunk {

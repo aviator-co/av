@@ -1,0 +1,71 @@
+# Test non-interactive remote adoption with --yes.
+#
+# Remote stack:  main -> feat-a (PR1) -> feat-b (PR2)
+#
+# `av adopt --remote feat-b --yes` should adopt feat-b and its ancestor feat-a
+# without opening the interactive picker.
+
+# --yes requires --remote.
+! exec av adopt --yes
+stderr '--yes can only be used together with --remote'
+
+# --parent and --remote can't be combined.
+! exec av adopt --parent main --remote feat-b --yes
+stderr 'none of the others can be'
+
+# Build the stack, push it, then drop the local branches so they only exist on
+# the remote.
+exec git checkout -b feat-a
+commit-file a.txt 'a\n' 'Commit a'
+exec git checkout -b feat-b
+commit-file b.txt 'b\n' 'Commit b'
+exec git push origin feat-a feat-b
+exec git checkout main
+exec git branch -D feat-a feat-b
+
+# Model the remote PR stack: each PR body carries av stack metadata so the
+# walk can climb from feat-b up to the trunk.
+mock-pull feat-a 1 OPEN base=main body=$WORK/feat-a-body.txt
+mock-pull feat-b 2 OPEN base=feat-a body=$WORK/feat-b-body.txt
+
+exec av adopt --remote feat-b --yes --dry-run
+stdout 'Would adopt:'
+stdout 'feat-b \(parent: feat-a\)'
+stdout 'feat-a \(parent: main\)'
+! exec git rev-parse --verify refs/heads/feat-a
+
+# A PR without av metadata whose base has no PR of its own, and a stack whose
+# trunk isn't configured locally, are both adoptable.
+mock-pull solo 3 OPEN base=main
+exec av adopt --remote solo --yes --dry-run
+stdout 'solo \(parent: main\)'
+mock-pull rel-a 4 OPEN base=release-1.2 body=$WORK/rel-a-body.txt
+exec av adopt --remote rel-a --yes --dry-run
+stdout 'rel-a \(parent: release-1.2\)'
+
+exec av adopt --remote feat-b --yes
+branch-parent feat-a main
+branch-parent feat-b feat-a
+exec git rev-parse --abbrev-ref HEAD
+stdout '^feat-b$'
+exec git rev-parse --abbrev-ref feat-b@{upstream}
+stdout '^origin/feat-b$'
+
+-- feat-a-body.txt --
+<!-- av pr metadata
+```
+{"parent":"main","trunk":"main"}
+```
+-->
+-- feat-b-body.txt --
+<!-- av pr metadata
+```
+{"parent":"feat-a","parentPull":1,"trunk":"main"}
+```
+-->
+-- rel-a-body.txt --
+<!-- av pr metadata
+```
+{"parent":"release-1.2","trunk":"release-1.2"}
+```
+-->
