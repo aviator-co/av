@@ -63,6 +63,19 @@ type Sequencer struct {
 	DetachedWorktrees map[string]string
 	// Branches skipped due to dirty worktrees. Maps branch name (short) to reason.
 	SkippedBranches map[string]string
+	// Commits dropped by the user via --skip while resolving rebase conflicts.
+	// These commits are NOT part of the rebased branches.
+	SkippedCommits []SkippedCommit
+}
+
+// SkippedCommit identifies a commit dropped via --skip during a rebase conflict.
+type SkippedCommit struct {
+	// The branch the commit was dropped from.
+	Branch plumbing.ReferenceName
+	// The full commit hash.
+	Hash string
+	// The commit's subject line.
+	Subject string
 }
 
 func NewSequencer(remoteName string, db meta.DB, ops []RestackOp) *Sequencer {
@@ -161,6 +174,16 @@ func (seq *Sequencer) runFromInterruptedState(
 		return result, nil
 	}
 	if seqSkip {
+		// Record the commit being dropped before it disappears from the rebase;
+		// REBASE_HEAD is the commit the rebase stopped on.
+		if hash, err := repo.Git(ctx, "rev-parse", "REBASE_HEAD"); err == nil && hash != "" {
+			subject, _ := repo.Git(ctx, "log", "-1", "--format=%s", hash)
+			seq.SkippedCommits = append(seq.SkippedCommits, SkippedCommit{
+				Branch:  seq.CurrentSyncRef,
+				Hash:    hash,
+				Subject: subject,
+			})
+		}
 		result, err := repo.RebaseParse(ctx, git.RebaseOpts{Skip: true})
 		if err != nil {
 			return nil, errors.Errorf("failed to skip in-progress rebase: %v", err)

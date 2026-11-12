@@ -1,0 +1,33 @@
+# A commit dropped with `restack --skip` must be reported in the final output.
+# Without the report, the restack ends with a green "done" tree and the skipped
+# commit silently disappears from the branch.
+
+exec av branch stack-1
+commit-file my-file '1a\n' 'Commit 1a'
+exec av branch stack-2
+commit-file my-file '1a\n2a\n' 'Commit 2a'
+commit-file other-file 'safe\n' 'Commit 2b'
+
+# Conflicting commit on the parent branch.
+exec git checkout stack-1
+commit-file my-file '1a\n1b\n' 'Commit 1b'
+
+# Rebasing stack-2 conflicts on 'Commit 2a'.
+! exec av restack
+stdout 'could not apply.*Commit 2a'
+
+# Skip the conflicting commit; 'Commit 2b' applies cleanly and the restack
+# completes — but the output must name the dropped commit.
+exec av restack --skip
+stdout 'commit\(s\) were dropped with --skip'
+stdout 'Commit 2a \(was on stack-2\)'
+stdout 'git cherry-pick'
+
+# The skipped commit's change is really gone from stack-2, the clean commit survives.
+exec git checkout stack-2
+cmp my-file $WORK/expected-my-file.txt
+exec cat other-file
+
+-- expected-my-file.txt --
+1a
+1b
