@@ -40,7 +40,7 @@ func (d *DB) WriteTx() meta.WriteTx {
 	// aborted/committed in order to prevent other transactions from modifying
 	// the state.
 	d.stateMu.Lock()
-	return &writeTx{d, readTx{d.state.copy()}}
+	return &writeTx{db: d, readTx: readTx{d.state.copy()}}
 }
 
 var _ meta.DB = &DB{}
