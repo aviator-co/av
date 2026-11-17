@@ -5,12 +5,12 @@ repos:
         name: goimports
         files: ".+.go$"
         language: system
-        entry: sh -c 'go run golang.org/x/tools/cmd/goimports@latest -w .'
+        entry: sh -c 'go tool goimports -w .'
       - id: gofumpt
         name: gofumpt
         files: ".+.go$"
         language: system
-        entry: sh -c 'go run mvdan.cc/gofumpt@latest -l -w .'
+        entry: sh -c 'go tool gofumpt -l -w .'
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -22,7 +22,7 @@ repos:
   - repo: https://github.com/python-jsonschema/check-jsonschema
     rev: 0.38.0
     hooks:
-      - id: check-dependabot
+      - id: check-renovate
       - id: check-github-actions
       - id: check-github-workflows
 

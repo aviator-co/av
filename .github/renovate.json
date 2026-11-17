@@ -1,0 +1,45 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":enablePreCommit"
+  ],
+  "enabledManagers": ["gomod", "github-actions", "pre-commit"],
+  "postUpdateOptions": ["gomodTidy"],
+  "minimumReleaseAge": "7 days",
+  "prConcurrentLimit": 0,
+  "prHourlyLimit": 0,
+  "vulnerabilityAlerts": { "enabled": false },
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "matchDepTypes": ["golang"],
+      "rangeStrategy": "bump"
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "go dependencies"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "github actions"
+    },
+    {
+      "matchManagers": ["pre-commit"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "pre-commit hooks"
+    },
+    {
+      "matchPackageNames": [
+        "github.com/golangci/golangci-lint/v2",
+        "golangci/golangci-lint"
+      ],
+      "groupName": "golangci-lint"
+    }
+  ]
+}
