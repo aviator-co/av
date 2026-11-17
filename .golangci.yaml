@@ -57,6 +57,10 @@ linters:
     - whitespace
   exclusions:
     generated: lax
+    rules:
+      - linters:
+          - govet
+        text: "cannot inline: type parameter inference is not yet supported"
     presets:
       - comments
       - common-false-positives
