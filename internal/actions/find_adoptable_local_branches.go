@@ -15,6 +15,7 @@ import (
 )
 
 func NewFindAdoptableLocalBranchesModel(
+	ctx context.Context,
 	repo *git.Repo,
 	db meta.DB,
 	onDone func(
@@ -24,6 +25,7 @@ func NewFindAdoptableLocalBranchesModel(
 	) tea.Cmd,
 ) tea.Model {
 	return &FindAdoptableLocalBranchesModel{
+		ctx:     func() context.Context { return ctx },
 		repo:    repo,
 		db:      db,
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
@@ -32,6 +34,7 @@ func NewFindAdoptableLocalBranchesModel(
 }
 
 type FindAdoptableLocalBranchesModel struct {
+	ctx     func() context.Context
 	repo    *git.Repo
 	db      meta.DB
 	spinner spinner.Model
@@ -49,7 +52,7 @@ func (m *FindAdoptableLocalBranchesModel) Init() tea.Cmd {
 		if err != nil {
 			return err
 		}
-		branches, err := treedetector.DetectBranches(context.Background(), m.repo, unmanagedBranches)
+		branches, err := treedetector.DetectBranches(m.ctx(), m.repo, unmanagedBranches)
 		if err != nil {
 			return err
 		}
