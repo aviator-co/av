@@ -5,10 +5,19 @@ import (
 	"os"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"emperror.dev/errors"
+	"github.com/aviator-co/av/internal/actions"
+	"github.com/aviator-co/av/internal/git"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/utils/uiutils"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
+
+var orphanFlags struct {
+	Yes bool
+}
 
 var orphanCmd = &cobra.Command{
 	Use:   "orphan",
@@ -32,34 +41,141 @@ To manage orphaned branches with av again, re-adopt them with "av adopt".`),
 		if err != nil {
 			return err
 		}
-		tx := db.WriteTx()
-		defer tx.Abort()
 
-		currentBranch, err := repo.CurrentBranchName()
+		branchesToOrphan, err := collectBranchesToOrphan(repo, db.ReadTx())
 		if err != nil {
-			return errors.WrapIf(err, "failed to determine current branch")
-		}
-
-		subsequentBranches := meta.SubsequentBranches(tx, currentBranch)
-
-		var branchesToOrphan []string
-		branchesToOrphan = append(branchesToOrphan, currentBranch)
-		branchesToOrphan = append(branchesToOrphan, subsequentBranches...)
-
-		for _, branch := range branchesToOrphan {
-			tx.DeleteBranch(branch)
-		}
-
-		if err := tx.Commit(); err != nil {
 			return err
 		}
 
-		fmt.Fprintf(
-			os.Stderr,
-			"These branched are orphaned: %s\n",
-			strings.Join(branchesToOrphan, ", "),
-		)
+		if len(branchesToOrphan) > 1 && !orphanFlags.Yes {
+			if !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
+				// Without a terminal on both ends the prompt is either unanswerable
+				// or invisible (RunBubbleTea drops the renderer), so refuse rather
+				// than let Enter pick the default unseen.
+				return errors.Errorf(
+					"refusing to orphan %d branches without confirmation; pass --yes to orphan %s",
+					len(branchesToOrphan),
+					strings.Join(branchesToOrphan, ", "),
+				)
+			}
+			return uiutils.RunBubbleTea(&orphanConfirmViewModel{
+				db:               db,
+				branchesToOrphan: branchesToOrphan,
+			})
+		}
 
-		return nil
+		return orphanBranches(db, branchesToOrphan)
 	},
+}
+
+// orphanConfirmViewModel asks before orphaning more than one branch.
+type orphanConfirmViewModel struct {
+	db               meta.DB
+	branchesToOrphan []string
+
+	uiutils.BaseStackedView
+}
+
+// orphanedBranchesMsg reports that the branches were orphaned.
+type orphanedBranchesMsg struct{}
+
+// Init shows the Yes/No prompt; No quits without orphaning.
+func (vm *orphanConfirmViewModel) Init() tea.Cmd {
+	return vm.AddView(&uiutils.NewlineModel{Model: uiutils.NewPromptModel(
+		orphanConfirmPrompt(vm.branchesToOrphan),
+		[]string{"Yes", "No"},
+		func(choice string) tea.Cmd {
+			if choice == "No" {
+				return tea.Quit
+			}
+			return vm.orphanBranches()
+		},
+	)})
+}
+
+// Update quits once the branches are orphaned.
+func (vm *orphanConfirmViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg.(type) {
+	case orphanedBranchesMsg:
+		return vm, tea.Quit
+	}
+	return vm, vm.BaseStackedView.Update(msg)
+}
+
+// View renders the stacked prompt view.
+func (vm *orphanConfirmViewModel) View() tea.View {
+	return vm.BaseStackedView.View()
+}
+
+// ExitError exits non-zero when orphaning failed; the error was already shown.
+func (vm *orphanConfirmViewModel) ExitError() error {
+	if vm.Err != nil {
+		return actions.ErrExitSilently{ExitCode: 1}
+	}
+	return nil
+}
+
+// orphanBranches orphans the branches off the UI goroutine.
+func (vm *orphanConfirmViewModel) orphanBranches() tea.Cmd {
+	return func() tea.Msg {
+		if err := orphanBranches(vm.db, vm.branchesToOrphan); err != nil {
+			return err
+		}
+		return orphanedBranchesMsg{}
+	}
+}
+
+// orphanConfirmPrompt names every branch the confirmation would orphan.
+func orphanConfirmPrompt(branchesToOrphan []string) string {
+	return fmt.Sprintf(
+		"Orphaning %d branches will stop av from tracking: %s. Re-adoption is one-by-one. Continue?",
+		len(branchesToOrphan),
+		strings.Join(branchesToOrphan, ", "),
+	)
+}
+
+// collectBranchesToOrphan returns the current branch followed by its
+// managed descendants.
+func collectBranchesToOrphan(repo *git.Repo, tx meta.ReadTx) ([]string, error) {
+	currentBranch, err := repo.CurrentBranchName()
+	if err != nil {
+		return nil, errors.WrapIf(err, "failed to determine current branch")
+	}
+
+	branchesToOrphan := []string{currentBranch}
+	branchesToOrphan = append(branchesToOrphan, meta.SubsequentBranches(tx, currentBranch)...)
+	return branchesToOrphan, nil
+}
+
+// orphanBranches deletes the branches' av metadata in one transaction; the
+// git branches themselves are left alone.
+func orphanBranches(db meta.DB, branchesToOrphan []string) error {
+	tx := db.WriteTx()
+	defer tx.Abort()
+
+	for _, branch := range branchesToOrphan {
+		tx.DeleteBranch(branch)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(
+		os.Stderr,
+		"These branches are orphaned: %s\n",
+		strings.Join(branchesToOrphan, ", "),
+	)
+
+	return nil
+}
+
+func init() {
+	orphanCmd.Flags().BoolVarP(
+		&orphanFlags.Yes,
+		"yes",
+		"y",
+		false,
+		"orphan multiple branches without prompting for confirmation",
+	)
 }
