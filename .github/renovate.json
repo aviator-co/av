@@ -6,19 +6,13 @@
     ":enablePreCommit"
   ],
   "enabledManagers": ["gomod", "github-actions", "pre-commit"],
-  "postUpdateOptions": ["gomodTidy"],
+  "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"],
   "minimumReleaseAge": "7 days",
   "prConcurrentLimit": 0,
   "prHourlyLimit": 0,
   "vulnerabilityAlerts": { "enabled": false },
   "labels": ["dependencies"],
   "packageRules": [
-    {
-      "matchManagers": ["gomod"],
-      "matchDepNames": ["go"],
-      "matchDepTypes": ["golang"],
-      "rangeStrategy": "bump"
-    },
     {
       "matchManagers": ["gomod"],
       "matchUpdateTypes": ["minor", "patch"],
@@ -35,11 +29,18 @@
       "groupName": "pre-commit hooks"
     },
     {
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "matchDepTypes": ["golang"],
+      "rangeStrategy": "bump",
+      "groupName": "go and golangci-lint"
+    },
+    {
       "matchPackageNames": [
         "github.com/golangci/golangci-lint/v2",
         "golangci/golangci-lint"
       ],
-      "groupName": "golangci-lint"
+      "groupName": "go and golangci-lint"
     }
   ]
 }
