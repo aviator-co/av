@@ -5,11 +5,11 @@ go 1.27.4
 require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.1
+	charm.land/glamour/v2 v2.0.1
 	charm.land/lipgloss/v2 v2.1.0
 	emperror.dev/errors v0.8.1
 	github.com/adrg/xdg v0.5.3
 	github.com/chainguard-dev/git-urls v1.0.2
-	github.com/charmbracelet/glamour v1.0.0
 	github.com/dustin/go-humanize v1.1.0
 	github.com/erikgeiser/promptkit v0.12.0
 	github.com/fatih/color v1.19.0
@@ -81,10 +81,8 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charithe/durationcheck v0.0.11 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
-	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4 // indirect
 	github.com/charmbracelet/x/ansi v0.11.9 // indirect
-	github.com/charmbracelet/x/cellbuf v0.0.15 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20260316093931-f2fb44ab3145 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect

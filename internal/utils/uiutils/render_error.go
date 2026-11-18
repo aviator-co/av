@@ -3,10 +3,10 @@ package uiutils
 import (
 	"fmt"
 
+	"charm.land/glamour/v2"
+	"charm.land/glamour/v2/styles"
 	"emperror.dev/errors"
 	"github.com/aviator-co/av/internal/utils/colors"
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/glamour/styles"
 )
 
 var (
