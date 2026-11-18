@@ -29,6 +29,10 @@ type Branch struct {
 	ExcludeFromSyncAll bool `json:"excludeFromSyncAll,omitempty"`
 }
 
+func (b *Branch) IsMerged() bool {
+	return b.MergeCommit != "" || (b.PullRequest != nil && b.PullRequest.State == githubv4.PullRequestStateMerged)
+}
+
 func (b *Branch) IsStackRoot() bool {
 	return b.Parent.Trunk
 }

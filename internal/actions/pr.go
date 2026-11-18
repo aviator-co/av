@@ -136,6 +136,34 @@ func getExistingOpenPR(
 	return nil, nil
 }
 
+// checkParentNotMerged returns an error if the parent branch has been merged.
+// Only av sync records merges, so the metadata may be stale and the parent's PR
+// state is refreshed from GitHub first. A failed refresh doesn't block the PR.
+func checkParentNotMerged(
+	ctx context.Context,
+	client *gh.Client,
+	tx meta.WriteTx,
+	parent meta.BranchState,
+) error {
+	if parent.Name == "" || parent.Trunk {
+		return nil
+	}
+	parentMeta, _ := tx.Branch(parent.Name)
+	if parentMeta.PullRequest != nil && !parentMeta.IsMerged() {
+		if _, err := UpdatePullRequestState(ctx, client, tx, parent.Name); err != nil {
+			logrus.WithError(err).Debug("failed to refresh the parent pull request state")
+		}
+		parentMeta, _ = tx.Branch(parent.Name)
+	}
+	if parentMeta.IsMerged() {
+		return errors.Errorf(
+			"failed to create a pull request. The parent branch %q has already been merged\nPlease run 'av sync' to rebase the branch first.",
+			parent.Name,
+		)
+	}
+	return nil
+}
+
 // CreatePullRequest creates a pull request on GitHub for the current branch, if
 // one doesn't already exist.
 func CreatePullRequest(
@@ -151,6 +179,10 @@ func CreatePullRequest(
 
 	repoMeta := tx.Repository()
 	branchMeta, _ := tx.Branch(opts.BranchName)
+
+	if err := checkParentNotMerged(ctx, client, tx, branchMeta.Parent); err != nil {
+		return nil, err
+	}
 
 	var existingPR *gh.PullRequest
 	if !opts.Force {
@@ -276,14 +308,6 @@ func CreatePullRequest(
 	}
 	if commitsList == "" {
 		return nil, errors.Errorf("no commits between %q and %q", prCompareRef, opts.BranchName)
-	}
-
-	// Check if a parent branch has already been merged or not
-	if parentMeta.MergeCommit != "" {
-		return nil, errors.Errorf(
-			"failed to create a pull request. The parent branch %q has already been merged\nPlease run 'av sync' to rebase the branch first.",
-			parentMeta.Name,
-		)
 	}
 
 	if existingPR != nil {

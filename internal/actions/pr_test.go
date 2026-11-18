@@ -1,10 +1,12 @@
 package actions_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/aviator-co/av/internal/actions"
 	"github.com/aviator-co/av/internal/meta"
+	"github.com/aviator-co/av/internal/meta/jsonfiledb"
 	"github.com/aviator-co/av/internal/utils/maputils"
 	"github.com/aviator-co/av/internal/utils/stackutils"
 	"github.com/stretchr/testify/assert"
@@ -262,4 +264,25 @@ func (tx fakeReadTx) Branch(name string) (meta.Branch, bool) {
 
 func (tx fakeReadTx) AllBranches() map[string]meta.Branch {
 	return maputils.Copy(tx)
+}
+
+func TestCreatePullRequestMergedParent(t *testing.T) {
+	for name, parent := range map[string]meta.Branch{
+		"merge commit": {Name: "parent", MergeCommit: "abc123"},
+		"merged PR":    {Name: "parent", PullRequest: &meta.PullRequest{State: "MERGED"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db, _, err := jsonfiledb.OpenPath(filepath.Join(t.TempDir(), "av.json"))
+			require.NoError(t, err)
+			tx := db.WriteTx()
+			defer tx.Abort()
+			tx.SetBranch(parent)
+			tx.SetBranch(meta.Branch{Name: "child", Parent: meta.BranchState{Name: "parent"}})
+			// A nil repo and client panic on any git or GitHub call, so this
+			// also proves the check runs first.
+			result, err := actions.CreatePullRequest(t.Context(), nil, nil, tx, actions.CreatePullRequestOpts{BranchName: "child"})
+			assert.Nil(t, result)
+			require.EqualError(t, err, "failed to create a pull request. The parent branch \"parent\" has already been merged\nPlease run 'av sync' to rebase the branch first.")
+		})
+	}
 }
