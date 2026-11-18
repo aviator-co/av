@@ -2,6 +2,7 @@ package sequencerui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
@@ -217,6 +218,26 @@ func (vm *RestackModel) View() tea.View {
 			}
 			sb.WriteString("\n")
 		}
+	}
+	if vm.state != nil && vm.state.Seq != nil && vm.state.Seq.CurrentSyncRef == "" &&
+		len(vm.state.Seq.SkippedCommits) > 0 {
+		sb.WriteString("\n")
+		sb.WriteString(colors.FailureStyle.Render(
+			fmt.Sprintf(
+				"⚠ %d commit(s) were dropped with --skip and are NOT in the restacked branches:",
+				len(vm.state.Seq.SkippedCommits),
+			),
+		) + "\n")
+		for _, sc := range vm.state.Seq.SkippedCommits {
+			hash := sc.Hash
+			if len(hash) > 7 {
+				hash = hash[:7]
+			}
+			sb.WriteString("  " + hash + " " + sc.Subject + " (was on " + sc.Branch.Short() + ")\n")
+		}
+		sb.WriteString(
+			colors.Faint("Recover a dropped commit with: git cherry-pick <hash>") + "\n",
+		)
 	}
 	if len(vm.worktreeMessages) > 0 {
 		sb.WriteString("\n")
