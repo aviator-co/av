@@ -1,11 +1,11 @@
 module github.com/aviator-co/av
 
-go 1.26.0
+go 1.26.7
 
 require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.1
-	charm.land/lipgloss/v2 v2.0.6
+	charm.land/lipgloss/v2 v2.1.0
 	emperror.dev/errors v0.8.1
 	github.com/adrg/xdg v0.5.3
 	github.com/chainguard-dev/git-urls v1.0.2
@@ -26,7 +26,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
-	golang.org/x/mod v0.42.0
+	golang.org/x/mod v0.43.0
 	golang.org/x/oauth2 v0.38.0
 )
 
